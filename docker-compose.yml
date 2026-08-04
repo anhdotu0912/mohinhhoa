@@ -1,16 +1,18 @@
-version: "3.8"
-
 services:
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=sqlite:///./app.db
+      - CHROMA_DIR=./chroma_db
     volumes:
-      - ./data:/app/data
+      - ./backend/data:/app/data
+      - ./backend/chroma_db:/app/chroma_db
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
