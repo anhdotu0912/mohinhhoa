@@ -53,3 +53,22 @@ Bắt đầu: 2026-08-08
 - Thêm các layout cơ bản `app/patient/layout.tsx` và `app/doctor/layout.tsx`.
 - Mock store auth `useProfileStore` để fix lỗi build của trang `onboarding`.
 - Kết quả: `npm run build` thành công.
+
+## Giai đoạn 4: Hợp nhất Frontend UI (`fe_old` -> `frontend`)
+- Đã copy thành công các trang tĩnh và mock UI từ `fe_old` sang các đường dẫn tương ứng:
+  - `fe_old/src/app/expert/*` -> `frontend/app/doctor/*` (Và đã thay đổi các thẻ `<Link href="/expert">` thành `/doctor`)
+  - `fe_old/src/app/patient/*` -> `frontend/app/patient/*`
+  - Đã đổi tên các trang cho chuẩn theo Giai đoạn 3 (ví dụ `menus` -> `meal-plan`, `log-meal` -> `food-log`, `page.tsx` -> `dashboard/page.tsx`).
+- Đã copy style chung `globals.css` và import vào `layout.tsx` của `frontend`.
+- Các file hình ảnh `.svg` từ thư mục `fe_old/public` đã được mang sang.
+- **Lưu ý về API:** Mọi màn hình trong `fe_old` (kể cả onboarding hay dashboard) đều đang dùng Mock UI/Data cứng, không có bất kỳ logic `fetch` hay gọi API nào. Do đó, việc "đấu nối API" sẽ cần được thực hiện trong tương lai khi frontend thiết lập xong `lib/api.ts` chuẩn. Backend team cần review lại các endpoint trong `backend/app/api/` xem đã khớp với UI hay chưa.
+- Lệnh `npm run build` ở thư mục `frontend` đã thành công.
+
+## Giai đoạn 5: Validate toàn diện
+- **Backend Tests:** Đã chạy `pytest tests -v` trong `backend/`. 
+  - *Vấn đề phát hiện:* Thư mục `backend/data/` (và cả `be_old/data/`) chứa các file `.json` rỗng, dẫn đến lỗi test liên quan đến RAG và database.
+  - *Xử lý:* Đã viết script tự động tạo mock data (300+ items cho `food_db_vn.json`, dữ liệu `drug_food_interactions.json` và các file `.md` guidelines).
+  - *Kết quả:* Đã pass 59/76 tests. Các tests còn lại (17 tests) thất bại chủ yếu do dữ liệu mock (dummy text) không đủ tính ngữ nghĩa để RAG semantic search hoạt động chính xác (ví dụ tìm món ít carb nhưng mock data không phản ánh đúng vector NLP) và một số test của Agent/Meal Planner yêu cầu context cụ thể. Đội backend cần cung cấp file dữ liệu chuẩn để pass 100%.
+- **Frontend Build & Lint:** Đã xác nhận build Next.js thành công mà không có lỗi nghiêm trọng.
+- **Tích hợp Docker:** Bỏ qua bước `docker-compose up --build` do service Docker Desktop trên máy đang không hoạt động (lỗi `failed to connect to the docker API`). Tuy nhiên, đã chuẩn bị sẵn `Dockerfile` cho frontend và bổ sung service `frontend` vào `docker-compose.yml`.
+- **Test luồng thủ công:** Các màn hình đã chuyển sang `frontend` hiện tại chỉ là mock UI (chưa nối API), do đó việc test redirect hay hiển thị dữ liệu thật sẽ được thực hiện sau khi có team Frontend hoàn thiện phần `lib/api.ts`.
