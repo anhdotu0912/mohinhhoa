@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useProfileStore } from "../../store/useProfileStore";
+import { useProfileStore } from "../../../store/useProfileStore";
 
 const DISEASES = [
   { id: "diabetes_t2", label: "Đái tháo đường type 2" },
