@@ -36,9 +36,9 @@ graph TB
 ## Components
 
 ### 1. Frontend (React/Next.js)
-- **Purpose:** [mô tả]
-- **Key Features:** [danh sách]
-- **State Management:** [approach]
+- **Purpose:** Cung cấp giao diện tương tác cho người dùng.
+- **Key Features:** Hỗ trợ đa vai trò (Bệnh nhân và Bác sĩ/Chuyên gia dinh dưỡng) với các App Router riêng rẽ (`/patient/*` và `/doctor/*`).
+- **State Management:** Zustand (dự kiến).
 
 ### 2. Backend (FastAPI)
 - **Purpose:** [mô tả]
