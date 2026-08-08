@@ -32,3 +32,24 @@ Bắt đầu: 2026-08-08
 | **NEW** | Tất cả file trong `src/app/expert/*` và `src/app/patient/*` | Chuyển đổi theo cấu trúc mới |
 | **CONFLICT** | `package.json`, `tsconfig.json` | Cần đối chiếu và merge |
 | **SKIP** | `next.config.ts`, `eslint.config.mjs`, `README.md` | Bỏ qua do `frontend` đã có |
+
+## Giai đoạn 2: Di chuyển Backend (be_old → backend)
+- Đã copy tất cả các file NEW từ `be_old` sang `backend/app/...` đúng vị trí.
+- Đã đối chiếu các file CONFLICT:
+  - Tất cả các file trong `app/` (ngoại trừ vài file như `core/config.py`, `main.py`, `schemas/food_log.py`) ở `backend/` trước đó chỉ là placeholder (`"""Placeholder"""`).
+  - Đã overwrite các file placeholder bằng code thực tế từ `be_old/`.
+  - Cập nhật thủ công `requirements.txt` bằng cách thêm `rank-bm25` và `unidecode`.
+  - Copy đè các file `app/core/config.py`, `app/main.py`, `app/schemas/food_log.py` vì chúng chứa code chi tiết hơn.
+- Không có thư mục `data` trong `be_old`, giữ nguyên `backend/data`.
+- Đang chạy pytest với môi trường ảo.
+
+## Giai đoạn 3: Tái cấu trúc Frontend
+- Đã tạo các thư mục phân quyền: `app/patient`, `app/doctor`, `components/patient`, `components/doctor`, `components/shared`.
+- Chuyển các page hiện có vào đúng thư mục:
+  - `dashboard`, `food-log`, `meal-plan`, `onboarding` -> `app/patient/`
+  - `dietitian` -> `app/doctor/`
+- Đã fix lỗi file `next.config.ts` (đổi thành `next.config.mjs`) và copy `eslint.config.mjs` từ `fe_old` sang để hỗ trợ lint/build.
+- Sửa lại file `app/page.tsx` để có redirect link theo vai trò.
+- Thêm các layout cơ bản `app/patient/layout.tsx` và `app/doctor/layout.tsx`.
+- Mock store auth `useProfileStore` để fix lỗi build của trang `onboarding`.
+- Kết quả: `npm run build` thành công.
