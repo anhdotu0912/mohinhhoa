@@ -235,6 +235,16 @@ def test_chat_thin_wrapper(client):
     assert data["message"]
 
 
+def test_chat_empty_message_rejected(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"message": ""},
+    )
+    assert response.status_code == 422
+
+
 def test_meal_plan_not_found(client):
     headers = _login(client, PATIENT)
     response = client.get("/api/v1/meal-plans/does-not-exist", headers=headers)
