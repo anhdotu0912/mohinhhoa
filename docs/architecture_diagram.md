@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TB
-    User([User]) --> UI[Frontend<br/>React/Next.js]
+    User([User: Bệnh nhân/Bác sĩ]) --> UI[Frontend<br/>Next.js App Router]
     UI -->|REST API| API[FastAPI Backend]
     API --> Agent[LangGraph Agent]
     Agent --> LLM[LLM Service<br/>GPT-4o / Gemini]
