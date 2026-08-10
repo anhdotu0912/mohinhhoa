@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TopBar } from "@/components/shared/TopBar";
 
 export default function PatientHistoryPage() {
   const pastMeals = [
@@ -23,6 +24,20 @@ export default function PatientHistoryPage() {
   ];
 
   return (
+    <>
+      <TopBar
+        title="Lịch sử & tiến độ"
+        rightSlot={
+          <div className="relative hidden sm:flex items-center border border-outline-variant rounded-lg px-3 py-1.5 bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors text-xs">
+            <span className="font-body text-body text-on-surface mr-2 font-medium">
+              7 ngày qua
+            </span>
+            <span className="material-symbols-outlined text-on-surface-variant text-[18px]">
+              calendar_today
+            </span>
+          </div>
+        }
+      />
     <main className="flex-1 overflow-y-auto p-md md:p-xl w-full flex justify-center">
       <div className="w-full max-w-[900px] flex flex-col gap-section-gap">
         {/* Health Trends Chart Card */}
@@ -132,5 +147,6 @@ export default function PatientHistoryPage() {
         </section>
       </div>
     </main>
+    </>
   );
 }

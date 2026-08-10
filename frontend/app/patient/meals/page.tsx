@@ -1,8 +1,36 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { TopBar } from "@/components/shared/TopBar";
+
 export default function PatientMealsPage() {
   return (
+    <>
+      <TopBar
+        title="Thực đơn hôm nay"
+        rightSlot={
+          <div className="flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg p-1 shadow-sm">
+            <button
+              type="button"
+              className="p-1 hover:bg-surface-container-low rounded text-on-surface-variant transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">chevron_left</span>
+            </button>
+            <div className="px-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-sm">
+                calendar_month
+              </span>
+              <span className="font-body-bold text-on-surface text-sm">Thứ Hai, 16/10</span>
+            </div>
+            <button
+              type="button"
+              className="p-1 hover:bg-surface-container-low rounded text-on-surface-variant transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+            </button>
+          </div>
+        }
+      />
     <main className="flex-1 w-full p-lg min-h-[calc(100vh-64px)] flex justify-center">
       <div className="w-full max-w-[800px] flex flex-col gap-section-gap py-md">
         {/* Progress / Summary Card */}
@@ -235,5 +263,6 @@ export default function PatientMealsPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

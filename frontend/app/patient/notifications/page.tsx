@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { TopBar } from "@/components/shared/TopBar";
 
 export default function PatientNotificationsPage() {
   return (
+    <>
+      <TopBar title="Thông báo" />
     <main className="flex-1 w-full p-4 md:p-8 pb-12">
       <div className="max-w-[800px] mx-auto w-full">
         <div className="flex flex-col gap-4">
@@ -97,5 +100,6 @@ export default function PatientNotificationsPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

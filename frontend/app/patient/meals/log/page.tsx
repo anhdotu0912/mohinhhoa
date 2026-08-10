@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TopBar } from "@/components/shared/TopBar";
 
 interface MealState {
   type: "as_planned" | "custom";
@@ -22,6 +23,8 @@ export default function PatientMealLogPage() {
   };
 
   return (
+    <>
+      <TopBar title="Ghi nhận bữa ăn" />
     <main className="flex-1 w-full p-lg">
       <div className="max-w-[800px] mx-auto flex flex-col gap-section-gap">
         {/* Title Header */}
@@ -203,5 +206,6 @@ export default function PatientMealLogPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

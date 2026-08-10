@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { TopBar } from "@/components/shared/TopBar";
 
 interface Message {
   id: string;
@@ -96,6 +97,16 @@ export default function PatientAssistantPage() {
   };
 
   return (
+    <>
+      <TopBar
+        title="Trợ lý AI"
+        rightSlot={
+          <span className="px-sm py-[2px] rounded-full bg-primary/10 text-primary font-label text-xs border border-primary/20 flex items-center gap-xs">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            Đang hoạt động
+          </span>
+        }
+      />
     <div className="flex-1 flex h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Column 1: Lịch sử trò chuyện (Left Panel - 240px) */}
       {showHistory && (
@@ -411,5 +422,6 @@ export default function PatientAssistantPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

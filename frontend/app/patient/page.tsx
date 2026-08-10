@@ -1,8 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { TopBar } from "@/components/shared/TopBar";
 
 export default function PatientDashboardPage() {
   return (
+    <>
+      <TopBar title="Chào, Nguyễn Văn A" />
     <main className="flex-1 p-md md:p-lg lg:p-xl flex flex-col gap-section-gap max-w-container-max-width mx-auto w-full">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg items-start">
         {/* Left Column (65%) - Today's Meal Plan */}
@@ -150,5 +153,6 @@ export default function PatientDashboardPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

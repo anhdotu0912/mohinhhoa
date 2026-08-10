@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { TopBar } from "@/components/shared/TopBar";
 
 interface Message {
   id: string;
@@ -10,6 +11,9 @@ interface Message {
   time: string;
   avatar?: string;
 }
+
+const DOCTOR_HEADER_AVATAR =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuC5r_ZeLtWNoVeKuK3GOSjuEdF1_-FpUL5Af3hmrd7IbG7wEyzqvCNJQDjwV_qhNXWYvy1UuM9Gtrp1Ti9xMrCeTe42VvCmSMzcQ7zPhjEWuVElrSGJg0DpOiZNM-Tlb1Jsd2t-sxGpKsKLGnMNN2o8HCHRfuQcyhMrmQlNyLsoDgLyRLgQjsWag0pST3a_RZLkVOyZKis7Yv8iItxC-m4oUxgsHiCmZ6WegmYP55ItbhRY62snjVL-lw";
 
 export default function PatientMessagesPage() {
   const [messages, setMessages] = useState<Message[]>([
@@ -94,6 +98,49 @@ export default function PatientMessagesPage() {
   };
 
   return (
+    <>
+      <TopBar
+        title="Bác sĩ Minh"
+        showUtilities={false}
+        leftSlot={
+          <div className="flex items-center gap-md">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant">
+                <img
+                  alt="Dr. Minh"
+                  className="w-full h-full object-cover"
+                  src={DOCTOR_HEADER_AVATAR}
+                />
+              </div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#2F8F7A] border-2 border-surface-container-lowest rounded-full"></div>
+            </div>
+            <div>
+              <h1 className="font-h2 text-h2 text-on-surface tracking-tight font-semibold text-base">
+                Bác sĩ Minh
+              </h1>
+              <p className="font-caption text-caption text-on-surface-variant text-xs">
+                Chuyên gia Dinh dưỡng
+              </p>
+            </div>
+          </div>
+        }
+        rightSlot={
+          <div className="flex items-center gap-sm">
+            <button
+              type="button"
+              className="p-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[24px]">call</span>
+            </button>
+            <button
+              type="button"
+              className="p-sm text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[24px]">more_vert</span>
+            </button>
+          </div>
+        }
+      />
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Chat Thread Canvas */}
       <div className="flex-1 overflow-y-auto chat-scroll p-md md:p-lg flex flex-col items-center">
@@ -206,5 +253,6 @@ export default function PatientMessagesPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
