@@ -138,36 +138,101 @@ P-014
 │   └── results
 │       └── report.md
 ├── frontend
+│   ├── api
 │   ├── app
-│   │   ├── dashboard
+│   │   ├── (auth)
+│   │   ├── doctor
+│   │   │   ├── messages
+│   │   │   │   ├── [conversationId]
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── patients
+│   │   │   │   ├── [patientId]
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── compliance
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── constraints
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── reviews
+│   │   │   │   ├── [planId]
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
 │   │   │   └── page.tsx
-│   │   ├── dietitian
+│   │   ├── patient
+│   │   │   ├── assistant
+│   │   │   │   └── page.tsx
+│   │   │   ├── history
+│   │   │   │   └── page.tsx
+│   │   │   ├── meals
+│   │   │   │   ├── log
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── messages
+│   │   │   │   └── page.tsx
+│   │   │   ├── notifications
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
 │   │   │   └── page.tsx
-│   │   ├── food-log
-│   │   │   └── page.tsx
-│   │   ├── meal-plan
-│   │   │   └── page.tsx
-│   │   ├── onboarding
-│   │   │   └── page.tsx
+│   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── components
-│   │   ├── alerts
-│   │   ├── chat
-│   │   ├── food-log
-│   │   ├── meal-plan
-│   │   └── ui
+│   │   └── shared
+│   │       ├── AppShell.tsx
+│   │       ├── MobileMenuContext.tsx
+│   │       ├── Sidebar.tsx
+│   │       └── TopBar.tsx
+│   ├── hooks
 │   ├── lib
-│   │   ├── api.ts
-│   │   └── types.ts
+│   │   └── nav-config.ts
+│   ├── public
+│   ├── services
 │   ├── store
-│   │   ├── useMealPlanStore.ts
-│   │   └── useProfileStore.ts
+│   ├── utils
 │   ├── .env.local.example
+│   ├── .eslintrc.json
+│   ├── Dockerfile
+│   ├── eslint.config.mjs
 │   ├── next-env.d.ts
+│   ├── next.config.mjs
 │   ├── package-lock.json
 │   ├── package.json
-│   └── tsconfig.json
+│   ├── postcss.config.mjs
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   └── tsconfig.tsbuildinfo
+├── ui
+│   └── stitch_vmec_10_health_assistant
+│       ├── compliance
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── constraints
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── dashboard
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── landing
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── messages
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── patients
+│       │   └── [patientId]
+│       │       ├── code.html
+│       │       └── screen.png
+│       ├── reviews
+│       │   ├── code.html
+│       │   └── screen.png
+│       ├── reviews_
+│       │   ├── code.html
+│       │   └── screen.png
+│       └── sign-in
+│           ├── code.html
+│           └── screen.png
 ├── presentation
 │   └── README.md
 ├── scripts
@@ -196,6 +261,7 @@ P-014
 ├── .gitignore
 ├── ARCHITECTURE.md
 ├── CLAUDE.md
+├── FRONTEND_STRUCTURE.md
 ├── JOURNAL.md
 ├── Makefile
 ├── README.md
