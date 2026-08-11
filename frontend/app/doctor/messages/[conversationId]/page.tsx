@@ -1,4 +1,7 @@
+"use client";
+
 import DoctorMessagesPage from "../page";
 
-export default DoctorMessagesPage;
-
+export default function ConversationDetailPage() {
+  return <DoctorMessagesPage />;
+}

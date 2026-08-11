@@ -60,8 +60,11 @@ class Swap(BaseModel):
 
 
 class MealPlanOutput(BaseModel):
-    """Full 7-day meal plan output — contract §1.2."""
+    """Full multi-day meal plan output — contract §1.2."""
     id: str = ""
+    variant_group_id: str | None = None
+    variant_index: int | None = None
+    total_variants: int | None = None
     user_id: str = ""
     profile_snapshot: dict = Field(default_factory=dict)
     days: list[DayPlan] = Field(default_factory=list)

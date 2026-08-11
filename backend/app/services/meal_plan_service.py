@@ -38,6 +38,9 @@ def get_profile(db: Session, user_id: str) -> PatientProfile:
 def _persist_plan(db: Session, user_id: str, plan: MealPlanOutput) -> MealPlan:
     row = MealPlan(
         id=plan.id,
+        variant_group_id=plan.variant_group_id,
+        variant_index=plan.variant_index,
+        total_variants=plan.total_variants,
         user_id=user_id,
         profile_snapshot=plan.profile_snapshot,
         days=[day.model_dump() for day in plan.days],
@@ -53,6 +56,9 @@ def _persist_plan(db: Session, user_id: str, plan: MealPlanOutput) -> MealPlan:
 def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
     return MealPlanOutput(
         id=row.id,
+        variant_group_id=row.variant_group_id,
+        variant_index=row.variant_index,
+        total_variants=row.total_variants,
         user_id=row.user_id,
         profile_snapshot=row.profile_snapshot or {},
         days=row.days or [],

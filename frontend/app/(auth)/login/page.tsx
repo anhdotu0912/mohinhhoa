@@ -7,15 +7,33 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [role, setRole] = useState<"doctor" | "patient">("doctor");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === "doctor") {
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Auto-detect role based on email/identifier or default to doctor/patient
+    if (
+      cleanEmail.includes("doctor") ||
+      cleanEmail.includes("bacsi") ||
+      cleanEmail.startsWith("bs")
+    ) {
       router.push("/doctor");
     } else {
+      router.push("/patient");
+    }
+  };
+
+  const handleDemoLogin = (targetRole: "doctor" | "patient") => {
+    if (targetRole === "doctor") {
+      setEmail("bacsi.minh@vmec.vn");
+      setPassword("12345678");
+      router.push("/doctor");
+    } else {
+      setEmail("nguyenvana@gmail.com");
+      setPassword("12345678");
       router.push("/patient");
     }
   };
@@ -31,37 +49,11 @@ export default function LoginPage() {
             </h1>
           </Link>
           <p className="font-caption text-caption text-on-surface-variant text-xs">
-            Hệ thống Trợ lý Dinh dưỡng & Quản lý Y tế AI
+            Đăng nhập hệ thống Trợ lý Dinh dưỡng & Quản lý Y tế AI
           </p>
         </div>
 
-        {/* Role Selector Tabs */}
-        <div className="flex bg-surface-container-low p-1 rounded-xl mb-lg border border-outline-variant/40">
-          <button
-            type="button"
-            onClick={() => setRole("doctor")}
-            className={`flex-1 py-2 rounded-lg font-body-bold text-xs font-semibold transition-all cursor-pointer ${
-              role === "doctor"
-                ? "bg-surface-container-lowest text-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Bác sĩ Chuyên khoa
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole("patient")}
-            className={`flex-1 py-2 rounded-lg font-body-bold text-xs font-semibold transition-all cursor-pointer ${
-              role === "patient"
-                ? "bg-surface-container-lowest text-primary shadow-xs"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Bệnh nhân
-          </button>
-        </div>
-
-        {/* Form */}
+        {/* Unified Login Form */}
         <form onSubmit={handleLogin} className="space-y-md">
           <div>
             <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
@@ -72,7 +64,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={role === "doctor" ? "bacsi.minh@vmec.vn" : "BN-10293 hoặc Email"}
+              placeholder="Nhập email hoặc mã định danh của bạn..."
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -100,16 +92,39 @@ export default function LoginPage() {
             type="submit"
             className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md"
           >
-            Đăng nhập với vai trò {role === "doctor" ? "Bác sĩ" : "Bệnh nhân"}
+            Đăng nhập
           </button>
         </form>
+
+        {/* Demo Quick Access */}
+        <div className="mt-md p-sm bg-surface-container-low rounded-xl border border-outline-variant/40">
+          <p className="text-[11px] text-on-surface-variant font-semibold mb-xs text-center">
+            💡 TRUY CẬP NHANH DEMO (ĐÃ CÓ TÀI KHOẢN):
+          </p>
+          <div className="flex gap-xs">
+            <button
+              type="button"
+              onClick={() => handleDemoLogin("doctor")}
+              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer"
+            >
+              👨‍⚕️ Demo Bác sĩ
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDemoLogin("patient")}
+              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer"
+            >
+              🧑‍🤝‍🧑 Demo Bệnh nhân
+            </button>
+          </div>
+        </div>
 
         <div className="mt-lg pt-md border-t border-outline-variant/40 text-center">
           <p className="font-caption text-caption text-on-surface-variant text-xs">
             Chưa có tài khoản?{" "}
-            <a href="#" className="text-primary font-bold hover:underline">
-              Đăng ký thông tin y tế
-            </a>
+            <Link href="/register" className="text-primary font-bold hover:underline">
+              Đăng ký tài khoản mới
+            </Link>
           </p>
         </div>
       </div>

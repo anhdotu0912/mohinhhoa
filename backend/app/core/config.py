@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # are not implemented yet (meal plan, interaction check). Disable in prod.
     DEMO_MOCK: bool = True
 
+    # Generation defaults
+    DEFAULT_VARIANTS_PER_JOB: int = 3
+    DEFAULT_PLAN_DAYS: int = 7
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
