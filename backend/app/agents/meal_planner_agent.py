@@ -180,14 +180,8 @@ def generate_meal_plan(
     medications = profile_obj.medications or []
     target_kcal = profile_obj.target_kcal or 1800
 
-    # Determine guideline citations based on diseases
-    guideline_citations: list[str] = ["byt_vn_notes.md"]
-    if any("diabetes" in d for d in diseases):
-        guideline_citations.append("ada_diabetes.md")
-    if any("hypertension" in d or "cardio" in d for d in diseases):
-        guideline_citations.append("aha_cardiovascular.md")
-    if any("gout" in d for d in diseases):
-        guideline_citations.append("acr_gout.md")
+    # Determine guideline citations for diabetes focus
+    guideline_citations: list[str] = ["ada_diabetes.md", "byt_vn_notes.md"]
 
     # Get available safe foods
     safe_foods = _get_safe_food_items(profile_obj)
@@ -203,11 +197,8 @@ def generate_meal_plan(
     veggie_foods = safe_foods["rau"] or _load_food_db()[10:13]
     fruit_foods = safe_foods["trai_cay"] or _load_food_db()[15:18]
 
-    # Preference for diabetes (brown rice over white rice)
-    if "diabetes_t2" in diseases:
-        starchy_foods_pref = [f for f in starchy_foods if "diabetes-friendly" in f.get("tags", [])] + starchy_foods
-    else:
-        starchy_foods_pref = starchy_foods
+    # Always prioritize diabetes-friendly complex carbs (brown rice, oats, whole grains)
+    starchy_foods_pref = [f for f in starchy_foods if "diabetes-friendly" in f.get("tags", [])] + starchy_foods
 
     days: list[DayPlan] = []
     swaps: list[Swap] = []

@@ -14,7 +14,10 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import chromadb
+try:
+    import chromadb
+except ImportError:
+    chromadb = None  # type: ignore
 
 from app.core.config import settings
 from app.rag.embeddings import get_embedding_function

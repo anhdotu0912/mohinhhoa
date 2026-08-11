@@ -122,12 +122,12 @@ class TestNutritionCalculator:
 # ============================================================
 
 class TestInteractionSwapping:
-    def test_warfarin_interaction_swaps_dangerous_foods(self):
-        """Patient taking Warfarin with dangerous food items should trigger swaps."""
+    def test_diabetes_interaction_swaps_dangerous_foods(self):
+        """Diabetes patient taking Metformin/Glipizide should have safe food swaps for dangerous items."""
         profile = PatientProfile(
-            user_id="warfarin_user",
-            disease=["hypertension"],
-            medications=["warfarin"],
+            user_id="diabetes_user",
+            disease=["diabetes_t2"],
+            medications=["metformin", "glipizide"],
             target_kcal=1800,
         )
         plan = generate_meal_plan(profile)
@@ -136,10 +136,8 @@ class TestInteractionSwapping:
         for day in plan.days:
             for meal in day.meals:
                 for item in meal.items:
-                    # 'Rau muống' causes dangerous interaction with Warfarin
-                    assert "rau muống" not in item.name.lower(), (
-                        f"Found dangerous food 'Rau muống' for Warfarin patient on day {day.day_index}"
-                    )
+                    assert "rượu" not in item.name.lower()
+                    assert "bia" not in item.name.lower()
 
 
 # ============================================================

@@ -1,4 +1,4 @@
-"""Profile Loader node — loads patient profile into agent state."""
+"""Profile Loader node — loads patient profile into agent state (Diabetes focused)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from app.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
 
-# Demo profiles for MVP (loaded by user_id)
+# Demo profiles for MVP (loaded by user_id) — All focused on Diabetes (Đái tháo đường T2)
 _DEMO_PROFILES: dict[str, dict] = {
     "demo_patient_1": {
         "id": "profile_1",
@@ -24,8 +24,8 @@ _DEMO_PROFILES: dict[str, dict] = {
     "demo_patient_2": {
         "id": "profile_2",
         "user_id": "demo_patient_2",
-        "disease": ["hypertension", "diabetes_t2"],
-        "medications": ["amlodipine", "metformin", "atorvastatin"],
+        "disease": ["diabetes_t2"],
+        "medications": ["metformin", "atorvastatin", "amlodipine"],
         "allergies": [],
         "bmi": 28.0,
         "target_kcal": 1600,
@@ -35,12 +35,12 @@ _DEMO_PROFILES: dict[str, dict] = {
     "demo_patient_3": {
         "id": "profile_3",
         "user_id": "demo_patient_3",
-        "disease": ["gout"],
-        "medications": ["allopurinol"],
+        "disease": ["diabetes_t2"],
+        "medications": ["glipizide", "lisinopril"],
         "allergies": [],
         "bmi": 24.0,
         "target_kcal": 2000,
-        "restrictions": {"carb_per_meal": 60, "sodium_daily": 2300},
+        "restrictions": {"carb_per_meal": 50, "sodium_daily": 2000},
         "preferences": ["thích ăn cá"],
     },
 }
@@ -64,17 +64,17 @@ def profile_loader(state: AgentState) -> AgentState:
     if profile:
         logger.info("Loaded demo profile for user %s", user_id)
     else:
-        # Default minimal profile
-        logger.warning("No profile found for user %s, using defaults", user_id)
+        # Default minimal profile for diabetes
+        logger.warning("No profile found for user %s, using diabetes defaults", user_id)
         profile = {
             "id": "",
             "user_id": user_id,
-            "disease": [],
-            "medications": [],
+            "disease": ["diabetes_t2"],
+            "medications": ["metformin"],
             "allergies": [],
             "bmi": None,
-            "target_kcal": 2000,
-            "restrictions": {"carb_per_meal": 60, "sodium_daily": 2300},
+            "target_kcal": 1800,
+            "restrictions": {"carb_per_meal": 45, "sodium_daily": 2300},
             "preferences": [],
         }
 
