@@ -24,6 +24,11 @@ VALID_INTENTS = {
 
 # Keyword patterns for rule-based fallback
 _INTENT_PATTERNS = {
+    "refuse": [
+        r"đổi thuốc", r"thay thuốc", r"đổi liều", r"tăng liều", r"giảm liều",
+        r"ngưng thuốc", r"bỏ thuốc", r"kê thuốc", r"kê đơn",
+        r"chẩn đoán", r"xét nghiệm",
+    ],
     "meal_plan": [
         r"thực đơn", r"meal\s*plan", r"lên kế hoạch ăn", r"kế hoạch dinh dưỡng",
         r"gợi ý bữa ăn", r"7 ngày", r"bữa sáng.*bữa trưa.*bữa tối",
@@ -31,17 +36,12 @@ _INTENT_PATTERNS = {
     ],
     "interaction_check": [
         r"tương tác.*thuốc", r"thuốc.*thực phẩm", r"drug.*food",
-        r"interaction", r"warfarin", r"uống thuốc.*ăn",
+        r"interaction", r"metformin", r"uống thuốc.*ăn",
         r"kiểm tra tương tác", r"có ăn được không.*đang uống",
     ],
     "food_log": [
         r"ghi lại", r"log", r"hôm nay ăn", r"sáng nay ăn", r"tối qua ăn",
         r"vừa ăn", r"bữa.*ăn.*xong",
-    ],
-    "refuse": [
-        r"đổi thuốc", r"thay thuốc", r"đổi liều", r"tăng liều", r"giảm liều",
-        r"ngưng thuốc", r"bỏ thuốc", r"kê thuốc", r"kê đơn",
-        r"chẩn đoán", r"xét nghiệm",
     ],
 }
 

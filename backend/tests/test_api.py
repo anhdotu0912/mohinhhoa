@@ -71,17 +71,17 @@ def test_profile_upsert_and_get(client):
     assert "diabetes_t2" in response.json()["disease"]
 
     payload = {
-        "disease": ["diabetes_t2", "hypertension"],
-        "medications": ["metformin", "warfarin"],
+        "disease": ["diabetes_t2"],
+        "medications": ["metformin", "glipizide"],
         "allergies": ["hải sản"],
         "bmi": 26.5,
         "target_kcal": 1800,
-        "restrictions": {"carb_per_meal": 45, "sodium_daily": 1500},
+        "restrictions": {"carb_per_meal": 45, "sodium_daily": 2300},
         "preferences": ["thích ăn cơm"],
     }
     response = client.post("/api/v1/profile", headers=headers, json=payload)
     assert response.status_code == 200, response.text
-    assert response.json()["medications"] == ["metformin", "warfarin"]
+    assert response.json()["medications"] == ["metformin", "glipizide"]
     assert response.json()["restrictions"]["carb_per_meal"] == 45
 
 
@@ -99,7 +99,7 @@ def test_north_star_flow(client):
     plan_id = plan["id"]
 
     # Swap shape uses contract alias "from".
-    assert plan["swaps"][0]["from"] == "rau muống xào tỏi"
+    assert plan["swaps"][0]["from"] == "rượu nếp"
 
     # 2. Meal plan is persisted and retrievable.
     response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=headers)
@@ -110,11 +110,11 @@ def test_north_star_flow(client):
     assert response.status_code == 200, response.text
     assert response.json()["id"] == plan_id
 
-    # 3. Warfarin × rau muống alert is persisted (Nguy hiểm).
+    # 3. Metformin × rượu alert is persisted (Nguy hiểm).
     response = client.get("/api/v1/alerts", headers=headers)
     assert response.status_code == 200, response.text
     alerts = response.json()
-    assert any(a["severity"] == "Nguy hiểm" and a["drug"] == "warfarin" for a in alerts)
+    assert any(a["severity"] == "Nguy hiểm" and a["drug"] == "metformin" for a in alerts)
 
     # 4. Notifications materialized: 7×4 reminders + 7 checkins + followup.
     response = client.get("/api/v1/notifications", headers=headers)
@@ -159,7 +159,7 @@ def test_interactions_check_persists_alerts(client):
     response = client.post(
         "/api/v1/interactions/check",
         headers=headers,
-        json={"medications": ["warfarin"], "foods": ["rau muống", "cơm gạo lứt"]},
+        json={"medications": ["metformin"], "foods": ["rượu", "cơm gạo lứt"]},
     )
     assert response.status_code == 200, response.text
     interactions = response.json()["interactions"]
@@ -167,7 +167,7 @@ def test_interactions_check_persists_alerts(client):
     assert interactions[0]["severity"] == "Nguy hiểm"
 
     response = client.get("/api/v1/alerts", headers=headers)
-    assert any(a["drug"] == "warfarin" and a["food"] == "rau muống" for a in response.json())
+    assert any(a["drug"] == "metformin" and a["food"] == "rượu" for a in response.json())
 
     response = client.get("/api/v1/notifications", headers=headers)
     assert any(n["type"] == "interaction_followup" for n in response.json())

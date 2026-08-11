@@ -156,16 +156,24 @@ def retrieve_guidelines(
     return chunks
 
 
-def retrieve_hybrid(
+from functools import lru_cache
+
+@lru_cache(maxsize=256)
+def _retrieve_hybrid_cached(
+    query: str,
+    top_k: int = 10,
+    collection_name: str = "food_items",
+) -> list[RetrievedChunk]:
+    """Cached internal helper for hybrid retrieval."""
+    return _retrieve_hybrid_uncached(query, top_k, collection_name)
+
+
+def _retrieve_hybrid_uncached(
     query: str,
     top_k: int = 10,
     collection_name: str = "food_items",
     client: chromadb.ClientAPI | None = None,
 ) -> list[RetrievedChunk]:
-    """Hybrid retrieval combining dense (ChromaDB) + BM25 keyword matching.
-
-    Uses reciprocal rank fusion (RRF) to merge results.
-    """
     # Dense retrieval
     if collection_name == "food_items":
         dense_results = retrieve_foods(query, top_k=top_k * 2, client=client)
@@ -179,6 +187,22 @@ def retrieve_hybrid(
     fused = _reciprocal_rank_fusion(dense_results, bm25_results, k=60)
 
     return fused[:top_k]
+
+
+def retrieve_hybrid(
+    query: str,
+    top_k: int = 10,
+    collection_name: str = "food_items",
+    client: chromadb.ClientAPI | None = None,
+) -> list[RetrievedChunk]:
+    """Hybrid retrieval combining dense (ChromaDB) + BM25 keyword matching with RRF.
+
+    Uses caching when client is None to improve performance.
+    """
+    if client is None:
+        return _retrieve_hybrid_cached(query, top_k, collection_name)
+    return _retrieve_hybrid_uncached(query, top_k, collection_name, client=client)
+
 
 
 def _bm25_search(

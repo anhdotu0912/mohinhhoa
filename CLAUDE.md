@@ -7,7 +7,7 @@
 
 ## 1. Tổng quan dự án
 
-**Sản phẩm:** AI Agent giúp bệnh nhân (tiểu đường, tim mạch, gout...) nhận thực đơn cá nhân hoá theo bệnh lý, nhận cảnh báo tương tác thuốc–thực phẩm, và nhận nhắc tuân thủ (compliance) theo thực đơn/thuốc. Có dashboard cho chuyên gia dinh dưỡng duyệt thực đơn.
+**Sản phẩm:** AI Agent giúp bệnh nhân đái tháo đường (tiểu đường Type 2) nhận thực đơn cá nhân hoá theo bệnh lý, nhận cảnh báo tương tác thuốc–thực phẩm, và nhận nhắc tuân thủ (compliance) theo thực đơn/thuốc. Có dashboard cho chuyên gia dinh dưỡng duyệt thực đơn.
 
 **Timeline:** Prototype 2 tuần (14 ngày), mục tiêu là demo, không phải sản phẩm hoàn chỉnh.
 
@@ -159,21 +159,21 @@ Chi tiết backlog từng role: `/tasks/be1-ai-core.md`, `/tasks/be2-platform.md
 
 ```json
 {
-  "disease": ["diabetes_t2", "hypertension"],
-  "medications": ["metformin", "amlodipine"],
+  "disease": ["diabetes_t2"],
+  "medications": ["metformin", "glipizide"],
   "allergies": ["hải sản"],
   "bmi": 26.5,
   "target_kcal": 1800,
-  "restrictions": { "carb_per_meal": 45, "sodium_daily": 1500 },
-  "preferences": ["thích ăn cơm", "không ăn thịt bò"]
+  "restrictions": { "carb_per_meal": 45, "sodium_daily": 2300 },
+  "preferences": ["thích ăn cơm", "ít dầu mỡ"]
 }
 ```
 
 **Format cặp tương tác thuốc–thực phẩm:**
 ```json
 {
-  "drug": "warfarin",
-  "food": "rau muống",
+  "drug": "metformin",
+  "food": "rượu",
   "mechanism": "...",
   "severity": "Nguy hiểm|Cần chú ý|An toàn",
   "recommendation": "..."

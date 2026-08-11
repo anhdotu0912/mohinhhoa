@@ -78,8 +78,8 @@ def test_alert_creates_followup_only_for_warning_severities(db_session):
 
     danger = Alert(
         user_id="user_x",
-        drug="warfarin",
-        food="rau muống",
+        drug="metformin",
+        food="rượu",
         mechanism="m",
         severity="Nguy hiểm",
         recommendation="r",

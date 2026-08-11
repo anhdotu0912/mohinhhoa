@@ -39,16 +39,16 @@ Bốn schema dưới đây là contract lõi. Tham chiếu hồ sơ bệnh nhân
 {
   "id": "uuid",
   "user_id": "uuid",
-  "disease": ["diabetes_t2", "hypertension"],
-  "medications": ["metformin", "amlodipine"],
+  "disease": ["diabetes_t2"],
+  "medications": ["metformin", "glipizide"],
   "allergies": ["hải sản"],
   "bmi": 26.5,
   "target_kcal": 1800,
   "restrictions": {
     "carb_per_meal": 45,
-    "sodium_daily": 1500
+    "sodium_daily": 2300
   },
-  "preferences": ["thích ăn cơm", "không ăn thịt bò"]
+  "preferences": ["thích ăn cơm", "ít dầu mỡ"]
 }
 ```
 
@@ -100,9 +100,9 @@ Agent MealPlanner **PHẢI** trả đúng shape này. `days` luôn có đúng **
     {
       "day_index": 2,
       "slot": "lunch",
-      "from": "Rau muống xào",
-      "to": "Rau ngót luộc",
-      "reason": "interaction:warfarin"
+      "from": "Rượu nếp",
+      "to": "Nước lọc",
+      "reason": "interaction:metformin"
     }
   ],
   "citations": ["ada_diabetes.md", "byt_vn_notes.md"],
@@ -188,12 +188,12 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 {
   "id": "uuid",
   "user_id": "uuid",
-  "drug": "warfarin",
-  "food": "rau muống",
-  "mechanism": "Vitamin K đối kháng tác dụng anticoagulant",
+  "drug": "metformin",
+  "food": "rượu",
+  "mechanism": "Rượu làm tăng nguy cơ nhiễm toan lactic khi dùng cùng metformin.",
   "severity": "Nguy hiểm",
-  "recommendation": "Hạn chế và giữ ổn định lượng rau giàu K; trao đổi với bác sĩ.",
-  "sources": ["drug_food_interactions#warfarin_rau_muong"],
+  "recommendation": "Tránh uống rượu khi đang dùng metformin; trao đổi với bác sĩ.",
+  "sources": ["drug_food_interactions#metformin_alcohol"],
   "meal_plan_id": "uuid | null",
   "food_log_id": "uuid | null",
   "created_at": "ISO-8601"
@@ -262,8 +262,8 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 ### Input
 ```json
 {
-  "medications": ["warfarin"],
-  "foods": ["rau muống", "cơm trắng"],
+  "medications": ["metformin"],
+  "foods": ["rượu", "cơm trắng"],
   "profile_user_id": "uuid | null"
 }
 ```
@@ -273,12 +273,12 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 {
   "interactions": [
     {
-      "drug": "warfarin",
-      "food": "rau muống",
-      "mechanism": "Vitamin K đối kháng tác dụng anticoagulant",
+      "drug": "metformin",
+      "food": "rượu",
+      "mechanism": "Rượu làm tăng nguy cơ nhiễm toan lactic khi dùng cùng metformin.",
       "severity": "Nguy hiểm",
-      "recommendation": "Hạn chế và giữ ổn định lượng rau giàu K; trao đổi với bác sĩ.",
-      "sources": ["drug_food_interactions#warfarin_rau_muong"]
+      "recommendation": "Tránh uống rượu khi đang dùng metformin; trao đổi với bác sĩ.",
+      "sources": ["drug_food_interactions#metformin_alcohol"]
     }
   ]
 }

@@ -32,7 +32,7 @@ Bệnh nhân thường không biết rau xanh giàu K / rượu / grapefruit… 
 
 ## 4. User stories
 
-1. Là bệnh nhân uống warfarin, tôi muốn được cảnh báo nếu thực đơn có rau muống / rau giàu vitamin K.
+1. Là bệnh nhân uống metformin, tôi muốn được cảnh báo nếu thực đơn có rượu/bia nguy hiểm.
 2. Là hệ thống meal planner, tôi muốn lọc món nguy hiểm trước khi trả plan.
 3. Là bệnh nhân trên Dashboard, tôi muốn thấy danh sách alert rõ ràng theo mức độ.
 
@@ -51,25 +51,25 @@ Bệnh nhân thường không biết rau xanh giàu K / rượu / grapefruit… 
 
 ```json
 {
-  "drug": "warfarin",
-  "drug_aliases": ["coumadin"],
-  "food": "rau muống",
-  "food_aliases": ["rau muong"],
-  "mechanism": "Vitamin K đối kháng tác dụng anticoagulant",
+  "drug": "metformin",
+  "drug_aliases": ["glucophage"],
+  "food": "rượu",
+  "food_aliases": ["ruou", "alcohol"],
+  "mechanism": "Rượu làm tăng nguy cơ nhiễm toan lactic khi dùng cùng metformin.",
   "severity": "Nguy hiểm",
-  "recommendation": "Hạn chế lượng và giữ ổn định; trao đổi với bác sĩ trước khi thay đổi chế độ ăn.",
+  "recommendation": "Tránh uống rượu khi đang dùng metformin; trao đổi với bác sĩ.",
   "sources": ["guideline_or_ref_id"]
 }
 ```
 
 ## 7. Acceptance criteria
 
-- [ ] KB ≥20 cặp, cover ≥5 drug phổ biến (metformin, warfarin, amlodipine, allopurinol, atorvastatin…)
-- [ ] Test: warfarin + rau muống → `Nguy hiểm`
-- [ ] Test: không match → list rỗng (không hallucinate)
-- [ ] Test guardrail: output không chứa pattern “ngưng thuốc” / “đổi liều”
-- [ ] `test_interaction_checker.py` pass
-- [ ] Schema khớp `InteractionCheckOutput`
+- [x] KB ≥20 cặp, tập trung hoàn toàn vào tiểu đường và biến chứng (metformin, glipizide, insulin...)
+- [x] Test: metformin + rượu → `Nguy hiểm`
+- [x] Test: không match → list rỗng (không hallucinate)
+- [x] Test guardrail: output không chứa pattern “ngưng thuốc” / “đổi liều”
+- [x] `test_interaction_checker.py` pass
+- [x] Schema khớp `InteractionCheckOutput`
 
 ## 8. Dependencies & handoff
 

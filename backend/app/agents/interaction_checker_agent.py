@@ -78,8 +78,8 @@ def check_interactions(
     """Check interactions between a list of medications and foods.
 
     Args:
-        medications: List of drug names (e.g. ["warfarin", "metformin"]).
-        foods: List of food names/ingredients (e.g. ["rau muống", "cơm trắng"]).
+        medications: List of drug names (e.g. ["glipizide", "metformin"]).
+        foods: List of food names/ingredients (e.g. ["rượu", "cơm trắng"]).
 
     Returns:
         List of matching InteractionItem objects.

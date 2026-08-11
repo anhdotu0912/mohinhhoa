@@ -13,13 +13,13 @@ class PatientProfile(BaseModel):
     """Patient medical & dietary profile."""
     id: str = ""
     user_id: str = ""
-    disease: list[str] = Field(default_factory=list, description="e.g. diabetes_t2, hypertension, gout")
-    medications: list[str] = Field(default_factory=list, description="e.g. metformin, warfarin")
+    disease: list[str] = Field(default_factory=list, description="e.g. diabetes_t2")
+    medications: list[str] = Field(default_factory=list, description="e.g. metformin, glipizide")
     allergies: list[str] = Field(default_factory=list, description="e.g. hải sản, đậu phộng")
     bmi: float | None = None
     target_kcal: int = 1800
     restrictions: Restrictions = Field(default_factory=Restrictions)
-    preferences: list[str] = Field(default_factory=list, description="e.g. thích ăn cơm, không ăn thịt bò")
+    preferences: list[str] = Field(default_factory=list, description="e.g. thích ăn cơm, ít dầu mỡ")
 
     model_config = {"from_attributes": True}
 

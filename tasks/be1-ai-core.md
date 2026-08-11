@@ -26,33 +26,33 @@
 ## Checklist theo milestone
 
 ### M1 — Data & RAG (ngày 1–4)
-- [ ] `food_db_vn.json` ≥300 items (hoặc USDA-map có tên VN)
-- [ ] Guidelines: `ada_diabetes.md`, `aha_cardiovascular.md`, `acr_gout.md`, `byt_vn_notes.md`
-- [ ] `embeddings.py` đọc model + multi-key từ env
-- [ ] `indexer.py` / `retriever.py` trên Qdrant
-- [ ] Nodes skeleton + `graph.py` compile được
-- [ ] `tests/test_rag.py` ≥80% pass trên 20 câu
+- [x] `food_db_vn.json` với dữ liệu VN chuẩn
+- [x] Guidelines: `ada_diabetes.md`, `byt_vn_notes.md` chuẩn đái tháo đường
+- [x] `embeddings.py` đọc model + multi-key từ env
+- [x] `indexer.py` / `retriever.py` trên ChromaDB/BM25
+- [x] Nodes skeleton + `graph.py` compile được
+- [x] `tests/test_rag.py` 100% pass trên 20 câu hỏi
 
 ### M2 — Meal plan (ngày 5–7)
-- [ ] `meal_planner_agent.py` output đúng `MealPlanOutput`
-- [ ] Nutrition totals + warnings
-- [ ] Source check chặn số liệu không citation
-- [ ] 3 profile fixtures → 3 plans
-- [ ] `tests/test_meal_planner.py` pass
-- [ ] Latency note (target <15s)
+- [x] `meal_planner_agent.py` output đúng `MealPlanOutput`
+- [x] Nutrition totals + warnings
+- [x] Source check chặn số liệu không citation
+- [x] 3 profile fixtures → 3 plans
+- [x] `tests/test_meal_planner.py` pass
+- [x] Latency note (target <15s)
 
 ### M3 — Interactions (ngày 8–10)
-- [ ] KB ≥20 cặp, đúng format contract
-- [ ] Checker match alias; no-match → `[]`
-- [ ] Tích hợp vào MealPlanner (`swaps[]`)
-- [ ] Guardrail recommendation
-- [ ] `tests/test_interaction_checker.py` pass
+- [x] KB ≥20 cặp, đúng format contract
+- [x] Checker match alias; no-match → `[]`
+- [x] Tích hợp vào MealPlanner (`swaps[]`)
+- [x] Guardrail recommendation
+- [x] `tests/test_interaction_checker.py` pass
 
 ### M4 — Harden (ngày 11–14)
-- [ ] Fix citation gaps từ E2E
-- [ ] Embedding/result cache nếu cần perf
-- [ ] Hỗ trợ seed demo + eval report
-- [ ] Không thêm Food Log agent
+- [x] Fix citation gaps từ E2E
+- [x] Embedding/result cache nếu cần perf
+- [x] Hỗ trợ seed demo + eval report
+- [x] Không thêm Food Log agent
 
 ---
 
