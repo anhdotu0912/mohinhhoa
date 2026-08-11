@@ -150,11 +150,21 @@ def _find_swap_food(
     return None
 
 
-def generate_meal_plan(profile: PatientProfile | dict[str, Any]) -> MealPlanOutput:
-    """Generate a full 7-day personalized medical meal plan.
+def generate_meal_plan(
+    profile: PatientProfile | dict[str, Any],
+    days_count: int = 7,
+    variant_group_id: str | None = None,
+    variant_index: int | None = None,
+    total_variants: int | None = None,
+) -> MealPlanOutput:
+    """Generate a full multi-day personalized medical meal plan.
 
     Args:
         profile: PatientProfile instance or dict.
+        days_count: Number of days to generate (default 7).
+        variant_group_id: Optional grouping ID for alternative options.
+        variant_index: 1-indexed variant number.
+        total_variants: Total number of variants in group.
 
     Returns:
         MealPlanOutput schema matching contract §1.2.
@@ -202,8 +212,8 @@ def generate_meal_plan(profile: PatientProfile | dict[str, Any]) -> MealPlanOutp
     days: list[DayPlan] = []
     swaps: list[Swap] = []
 
-    # Generate 7 days
-    for day_idx in range(1, 8):
+    # Generate requested days count (configurable, defaults to 7)
+    for day_idx in range(1, days_count + 1):
         # 1. Breakfast
         b_starch = starchy_foods_pref[(day_idx - 1) % len(starchy_foods_pref)]
         b_protein = main_protein_sources[(day_idx * 2) % len(main_protein_sources)]
@@ -295,6 +305,9 @@ def generate_meal_plan(profile: PatientProfile | dict[str, Any]) -> MealPlanOutp
 
     return MealPlanOutput(
         id=plan_id,
+        variant_group_id=variant_group_id,
+        variant_index=variant_index,
+        total_variants=total_variants,
         user_id=user_id,
         profile_snapshot=profile_obj.model_dump() if hasattr(profile_obj, "model_dump") else dict(profile_obj),
         days=days,

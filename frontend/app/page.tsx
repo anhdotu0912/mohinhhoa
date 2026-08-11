@@ -27,10 +27,10 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-md">
-            <Link href="/patient" className="font-body-bold text-body-bold text-primary hover:text-primary-fixed transition-colors">
+            <Link href="/login" className="font-body-bold text-body-bold text-primary hover:text-primary-fixed transition-colors">
               Đăng nhập
             </Link>
-            <Link href="/patient" className="bg-primary text-on-primary font-body-bold text-body-bold h-10 px-md rounded-button flex items-center justify-center hover:opacity-90 transition-opacity">
+            <Link href="/register" className="bg-primary text-on-primary font-body-bold text-body-bold h-10 px-md rounded-button flex items-center justify-center hover:opacity-90 transition-opacity">
               Bắt đầu
             </Link>
           </div>

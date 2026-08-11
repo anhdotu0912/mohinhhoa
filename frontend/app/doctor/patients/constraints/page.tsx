@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { TopBar } from "@/components/shared/TopBar";
 import { MOCK_PATIENTS } from "@/lib/mock-data";
+import { PatientCard } from "@/components/doctor/PatientCard";
 
 interface PatientConstraints {
   salt: number;
@@ -14,11 +15,27 @@ interface PatientConstraints {
 
 export default function PatientConstraintsPage() {
   const [selectedPatientId, setSelectedPatientId] = useState("BN-10293");
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const selectedPatient =
     MOCK_PATIENTS.find((p) => p.id === selectedPatientId) || MOCK_PATIENTS[0];
+
+  const filteredPatients = MOCK_PATIENTS.filter((p) => {
+    if (!patientSearch.trim()) return true;
+    const q = patientSearch.toLowerCase().trim();
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.id.toLowerCase().includes(q) ||
+      p.condition.toLowerCase().includes(q)
+    );
+  });
+
+  const handleSelectPatient = (patientId: string) => {
+    setSelectedPatientId(patientId);
+    setIsSelectModalOpen(false);
+  };
 
   // Per-patient constraint state store
   const [constraintsMap, setConstraintsMap] = useState<Record<string, PatientConstraints>>({
@@ -91,11 +108,11 @@ export default function PatientConstraintsPage() {
             </p>
           </div>
 
-          {/* Patient Selector Dropdown */}
+          {/* Patient Selector Button */}
           <div className="relative shrink-0">
             <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-sm px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl font-body text-body text-on-surface hover:border-primary transition-all cursor-pointer shadow-xs min-w-[260px] justify-between"
+              onClick={() => setIsSelectModalOpen(true)}
+              className="flex items-center gap-sm px-md py-sm bg-surface-container-lowest border border-outline-variant hover:border-primary rounded-xl font-body text-body text-on-surface transition-all cursor-pointer shadow-xs min-w-[260px] justify-between group active:scale-95"
             >
               <div className="flex items-center gap-sm">
                 <img
@@ -107,41 +124,10 @@ export default function PatientConstraintsPage() {
                   {selectedPatient.name} ({selectedPatient.id})
                 </span>
               </div>
-              <span className="material-symbols-outlined text-outline text-[20px]">
-                arrow_drop_down
+              <span className="material-symbols-outlined text-primary group-hover:translate-x-0.5 transition-transform text-[20px]">
+                swap_horiz
               </span>
             </button>
-
-            {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg z-30 overflow-hidden py-xs">
-                {MOCK_PATIENTS.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setSelectedPatientId(p.id);
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-md py-sm flex items-center gap-sm hover:bg-surface-container-low transition-colors cursor-pointer text-xs ${
-                      p.id === selectedPatientId
-                        ? "bg-primary-container/10 font-bold text-primary"
-                        : "text-on-surface"
-                    }`}
-                  >
-                    <img
-                      src={p.avatar}
-                      alt={p.name}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <div>
-                      <p className="font-semibold">{p.name}</p>
-                      <p className="text-[11px] text-on-surface-variant">
-                        {p.id} • {p.condition}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -313,7 +299,81 @@ export default function PatientConstraintsPage() {
           </div>
         </div>
       </main>
+
+      {/* PATIENT SELECTION MODAL */}
+      {isSelectModalOpen && (
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
+              <div className="flex items-center gap-sm">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-[22px]">gavel</span>
+                </div>
+                <div>
+                  <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
+                    Chọn bệnh nhân để thiết lập ràng buộc lâm sàng
+                  </h3>
+                  <p className="font-caption text-caption text-on-surface-variant text-xs">
+                    Vui lòng chọn một bệnh nhân trong danh sách phụ trách bên dưới
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSelectModalOpen(false)}
+                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Search Input Box */}
+            <div className="relative mb-md">
+              <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px]">
+                search
+              </span>
+              <input
+                type="text"
+                value={patientSearch}
+                onChange={(e) => setPatientSearch(e.target.value)}
+                placeholder="Tìm theo tên, mã bệnh nhân (VD: BN-10293), hoặc bệnh lý..."
+                className="w-full pl-xl pr-md py-sm bg-surface-container-low border border-outline-variant rounded-xl font-body text-body text-on-surface text-xs focus:outline-none focus:border-primary transition-colors"
+                autoFocus
+              />
+            </div>
+
+            {/* Patient List */}
+            <div className="flex-1 overflow-y-auto space-y-sm pr-xs">
+              {filteredPatients.length === 0 ? (
+                <div className="text-center py-xl text-on-surface-variant text-xs">
+                  Không tìm thấy bệnh nhân phù hợp với từ khóa &quot;{patientSearch}&quot;.
+                </div>
+              ) : (
+                filteredPatients.map((p) => (
+                  <PatientCard
+                    key={p.id}
+                    patient={p}
+                    isSelected={p.id === selectedPatientId}
+                    actionText={p.id === selectedPatientId ? "Đang chọn" : "Chọn bệnh nhân"}
+                    onSelect={handleSelectPatient}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-md border-t border-outline-variant mt-md flex justify-between items-center text-xs text-on-surface-variant">
+              <span>Hiển thị {filteredPatients.length} bệnh nhân</span>
+              <button
+                onClick={() => setIsSelectModalOpen(false)}
+                className="px-md py-sm border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-

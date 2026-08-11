@@ -9,6 +9,8 @@ import {
 } from "@/lib/nav-config";
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
 
+import { useQueueStore } from "@/lib/queue-store";
+
 type TopBarProps = {
   title: string;
   rightSlot?: ReactNode;
@@ -23,10 +25,17 @@ export function TopBar({
   showUtilities = true,
 }: TopBarProps) {
   const { openMobileMenu, role } = useMobileMenu();
+  const { jobs, openDrawer } = useQueueStore();
+
   const notificationsHref =
     role === "patient" ? "/patient/notifications" : "/doctor";
   const avatarSrc =
     role === "doctor" ? DOCTOR_AVATAR_SRC : TOPBAR_PATIENT_AVATAR_SRC;
+
+  const activeJobsCount = jobs.filter(
+    (j) => j.status === "queued" || j.status === "processing"
+  ).length;
+  const isProcessing = jobs.some((j) => j.status === "processing");
 
   return (
     <header className="bg-white dark:bg-surface-container-lowest text-primary font-h2 text-h2 flex justify-between items-center h-16 px-lg w-full border-b border-outline-variant z-30 sticky top-0 shrink-0">
@@ -53,6 +62,33 @@ export function TopBar({
 
         {showUtilities ? (
           <div className="flex items-center gap-md shrink-0">
+            {role === "doctor" && (
+              <button
+                type="button"
+                onClick={openDrawer}
+                title="Hàng đợi tạo thực đơn AI"
+                className="relative text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant"
+              >
+                <span
+                  className={`material-symbols-outlined ${
+                    isProcessing ? "animate-spin text-emerald-600" : ""
+                  }`}
+                >
+                  {isProcessing ? "progress_activity" : "auto_awesome"}
+                </span>
+
+                {activeJobsCount > 0 && (
+                  <span
+                    className={`absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] px-1 bg-emerald-600 text-white font-bold text-[11px] rounded-full flex items-center justify-center shadow-xs ${
+                      isProcessing ? "animate-pulse ring-2 ring-emerald-300" : ""
+                    }`}
+                  >
+                    {activeJobsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <Link
               href={notificationsHref}
               className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant"
@@ -76,3 +112,4 @@ export function TopBar({
     </header>
   );
 }
+
