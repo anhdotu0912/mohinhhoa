@@ -29,6 +29,12 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
       href: "/doctor/patients/constraints",
       icon: "clinical_notes",
     },
+    {
+      id: "history",
+      label: "Lịch sử",
+      href: "/doctor/history",
+      icon: "history",
+    },
     { id: "messages", label: "Tin nhắn", href: "/doctor/messages", icon: "forum" },
   ],
   patient: [
