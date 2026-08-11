@@ -314,11 +314,11 @@ export default function DoctorDashboardPage() {
               </div>
 
               {/* Interactive Bar Chart */}
-              <div className="relative pt-6 pb-2 min-h-[190px] flex flex-col justify-end">
+              <div className="relative pt-6 pb-2 min-h-[220px] flex flex-col justify-end">
                 {/* Benchmark Target Line (80%) */}
                 <div
-                  className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-end pr-1"
-                  style={{ bottom: "80%" }}
+                  className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-end pr-1 pointer-events-none"
+                  style={{ bottom: "calc(26px + 120px * 0.8)" }}
                 >
                   <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-300">
                     Chỉ tiêu 80%
@@ -327,12 +327,12 @@ export default function DoctorDashboardPage() {
 
                 {/* Y-axis grid line 50% */}
                 <div
-                  className="absolute left-0 right-0 border-b border-gray-200/70 z-0"
-                  style={{ bottom: "50%" }}
+                  className="absolute left-0 right-0 border-b border-gray-200/70 z-0 pointer-events-none"
+                  style={{ bottom: "calc(26px + 120px * 0.5)" }}
                 ></div>
 
                 {/* Bars Container */}
-                <div className="w-full flex items-end justify-between px-1 z-10 gap-1.5 h-[150px]">
+                <div className="w-full flex items-end justify-between px-1 z-10 gap-1.5">
                   {chartData.map((item) => {
                     const isHigh = item.rate >= 80;
                     const isMedium = item.rate >= 60 && item.rate < 80;
@@ -376,16 +376,18 @@ export default function DoctorDashboardPage() {
                           {item.rate}%
                         </span>
 
-                        {/* Bar */}
-                        <div
-                          className={`w-full max-w-[28px] rounded-t-md transition-all duration-300 ${barBg} ${
-                            hoveredDay?.day === item.day ? "scale-105 shadow-md" : ""
-                          }`}
-                          style={{ height: `${item.rate}%` }}
-                        ></div>
+                        {/* Bar Track (Explicit height 120px to allow percentage heights) */}
+                        <div className="w-full h-[120px] flex items-end justify-center">
+                          <div
+                            className={`w-full max-w-[28px] rounded-t-md transition-all duration-300 ${barBg} ${
+                              hoveredDay?.day === item.day ? "scale-105 shadow-md" : ""
+                            }`}
+                            style={{ height: `${item.rate}%` }}
+                          ></div>
+                        </div>
 
                         {/* X-axis Day Label */}
-                        <span className="mt-1.5 text-[11px] font-medium text-on-surface-variant">
+                        <span className="mt-1.5 text-[11px] font-semibold text-on-surface-variant">
                           {item.day}
                         </span>
                       </div>

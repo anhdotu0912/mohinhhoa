@@ -7,6 +7,8 @@ import Link from "next/link";
 import { TopBar } from "@/components/shared/TopBar";
 
 import { MOCK_PATIENTS, Patient } from "@/lib/mock-data";
+import { useMealLogsStore } from "@/lib/meal-logs-store";
+import { usePlansStore } from "@/lib/plans-store";
 
 interface PatientDetailData extends Patient {
   patientCode: string;
@@ -107,6 +109,15 @@ export default function PatientDetailPage({
     name: `Bệnh nhân ${patientId}`,
     patientCode: patientId.toUpperCase(),
   };
+
+  // Stores data for History tab summary
+  const { getLogsByPatientId } = useMealLogsStore();
+  const { getPlansByPatientId } = usePlansStore();
+
+  const allLogs = getLogsByPatientId(patientId);
+  const allPlans = getPlansByPatientId(patientId);
+  const recentMealLogs = allLogs.slice(0, 4);
+  const recentPlans = allPlans.slice(0, 4);
 
   // State management
   const [vitals, setVitals] = useState(patient.vitals);
@@ -507,6 +518,142 @@ export default function PatientDetailPage({
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Card 4: Lịch sử ăn uống & thực đơn (Tóm tắt) */}
+              <div className="bg-surface rounded-xl border border-outline-variant shadow-subtle flex flex-col">
+                <div className="p-card-padding border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+                  <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-sm font-semibold text-base">
+                    <span className="material-symbols-outlined text-primary">
+                      history
+                    </span>
+                    Lịch sử ăn uống & thực đơn gần đây
+                  </h4>
+                  <Link
+                    href={`/doctor/history/${patientId}`}
+                    className="text-primary hover:text-primary-container transition-colors text-xs font-body-bold flex items-center gap-xs cursor-pointer font-semibold"
+                  >
+                    <span>Xem đầy đủ lịch sử</span>
+                    <span className="material-symbols-outlined text-[16px]">
+                      arrow_forward
+                    </span>
+                  </Link>
+                </div>
+
+                <div className="p-card-padding grid grid-cols-1 lg:grid-cols-2 gap-section-gap">
+                  {/* Left Column: Recent Diet Logs */}
+                  <div className="space-y-sm">
+                    <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider flex items-center gap-xs">
+                      <span className="material-symbols-outlined text-[16px] text-primary">
+                        restaurant
+                      </span>
+                      Nhật ký ăn uống gần đây ({recentMealLogs.length})
+                    </h5>
+
+                    {recentMealLogs.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant italic py-sm">Chưa có nhật ký ghi nhận.</p>
+                    ) : (
+                      <div className="space-y-xs">
+                        {recentMealLogs.map((log) => (
+                          <div
+                            key={log.id}
+                            className="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-sm flex items-center justify-between gap-sm text-xs"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-xs mb-0.5">
+                                <span className="font-semibold text-on-surface">
+                                  {log.mealLabel}
+                                </span>
+                                <span className="text-on-surface-variant font-caption text-[11px]">
+                                  • {log.loggedAt}
+                                </span>
+                              </div>
+                              <p className="text-on-surface-variant truncate text-[11px]">
+                                {log.foodItems.map((f) => f.name).join(", ") || "Ghi nhận sự kiện tuân thủ"}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
+                                log.complianceType === "custom" || log.sourceBadgeText === "Ăn khác"
+                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                  : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                              }`}
+                            >
+                              {log.complianceType === "custom" || log.sourceBadgeText === "Ăn khác" ? "Ăn khác" : "Ăn đúng"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Recent Menu Plans */}
+                  <div className="space-y-sm">
+                    <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider flex items-center gap-xs">
+                      <span className="material-symbols-outlined text-[16px] text-primary">
+                        menu_book
+                      </span>
+                      Thực đơn gần đây ({recentPlans.length})
+                    </h5>
+
+                    {recentPlans.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant italic py-sm">Chưa có thực đơn nào được khởi tạo.</p>
+                    ) : (
+                      <div className="space-y-xs">
+                        {recentPlans.map((plan) => (
+                          <Link
+                            key={plan.id}
+                            href={`/doctor/reviews/${patientId}/${plan.id}`}
+                            className="bg-surface-container-lowest border border-outline-variant/60 hover:border-primary/50 transition-all rounded-lg p-sm flex items-center justify-between gap-sm text-xs group cursor-pointer block"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-on-surface group-hover:text-primary transition-colors truncate text-xs">
+                                {plan.planTitle}
+                              </p>
+                              <p className="text-on-surface-variant font-caption text-[11px]">
+                                Khởi tạo: {plan.createdAt}
+                              </p>
+                            </div>
+
+                            <div>
+                              {plan.status === "pending" && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                  Chờ duyệt
+                                </span>
+                              )}
+                              {plan.status === "approved" && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  Đã duyệt
+                                </span>
+                              )}
+                              {plan.status === "rejected" && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-800 border border-red-200">
+                                  Đã từ chối
+                                </span>
+                              )}
+                              {plan.status === "unselected" && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                  Không chọn
+                                </span>
+                              )}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-card-padding py-sm bg-surface-container-low/40 border-t border-outline-variant/60 flex justify-end rounded-b-xl">
+                  <Link
+                    href={`/doctor/history/${patientId}`}
+                    className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    <span>Xem toàn bộ dòng thời gian lịch sử ({allLogs.length} nhật ký, {allPlans.length} thực đơn)</span>
+                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                  </Link>
                 </div>
               </div>
             </div>
