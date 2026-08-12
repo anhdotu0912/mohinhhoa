@@ -1,15 +1,17 @@
 # Contracts — Agent & API I/O Schema
 
-> **Luật:** Sửa file này TRƯỚC khi đổi code Agent/API/FE types.  
-> Owners: BE1 (Agent sections) · BE2 (HTTP/API sections) · FE (consume, mirror `frontend/lib/types.ts`)  
-> **Contract version:** `2026-08-04.foundation.1`
+> **Luật:** Sửa file này TRƯỚC khi đổi code Agent / Pydantic `AgentRun*` / meal-plan agent shapes.  
+> Owners: BE1 (Agent sections) · BE2 (HTTP mirror trong `contracts/api-v1.md`) · FE (consume qua API)  
+> **Contract version:** `2026-08-12.asbuilt.1`  
+> **Khớp code:** `backend/app/schemas/meal_plan.py`, `graph.run_agent`  
+> HTTP chi tiết FE↔BE: [`contracts/api-v1.md`](api-v1.md) (nếu lệch Swagger → ưu tiên Swagger rồi cập nhật api-v1).
 
 ---
 
 ## 0. Conventions
 
 - Thời gian: ISO-8601, timezone `Asia/Ho_Chi_Minh` trừ khi noted.
-- ID: UUID string (một số entity legacy có thể dùng `int`).
+- ID: UUID string (demo seed có thể dùng id cố định kiểu `demo_patient_1`).
 - Error HTTP envelope:
 
 ```json
@@ -20,7 +22,7 @@
 ```
 
 - Severity enum: `"Nguy hiểm" | "Cần chú ý" | "An toàn"`
-- Roles: `"patient" | "dietitian"`
+- Roles: `"patient" | "dietitian"` (FE map `dietitian` → shell `/doctor/*`)
 - Macro object dùng chung:
 
 ```json
@@ -29,9 +31,7 @@
 
 ---
 
-## 1. Core schemas (nguồn sự thật — mọi Agent phải khớp)
-
-Bốn schema dưới đây là contract lõi. Tham chiếu hồ sơ bệnh nhân theo CLAUDE.md §8.
+## 1. Core schemas
 
 ### 1.1 PatientProfile
 
@@ -52,21 +52,20 @@ Bốn schema dưới đây là contract lõi. Tham chiếu hồ sơ bệnh nhân
 }
 ```
 
-**HTTP**
-- `POST /api/v1/profile` — upsert (patient)
-- `GET /api/v1/profile/me` — get own profile
+**HTTP:** `POST /api/v1/profile`, `GET /api/v1/profile/me` — xem `api-v1.md`.
 
----
+### 1.2 MealPlanOutput
 
-### 1.2 MealPlan (7 ngày) — MealPlanOutput
-
-Agent MealPlanner **PHẢI** trả đúng shape này. `days` luôn có đúng **7** phần tử (`day_index` 1..7).
+Agent MealPlanner / mock builder **PHẢI** trả đúng shape này. `days` luôn có đúng **7** phần tử (`day_index` 1..7).
 
 ```json
 {
   "id": "uuid",
+  "variant_group_id": "uuid | null",
+  "variant_index": "int | null",
+  "total_variants": "int | null",
   "user_id": "uuid",
-  "profile_snapshot": { "$ref": "PatientProfile" },
+  "profile_snapshot": {},
   "days": [
     {
       "day_index": 1,
@@ -81,7 +80,7 @@ Agent MealPlanner **PHẢI** trả đúng shape này. `days` luôn có đúng **
               "kcal": 200,
               "macros": { "carb_g": 45, "protein_g": 4, "fat_g": 0.5, "sodium_mg": 5 },
               "food_id": "food_db_id_or_null",
-              "citations": ["food_db_vn#com_trang", "ada_diabetes.md#carb"]
+              "citations": ["food_db_vn#com_trang"]
             }
           ]
         }
@@ -105,84 +104,20 @@ Agent MealPlanner **PHẢI** trả đúng shape này. `days` luôn có đúng **
       "reason": "interaction:warfarin"
     }
   ],
-  "citations": ["ada_diabetes.md", "byt_vn_notes.md"],
+  "citations": ["ada_diabetes.md"],
   "status": "pending_review"
 }
 ```
 
 **Status:** `pending_review | approved | rejected | edited`
 
-**MealPlannerAgent input**
-```json
-{
-  "profile": { "$ref": "PatientProfile" },
-  "days": 7,
-  "locale": "vi-VN"
-}
-```
+**MealPlannerAgent input (nội bộ BE1):** `{ "profile": PatientProfile, "days": 7, "locale": "vi-VN" }`
 
-**HTTP**
-- `POST /api/v1/meal-plans/generate`
-- `GET /api/v1/meal-plans/me`
-- `GET /api/v1/meal-plans/{id}`
+### 1.3 FoodLogEntry (Won't Have MVP)
 
----
-
-### 1.3 FoodLogEntry
-
-Schema sẵn cho FoodLogAgent / API (chưa bắt buộc ship trong demo MVP). Mọi số liệu dinh dưỡng trong `items`/`totals` phải có `citations` khi Agent generate.
-
-```json
-{
-  "id": "uuid",
-  "user_id": "uuid",
-  "raw_text": "sáng nay ăn phở bò một tô",
-  "meal_type": "breakfast | lunch | dinner | snack | other",
-  "items": [
-    {
-      "name": "Phở bò",
-      "portion": "1 tô",
-      "kcal": 450,
-      "macros": { "carb_g": 55, "protein_g": 25, "fat_g": 12, "sodium_mg": 1200 },
-      "citations": ["food_db_vn#pho_bo"]
-    }
-  ],
-  "totals": {
-    "kcal": 450,
-    "carb_g": 55,
-    "protein_g": 25,
-    "fat_g": 12,
-    "sodium_mg": 1200
-  },
-  "alert_ids": ["uuid"],
-  "logged_at": "ISO-8601"
-}
-```
-
-**FoodLogAgent I/O**
-```json
-// Input
-{
-  "user_id": "uuid",
-  "raw_text": "string",
-  "meal_type": "breakfast | lunch | dinner | snack | other",
-  "logged_at": "ISO-8601 | null"
-}
-
-// Output
-{ "$ref": "FoodLogEntry" }
-```
-
-**HTTP (khi implement)**
-- `POST /api/v1/food-logs`
-- `GET /api/v1/food-logs`
-- `GET /api/v1/food-logs/{id}`
-
----
+Schema / stub agent / FE route có thể còn trong repo nhưng **không** thuộc demo MVP. Không mount HTTP food-log trong `main.py`. Nav FE không được hiện mục Ghi nhận.
 
 ### 1.4 Alert
-
-Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc một trong 3 mức.
 
 ```json
 {
@@ -200,9 +135,6 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 }
 ```
 
-**HTTP**
-- `GET /api/v1/alerts` — patient own / dietitian by `patient_id` query
-
 ---
 
 ## 2. Graph / AgentState (BE1)
@@ -211,19 +143,13 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 {
   "user_id": "uuid",
   "message": "string | null",
+  "force_intent": "meal_plan | interaction_check | food_log | rag_qa | null",
   "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown",
-  "profile": { "$ref": "PatientProfile" },
-  "rag_context": [
-    {
-      "chunk_id": "string",
-      "text": "string",
-      "source": "string",
-      "score": 0.0
-    }
-  ],
-  "meal_plan": { "$ref": "MealPlanOutput | null" },
-  "food_log": { "$ref": "FoodLogEntry | null" },
-  "interactions": { "$ref": "InteractionCheckOutput | null" },
+  "profile": {},
+  "rag_context": [],
+  "meal_plan": "MealPlanOutput | null",
+  "food_log": null,
+  "interactions": "InteractionCheckOutput | null",
   "answer": "string | null",
   "citations": ["string"],
   "guardrail_flags": ["string"],
@@ -233,7 +159,8 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 
 **Facade:** `run_agent(input: AgentRunInput) -> AgentRunOutput`
 
-### AgentRunInput
+### AgentRunInput (khớp Pydantic hiện tại)
+
 ```json
 {
   "user_id": "uuid",
@@ -242,7 +169,11 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 }
 ```
 
-### AgentRunOutput
+**As-built:** BE2 **không** truyền `profile` vào facade. `profile_loader` node load profile (demo map / DB theo implementation hiện tại).  
+**To-be (gap):** nên để BE2 inject profile từ DB — ghi trong `tasks/roadmap-gap-closure.md`; khi đổi phải bump version contract này trước.
+
+### AgentRunOutput (khớp Pydantic hiện tại)
+
 ```json
 {
   "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown",
@@ -255,11 +186,16 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 }
 ```
 
+**Lưu ý persist:** `meal_plan_id` chỉ có ý nghĩa khi plan đã được BE2 ghi DB. Nhánh `DEMO_MOCK=true` persist trong `meal_plan_service`; nhánh agent thật còn gap persist (xem gap-closure TASK-02).
+
+Chat HTTP trả đúng `AgentRunOutput` (field `message`, không phải `reply`).
+
 ---
 
 ## 3. InteractionCheckerAgent
 
 ### Input
+
 ```json
 {
   "medications": ["warfarin"],
@@ -269,73 +205,38 @@ Khớp format cặp thuốc–thực phẩm CLAUDE.md. Severity bắt buộc m�
 ```
 
 ### Output — InteractionCheckOutput
+
 ```json
 {
   "interactions": [
     {
       "drug": "warfarin",
       "food": "rau muống",
-      "mechanism": "Vitamin K đối kháng tác dụng anticoagulant",
+      "mechanism": "...",
       "severity": "Nguy hiểm",
-      "recommendation": "Hạn chế và giữ ổn định lượng rau giàu K; trao đổi với bác sĩ.",
+      "recommendation": "...",
       "sources": ["drug_food_interactions#warfarin_rau_muong"]
     }
   ]
 }
 ```
 
-Mỗi phần tử `interactions[]` khi persist → tạo record `{ "$ref": "Alert" }`.
-
-**HTTP:** `POST /api/v1/interactions/check`
+**As-built HTTP:** khi `DEMO_MOCK=true`, `POST /api/v1/interactions/check` dùng helper mock (`meal_plan_demo.check_interactions`, KB rút gọn). Khi `DEMO_MOCK=false` route trả **501** (chưa wire agent thật). Agent + KB đầy đủ (`data/drug_food_interactions.json`, ~28 cặp) dùng trong graph / meal planner.
 
 ---
 
-## 4. Compliance Notification (BE2 service — không phải LangGraph agent)
+## 4. Compliance Notification (BE2 — không phải LangGraph node)
 
-```json
-{
-  "id": "uuid",
-  "user_id": "uuid",
-  "type": "meal_reminder | interaction_followup | plan_approved | adherence_checkin",
-  "title": "string",
-  "body": "string",
-  "scheduled_at": "ISO-8601",
-  "status": "pending | sent | read | dismissed | done | cancelled",
-  "related_ids": {
-    "meal_plan_id": "uuid | null",
-    "alert_id": "uuid | null",
-    "day_index": 1,
-    "slot": "breakfast | lunch | dinner | snack | null"
-  },
-  "payload": {
-    "adherence": "yes | partial | no | null"
-  },
-  "created_at": "ISO-8601",
-  "updated_at": "ISO-8601"
-}
-```
+Shape + event table: xem `api-v1.md` và `specs/04-compliance-notification.md`.
 
-**HTTP**
-- `GET /api/v1/notifications?status=&type=`
-- `POST /api/v1/notifications/{id}/read`
-- `POST /api/v1/notifications/{id}/dismiss`
-- `POST /api/v1/notifications/{id}/done` — body: `{ "adherence": "yes|partial|no" }`
-- `POST /api/v1/notifications/demo/simulate` — demo only
-
-| Event | Notifications created |
-|---|---|
-| Meal plan generated | `meal_reminder` × slots × days (`pending`) + optional `adherence_checkin` × 7 |
-| Plan approved | `plan_approved` (`sent`) |
-| Plan rejected | cancel future reminders of that plan |
-| Alert severity in {Nguy hiểm, Cần chú ý} | `interaction_followup` (`sent`) |
+`POST /notifications/demo/simulate` **as-built:** insert vài notification mẫu (seed), **không** bulk-flip mọi `pending → sent`.
 
 ---
 
 ## 5. Dietitian Review
 
-`GET /api/v1/dietitian/meal-plans?status=pending_review`
+Request/response: xem `api-v1.md`. Body as-built:
 
-`POST /api/v1/dietitian/meal-plans/{id}/review`
 ```json
 {
   "action": "approve | reject | edit",
@@ -344,45 +245,16 @@ Mỗi phần tử `interactions[]` khi persist → tạo record `{ "$ref": "Aler
 }
 ```
 
-```json
-{
-  "meal_plan_id": "uuid",
-  "status": "approved | rejected | edited",
-  "trust_badge": "dietitian_reviewed",
-  "reviewed_at": "ISO-8601",
-  "reviewer_id": "uuid"
-}
-```
+---
+
+## 6. Auth / Chat
+
+- Auth: `api-v1.md`
+- Chat: `POST /api/v1/chat` → `AgentRunOutput`
 
 ---
 
-## 6. Auth
+## 7. Versioning
 
-- `POST /api/v1/auth/register` `{ "email", "password", "role": "patient|dietitian" }`
-- `POST /api/v1/auth/login` → `{ "access_token", "token_type": "bearer", "role", "user_id" }`
-- Header: `Authorization: Bearer <jwt>`
-
----
-
-## 7. Chat (thin wrapper)
-
-`POST /api/v1/chat`
-
-```json
-{ "message": "string" }
-```
-
-Response: `{ "$ref": "AgentRunOutput" }`
-
----
-
-## 8. Out of contract (post-MVP)
-
-- Push notification provider payloads (FCM/APNs) — extension của Notification object.
-
----
-
-## 9. Versioning
-
-- Breaking change: bump **Contract version** + báo cả 3 role trong PR.
-- **Contract version:** `2026-08-04.foundation.1`
+- Breaking change Agent I/O: bump **Contract version** + ACK BE1/BE2.
+- Bản này đồng bộ **as-built code** (`message` / `meal_plan_id`), thay bản WT lệch (`reply` / embedded `meal_plan`) từng gây handoff sai.

@@ -1,73 +1,24 @@
-# BE1 — AI Core backlog
+# BE1 — AI Core (ownership rút gọn)
 
 > Modules: `agents/`, `rag/`, `guardrails/`, `services/nutrition_calculator.py`, `data/`, AI tests  
-> Specs: `meal-planner.md`, `interaction-checker.md`  
-> ADRs: `001`, `002`, `003`
-
----
+> Specs: `02`, `03`, `06` · ADRs: `001` (Chroma), `002`, `003`  
+> Backlog chi tiết: [`roadmap-gap-closure.md`](roadmap-gap-closure.md)
 
 ## Trách nhiệm
 
-- Embedding (Gemini + rotation), index/retrieve Qdrant, hybrid dense+BM25
-- LangGraph: profile_loader → intent_classifier → rag / meal_plan / interaction / refuse
-- MealPlannerAgent + NutritionCalculator + SourceCheck
-- InteractionCheckerAgent + KB `drug_food_interactions.json` (≥20)
-- Guardrails rules (từ chối đổi thuốc/liều)
-- Eval: RAG accuracy, meal planner fixtures, interaction tests
+- Index/retrieve **ChromaDB**, embedding MiniLM (local)
+- LangGraph: profile_loader → intent → meal_plan / interaction / rag_qa / refuse / food_log stub
+- MealPlannerAgent + NutritionCalculator
+- InteractionCheckerAgent + KB `drug_food_interactions.json`
+- Guardrails `rules.py` / `source_check.py` (TASK-04 — hiện placeholder)
+- Eval: RAG, meal planner, interaction tests
 
-## Không làm (trừ khi được nhờ rõ)
+## Không làm (trừ khi nhờ)
 
-- JWT chi tiết, SQLAlchemy migrations, notification scheduler
-- Frontend components
-- Dietitian review business persistence (chỉ đảm bảo output schema)
+- JWT/migrations chi tiết, notification persistence, FE components
 
----
+## Focus hiện tại
 
-## Checklist theo milestone
-
-### M1 — Data & RAG (ngày 1–4)
-- [ ] `food_db_vn.json` ≥300 items (hoặc USDA-map có tên VN)
-- [ ] Guidelines: `ada_diabetes.md`, `aha_cardiovascular.md`, `acr_gout.md`, `byt_vn_notes.md`
-- [ ] `embeddings.py` đọc model + multi-key từ env
-- [ ] `indexer.py` / `retriever.py` trên Qdrant
-- [ ] Nodes skeleton + `graph.py` compile được
-- [ ] `tests/test_rag.py` ≥80% pass trên 20 câu
-
-### M2 — Meal plan (ngày 5–7)
-- [ ] `meal_planner_agent.py` output đúng `MealPlanOutput`
-- [ ] Nutrition totals + warnings
-- [ ] Source check chặn số liệu không citation
-- [ ] 3 profile fixtures → 3 plans
-- [ ] `tests/test_meal_planner.py` pass
-- [ ] Latency note (target <15s)
-
-### M3 — Interactions (ngày 8–10)
-- [ ] KB ≥20 cặp, đúng format contract
-- [ ] Checker match alias; no-match → `[]`
-- [ ] Tích hợp vào MealPlanner (`swaps[]`)
-- [ ] Guardrail recommendation
-- [ ] `tests/test_interaction_checker.py` pass
-
-### M4 — Harden (ngày 11–14)
-- [ ] Fix citation gaps từ E2E
-- [ ] Embedding/result cache nếu cần perf
-- [ ] Hỗ trợ seed demo + eval report
-- [ ] Không thêm Food Log agent
-
----
-
-## Handoff artifacts phải giao BE2/FE
-
-| Artefact | Khi |
-|---|---|
-| Contract Agent sections ổn định | Trước ngày 6 |
-| Sample `MealPlanOutput` JSON | Ngày 5 EOD |
-| Sample `InteractionCheckOutput` + list drug demo | Ngày 10 |
-| `run_agent` Python API ổn định | Ngày 4–6 |
-
-## Commands
-
-```bash
-cd backend
-pytest tests/test_rag.py tests/test_meal_planner.py tests/test_interaction_checker.py -q
-```
+- TASK-02: ổn định nhánh `DEMO_MOCK=false` (persist plan từ agent)
+- TASK-03: đã chốt giữ Chroma (ADR-001 superseded)
+- TASK-04: implement guardrails thật

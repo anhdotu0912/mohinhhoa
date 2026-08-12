@@ -41,7 +41,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
     { id: "home", label: "Trang chủ", href: "/patient", icon: "dashboard" },
     { id: "assistant", label: "Trợ lý AI", href: "/patient/assistant", icon: "smart_toy" },
     { id: "meals", label: "Thực đơn", href: "/patient/meals", icon: "restaurant" },
-    { id: "log", label: "Ghi nhận", href: "/patient/meals/log", icon: "edit_note" },
+    // Food Log Won't Have MVP — route /patient/meals/log có thể còn nhưng không hiện nav
     {
       id: "notifications",
       label: "Thông báo",

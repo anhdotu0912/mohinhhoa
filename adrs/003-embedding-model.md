@@ -1,32 +1,22 @@
-# ADR 003 — Embedding Model
+# ADR-003: Embedding Model cho RAG
 
-- **Status:** Accepted
-- **Date:** 2026-08-04
-- **Deciders:** BE1 (AI Core)
+## Status
+Accepted — đang chạy `paraphrase-multilingual-MiniLM-L12-v2`. Gemini Embedding **chưa** implement.
 
 ## Context
-
-Cần embedding đa ngữ, tiếng Việt tốt, chi phí thấp, có thể xoay vòng API key khi rate-limit. Trước đó từng cân nhắc `multilingual-e5-base` self-host.
+Nội dung KB (food_db_vn, guidelines) chủ yếu tiếng Việt. Cần embedding model hỗ trợ tốt tiếng Việt cho dense retrieval, đồng thời cân nhắc chi phí/rate-limit nếu dùng API ngoài (so với model chạy local).
 
 ## Decision
+Dùng model đa ngôn ngữ **`paraphrase-multilingual-MiniLM-L12-v2`** (SentenceTransformer local) làm mặc định qua `EMBEDDING_MODEL` trong env.
 
-Dùng **Gemini Embedding 2** (tên model cụ thể cấu hình qua env, vd. `EMBEDDING_MODEL`), có **API key rotation**.
-
-## Options considered
-
-| Option | Pros | Cons |
-|---|---|---|
-| multilingual-e5-base (local) | Free, offline | RAM/CPU trên Railway; ops nặng prototype |
-| OpenAI text-embedding-3 | Chất lượng ổn | Cost; tiếng Việt không phải điểm mạnh nhất |
-| **Gemini Embedding 2** | API managed, VN ổn, khớp stack Gemini keys | Rate-limit → cần rotation + cache |
+## As-built (quan trọng)
+- **Gemini Embedding / API key rotation: chưa implement.** Đổi env chỉ đổi tên model SentenceTransformer local (vẫn cần re-index).
+- CLAUDE.md cũ từng ghi Gemini Embedding 2 — **lỗi thời**; không coi đó là stack hiện tại.
 
 ## Consequences
+- **Positive:** Demo ổn định, không phụ thuộc quota embedding API.
+- **Negative:** Chất lượng tiếng Việt có thể thấp hơn embedding API lớn — eval trước khi đổi.
+- **Post-demo:** nếu chuyển Gemini/OpenAI embedding → implement client mới + rotation + re-index toàn bộ Chroma.
 
-- Env bắt buộc: `EMBEDDING_MODEL`, `GEMINI_API_KEYS` (list/CSV) hoặc cơ chế rotation tương đương.
-- Cache embedding theo hash(chunk) để giảm cost/latency khi re-index.
-- Indexer (BE1) fail-soft: hết quota → log rõ, không silent empty index.
-- Không đổi Vector DB khi đổi embedding model — **phải re-index** toàn bộ nếu đổi model.
-
-## Non-goals
-
-Fine-tune embedding. Cross-encoder rerank (Could Have nếu còn thời gian ngày 12–13).
+## Lưu ý vận hành
+Đổi embedding model bắt buộc **re-index** Vector Store — không tương thích ngược giữa các model.
