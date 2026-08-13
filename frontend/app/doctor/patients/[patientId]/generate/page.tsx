@@ -6,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/shared/TopBar";
 import { MOCK_PATIENTS } from "@/lib/mock-data";
-import { PatientCard } from "@/components/doctor/PatientCard";
+import { PatientCard, truncatePatientId } from "@/components/doctor/PatientCard";
 import { DEFAULT_PLAN_DAYS, DEFAULT_VARIANTS_PER_JOB, DURATION_OPTIONS } from "@/lib/config";
 import { usePlansStore, MealPlanItem, DayMealPlan } from "@/lib/plans-store";
 
@@ -75,7 +75,7 @@ export default function DoctorGenerateMealPlanPage() {
     { title: "Áp dụng ràng buộc", desc: "Giới hạn muối, đường, đạm" },
     { title: "Sinh 3 phương án", desc: "Đa dạng hóa cơ cấu món" },
     { title: "Bao phủ nhiều ngày", desc: `Tạo đủ ${daysCount} ngày/phương án` },
-    { title: "Hoàn thiện & Lưu", desc: "Gom nhóm variantGroupId" },
+    { title: "Hoàn thiện & Lưu", desc: "Lưu nhóm phương án" },
   ];
 
   const togglePriority = (item: string) => {
@@ -233,9 +233,7 @@ export default function DoctorGenerateMealPlanPage() {
 
   return (
     <>
-      <TopBar
-        title="Tạo thực đơn mới bằng AI (Nhiều phương án)"
-      />
+      <TopBar title="Tạo thực đơn mới bằng AI" />
 
       <main className="p-lg max-w-[1400px]">
         {/* Back Link & Header */}
@@ -432,16 +430,32 @@ export default function DoctorGenerateMealPlanPage() {
                   </button>
                 </div>
                 <div className="space-y-sm text-xs">
-                  <div className="flex items-center gap-sm">
-                    <img
-                      src={patient.avatar}
-                      alt={patient.name}
-                      className="w-10 h-10 rounded-full object-cover border border-outline-variant"
-                    />
-                    <div>
-                      <p className="font-bold text-on-surface">{patient.name}</p>
-                      <p className="text-on-surface-variant text-[11px]">
-                        {patient.age} tuổi • {patient.gender} • ID: {patient.id}
+                  <div className="flex items-center gap-sm min-w-0">
+                    {patient.avatar ? (
+                      <img
+                        src={patient.avatar}
+                        alt={patient.name}
+                        className="w-10 h-10 rounded-full object-cover border border-outline-variant shrink-0"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fallback = el.nextElementSibling as HTMLElement | null;
+                          if (fallback) fallback.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-10 h-10 rounded-full border border-outline-variant shrink-0 bg-primary/10 text-primary flex items-center justify-center text-sm font-bold ${
+                        patient.avatar ? "hidden" : ""
+                      }`}
+                      aria-hidden
+                    >
+                      {(patient.name.trim().charAt(0) || "?").toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-on-surface truncate">{patient.name}</p>
+                      <p className="text-on-surface-variant text-[11px] truncate" title={patient.id}>
+                        {patient.age} tuổi • {patient.gender} • ID: {truncatePatientId(patient.id)}
                       </p>
                     </div>
                   </div>
@@ -561,7 +575,7 @@ export default function DoctorGenerateMealPlanPage() {
                   <span className="material-symbols-outlined text-[16px] text-primary">
                     terminal
                   </span>
-                  LIVE MULTI-VARIANT AGENT STREAM
+                  Nhật ký tiến trình
                 </span>
                 <span className="font-caption text-[11px] text-on-surface-variant">
                   {logs.length} sự kiện được ghi nhận
@@ -616,51 +630,66 @@ export default function DoctorGenerateMealPlanPage() {
 
       {/* PATIENT SELECTION MODAL */}
       {isSelectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
-              <div className="flex items-center gap-sm">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-[22px]">auto_awesome</span>
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-outline-variant shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
                 </div>
-                <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-on-surface leading-snug">
                     Chọn bệnh nhân để tạo thực đơn AI
                   </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {filteredPatients.length} bệnh nhân{patientSearch ? " khớp kết quả" : " trong hệ thống"}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsSelectModalOpen(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="relative mb-md">
-              <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px]">
-                search
-              </span>
-              <input
-                type="text"
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-                placeholder="Tìm theo tên, mã bệnh nhân (VD: BN-10293), hoặc bệnh lý..."
-                className="w-full pl-xl pr-md py-sm bg-surface-container-low border border-outline-variant rounded-xl font-body text-body text-on-surface text-xs focus:outline-none focus:border-primary transition-colors"
-                autoFocus
-              />
+            {/* Search */}
+            <div className="px-5 py-3 shrink-0">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px] pointer-events-none">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={patientSearch}
+                  onChange={(e) => setPatientSearch(e.target.value)}
+                  placeholder="Tìm theo tên, mã, hoặc bệnh lý..."
+                  className="w-full pl-9 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  autoFocus
+                />
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-sm pr-xs">
-              {filteredPatients.map((p) => (
-                <PatientCard
-                  key={p.id}
-                  patient={p}
-                  isSelected={p.id === patient.id}
-                  actionText={p.id === patient.id ? "Đang chọn" : "Chọn bệnh nhân"}
-                  onSelect={handleSelectPatient}
-                />
-              ))}
+            {/* Patient List */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-5 space-y-2">
+              {filteredPatients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[40px] mb-2 opacity-40">search_off</span>
+                  <p className="text-sm">Không tìm thấy bệnh nhân phù hợp</p>
+                </div>
+              ) : (
+                filteredPatients.map((p) => (
+                  <PatientCard
+                    key={p.id}
+                    patient={p}
+                    isSelected={p.id === patient.id}
+                    actionText={p.id === patient.id ? "Đang chọn" : "Chọn"}
+                    onSelect={handleSelectPatient}
+                  />
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -45,7 +45,7 @@ Là **bệnh nhân**, tôi muốn được cảnh báo nếu món ăn tương t�
 | Method | Path | Role |
 |---|---|---|
 | POST | `/api/v1/interactions/check` | patient (as-built require patient) |
-| GET | `/api/v1/alerts` | patient/dietitian |
+| GET | `/api/v1/alerts` | patient/doctor |
 
 ## 9. Liên quan
 - KB: `backend/data/drug_food_interactions.json`

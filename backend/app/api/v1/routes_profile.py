@@ -29,9 +29,18 @@ def upsert_profile(
     row.medications = payload.medications
     row.allergies = payload.allergies
     row.bmi = payload.bmi
+    row.weight = payload.weight
+    row.height = payload.height
+    row.age = payload.age
+    row.gender = payload.gender
+    row.phone = payload.phone
+    row.address = payload.address
+    row.blood_pressure = payload.blood_pressure
+    row.blood_glucose = payload.blood_glucose
     row.target_kcal = payload.target_kcal
     row.restrictions = payload.restrictions.model_dump()
     row.preferences = payload.preferences
+    row.treatment_goals = payload.treatment_goals
     db.commit()
     return get_profile(db, user.id)
 

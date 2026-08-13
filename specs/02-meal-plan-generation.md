@@ -7,10 +7,10 @@
 Sinh thực đơn 7 ngày cá nhân hoá theo bệnh lý, thuốc, dị ứng, mục tiêu kcal — có trích dẫn nguồn (citation), có kiểm tra tương tác thuốc–thực phẩm, và ở trạng thái chờ chuyên gia duyệt trước khi bệnh nhân dùng chính thức.
 
 ## 2. User story
-Là **bệnh nhân** (hoặc **dietitian** generate hộ), tôi muốn nhận thực đơn 7 ngày phù hợp với hồ sơ bệnh lý của mình, để có kế hoạch ăn uống an toàn và đúng mục tiêu dinh dưỡng.
+Là **bệnh nhân** (hoặc **doctor** generate hộ), tôi muốn nhận thực đơn 7 ngày phù hợp với hồ sơ bệnh lý của mình, để có kế hoạch ăn uống an toàn và đúng mục tiêu dinh dưỡng.
 
 ## 3. Business rules
-1. Actor được phép generate: `patient` (tự generate) hoặc dietitian qua UI `/doctor/patients/{id}/generate` (khi FE nối API — hiện UI có thể local mock).
+1. Actor được phép generate: `patient` (tự generate) hoặc doctor qua UI `/doctor/patients/{id}/generate` (khi FE nối API — hiện UI có thể local mock).
 2. Plan mới tạo luôn có `status = pending_review`.
 3. Hai nhánh theo `DEMO_MOCK` (ADR-005):
    - **`true` (mặc định, as-built path demo):** `build_mock_meal_plan` → persist DB → interaction mock trên món plan → alerts + `materialize_from_meal_plan`.

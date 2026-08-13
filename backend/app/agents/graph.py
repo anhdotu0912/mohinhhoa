@@ -42,7 +42,7 @@ def meal_plan_node(state: AgentState) -> AgentState:
             f"(Mục tiêu: {profile.target_kcal} kcal/ngày, Bệnh lý: {', '.join(profile.disease or ['bình thường'])}).\n"
             f"- Số ngày: 7 ngày (tổng {len(plan_output.days)} ngày)\n"
             f"- Số món ăn bị thay thế do tương tác thuốc: {len(plan_output.swaps)} món\n"
-            f"- Trạng thái: {plan_output.status} (chờ dietitian duyệt)"
+            f"- Trạng thái: {plan_output.status} (chờ bác sĩ duyệt)"
         )
         return {
             **state,

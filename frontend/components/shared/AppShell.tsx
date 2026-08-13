@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { AppRole } from "@/lib/nav-config";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { MobileMenuContext } from "@/components/shared/MobileMenuContext";
@@ -14,6 +15,8 @@ export function AppShell({
   role: AppRole;
   children: ReactNode;
 }) {
+  const pathname = usePathname();
+  const hideChrome = pathname?.startsWith("/patient/onboarding");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const openMobileMenu = useCallback(() => setMobileMenuOpen(true), []);
@@ -29,6 +32,12 @@ export function AppShell({
     }),
     [mobileMenuOpen, openMobileMenu, closeMobileMenu, role]
   );
+
+  if (hideChrome) {
+    return (
+      <MobileMenuContext.Provider value={value}>{children}</MobileMenuContext.Provider>
+    );
+  }
 
   return (
     <MobileMenuContext.Provider value={value}>

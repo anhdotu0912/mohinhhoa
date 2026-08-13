@@ -80,3 +80,10 @@ Nếu bạn muốn chạy cả Frontend và Backend cùng lúc thông qua Docker
    docker-compose up --build
    ```
 3. Sau khi build xong, hệ thống sẽ tự động khởi chạy cả hai dịch vụ.
+
+
+ │ Role      │ Email                      │ Password │
+  ├───────────┼────────────────────────────┼──────────┤
+  │ Bệnh nhân │ demo_patient_1@example.com │ demo1234 │
+  ├───────────┼────────────────────────────┼──────────┤
+  │ Bác sĩ    │ demo_doctor@example.com    │ demo1234 │

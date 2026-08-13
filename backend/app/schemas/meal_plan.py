@@ -71,6 +71,7 @@ class MealPlanOutput(BaseModel):
     swaps: list[Swap] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     status: str = "pending_review"
+    created_at: str | None = None
 
 
 # --- Alert schema (contract §1.4) ---

@@ -22,7 +22,7 @@
 ```
 
 - Severity enum: `"Nguy hiểm" | "Cần chú ý" | "An toàn"`
-- Roles: `"patient" | "dietitian"` (FE map `dietitian` → shell `/doctor/*`)
+- Roles: `"patient" | "doctor"` (FE shell `/doctor/*` khớp role API `doctor`)
 - Macro object dùng chung:
 
 ```json

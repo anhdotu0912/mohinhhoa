@@ -15,7 +15,7 @@
 
 **Definition of Done:**
 - [ ] Không còn import từ `frontend/lib/mock-data` ở các trang đã wiring
-- [ ] Test manual: login → onboarding → generate → alerts/notifications → dietitian review → thấy trạng thái cập nhật, toàn bộ qua API thật
+- [ ] Test manual: login → onboarding → generate → alerts/notifications → doctor review → thấy trạng thái cập nhật, toàn bộ qua API thật
 - [ ] Tuân thủ `contracts/api-v1.md` — không tự thêm field ngoài contract
 
 ---

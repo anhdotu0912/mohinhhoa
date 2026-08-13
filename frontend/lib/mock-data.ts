@@ -1,3 +1,5 @@
+import type { DoctorPatientSummary } from "./types";
+
 export interface Patient {
   id: string;
   name: string;
@@ -16,6 +18,45 @@ export interface Patient {
   height?: number; // cm
   bloodSugar?: string;
   bloodPressure?: string;
+  statusKey?: "attention" | "stable" | "warning" | "pending";
+  latestPlanId?: string | null;
+  latestPlanStatus?: string | null;
+  alertCount?: number;
+}
+
+export function statusColorFor(
+  status: Patient["status"]
+): string {
+  switch (status) {
+    case "Cảnh báo":
+      return "bg-tertiary-fixed text-tertiary-fixed-dim";
+    case "Cần chú ý":
+      return "bg-error-container text-error";
+    case "Chờ duyệt":
+      return "bg-amber-100 text-amber-800";
+    default:
+      return "bg-primary-container/20 text-primary";
+  }
+}
+
+export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
+  return {
+    id: p.id,
+    name: p.name,
+    age: p.age ?? 0,
+    gender: p.gender ?? "—",
+    condition: p.condition_label,
+    status: p.status,
+    statusColor: statusColorFor(p.status),
+    lastUpdate: p.last_update || "—",
+    avatar: p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+    email: p.email,
+    bmi: p.bmi ?? undefined,
+    statusKey: p.status_key,
+    latestPlanId: p.latest_plan_id,
+    latestPlanStatus: p.latest_plan_status,
+    alertCount: p.alert_count,
+  };
 }
 
 export const MOCK_PATIENTS: Patient[] = [

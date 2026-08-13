@@ -23,7 +23,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 def chat(
     payload: ChatRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("patient", "dietitian")),
+    user: User = Depends(require_roles("patient", "doctor")),
 ) -> AgentRunOutput:
     try:
         from app.agents.graph import run_agent

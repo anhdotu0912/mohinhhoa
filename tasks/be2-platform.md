@@ -8,7 +8,7 @@
 
 - Auth JWT, seed demo accounts
 - REST routes mounted trong `main.py`
-- Persist MealPlan / Alert / Notification; dietitian review
+- Persist MealPlan / Alert / Notification; doctor review
 - `DEMO_MOCK` orchestration trong `meal_plan_service` / interaction route
 - Wire `run_agent` từ chat / generate (khi mock off)
 - Postgres khi deploy (ADR-006)

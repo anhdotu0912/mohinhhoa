@@ -29,9 +29,18 @@ def get_profile(db: Session, user_id: str) -> PatientProfile:
         medications=row.medications or [],
         allergies=row.allergies or [],
         bmi=row.bmi,
+        weight=row.weight,
+        height=row.height,
+        age=row.age,
+        gender=row.gender,
+        phone=row.phone,
+        address=row.address,
+        blood_pressure=row.blood_pressure,
+        blood_glucose=row.blood_glucose,
         target_kcal=row.target_kcal or 1800,
         restrictions=row.restrictions or {},
         preferences=row.preferences or [],
+        treatment_goals=row.treatment_goals or [],
     )
 
 
@@ -65,6 +74,7 @@ def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
         swaps=row.swaps or [],
         citations=row.citations or [],
         status=row.status,
+        created_at=row.created_at.isoformat() if row.created_at else None,
     )
 
 

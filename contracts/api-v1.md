@@ -9,10 +9,11 @@
 **Role:** public
 ```json
 // Request
-{ "email": "string", "password": "string", "role": "patient | dietitian" }
+{ "email": "string", "password": "string", "role": "patient | doctor", "full_name": "string | null" }
 // Response 201
-{ "id": "string", "email": "string", "role": "patient | dietitian" }
+{ "id": "string", "email": "string", "role": "patient | doctor", "full_name": "string | null" }
 ```
+> `full_name` là optional (nullable) — dùng khi doctor tạo tài khoản patient từ dashboard; nếu bỏ trống, tên hiển thị suy ra từ email.
 
 ### POST /api/v1/auth/login
 **Role:** public
@@ -20,7 +21,7 @@
 // Request
 { "email": "string", "password": "string" }
 // Response 200
-{ "access_token": "string", "token_type": "bearer", "role": "patient | dietitian" }
+{ "access_token": "string", "token_type": "bearer", "role": "patient | doctor" }
 ```
 Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_token>`.
 
@@ -35,9 +36,18 @@ Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_t
   "medications": ["string"],
   "allergies": ["string"],
   "bmi": 0.0,
+  "weight": 0.0,
+  "height": 0.0,
+  "age": 0,
+  "gender": "Nam | Nữ | Khác",
+  "phone": "string | null",
+  "address": "string | null",
+  "blood_pressure": "string | null",
+  "blood_glucose": "string | null",
   "target_kcal": 0,
   "restrictions": { "carb_per_meal": 0, "sodium_daily": 0 },
-  "preferences": ["string"]
+  "preferences": ["string"],
+  "treatment_goals": ["string"]
 }
 // Response 200 — trả lại Profile đã lưu
 ```
@@ -48,7 +58,7 @@ Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_t
 ## Meal Plans
 
 ### POST /api/v1/meal-plans/generate
-**Role:** patient (dietitian gọi qua `/doctor/patients/{id}/generate` — endpoint riêng phía dietitian, cùng contract response)
+**Role:** patient (doctor gọi qua `/doctor/patients/{id}/generate` — endpoint riêng phía doctor, cùng contract response)
 ```json
 // Response 201
 {
@@ -66,7 +76,7 @@ Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_t
 **Role:** patient — trả plan mới nhất của user hiện tại.
 
 ### GET /api/v1/meal-plans/{id}
-**Role:** auth (patient chỉ xem plan của mình; dietitian xem plan bệnh nhân trong hàng đợi)
+**Role:** auth (patient chỉ xem plan của mình; doctor xem plan bệnh nhân trong hàng đợi)
 
 ## Interactions
 
@@ -94,7 +104,7 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 ## Alerts
 
 ### GET /api/v1/alerts
-**Role:** patient/dietitian
+**Role:** patient/doctor
 ```json
 // Response 200
 [
@@ -142,13 +152,120 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 ### POST /api/v1/notifications/demo/simulate
 **Role:** patient (demo) — **as-built:** insert vài notification mẫu cho user hiện tại (seed). **Không** bulk-update mọi `pending → sent`. ⚠️ Cần guard tắt / chặn ở production (TASK-06).
 
-## Dietitian Review
+## Doctor Review
 
-### GET /api/v1/dietitian/meal-plans
-**Role:** dietitian — filter `?status=pending_review`
+### GET /api/v1/doctor/patients
+**Role:** doctor — danh sách bệnh nhân (+ profile tóm tắt, trạng thái plan/alert)
+```json
+// Query optional: ?q=keyword&status=attention|warning|stable|pending|all
+// Response 200 — DoctorPatientSummary[]
+[
+  {
+    "id": "demo_patient_1",
+    "email": "demo_patient_1@example.com",
+    "name": "Nguyễn Văn A",
+    "disease": ["diabetes_t2", "hypertension"],
+    "condition_label": "Tiểu đường type 2, Tăng huyết áp",
+    "status": "Cảnh báo | Cần chú ý | Ổn định | Chờ duyệt",
+    "status_key": "warning | attention | stable | pending",
+    "latest_plan_id": "string | null",
+    "latest_plan_status": "pending_review | approved | ...",
+    "alert_count": 0,
+    "bmi": 26.5,
+    "weight": 72.5,
+    "height": 170,
+    "age": 45,
+    "gender": "Nam",
+    "phone": "0901 234 567",
+    "address": "Quận 1, TP. Hồ Chí Minh",
+    "blood_pressure": "130/80 mmHg",
+    "blood_glucose": "135 mg/dL",
+    "treatment_goals": ["string"],
+    "last_update": "12/08/2026",
+    "avatar": "string"
+  }
+]
+```
 
-### POST /api/v1/dietitian/meal-plans/{id}/review
-**Role:** dietitian
+### GET /api/v1/doctor/patients/{patient_id}
+**Role:** doctor — chi tiết 1 bệnh nhân (cùng schema DoctorPatientSummary)
+
+### PUT /api/v1/doctor/patients/{patient_id}/metrics
+**Role:** doctor — cập nhật chỉ số cơ thể (inline edit)
+```json
+// Request
+{ "weight": 72.5, "height": 170 }
+// Response 200
+{
+  "weight": 72.5,
+  "height": 170.0,
+  "bmi": 25.1,
+  "bmi_category": "Thừa cân nhẹ",
+  "updated_at": "12/10/2023"
+}
+```
+> Validate: `weight > 0`, `height > 0` (sai → 422). BMI do backend tính lại: `weight(kg) / (height(m))^2`, làm tròn 1 chữ số thập phân. `bmi_category` chuẩn Châu Á: <18.5 Thiếu cân · 18.5–22.9 Bình thường · 23–24.9 Thừa cân nhẹ · ≥25 Béo phì.
+
+### PUT /api/v1/doctor/patients/{patient_id}/goals
+**Role:** doctor — cập nhật danh sách mục tiêu điều trị (thay toàn bộ)
+```json
+// Request
+{ "goals": ["Kiểm soát đường huyết (HbA1c < 7%).", "Giảm cân 2kg trong 1 tháng."] }
+// Response 200
+{ "goals": ["string"] }
+```
+
+### PUT /api/v1/doctor/patients/{patient_id}/profile
+**Role:** doctor — cập nhật thông tin chung của bệnh nhân (tên, avatar, email, tuổi, giới tính, liên hệ, chẩn đoán, thuốc, dị ứng, dinh dưỡng, mục tiêu)
+```json
+// Request — field KHÔNG gửi → giữ nguyên; field gửi null → xóa (avatar/full_name → mặc định)
+{
+  "full_name": "Nguyễn Văn A",
+  "email": "nguyenvana@gmail.com",
+  "avatar": "https://.../avatar.png",
+  "age": 45,
+  "gender": "Nam",
+  "phone": "0901 234 567",
+  "address": "Quận 1, TP. Hồ Chí Minh",
+  "blood_pressure": "130/80 mmHg",
+  "blood_glucose": "135 mg/dL",
+  "disease": ["diabetes_t2", "hypertension"],
+  "medications": ["metformin"],
+  "allergies": ["hải sản"],
+  "preferences": ["thích ăn cơm", "không ăn thịt bò"],
+  "treatment_goals": ["Kiểm soát đường huyết (HbA1c < 7%)."]
+}
+// Response 200 — DoctorPatientSummary (mới nhất)
+```
+> Email trùng tài khoản khác → 409 `EMAIL_EXISTS`. `age` ngoài 0–130 → 422.
+
+### GET /api/v1/doctor/catalog
+**Role:** doctor, patient — danh mục có sẵn để chọn tags (thuốc, dị ứng, chẩn đoán)
+```json
+// Response 200
+{
+  "medicines": [{ "id": "uuid", "name": "Metformin 500mg" }],
+  "allergies": [{ "id": "uuid", "name": "Hải sản" }],
+  "diagnoses": [{ "code": "diabetes_t2", "name": "Tiểu đường type 2" }]
+}
+```
+
+### POST /api/v1/doctor/patients/{patient_id}/avatar
+**Role:** doctor — upload ảnh đại diện (multipart/form-data, field `file`, ảnh ≤ 2MB, png/jpg/webp/gif)
+```json
+// Response 200
+{ "avatar": "/static/avatars/{patient_id}.png" }
+```
+> File không phải ảnh → 415 `INVALID_IMAGE`; quá 2MB → 413 `IMAGE_TOO_LARGE`.
+
+### POST /api/v1/doctor/patients/{patient_id}/meal-plans/generate
+**Role:** doctor — tạo thực đơn 7 ngày cho bệnh nhân (cùng response `MealPlanOutput`)
+
+### GET /api/v1/doctor/meal-plans
+**Role:** doctor — filter `?status=pending_review` (mặc định) hoặc `?status=all` (tất cả plan); response `MealPlanOutput` (thêm `created_at: "ISO-8601 | null"`)
+
+### POST /api/v1/doctor/meal-plans/{id}/review
+**Role:** doctor
 ```json
 // Request (as-built ReviewRequest)
 {
@@ -160,7 +277,7 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 {
   "meal_plan_id": "string",
   "status": "approved | rejected | edited",
-  "trust_badge": "dietitian_reviewed | null",
+  "trust_badge": "doctor_reviewed | null",
   "reviewed_at": "ISO-8601",
   "reviewer_id": "string"
 }
@@ -200,4 +317,4 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 - `Alert.severity`: `Nguy hiểm | Cần chú ý | An toàn`
 - `Notification.type`: `meal_reminder | interaction_followup | plan_approved | adherence_checkin`
 - `Notification.status`: `pending | sent | read | dismissed | done | cancelled`
-- `User.role`: `patient | dietitian`
+- `User.role`: `patient | doctor`

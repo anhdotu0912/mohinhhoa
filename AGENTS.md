@@ -8,5 +8,6 @@ Hướng dẫn ngắn cho AI coding agent trên repo **P-014**.
 4. ADR: [`adrs/`](adrs/) — Chroma (001 superseded), LangGraph, MiniLM, compliance event-driven, `DEMO_MOCK`, SQLite.
 5. Contracts: [`contracts/agent-io-schema.md`](contracts/agent-io-schema.md) + [`contracts/api-v1.md`](contracts/api-v1.md). **Sửa contract trước, code sau.**
 6. Backlog: [`tasks/roadmap-gap-closure.md`](tasks/roadmap-gap-closure.md).
+7. Hạn chế thay đổi frontend đã được thiết kế.
 
 **Không** implement Food Log trong MVP (nav đã ẩn). Ưu tiên demo North Star mượt hơn thêm feature.
