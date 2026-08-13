@@ -30,28 +30,174 @@ from app.services.nutrition_calculator import calculate_day_totals, validate_nut
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-_FOOD_DB_PATH = _BACKEND_DIR / "data" / "food_db_vn.json"
+_PROJECT_ROOT = _BACKEND_DIR.parent  # P-014/
+_FOOD_DB_LEGACY_PATH = _BACKEND_DIR / "data" / "food_db_vn.json"
+_FOODS_CLEAN_PATH = _PROJECT_ROOT / "data" / "clean" / "foods.sample.json"
+_RECIPES_CLEAN_PATH = _PROJECT_ROOT / "data" / "clean" / "recipes.sample.json"
 
 _cached_foods: list[dict] | None = None
 
+# ── Mapping: food_group (tiếng Việt) → internal category ──────────────
+_FOOD_GROUP_MAP: dict[str, str] = {
+    "Ngũ cốc và sản phẩm": "tinh_bot",
+    "Khoai củ và sản phẩm": "tinh_bot",
+    "Thịt và sản phẩm": "thit",
+    "Thủy sản và sản phẩm": "hai_san",
+    "Hạt, đậu và sản phẩm": "dau",
+    "Trứng và sản phẩm": "trung_sua",
+    "Sữa và sản phẩm": "trung_sua",
+    "Rau, củ, quả dùng làm rau": "rau",
+    "Quả chín": "trai_cay",
+    "Dầu, mỡ, bơ": "khac",
+    "Gia vị, nước chấm": "khac",
+    "Đồ ngọt và nguyên liệu tạo ngọt": "khac",
+}
+
+# ── Mapping: recipe category → internal category ─────────────────────
+_RECIPE_CATEGORY_MAP: dict[str, str] = {
+    "rau_luoc_hap": "rau",
+    "goi_salad": "rau",
+    "xao_it_dau": "rau",
+    "canh": "canh",
+    "dam_luoc_hap_nuong": "thit",
+    "kho_om_ham_sot": "thit",
+    "bua_hoan_chinh": "tinh_bot",
+}
+
+
+def _normalize_food_item(raw: dict) -> dict:
+    """Convert a foods.sample.json entry into the internal format.
+
+    Internal format: {id, name, category, portion, kcal, macros, tags, aliases}
+    """
+    name_obj = raw.get("name", {})
+    nutrition = raw.get("nutrition_per_100g_edible", {})
+    classification = raw.get("classification", {})
+    dm = raw.get("diabetes_metadata", {})
+
+    food_group = classification.get("food_group", "")
+    category = _FOOD_GROUP_MAP.get(food_group, "khac")
+
+    # Build tags from metadata
+    tags: list[str] = []
+    if dm.get("suitability_label") == "ưu_tiên":
+        tags.append("diabetes-friendly")
+    if food_group == "Thủy sản và sản phẩm":
+        tags.append("allergen-shellfish")
+    if food_group == "Hạt, đậu và sản phẩm":
+        tags.append("allergen-soy")
+
+    return {
+        "id": raw.get("_id", ""),
+        "name": name_obj.get("vi", ""),
+        "category": category,
+        "portion": f"100g (phần ăn được)",
+        "kcal": float(nutrition.get("energy_kcal", 0) or 0),
+        "macros": {
+            "carb_g": float(nutrition.get("carbohydrate_g", 0) or 0),
+            "protein_g": float(nutrition.get("protein_g", 0) or 0),
+            "fat_g": float(nutrition.get("fat_g", 0) or 0),
+            "sodium_mg": float(nutrition.get("sodium_mg", 0) or 0),
+        },
+        "tags": tags,
+        "aliases": name_obj.get("aliases", []) + [name_obj.get("normalized_vi", "")],
+        "_source": "foods.sample.json",
+        "_source_url": raw.get("source", {}).get("current_lookup_url", ""),
+    }
+
+
+def _normalize_recipe_item(raw: dict) -> dict:
+    """Convert a recipes.sample.json entry into the internal format.
+
+    Internal format: {id, name, category, portion, kcal, macros, tags, aliases}
+    """
+    nutrition = raw.get("nutrition_calculated_from_main_ingredients", {})
+    dm = raw.get("diabetes_screening", {})
+
+    raw_cat = raw.get("category", "")
+    category = _RECIPE_CATEGORY_MAP.get(raw_cat, "khac")
+
+    tags: list[str] = []
+    if dm.get("label") == "ưu_tiên":
+        tags.append("diabetes-friendly")
+
+    # Build portion string from ingredients
+    ingredients = raw.get("ingredients", [])
+    portions = [f"{ing.get('name_vi', '')} {ing.get('raw_edible_weight_g', '')}g"
+                for ing in ingredients[:3]]
+    portion_str = ", ".join(portions) if portions else "1 phần"
+
+    return {
+        "id": raw.get("_id", ""),
+        "name": raw.get("name_vi", ""),
+        "category": category,
+        "portion": portion_str,
+        "kcal": float(nutrition.get("energy_kcal", 0) or 0),
+        "macros": {
+            "carb_g": float(nutrition.get("carbohydrate_g", 0) or 0),
+            "protein_g": float(nutrition.get("protein_g", 0) or 0),
+            "fat_g": float(nutrition.get("fat_g", 0) or 0),
+            "sodium_mg": float(nutrition.get("sodium_mg", 0) or 0),
+        },
+        "tags": tags,
+        "aliases": [],
+        "_source": "recipes.sample.json",
+        "_source_url": raw.get("source", {}).get("food_lookup_url", ""),
+    }
+
 
 def _load_food_db() -> list[dict]:
-    """Load food items from JSON database."""
+    """Load food items from the new clean data files (foods + recipes).
+
+    Reads from data/clean/foods.sample.json (500 items) and
+    data/clean/recipes.sample.json (300 recipes), normalizes both into the
+    internal format used by the meal planner downstream code.
+
+    Falls back to the legacy backend/data/food_db_vn.json if new files
+    are not available.
+    """
     global _cached_foods
     if _cached_foods is not None:
         return _cached_foods
 
-    if not _FOOD_DB_PATH.exists():
-        logger.error("Food DB file missing at %s", _FOOD_DB_PATH)
-        return []
+    all_items: list[dict] = []
 
-    try:
-        with open(_FOOD_DB_PATH, encoding="utf-8") as f:
-            _cached_foods = json.load(f)
-        return _cached_foods
-    except Exception as e:
-        logger.error("Error loading food DB: %s", e)
-        return []
+    # ── 1. Load new clean foods ──────────────────────────────────────
+    if _FOODS_CLEAN_PATH.exists():
+        try:
+            with open(_FOODS_CLEAN_PATH, encoding="utf-8") as f:
+                raw_foods = json.load(f)
+            normalized = [_normalize_food_item(item) for item in raw_foods]
+            all_items.extend(normalized)
+            logger.info("Loaded %d food items from %s", len(normalized), _FOODS_CLEAN_PATH.name)
+        except Exception as e:
+            logger.error("Error loading %s: %s", _FOODS_CLEAN_PATH.name, e)
+
+    # ── 2. Load new clean recipes ────────────────────────────────────
+    if _RECIPES_CLEAN_PATH.exists():
+        try:
+            with open(_RECIPES_CLEAN_PATH, encoding="utf-8") as f:
+                raw_recipes = json.load(f)
+            normalized = [_normalize_recipe_item(item) for item in raw_recipes]
+            all_items.extend(normalized)
+            logger.info("Loaded %d recipe items from %s", len(normalized), _RECIPES_CLEAN_PATH.name)
+        except Exception as e:
+            logger.error("Error loading %s: %s", _RECIPES_CLEAN_PATH.name, e)
+
+    # ── 3. Fallback to legacy DB ─────────────────────────────────────
+    if not all_items:
+        logger.warning("New data files not found, falling back to legacy %s", _FOOD_DB_LEGACY_PATH.name)
+        if _FOOD_DB_LEGACY_PATH.exists():
+            try:
+                with open(_FOOD_DB_LEGACY_PATH, encoding="utf-8") as f:
+                    all_items = json.load(f)
+            except Exception as e:
+                logger.error("Error loading legacy food DB: %s", e)
+                return []
+
+    _cached_foods = all_items
+    logger.info("Total food/recipe items loaded: %d", len(all_items))
+    return _cached_foods
 
 
 def _is_allergic(food: dict, allergies: list[str]) -> bool:
@@ -71,6 +217,10 @@ def _is_allergic(food: dict, allergies: list[str]) -> bool:
         # Check allergen tags
         if "hải sản" in allergy_norm or "hai san" in allergy_norm:
             if "allergen-shellfish" in food_tags or food.get("category") == "hai_san":
+                return True
+            # Also check food name for seafood keywords (catches recipes like "Canh nấu tôm")
+            _SEAFOOD_KEYWORDS = ["tôm", "cua", "mực", "ngao", "ốc", "cá ", "sò", "ghẹ", "hàu", "tôm đồng"]
+            if any(kw in food_name for kw in _SEAFOOD_KEYWORDS):
                 return True
         if "đậu" in allergy_norm or "dau" in allergy_norm:
             if "allergen-soy" in food_tags or "dau" in food.get("id", ""):

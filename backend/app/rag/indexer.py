@@ -91,12 +91,12 @@ def index_food_items(client: chromadb.ClientAPI | None = None) -> int:
         metadata={"description": "Vietnamese food items with nutrition data"},
     )
 
-    if not FOOD_DB_PATH.exists():
-        logger.warning("Food DB not found at %s", FOOD_DB_PATH)
-        return 0
+    from app.agents.meal_planner_agent import _load_food_db
 
-    with open(FOOD_DB_PATH, encoding="utf-8") as f:
-        foods = json.load(f)
+    foods = _load_food_db()
+    if not foods:
+        logger.warning("No food items loaded for indexing")
+        return 0
 
     ids = []
     documents = []
@@ -130,7 +130,7 @@ def index_food_items(client: chromadb.ClientAPI | None = None) -> int:
             "sodium_mg": macros.get("sodium_mg", 0),
             "portion": food.get("portion", ""),
             "tags": tags_str,
-            "source": "food_db_vn",
+            "source": food.get("_source", "food_db_vn"),
         })
 
     # ChromaDB has a max batch size; chunk if needed

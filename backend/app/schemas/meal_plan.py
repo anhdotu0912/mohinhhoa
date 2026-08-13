@@ -107,6 +107,11 @@ class InteractionItem(BaseModel):
     severity: str
     recommendation: str
     sources: list[str] = Field(default_factory=list)
+    # Extended clinical fields from drug_rules.json (optional)
+    drug_class: str | None = None
+    meal_timing: str | None = None
+    hypoglycemia_risk: str | None = None
+    ai_warning: str | None = None
 
 
 class InteractionCheckOutput(BaseModel):
