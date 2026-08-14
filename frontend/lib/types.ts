@@ -75,6 +75,12 @@ export interface FoodItem {
   macros: Macros;
   food_id?: string | null;
   citations: string[];
+  alternatives?: FoodItem[];
+}
+
+export interface GenerateMealPlanRequest {
+  notes?: string;
+  priorities?: string[];
 }
 
 export interface Meal {
@@ -218,9 +224,20 @@ export interface DoctorPatientSummary {
   status_key: DoctorPatientStatusKey;
   latest_plan_id?: string | null;
   latest_plan_status?: string | null;
+  plan_pending: number;
+  plan_total: number;
   alert_count: number;
   last_update: string;
   avatar: string;
+  /** Hạn thực đơn đã duyệt (chỉ có nghĩa khi latest_plan_status === "approved") */
+  plan_end_date?: string | null;
+  plan_days_left?: number | null;
+  plan_expiry?: "expiring" | "expired" | "ok" | "none";
+}
+
+export interface PlanExpiryDemoOut {
+  updated: string[];
+  skipped: string[];
 }
 
 export interface PatientMetrics {

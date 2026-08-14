@@ -48,9 +48,15 @@ class DoctorPatientSummary(BaseModel):
     status_key: Literal["attention", "stable", "warning", "pending"] = "stable"
     latest_plan_id: str | None = None
     latest_plan_status: str | None = None
+    plan_pending: int = 0
+    plan_total: int = 0
     alert_count: int = 0
     last_update: str = ""
     avatar: str = ""
+    # Hạn thực đơn đã duyệt (chỉ có ý nghĩa khi latest_plan_status == "approved")
+    plan_end_date: str | None = None
+    plan_days_left: int | None = None
+    plan_expiry: Literal["expiring", "expired", "ok", "none"] = "none"
 
 
 class MetricsUpdateRequest(BaseModel):
@@ -122,3 +128,16 @@ class CatalogOut(BaseModel):
 
 class AvatarOut(BaseModel):
     avatar: str
+
+
+class PlanExpiryDemoRequest(BaseModel):
+    """Demo: giả lập thực đơn sắp hết hạn / đã hết hạn (backdate reviewed_at)."""
+
+    mode: Literal["expiring", "expired"] = "expired"
+
+
+class PlanExpiryDemoOut(BaseModel):
+    """Kết quả giả lập: patient ids đã backdate + bỏ qua (không có plan approved)."""
+
+    updated: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)

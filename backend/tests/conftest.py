@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Hermetic tests: no LLM calls, demo mode on.
 os.environ["OPENAI_API_KEY"] = ""
+os.environ["DEEPSEEK_API_KEY"] = ""
+os.environ["LLM_API_KEY"] = ""
 os.environ["DEMO_MOCK"] = "true"
 
 import pytest  # noqa: E402

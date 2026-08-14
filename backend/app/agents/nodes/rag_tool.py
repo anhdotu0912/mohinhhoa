@@ -58,17 +58,11 @@ def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> st
     medications = ", ".join(profile.get("medications", [])) or "chưa rõ"
 
     try:
-        from langchain_openai import ChatOpenAI
-        from app.core.config import settings
+        from app.core.llm import get_chat_llm
 
-        if not settings.OPENAI_API_KEY:
+        llm = get_chat_llm(temperature=0.3)
+        if llm is None:
             return _template_answer(message, context_str)
-
-        llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            temperature=0.3,
-            api_key=settings.OPENAI_API_KEY,
-        )
 
         prompt = f"""Bạn là trợ lý dinh dưỡng AI cho bệnh nhân mạn tính. Trả lời câu hỏi dựa trên thông tin được cung cấp.
 

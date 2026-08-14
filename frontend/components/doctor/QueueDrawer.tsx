@@ -145,7 +145,7 @@ export function QueueDrawer() {
                   {job.status === "completed" && (
                     <div className="mt-xs pt-xs border-t border-outline-variant/60 flex items-center justify-between">
                       <span className="text-xs font-semibold text-emerald-800">
-                        {job.variantsCount || 3} phương án ({job.daysCount || 7} ngày)
+                        {job.planIds?.length || 1} thực đơn ({job.daysCount || 7} ngày)
                       </span>
                       <button
                         onClick={() => handleNavigateReview(job.patientId)}

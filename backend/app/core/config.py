@@ -6,9 +6,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # LLM
+    # LLM — provider: openai | deepseek
+    LLM_PROVIDER: str = "openai"
+    LLM_MODEL: str = ""
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = ""
     OPENAI_API_KEY: str = ""
-    LLM_MODEL: str = "gpt-4o-mini"
+    DEEPSEEK_API_KEY: str = ""
 
     # Embedding
     EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"

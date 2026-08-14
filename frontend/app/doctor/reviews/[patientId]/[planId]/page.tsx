@@ -1,83 +1,51 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
-import { MOCK_PATIENTS } from "@/lib/mock-data";
-import { usePlansStore, MealDishItem } from "@/lib/plans-store";
+import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import { mealPlanToUiItem } from "@/lib/meal-plan-mappers";
+import { MealDishItem, MealPlanItem } from "@/lib/plans-store";
+import { ApiError } from "@/lib/types";
+import { asRouteId } from "@/lib/route-params";
 
 export default function PlanReviewDetailPage() {
   const router = useRouter();
   const params = useParams();
 
-  const patientId = (params?.patientId as string) || "BN-10293";
-  const planId = (params?.planId as string) || "PLAN-10293-V1";
+  const patientId = asRouteId(params?.patientId);
+  const planId = asRouteId(params?.planId);
 
-  const { getPlanById, getVariantsByGroupId, updatePlanStatus } = usePlansStore();
-  const storePlan = getPlanById(planId);
-
-  const patient =
-    MOCK_PATIENTS.find((p) => p.id === patientId) || MOCK_PATIENTS[0];
-
-  const plan = storePlan || {
-    id: planId,
-    patientId: patient.id,
-    patientName: patient.name,
-    patientCode: patient.id,
-    condition: patient.condition,
-    duration: "7 ngày",
-    daysCount: 7,
-    status: "pending" as const,
-    planTitle: "Phương án 1: Thực đơn Chuẩn y khoa DASH",
-    calories: "1780 kcal/ngày",
-    salt: "1.8g/ngày",
-    sugar: "8g/ngày",
-    createdAt: "12/10/2023 08:30",
-    days: [
-      {
-        dayIndex: 1,
-        dayName: "Ngày 1",
-        breakfast: [{ name: "Phở gà ít béo (thịt lườn, nước dùng trong)", calories: 350, salt: 1.2, sugar: 0 }],
-        lunch: [{ name: "Cơm gạo lứt + Cá hồi áp chảo măng tây", calories: 470, salt: 0.8, sugar: 0 }],
-        dinner: [{ name: "Ức gà hấp gừng sả + Rau củ luộc thập cẩm", calories: 310, salt: 0.5, sugar: 1 }],
-        totalCalories: 1780,
-        totalSalt: 1.8,
-        totalSugar: 8.0,
-      },
-    ],
-    warnings: ["Theo dõi huyết áp & chỉ số đường huyết hàng ngày."],
-    citations: [
-      "QĐ 41/2016-BYT (Hướng dẫn Dinh dưỡng Lâm sàng)",
-      "AHA 2023 Dietary Guidance",
-    ],
-  };
-
-  // Group sibling variants if available
-  const siblingVariants = plan.variantGroupId
-    ? getVariantsByGroupId(plan.variantGroupId)
-    : [];
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [plan, setPlan] = useState<MealPlanItem | null>(null);
+  const siblingVariants: MealPlanItem[] = [];
 
   // Active day index state (1-indexed)
   const [activeDayIndex, setActiveDayIndex] = useState<number>(1);
 
-  // Status & local dish list states for current active day
-  const [status, setStatus] = useState(plan.status);
+  const [status, setStatus] = useState(plan?.status || "pending");
 
-  // Get current active day data from plan.days array or default fallback
-  const daysList = plan.days && plan.days.length > 0 ? plan.days : [];
+  const daysList = plan?.days && plan.days.length > 0 ? plan.days : [];
   const currentDayData =
     daysList.find((d) => d.dayIndex === activeDayIndex) || daysList[0] || {
       dayIndex: 1,
       dayName: "Ngày 1",
-      breakfast: plan.breakfast || [],
-      lunch: plan.lunch || [],
-      dinner: plan.dinner || [],
-      snack: [],
-      totalCalories: 1750,
-      totalSalt: 1.8,
-      totalSugar: 8.0,
+      breakfast: plan?.breakfast || [],
+      lunch: plan?.lunch || [],
+      dinner: plan?.dinner || [],
+      snack: [] as MealDishItem[],
+      totalCalories: 0,
+      totalSalt: 0,
+      totalSugar: 0,
     };
 
   const [breakfast, setBreakfast] = useState<MealDishItem[]>(currentDayData.breakfast || []);
@@ -113,24 +81,83 @@ export default function PlanReviewDetailPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleApprove = () => {
-    setStatus("approved");
-    updatePlanStatus(patientId, planId, "approved");
-    showToast("Đã duyệt phương án thực đơn! 2 phương án còn lại tự động chuyển trạng thái 'Không chọn'.");
-    setTimeout(() => {
-      router.push(`/doctor/reviews/${patientId}`);
-    }, 1500);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!planId || !patientId) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [planRow, patientRow] = await Promise.all([
+        api.getMealPlan(planId),
+        api.getDoctorPatient(patientId),
+      ]);
+      const uiPatient = {
+        ...doctorPatientToUi(patientRow),
+        avatar: assetUrl(patientRow.avatar) || doctorPatientToUi(patientRow).avatar,
+      };
+      const uiPlan = mealPlanToUiItem(planRow, {
+        patientName: uiPatient.name,
+        patientCode: uiPatient.id,
+        condition: uiPatient.condition,
+      });
+      setPatient(uiPatient);
+      setPlan(uiPlan);
+      setStatus(uiPlan.status);
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : "Không tải được thực đơn.");
+    } finally {
+      setLoading(false);
+    }
+  }, [planId, patientId]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token || role !== "doctor") {
+      router.replace("/login");
+      return;
+    }
+    void load();
+  }, [hydrated, token, role, router, load]);
+
+  useEffect(() => {
+    if (!plan) return;
+    const day = plan.days.find((d) => d.dayIndex === activeDayIndex) || plan.days[0];
+    if (!day) return;
+    setBreakfast(day.breakfast || []);
+    setLunch(day.lunch || []);
+    setDinner(day.dinner || []);
+    setSnack(day.snack || []);
+  }, [plan, activeDayIndex]);
+
+  const handleApprove = async () => {
+    try {
+      await api.reviewMealPlan(planId, { action: "approve" });
+      setStatus("approved");
+      showToast("Đã duyệt thực đơn.");
+      setTimeout(() => {
+        router.push("/doctor/reviews");
+      }, 1200);
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
+    }
   };
 
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (!rejectReason.trim()) return;
-    setStatus("rejected");
-    updatePlanStatus(patientId, planId, "rejected");
-    setRejectModalOpen(false);
-    showToast("Đã từ chối phương án thực đơn này!");
-    setTimeout(() => {
-      router.push(`/doctor/reviews/${patientId}`);
-    }, 1200);
+    try {
+      await api.reviewMealPlan(planId, { action: "reject", notes: rejectReason.trim() });
+      setStatus("rejected");
+      setRejectModalOpen(false);
+      showToast("Đã từ chối thực đơn.");
+      setTimeout(() => {
+        router.push("/doctor/reviews");
+      }, 1200);
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Không từ chối được thực đơn.");
+    }
   };
 
   const handleRemoveDish = (meal: "breakfast" | "lunch" | "dinner" | "snack", index: number) => {
@@ -178,6 +205,57 @@ export default function PlanReviewDetailPage() {
     dinner.reduce((sum, item) => sum + item.sugar, 0) +
     snack.reduce((sum, item) => sum + item.sugar, 0);
 
+  const applyAlternative = (
+    meal: "breakfast" | "lunch" | "dinner" | "snack",
+    index: number,
+    alt: MealDishItem
+  ) => {
+    const replace = (list: MealDishItem[]) => {
+      const current = list[index];
+      if (!current) return list;
+      const next = [...list];
+      next[index] = {
+        ...alt,
+        alternatives: [
+          { ...current, alternatives: [] },
+          ...(current.alternatives || []).filter((a) => a.name !== alt.name),
+        ],
+      };
+      return next;
+    };
+    if (meal === "breakfast") setBreakfast(replace);
+    if (meal === "lunch") setLunch(replace);
+    if (meal === "dinner") setDinner(replace);
+    if (meal === "snack") setSnack(replace);
+  };
+
+  if (!hydrated || !token || role !== "doctor") {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <>
+        <TopBar title="Chi tiết thực đơn" />
+        <main className="p-lg text-sm text-on-surface-variant">Đang tải thực đơn…</main>
+      </>
+    );
+  }
+
+  if (loadError || !plan || !patient) {
+    return (
+      <>
+        <TopBar title="Chi tiết thực đơn" />
+        <main className="p-lg">
+          <p className="text-sm text-error mb-md">{loadError || "Không tìm thấy thực đơn."}</p>
+          <Link href={`/doctor/patients/${patientId}`} className="text-xs font-semibold text-primary hover:underline">
+            Quay lại hồ sơ bệnh nhân
+          </Link>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <TopBar title={`Chi tiết thực đơn - ${plan.planTitle}`} />
@@ -216,7 +294,7 @@ export default function PlanReviewDetailPage() {
               <div>
                 <div className="flex items-center gap-xs flex-wrap">
                   <span className="bg-emerald-700 text-white text-[11px] px-2 py-0.5 rounded font-bold">
-                    Phương án {plan.variantIndex || 1}/{plan.totalVariants || 3}
+                    1 thực đơn • món thay thế
                   </span>
                   <h2 className="font-h1 text-h1 text-on-surface font-bold text-lg">
                     {patient.name}
@@ -437,24 +515,13 @@ export default function PlanReviewDetailPage() {
                   <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
                 ) : (
                   breakfast.map((item, idx) => (
-                    <div
+                    <DishRow
                       key={idx}
-                      className="flex items-center justify-between p-sm bg-surface-container-low/50 rounded-xl text-xs"
-                    >
-                      <span className="font-medium text-on-surface font-body">{item.name}</span>
-                      <div className="flex items-center gap-md text-on-surface-variant">
-                        <span>{item.calories} kcal</span>
-                        <span>Muối: {item.salt}g</span>
-                        {isEditingMenu && (
-                          <button
-                            onClick={() => handleRemoveDish("breakfast", idx)}
-                            className="text-red-500 hover:text-red-700 ml-xs p-1"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                      item={item}
+                      isEditing={isEditingMenu}
+                      onRemove={() => handleRemoveDish("breakfast", idx)}
+                      onSwap={(alt) => applyAlternative("breakfast", idx, alt)}
+                    />
                   ))
                 )}
               </div>
@@ -487,24 +554,13 @@ export default function PlanReviewDetailPage() {
                   <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
                 ) : (
                   lunch.map((item, idx) => (
-                    <div
+                    <DishRow
                       key={idx}
-                      className="flex items-center justify-between p-sm bg-surface-container-low/50 rounded-xl text-xs"
-                    >
-                      <span className="font-medium text-on-surface font-body">{item.name}</span>
-                      <div className="flex items-center gap-md text-on-surface-variant">
-                        <span>{item.calories} kcal</span>
-                        <span>Muối: {item.salt}g</span>
-                        {isEditingMenu && (
-                          <button
-                            onClick={() => handleRemoveDish("lunch", idx)}
-                            className="text-red-500 hover:text-red-700 ml-xs p-1"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                      item={item}
+                      isEditing={isEditingMenu}
+                      onRemove={() => handleRemoveDish("lunch", idx)}
+                      onSwap={(alt) => applyAlternative("lunch", idx, alt)}
+                    />
                   ))
                 )}
               </div>
@@ -537,24 +593,13 @@ export default function PlanReviewDetailPage() {
                   <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
                 ) : (
                   dinner.map((item, idx) => (
-                    <div
+                    <DishRow
                       key={idx}
-                      className="flex items-center justify-between p-sm bg-surface-container-low/50 rounded-xl text-xs"
-                    >
-                      <span className="font-medium text-on-surface font-body">{item.name}</span>
-                      <div className="flex items-center gap-md text-on-surface-variant">
-                        <span>{item.calories} kcal</span>
-                        <span>Muối: {item.salt}g</span>
-                        {isEditingMenu && (
-                          <button
-                            onClick={() => handleRemoveDish("dinner", idx)}
-                            className="text-red-500 hover:text-red-700 ml-xs p-1"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                      item={item}
+                      isEditing={isEditingMenu}
+                      onRemove={() => handleRemoveDish("dinner", idx)}
+                      onSwap={(alt) => applyAlternative("dinner", idx, alt)}
+                    />
                   ))
                 )}
               </div>
@@ -584,25 +629,14 @@ export default function PlanReviewDetailPage() {
                 </div>
 
                 <div className="space-y-xs">
-                  {snack.map((item, idx) => (
-                    <div
+                  {                  snack.map((item, idx) => (
+                    <DishRow
                       key={idx}
-                      className="flex items-center justify-between p-sm bg-surface-container-low/50 rounded-xl text-xs"
-                    >
-                      <span className="font-medium text-on-surface font-body">{item.name}</span>
-                      <div className="flex items-center gap-md text-on-surface-variant">
-                        <span>{item.calories} kcal</span>
-                        <span>Muối: {item.salt}g</span>
-                        {isEditingMenu && (
-                          <button
-                            onClick={() => handleRemoveDish("snack", idx)}
-                            className="text-red-500 hover:text-red-700 ml-xs p-1"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                      item={item}
+                      isEditing={isEditingMenu}
+                      onRemove={() => handleRemoveDish("snack", idx)}
+                      onSwap={(alt) => applyAlternative("snack", idx, alt)}
+                    />
                   ))}
                 </div>
               </div>
@@ -641,15 +675,15 @@ export default function PlanReviewDetailPage() {
             className="px-md py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-xs shadow-2xs"
           >
             <span className="material-symbols-outlined text-[18px]">cancel</span>
-            <span>Từ chối phương án này</span>
+            <span>Từ chối thực đơn này</span>
           </button>
 
           <button
-            onClick={handleApprove}
+            onClick={() => void handleApprove()}
             className="px-lg py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95 flex items-center gap-xs font-semibold"
           >
             <span className="material-symbols-outlined text-[18px]">check_circle</span>
-            <span>Duyệt phương án này</span>
+            <span>Duyệt thực đơn này</span>
           </button>
         </div>
       </div>
@@ -756,5 +790,51 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
     </>
+  );
+}
+
+function DishRow({
+  item,
+  isEditing,
+  onRemove,
+  onSwap,
+}: {
+  item: MealDishItem;
+  isEditing: boolean;
+  onRemove: () => void;
+  onSwap: (alt: MealDishItem) => void;
+}) {
+  const alts = item.alternatives || [];
+  return (
+    <div className="p-sm bg-surface-container-low/50 rounded-xl text-xs space-y-xs">
+      <div className="flex items-center justify-between gap-sm">
+        <span className="font-medium text-on-surface font-body">{item.name}</span>
+        <div className="flex items-center gap-md text-on-surface-variant shrink-0">
+          <span>{item.calories} kcal</span>
+          <span>Muối: {item.salt}g</span>
+          {isEditing && (
+            <button onClick={onRemove} className="text-red-500 hover:text-red-700 ml-xs p-1">
+              <span className="material-symbols-outlined text-[16px]">delete</span>
+            </button>
+          )}
+        </div>
+      </div>
+      {alts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-xs pl-1">
+          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Thay thế:</span>
+          {alts.map((alt) => (
+            <button
+              key={alt.foodId || alt.name}
+              type="button"
+              onClick={() => onSwap(alt)}
+              className="px-2 py-0.5 rounded-full border border-outline-variant text-[11px] text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
+              title={`${alt.calories} kcal`}
+            >
+              {alt.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

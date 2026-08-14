@@ -5,13 +5,11 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
-import { PatientCard } from "@/components/doctor/PatientCard";
-import { api } from "@/lib/api";
+import Pagination, { getPageItems } from "@/components/shared/Pagination";
+import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { ApiError, type CatalogItem, type CatalogOut } from "@/lib/types";
-
-type StatusFilter = "all" | "attention" | "warning" | "stable" | "pending";
 
 const ADD_STEP_LABELS = [
   "Tài khoản & Chung",
@@ -20,8 +18,19 @@ const ADD_STEP_LABELS = [
   "Dinh dưỡng & Mục tiêu",
 ];
 
+const PAGE_SIZE = 10;
+
 function truncateId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+  return id.length > 6 ? `...${id.slice(-4)}` : id;
+}
+
+/** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
 }
 
 export default function PatientsListPage() {
@@ -32,19 +41,14 @@ export default function PatientsListPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const [isMultiSelect, setIsMultiSelect] = useState(false);
-  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
-
-  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
-  const [patientSearch, setPatientSearch] = useState("");
+  const [diagnosisFilter, setDiagnosisFilter] = useState<string>("all");
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  const [page, setPage] = useState(1);
 
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -125,89 +129,52 @@ export default function PatientsListPage() {
         patient.condition.toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
-      if (statusFilter === "all") return true;
-      return patient.statusKey === statusFilter;
+      if (diagnosisFilter === "all") return true;
+      return (patient.disease ?? []).includes(diagnosisFilter);
     });
-  }, [patients, searchQuery, statusFilter]);
+  }, [patients, searchQuery, diagnosisFilter]);
 
-  const counts = useMemo(
-    () => ({
-      all: patients.length,
-      attention: patients.filter((p) => p.statusKey === "attention").length,
-      warning: patients.filter((p) => p.statusKey === "warning").length,
-      stable: patients.filter((p) => p.statusKey === "stable").length,
-      pending: patients.filter((p) => p.statusKey === "pending").length,
-    }),
-    [patients]
-  );
-
-  const modalFilteredPatients = useMemo(() => {
-    const q = patientSearch.trim().toLowerCase();
-    if (!q) return patients;
-    return patients.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q) ||
-        p.condition.toLowerCase().includes(q) ||
-        (p.email || "").toLowerCase().includes(q)
-    );
-  }, [patients, patientSearch]);
-
-  const toggleSelectPatient = (id: string) => {
-    setSelectedPatientIds((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedPatientIds.length === filteredPatients.length) {
-      setSelectedPatientIds([]);
-    } else {
-      setSelectedPatientIds(filteredPatients.map((p) => p.id));
-    }
-  };
-
-  const generateForPatients = async (ids: string[]) => {
-    if (ids.length === 0) return;
-    setGenerating(true);
-    let ok = 0;
-    let fail = 0;
-    try {
-      for (const id of ids) {
-        try {
-          await api.generateMealPlanForPatient(id);
-          ok += 1;
-        } catch {
-          fail += 1;
-        }
+  /** Các nhóm chẩn đoán (kèm số BN) để lọc — lấy từ dữ liệu bệnh nhân thật. */
+  const diagnosisFilters = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of patients) {
+      for (const code of p.disease ?? []) {
+        counts.set(code, (counts.get(code) ?? 0) + 1);
       }
-      if (ok > 0) {
-        showToast(
-          fail > 0
-            ? `Đã tạo ${ok} thực đơn, ${fail} lỗi`
-            : `Đã tạo ${ok} thực đơn (chờ duyệt)`
-        );
-        await loadPatients();
-      } else {
-        setError("Không tạo được thực đơn. Kiểm tra quyền doctor / backend.");
-      }
-    } finally {
-      setGenerating(false);
     }
-  };
+    const labelFor = (code: string) =>
+      catalog?.diagnoses.find((d) => d.code === code)?.name ?? code;
+    return [...counts.entries()]
+      .map(([code, count]) => ({ code, count, label: labelFor(code) }))
+      .sort(
+        (a, b) => b.count - a.count || a.label.localeCompare(b.label, "vi")
+      );
+  }, [patients, catalog]);
 
-  const handleBulkGenerate = async () => {
-    const ids = [...selectedPatientIds];
-    setSelectedPatientIds([]);
-    setIsMultiSelect(false);
-    await generateForPatients(ids);
-  };
+  // Về trang 1 khi đổi tab lọc / từ khóa tìm kiếm
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, diagnosisFilter]);
 
-  const handleSingleSelectPatient = (patientId: string) => {
-    setIsSelectModalOpen(false);
-    // Vào trang cấu hình AI — không generate API + nhảy thẳng [planId]
-    router.push(`/doctor/patients/${encodeURIComponent(patientId)}/generate`);
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedPatients = getPageItems(filteredPatients, safePage, PAGE_SIZE);
+
+  // Lấy catalog để hiển thị nhãn chẩn đoán cho bộ lọc.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getCatalog()
+      .then((c) => {
+        if (!cancelled) setCatalog(c);
+      })
+      .catch(() => {
+        /* bỏ qua — filter vẫn hoạt động với mã chẩn đoán */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAddPatientOpen) return;
@@ -492,34 +459,6 @@ export default function PatientsListPage() {
               <span className="material-symbols-outlined text-[18px]">person_add</span>
               <span>Thêm bệnh nhân</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsMultiSelect(!isMultiSelect);
-                if (isMultiSelect) setSelectedPatientIds([]);
-              }}
-              className={`px-md py-2 rounded-lg font-body-bold text-sm transition-all flex items-center gap-xs cursor-pointer border shadow-xs ${
-                isMultiSelect
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-500 font-semibold"
-                  : "bg-surface-container-lowest text-on-surface border-outline-variant hover:bg-surface-variant"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {isMultiSelect ? "check_box" : "checklist"}
-              </span>
-              <span>{isMultiSelect ? "Tắt chọn nhiều" : "Chọn nhiều"}</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={generating || patients.length === 0}
-              onClick={() => setIsSelectModalOpen(true)}
-              className="bg-primary text-on-primary px-md py-2 rounded-lg font-body-bold text-sm hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
-            >
-              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-              <span>{generating ? "Đang tạo..." : "Tạo thực đơn AI"}</span>
-            </button>
           </div>
         </div>
 
@@ -537,26 +476,29 @@ export default function PatientsListPage() {
         )}
 
         <div className="flex items-center gap-sm border-b border-outline-variant mb-lg pb-xs overflow-x-auto">
-          {(
-            [
-              ["all", "Tất cả", counts.all],
-              ["pending", "Chờ duyệt", counts.pending],
-              ["attention", "Cần chú ý", counts.attention],
-              ["warning", "Cảnh báo", counts.warning],
-              ["stable", "Ổn định", counts.stable],
-            ] as const
-          ).map(([key, label, count]) => (
+          <button
+            type="button"
+            onClick={() => setDiagnosisFilter("all")}
+            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              diagnosisFilter === "all"
+                ? "border-primary text-primary font-bold"
+                : "border-transparent text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Tất cả ({patients.length})
+          </button>
+          {diagnosisFilters.map((opt) => (
             <button
-              key={key}
+              key={opt.code}
               type="button"
-              onClick={() => setStatusFilter(key)}
+              onClick={() => setDiagnosisFilter(opt.code)}
               className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === key
+                diagnosisFilter === opt.code
                   ? "border-primary text-primary font-bold"
                   : "border-transparent text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              {label} ({count})
+              {opt.label} ({opt.count})
             </button>
           ))}
         </div>
@@ -583,34 +525,19 @@ export default function PatientsListPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-outline-variant">
-                    {isMultiSelect && (
-                      <th className="p-md w-12 text-center">
-                        <input
-                          type="checkbox"
-                          checked={
-                            selectedPatientIds.length > 0 &&
-                            selectedPatientIds.length === filteredPatients.length
-                          }
-                          onChange={toggleSelectAll}
-                          className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
-                        />
-                      </th>
-                    )}
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
-                      Bệnh nhân
-                    </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
                       Mã BN
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
-                      Chẩn đoán / Bệnh lý
+                      Bệnh nhân
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
-                      Trạng thái
+                      Chẩn đoán
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
                       Thực đơn
@@ -624,233 +551,102 @@ export default function PatientsListPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant font-body text-body">
-                  {filteredPatients.map((patient) => {
-                    const isSelected = selectedPatientIds.includes(patient.id);
+                  {pagedPatients.map((patient) => {
+                    const planPending = patient.planPending ?? 0;
+                    const planTotal = patient.planTotal ?? 0;
+                    // Bỏ avatar seed từ dicebear (thường lỗi do offline); resolve path /static/ theo API_BASE
+                    const avatar =
+                      patient.avatar &&
+                      !patient.avatar.startsWith("https://api.dicebear.com")
+                        ? assetUrl(patient.avatar)
+                        : "";
                     return (
-                      <tr
-                        key={patient.id}
-                        onClick={() => {
-                          if (isMultiSelect) toggleSelectPatient(patient.id);
-                        }}
-                        className={`transition-colors ${
-                          isSelected
-                            ? "bg-emerald-50/60 hover:bg-emerald-50"
-                            : "hover:bg-surface-bright"
-                        } ${isMultiSelect ? "cursor-pointer" : ""}`}
-                      >
-                        {isMultiSelect && (
-                          <td
-                            className="p-md text-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSelectPatient(patient.id)}
-                              className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500 cursor-pointer"
-                            />
-                          </td>
-                        )}
-                        <td className="p-md">
-                          <div className="flex items-center gap-sm">
-                            <img
-                              src={patient.avatar}
-                              alt={patient.name}
-                              className="w-10 h-10 rounded-full object-cover border border-outline-variant shrink-0 bg-surface-container"
-                            />
-                            <div>
-                              <p className="font-body-bold text-on-surface font-semibold text-sm">
-                                {patient.name}
-                              </p>
-                              <p className="font-caption text-caption text-on-surface-variant text-xs">
-                                {patient.email ||
-                                  (patient.age > 0
-                                    ? `${patient.age} tuổi • ${patient.gender}`
-                                    : "")}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-md">
-                          <div className="group/mabn inline-flex items-center gap-xs">
-                            <span className="font-mono text-xs font-medium text-on-surface-variant">
-                              {truncateId(patient.id)}
-                            </span>
-                            <button
-                              type="button"
-                              title="Sao chép mã bệnh nhân"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void navigator.clipboard
-                                  .writeText(patient.id)
-                                  .then(() => showToast("Đã sao chép mã BN"));
-                              }}
-                              className="opacity-0 group-hover/mabn:opacity-100 transition-opacity text-on-surface-variant hover:text-primary cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                content_copy
-                              </span>
-                            </button>
-                          </div>
-                        </td>
-                        <td className="p-md text-on-surface text-sm max-w-[220px]">
-                          {patient.condition}
-                          {(patient.alertCount || 0) > 0 && (
-                            <span className="ml-xs text-xs text-error font-semibold">
-                              · {patient.alertCount} alert
-                            </span>
-                          )}
-                        </td>
+                      <tr key={patient.id} className="transition-colors hover:bg-surface-bright">
                         <td className="p-md">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-full font-caption text-xs font-semibold ${patient.statusColor}`}
+                            title={patient.id}
+                            className="font-mono text-xs font-medium text-on-surface-variant"
                           >
-                            {patient.status}
+                            {truncateId(patient.id)}
                           </span>
                         </td>
-                        <td className="p-md text-xs text-on-surface-variant">
-                          {patient.latestPlanStatus || "Chưa có"}
+                        <td className="p-md">
+                          <div className="flex items-center gap-sm">
+                            <div className="relative w-9 h-9 shrink-0">
+                              <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                                {initials(patient.name)}
+                              </div>
+                              {avatar && (
+                                <img
+                                  src={avatar}
+                                  alt={patient.name}
+                                  className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <p className="font-body-bold text-on-surface font-semibold text-sm">
+                              {patient.name}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="p-md">
+                          <p
+                            title={patient.condition}
+                            className="text-on-surface text-sm max-w-[260px] truncate"
+                          >
+                            {patient.condition}
+                          </p>
+                        </td>
+                        <td className="p-md text-xs">
+                          {planTotal === 0 ? (
+                            <span className="text-on-surface-variant">Chưa có</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              {planPending > 0 ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
+                                  {planPending}
+                                </span>
+                              ) : (
+                                <span className="font-semibold text-on-surface">{planPending}</span>
+                              )}
+                              <span className="text-on-surface-variant">/ {planTotal}</span>
+                            </span>
+                          )}
                         </td>
                         <td className="p-md text-on-surface-variant text-xs">
                           {patient.lastUpdate}
                         </td>
-                        <td className="p-md text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="inline-flex items-center gap-xs">
-                            <button
-                              type="button"
-                              title="Tạo thực đơn AI"
-                              disabled={generating}
-                              onClick={() => handleSingleSelectPatient(patient.id)}
-                              className="w-8 h-8 inline-flex items-center justify-center bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs disabled:opacity-60"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">
-                                auto_awesome
-                              </span>
-                            </button>
-                            <Link
-                              href={`/doctor/patients/${patient.id}`}
-                              title="Xem hồ sơ"
-                              className="w-8 h-8 inline-flex items-center justify-center bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg hover:bg-primary hover:text-on-primary transition-all cursor-pointer active:scale-95 shadow-xs"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">
-                                visibility
-                              </span>
-                            </Link>
-                          </div>
+                        <td className="p-md text-right">
+                          <Link
+                            href={`/doctor/patients/${patient.id}`}
+                            title="Xem chi tiết"
+                            className="inline-flex items-center gap-1.5 px-md py-1.5 bg-surface-container-lowest border border-primary text-primary font-body-bold text-xs rounded-lg hover:bg-primary hover:text-on-primary transition-all cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              visibility
+                            </span>
+                            Xem chi tiết
+                          </Link>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              <Pagination
+                page={safePage}
+                totalItems={filteredPatients.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </div>
       </main>
-
-      {isMultiSelect && selectedPatientIds.length >= 1 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-gray-900/95 text-white px-lg py-md rounded-2xl shadow-2xl border border-gray-700/60 backdrop-blur-md flex items-center gap-lg">
-          <div className="flex items-center gap-sm">
-            <span className="w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center">
-              {selectedPatientIds.length}
-            </span>
-            <span className="font-body-bold font-medium text-sm">
-              Đã chọn{" "}
-              <strong className="text-emerald-400">{selectedPatientIds.length}</strong> bệnh
-              nhân
-            </span>
-          </div>
-
-          <div className="flex items-center gap-sm">
-            <button
-              type="button"
-              onClick={() => setSelectedPatientIds([])}
-              className="px-md py-2 text-xs text-gray-300 hover:text-white transition-colors cursor-pointer"
-            >
-              Hủy chọn
-            </button>
-            <button
-              type="button"
-              disabled={generating}
-              onClick={() => void handleBulkGenerate()}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-lg py-2.5 rounded-xl font-body-bold text-sm transition-all shadow-md flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
-            >
-              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-              <span>{generating ? "Đang tạo..." : "Tạo thực đơn hàng loạt"}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isSelectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/40 backdrop-blur-xs">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-[24px]">auto_awesome</span>
-                </div>
-                <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
-                    Chọn bệnh nhân để tạo thực đơn AI
-                  </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
-                    Tạo plan thật qua API — trạng thái pending_review
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSelectModalOpen(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            <div className="relative mb-md">
-              <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px]">
-                search
-              </span>
-              <input
-                type="text"
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-                placeholder="Tìm theo tên, mã bệnh nhân, email..."
-                className="w-full pl-xl pr-md py-sm bg-surface-container-low border border-outline-variant rounded-xl font-body text-body text-on-surface text-xs focus:outline-none focus:border-primary transition-colors"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-sm pr-xs">
-              {modalFilteredPatients.length === 0 ? (
-                <div className="text-center py-xl text-on-surface-variant text-xs">
-                  Không tìm thấy bệnh nhân phù hợp.
-                </div>
-              ) : (
-                modalFilteredPatients.map((patient) => (
-                  <PatientCard
-                    key={patient.id}
-                    patient={patient}
-                    onSelect={handleSingleSelectPatient}
-                  />
-                ))
-              )}
-            </div>
-
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-between items-center text-xs text-on-surface-variant">
-              <span>Hiển thị {modalFilteredPatients.length} bệnh nhân</span>
-              <button
-                type="button"
-                onClick={() => setIsSelectModalOpen(false)}
-                className="px-md py-sm border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isAddPatientOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/40 backdrop-blur-xs">

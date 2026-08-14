@@ -6,6 +6,7 @@ export interface Patient {
   age: number;
   gender: string;
   condition: string;
+  disease?: string[];
   status: "Cần chú ý" | "Ổn định" | "Cảnh báo" | "Chờ duyệt";
   statusColor: string;
   lastUpdate: string;
@@ -21,6 +22,8 @@ export interface Patient {
   statusKey?: "attention" | "stable" | "warning" | "pending";
   latestPlanId?: string | null;
   latestPlanStatus?: string | null;
+  planPending?: number;
+  planTotal?: number;
   alertCount?: number;
 }
 
@@ -46,6 +49,7 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     age: p.age ?? 0,
     gender: p.gender ?? "—",
     condition: p.condition_label,
+    disease: p.disease,
     status: p.status,
     statusColor: statusColorFor(p.status),
     lastUpdate: p.last_update || "—",
@@ -55,6 +59,8 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     statusKey: p.status_key,
     latestPlanId: p.latest_plan_id,
     latestPlanStatus: p.latest_plan_status,
+    planPending: p.plan_pending ?? 0,
+    planTotal: p.plan_total ?? 0,
     alertCount: p.alert_count,
   };
 }

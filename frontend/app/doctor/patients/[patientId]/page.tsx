@@ -4,7 +4,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
+import { asRouteId } from "@/lib/route-params";
 import { TopBar } from "@/components/shared/TopBar";
 import { PatientMetricsCard } from "@/components/doctor/PatientMetricsCard";
 import { api, assetUrl } from "@/lib/api";
@@ -56,7 +57,16 @@ interface PatientDetailData extends Patient {
 }
 
 function truncateId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
+  return id.length > 6 ? `...${id.slice(-4)}` : id;
+}
+
+/** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
 }
 
 function formatDateTime(iso?: string | null): string {
@@ -116,12 +126,9 @@ function buildDetail(summary: DoctorPatientSummary): PatientDetailData {
   };
 }
 
-export default function PatientDetailPage({
-  params,
-}: {
-  params: { patientId: string };
-}) {
-  const patientId = params.patientId;
+export default function PatientDetailPage() {
+  const params = useParams();
+  const patientId = asRouteId(params?.patientId);
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
@@ -184,6 +191,11 @@ export default function PatientDetailPage({
   };
 
   const loadData = useCallback(async () => {
+    if (!patientId) {
+      setLoading(false);
+      setError("Thiếu mã bệnh nhân.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -216,8 +228,9 @@ export default function PatientDetailPage({
       router.replace("/patient");
       return;
     }
+    if (!patientId) return;
     void loadData();
-  }, [hydrated, token, role, router, loadData]);
+  }, [hydrated, token, role, router, loadData, patientId]);
 
   const patient = useMemo(
     () => (summary ? buildDetail(summary) : null),
@@ -499,6 +512,18 @@ export default function PatientDetailPage({
     );
   }
 
+  // Bỏ avatar seed từ dicebear (thường lỗi do offline); resolve path /static/ theo API_BASE
+  const avatarSrc =
+    patient.avatar && !patient.avatar.startsWith("https://api.dicebear.com")
+      ? assetUrl(patient.avatar)
+      : "";
+  const previewAvatarUrl = editForm.avatarUrl.trim();
+  const previewAvatarSrc =
+    previewAvatarUrl &&
+    !previewAvatarUrl.startsWith("https://api.dicebear.com")
+      ? assetUrl(previewAvatarUrl)
+      : "";
+
   return (
     <>
       <TopBar title="Chi tiết bệnh nhân" />
@@ -553,11 +578,19 @@ export default function PatientDetailPage({
               {/* Profile Card */}
               <div className="bg-surface rounded-xl border border-outline-variant p-card-padding flex flex-col items-center text-center shadow-subtle hover:shadow-hover transition-shadow">
                 <div className="relative mb-md">
-                  <img
-                    alt={`${patient.name} Avatar`}
-                    className="w-24 h-24 rounded-full object-cover shadow-sm border-2 border-primary-fixed-dim"
-                    src={assetUrl(patient.avatar)}
-                  />
+                  <div className="w-24 h-24 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-2xl font-semibold">
+                    {initials(patient.name)}
+                  </div>
+                  {avatarSrc && (
+                    <img
+                      alt={`${patient.name} Avatar`}
+                      className="absolute inset-0 w-24 h-24 rounded-full object-cover shadow-sm border-2 border-primary-fixed-dim"
+                      src={avatarSrc}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  )}
                   <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></span>
                 </div>
                 <h3 className="font-h2 text-h2 text-on-surface mb-xs font-bold text-lg">
@@ -1042,14 +1075,21 @@ export default function PatientDetailPage({
                   Ảnh đại diện
                 </h5>
                 <div className="flex items-center gap-md">
-                  <img
-                    src={
-                      assetUrl(editForm.avatarUrl.trim()) ||
-                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${patientId}`
-                    }
-                    alt="Avatar preview"
-                    className="w-16 h-16 rounded-full object-cover border border-outline-variant bg-surface-container shrink-0"
-                  />
+                  <div className="relative w-16 h-16 shrink-0">
+                    <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-sm font-semibold">
+                      {initials(editForm.fullName.trim() || patient.name)}
+                    </div>
+                    {previewAvatarSrc && (
+                      <img
+                        src={previewAvatarSrc}
+                        alt="Avatar preview"
+                        className="absolute inset-0 w-16 h-16 rounded-full object-cover border border-outline-variant bg-surface-container"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
+                  </div>
                   <div className="flex-1 space-y-xs">
                     <label className="flex items-center gap-xs cursor-pointer">
                       <input

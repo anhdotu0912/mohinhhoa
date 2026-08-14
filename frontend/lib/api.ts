@@ -8,10 +8,12 @@ import {
   type DoctorPatientSummary,
   type DoctorPatientUpdate,
   type GoalsOut,
+  type GenerateMealPlanRequest,
   type MealPlanOutput,
   type NotificationOut,
   type PatientMetrics,
   type PatientProfile,
+  type PlanExpiryDemoOut,
   type ProfileUpsert,
   type RegisterResponse,
   type ReviewRequest,
@@ -19,6 +21,7 @@ import {
   type TokenResponse,
   type UserRole,
 } from "./types";
+import { asRouteId } from "./route-params";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
@@ -127,8 +130,11 @@ export const api = {
     });
   },
 
-  generateMealPlan(): Promise<MealPlanOutput> {
-    return request("/api/v1/meal-plans/generate", { method: "POST" });
+  generateMealPlan(payload?: GenerateMealPlanRequest): Promise<MealPlanOutput> {
+    return request("/api/v1/meal-plans/generate", {
+      method: "POST",
+      body: payload ?? {},
+    });
   },
 
   getMyMealPlan(): Promise<MealPlanOutput> {
@@ -185,7 +191,11 @@ export const api = {
   },
 
   getDoctorPatient(patientId: string): Promise<DoctorPatientSummary> {
-    return request(`/api/v1/doctor/patients/${encodeURIComponent(patientId)}`);
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}`);
   },
 
   updatePatientMetrics(
@@ -249,10 +259,13 @@ export const api = {
     return (await res.json()) as { avatar: string };
   },
 
-  generateMealPlanForPatient(patientId: string): Promise<MealPlanOutput> {
+  generateMealPlanForPatient(
+    patientId: string,
+    payload?: GenerateMealPlanRequest
+  ): Promise<MealPlanOutput> {
     return request(
       `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/meal-plans/generate`,
-      { method: "POST" }
+      { method: "POST", body: payload ?? {} }
     );
   },
 
@@ -266,6 +279,15 @@ export const api = {
     return request(`/api/v1/doctor/meal-plans/${id}/review`, {
       method: "POST",
       body: payload,
+    });
+  },
+
+  demoPlanExpiry(
+    mode: "expiring" | "expired"
+  ): Promise<PlanExpiryDemoOut> {
+    return request("/api/v1/doctor/demo/plan-expiry", {
+      method: "POST",
+      body: { mode },
     });
   },
 

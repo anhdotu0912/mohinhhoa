@@ -229,6 +229,23 @@ def test_demo_simulate(client):
     assert types == {"meal_reminder", "adherence_checkin", "plan_approved"}
 
 
+def test_demo_simulate_blocked_in_production(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    headers = _login(client, PATIENT)
+    response = client.post("/api/v1/notifications/demo/simulate", headers=headers)
+    assert response.status_code == 403, response.text
+    body = response.json()
+    assert body["code"] == "DEMO_DISABLED"
+    assert body["detail"] == "Endpoint demo không khả dụng ở production."
+
+    # No notifications were seeded by the blocked call.
+    response = client.get("/api/v1/notifications", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+
+
 def test_doctor_patients_list_and_generate(client):
     doctor_headers = _login(client, DOCTOR)
     response = client.get("/api/v1/doctor/patients", headers=doctor_headers)
@@ -251,6 +268,9 @@ def test_doctor_patients_list_and_generate(client):
     assert plan["user_id"] == patient_id
     assert plan["status"] == "pending_review"
     assert len(plan["days"]) == 7
+    first_items = plan["days"][0]["meals"][0]["items"]
+    assert first_items
+    assert "alternatives" in first_items[0]
 
 
 def test_doctor_role_guard(client):

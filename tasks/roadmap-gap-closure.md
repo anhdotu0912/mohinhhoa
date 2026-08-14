@@ -89,7 +89,7 @@
 
 **Definition of Done:**
 - [ ] Demo E2E chạy được trên URL production, không phải chỉ local
-- [ ] `POST /notifications/demo/simulate` bị chặn hoặc guard rõ ràng ở production (không lộ endpoint demo)
+- [x] `POST /notifications/demo/simulate` bị chặn hoặc guard rõ ràng ở production (không lộ endpoint demo) — guard `APP_ENV=production` → `403 DEMO_DISABLED` (2026-08-13)
 
 ---
 

@@ -22,6 +22,7 @@ class FoodItem(BaseModel):
     macros: Macros = Field(default_factory=Macros)
     food_id: str | None = None
     citations: list[str] = Field(default_factory=list)
+    alternatives: list["FoodItem"] = Field(default_factory=list)
 
 
 class Meal(BaseModel):
@@ -57,6 +58,12 @@ class Swap(BaseModel):
     reason: str
 
     model_config = {"populate_by_name": True}
+
+
+class GenerateMealPlanRequest(BaseModel):
+    """Optional doctor/patient notes forwarded to the meal planner LLM."""
+    notes: str = ""
+    priorities: list[str] = Field(default_factory=list)
 
 
 class MealPlanOutput(BaseModel):
@@ -133,3 +140,6 @@ class AgentRunOutput(BaseModel):
     alert_ids: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     guardrail_triggered: bool = False
+
+
+FoodItem.model_rebuild()

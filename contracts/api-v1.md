@@ -58,19 +58,22 @@ Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_t
 ## Meal Plans
 
 ### POST /api/v1/meal-plans/generate
-**Role:** patient (doctor gọi qua `/doctor/patients/{id}/generate` — endpoint riêng phía doctor, cùng contract response)
+**Role:** patient (doctor gọi `POST /api/v1/doctor/patients/{patient_id}/meal-plans/generate` — cùng body + response)
 ```json
-// Response 201
+// Request (tùy chọn, body rỗng vẫn hợp lệ)
+{ "notes": "ưu tiên hấp luộc", "priorities": ["Đa dạng món ăn"] }
+// Response 200
 {
   "id": "string",
   "user_id": "string",
   "status": "pending_review",
-  "days": [ /* 7 phần tử, mỗi phần tử: slots breakfast/lunch/dinner[/snack] */ ],
-  "swaps": [ /* các món đã bị swap do interaction nguy hiểm */ ],
+  "days": [ /* 7 phần tử; FoodItem có alternatives[] (món thay thế) */ ],
+  "swaps": [ /* món đã bị swap do interaction nguy hiểm */ ],
   "citations": [ /* nguồn cho số liệu dinh dưỡng */ ],
   "trust_badge": null
 }
 ```
+Luôn 1 plan / 7 ngày. `notes` + `priorities` đưa vào prompt LLM (catalog mock). Thiếu API key (`LLM_API_KEY` / `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` tùy `LLM_PROVIDER`) → fallback rule-based cùng catalog.
 
 ### GET /api/v1/meal-plans/me
 **Role:** patient — trả plan mới nhất của user hiện tại.
@@ -150,7 +153,7 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 ```
 
 ### POST /api/v1/notifications/demo/simulate
-**Role:** patient (demo) — **as-built:** insert vài notification mẫu cho user hiện tại (seed). **Không** bulk-update mọi `pending → sent`. ⚠️ Cần guard tắt / chặn ở production (TASK-06).
+**Role:** patient (demo) — **as-built:** insert vài notification mẫu cho user hiện tại (seed). **Không** bulk-update mọi `pending → sent`. ✅ Guard production đã implement (TASK-06): `APP_ENV=production` → `403 {"detail": "...", "code": "DEMO_DISABLED"}`.
 
 ## Doctor Review
 
@@ -170,6 +173,8 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
     "status_key": "warning | attention | stable | pending",
     "latest_plan_id": "string | null",
     "latest_plan_status": "pending_review | approved | ...",
+    "plan_pending": 0,
+    "plan_total": 0,
     "alert_count": 0,
     "bmi": 26.5,
     "weight": 72.5,
@@ -182,10 +187,19 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
     "blood_glucose": "135 mg/dL",
     "treatment_goals": ["string"],
     "last_update": "12/08/2026",
-    "avatar": "string"
+    "avatar": "string",
+    "plan_end_date": "16/08/2026 | null",
+    "plan_days_left": 2,
+    "plan_expiry": "expiring | expired | ok | none"
   }
 ]
 ```
+> `plan_pending` / `plan_total`: số thực đơn chưa duyệt (`pending_review`) và tổng số thực đơn của bệnh nhân — dùng cho cột "Thực đơn" (`plan_pending/plan_total`) trên màn danh sách.
+>
+> **Hạn thực đơn (mới)** — `plan_end_date` / `plan_days_left` / `plan_expiry` chỉ có ý nghĩa khi `latest_plan_status == "approved"` (plan đang có hiệu lực):
+> - Thời lượng = số ngày trong `days` (mặc định 7); ngày bắt đầu = `reviewed_at` (fallback `created_at`); `plan_days_left = (end_date − hôm nay).days`
+> - `plan_expiry`: `expiring` (còn ≤ 2 ngày — sắp ăn xong) · `expired` (đã hết hạn, bệnh nhân không còn thực đơn) · `ok` (còn nhiều ngày) · `none` (chưa có plan approved / không xác định được)
+> - FE dùng cho card cảnh báo "sắp/đã ăn xong" trên Dashboard bác sĩ → bấm "Tạo thực đơn mới".
 
 ### GET /api/v1/doctor/patients/{patient_id}
 **Role:** doctor — chi tiết 1 bệnh nhân (cùng schema DoctorPatientSummary)
@@ -259,7 +273,7 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
 > File không phải ảnh → 415 `INVALID_IMAGE`; quá 2MB → 413 `IMAGE_TOO_LARGE`.
 
 ### POST /api/v1/doctor/patients/{patient_id}/meal-plans/generate
-**Role:** doctor — tạo thực đơn 7 ngày cho bệnh nhân (cùng response `MealPlanOutput`)
+**Role:** doctor — tạo 1 thực đơn 7 ngày (kèm `alternatives[]` trên từng món). Body tùy chọn giống patient generate: `{ "notes", "priorities" }`.
 
 ### GET /api/v1/doctor/meal-plans
 **Role:** doctor — filter `?status=pending_review` (mặc định) hoặc `?status=all` (tất cả plan); response `MealPlanOutput` (thêm `created_at: "ISO-8601 | null"`)
@@ -280,6 +294,18 @@ Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent �
   "trust_badge": "doctor_reviewed | null",
   "reviewed_at": "ISO-8601",
   "reviewer_id": "string"
+}
+```
+
+### POST /api/v1/doctor/demo/plan-expiry
+**Role:** doctor — demo: giả lập thực đơn sắp/đã hết hạn (đẩy `reviewed_at` của plan approved mới nhất mỗi bệnh nhân về quá khứ). Chỉ khả dụng ngoài production (guard `DEMO_DISABLED`).
+```json
+// Request (PlanExpiryDemoRequest — optional body)
+{ "mode": "expiring | expired" }  // mặc định "expired"
+// Response 200 (PlanExpiryDemoOut)
+{
+  "updated": ["demo_patient_1"],   // patient có plan approved đã bị backdate
+  "skipped": ["demo_patient_2"]    // patient không có plan approved
 }
 ```
 

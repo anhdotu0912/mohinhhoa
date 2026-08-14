@@ -2,7 +2,7 @@
 
 > **Luật:** Sửa file này TRƯỚC khi đổi code Agent / Pydantic `AgentRun*` / meal-plan agent shapes.  
 > Owners: BE1 (Agent sections) · BE2 (HTTP mirror trong `contracts/api-v1.md`) · FE (consume qua API)  
-> **Contract version:** `2026-08-12.asbuilt.1`  
+> **Contract version:** `2026-08-13.alts.1`  
 > **Khớp code:** `backend/app/schemas/meal_plan.py`, `graph.run_agent`  
 > HTTP chi tiết FE↔BE: [`contracts/api-v1.md`](api-v1.md) (nếu lệch Swagger → ưu tiên Swagger rồi cập nhật api-v1).
 
@@ -80,7 +80,18 @@ Agent MealPlanner / mock builder **PHẢI** trả đúng shape này. `days` luô
               "kcal": 200,
               "macros": { "carb_g": 45, "protein_g": 4, "fat_g": 0.5, "sodium_mg": 5 },
               "food_id": "food_db_id_or_null",
-              "citations": ["food_db_vn#com_trang"]
+              "citations": ["food_catalog_demo#com_trang"],
+              "alternatives": [
+                {
+                  "name": "Cơm gạo lứt",
+                  "portion": "1 chén (~150g)",
+                  "kcal": 190,
+                  "macros": { "carb_g": 40, "protein_g": 4, "fat_g": 1, "sodium_mg": 5 },
+                  "food_id": "f_com_lut",
+                  "citations": ["food_catalog_demo#f_com_lut"],
+                  "alternatives": []
+                }
+              ]
             }
           ]
         }
@@ -111,7 +122,10 @@ Agent MealPlanner / mock builder **PHẢI** trả đúng shape này. `days` luô
 
 **Status:** `pending_review | approved | rejected | edited`
 
-**MealPlannerAgent input (nội bộ BE1):** `{ "profile": PatientProfile, "days": 7, "locale": "vi-VN" }`
+- `alternatives` trên `FoodItem`: món thay thế cùng nhóm (kcal gần). Không nest alternatives trong alternatives (mảng rỗng).
+- `swaps[]`: nhật ký món **đã bị đổi** vì tương tác thuốc nguy hiểm — không dùng làm menu chọn thay thế.
+
+**MealPlannerAgent input (nội bộ BE1):** `{ "profile": PatientProfile, "days": 7, "locale": "vi-VN", "notes": "", "priorities": [] }`
 
 ### 1.3 FoodLogEntry (Won't Have MVP)
 
