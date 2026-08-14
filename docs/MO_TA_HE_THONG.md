@@ -577,7 +577,7 @@ Swagger: `http://localhost:8000/docs`
 
 | Biến | Ý nghĩa |
 |---|---|
-| `DATABASE_URL` | SQLite / PostgreSQL |
+| `DATABASE_URL` | `sqlite:///./app.db` cho dev local; `postgresql://user:pass@host:5432/db` cho Postgres (prod / external) |
 | `DEMO_MOCK` | Mock meal plan cho demo ổn định |
 | `CHROMA_PERSIST_DIR` / Qdrant URL | Vector store |
 | `OPENAI_API_KEY` / LLM provider | Gọi model thật |

@@ -1,8 +1,20 @@
 """Application settings loaded from environment / .env."""
 
 from functools import lru_cache
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env từ cwd và tìm lên các thư mục cha (repo root) để chạy được từ
+# cả `backend/` lẫn repo root mà không cần copy .env. Không ghi đè env đã set.
+load_dotenv()
+
+_BACKEND_DIR = Path(__file__).resolve().parents[2]  # backend/
+_REPO_ROOT = Path(__file__).resolve().parents[3]  # repo root
+for _env_path in (_BACKEND_DIR / ".env", _REPO_ROOT / ".env"):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)
 
 
 class Settings(BaseSettings):
