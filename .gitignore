@@ -60,3 +60,10 @@ out/
 .ai-log/archive/
 
 ui/
+
+
+.cursor/
+.reasonix/
+.ver/
+.vercel/
+static/
