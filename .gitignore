@@ -62,6 +62,7 @@ out/
 ui/
 static/
 .reasonix/
+reasonix.toml
 
 # impeccable-ignore-start
 # Ephemeral output, runtime state, and per-dev overrides.
