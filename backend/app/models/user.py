@@ -1,4 +1,4 @@
-"""User model — patient / dietitian accounts."""
+"""User model — patient / doctor accounts."""
 
 from __future__ import annotations
 
@@ -22,4 +22,6 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="patient")
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    avatar: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

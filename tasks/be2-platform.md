@@ -1,79 +1,53 @@
-# BE2 — Platform API backlog
+# BE2 — Platform API
 
-> Modules: `api/`, `models/`, `schemas/`, `db/`, `core/`, `services/notification.py`, `main.py`  
-> Specs: `compliance-notification.md` (+ consume meal/interaction outputs)  
-> ADRs: `001` (compose Qdrant), `004`
+## Mục tiêu
+Đảm bảo mọi endpoint HTTP đúng contract (`contracts/api-v1.md`), persist đúng model/schema, và lấp các gap Planned có giá trị demo cao (Clinical Constraints, Doctor Compliance View) mà không phá vỡ North Star flow hiện tại.
 
----
+## Ownership
+`backend/app/api/`, `backend/app/models/`, `backend/app/schemas/`, `backend/app/services/`, `backend/app/db/`, `backend/app/core/`.
 
-## Trách nhiệm
+**Không đụng:** logic prompt/RAG/agent nội bộ (`backend/app/agents/`, `backend/app/rag/`, `backend/app/guardrails/`), `frontend/**`.
 
-- Auth JWT 2 role (`patient`, `dietitian`)
-- PostgreSQL models + migrations/session
-- REST: profile, meal-plans, chat, interactions/alerts, dietitian review, **notifications**
-- Compliance Notification service (materialize, status transitions, demo simulate)
-- Wire `run_agent` facade của BE1 vào routes (không nhúng logic prompt)
-- Deploy Railway + docker-compose (api, postgres, qdrant)
-- `tests/test_api.py`, `tests/test_compliance_notification.py`
+## Sub-tasks (checkbox)
 
-## Không làm (trừ khi được nhờ rõ)
+### Must — Vá lỗi nhỏ đã phát hiện khi audit (→ `specs/01`, `specs/03`)
+- [ ] Dọn field `age` khai báo trùng 2 lần trong `schemas/doctor.py::DoctorPatientSummary` (code smell, không gây lỗi runtime nhưng nên sửa).
 
-- Prompt engineering / retriever tuning
-- FE styling
-- Tự invent schema lệch contract
+### P2 — Auth: rate-limit + quên mật khẩu (→ `specs/01-account-auth.md`, quyết định 2026-08-15)
+- [ ] Thêm rate-limit `POST /auth/login` (đề xuất 5 lần/15 phút theo email+IP, `429 TOO_MANY_ATTEMPTS`) — bắt buộc trước khi mở khảo sát người dùng thật.
+- [ ] Thêm `POST /auth/forgot-password` + `POST /auth/reset-password` (token gửi email, `forgot-password` luôn trả 200 để không lộ thông tin email tồn tại).
 
----
+### P1 — Clinical Constraints + HITL (→ `specs/02`, `specs/04-clinical-constraints.md`, quyết định 2026-08-15)
+- [ ] Mở rộng `Restrictions` schema thêm `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` (song song field cũ, không xoá).
+- [ ] Thêm `constraints_status` (`"confirmed"|"pending_doctor_review"`) vào `PatientProfile`; `POST /profile` set `"pending_doctor_review"` khi patient đổi `target_kcal`/`restrictions`.
+- [ ] Thêm `PUT /doctor/patients/{patient_id}/constraints` (partial update, set `constraints_status="confirmed"`) + `POST /doctor/patients/{patient_id}/constraints/approve` (chỉ đổi status, không đổi giá trị).
+- [ ] Đảm bảo `GET /doctor/patients/{patient_id}` trả kèm `target_kcal`/`restrictions`/`constraints_status` để FE hiển thị badge "chờ xác nhận".
 
-## Checklist theo milestone
+### P1 — Doctor Compliance View (→ `specs/10-doctor-compliance-view.md`, ADR-008)
+- [ ] Thêm `GET /doctor/patients/{patient_id}/compliance` — on-the-fly aggregate từ `Notification(type="adherence_checkin")` + `Alert`, mặc định 14 ngày.
+- [ ] Thêm `COMPLIANCE_LOW_THRESHOLD_PCT` vào `backend/app/core/config.py` (default đề xuất `50`) — không hard-code ngưỡng "tuân thủ thấp" trong logic.
+- [ ] Thêm `POST /doctor/patients/{patient_id}/compliance/remind` — tạo `Notification(type="manual_reminder")` (type mới, đã chốt — không dùng lại `meal_reminder`/`adherence_checkin`). Thêm `manual_reminder` vào validate enum type ở mọi nơi cần.
 
-### M1 — Foundation (ngày 1–7)
-- [ ] `docker-compose`: postgres + qdrant + api
-- [ ] Models: `User`, `Profile`, `MealPlan`, `Alert`, `Notification`
-- [ ] Schemas Pydantic khớp contract
-- [ ] `POST/GET` auth, profile, meal-plans/generate+get, chat
-- [ ] Seed user patient + dietitian
-- [ ] CORS cho FE local + Vercel preview
+### P1 — Optimistic lock review + request-adjustment (→ `specs/06`, `specs/07`, quyết định 2026-08-15)
+- [ ] `POST /doctor/meal-plans/{id}/review`: kiểm tra `status=="pending_review"` trước khi áp dụng action; nếu không còn ở trạng thái chờ → `409 PLAN_ALREADY_REVIEWED`.
+- [ ] Thêm `POST /meal-plans/{meal_plan_id}/request-adjustment` (patient, chỉ trên plan `approved`) — set lại `status="pending_review"` + lưu `adjustment_note`; lỗi `400 PLAN_NOT_APPROVED` nếu plan chưa `approved`.
 
-### M2 — Alerts & Dietitian API (ngày 8–10)
-- [ ] Persist alerts từ interaction output
-- [ ] `GET /alerts`
-- [ ] `GET /dietitian/meal-plans`
-- [ ] Review endpoint stub sẵn sàng ngày 11
+### P1 — Đồng bộ persist meal plan qua chat (→ `specs/05-meal-plan-generation.md`, quyết định 2026-08-15)
+- [ ] Expose lại service persist meal plan hiện có (dùng trong `POST /meal-plans/generate`) để BE1 gọi từ `meal_plan_node`, tránh viết logic persist trùng lặp.
 
-### M3 — Compliance Notification (ngày 11)
-- [ ] `NotificationService.materialize_from_meal_plan`
-- [ ] Hooks: approve → `plan_approved`; reject → cancel future; alert → `interaction_followup`
-- [ ] Routes read/dismiss/done + demo simulate
-- [ ] Tests service + API
-- [ ] Dietitian review full (approve/edit/reject) + `trust_badge`
+### P2 — Validation & idempotency nhỏ (nhiều spec, quyết định 2026-08-15)
+- [ ] `PUT /doctor/patients/{id}/metrics`: bắt buộc gửi đủ `weight`+`height`, thiếu 1 trong 2 → `400 METRICS_INCOMPLETE` (`specs/03`, `specs/12`).
+- [ ] `POST /interactions/check`: thêm `unmatched_pairs[]` cho cặp không tìm thấy dữ liệu KB (`specs/08`).
+- [ ] `POST /notifications/demo/simulate`: sửa lại cho idempotent — chỉ tạo mới nếu chưa có bản ghi mẫu cùng loại đang `pending`/`sent` (`specs/11`).
 
-### M4 — Ship (ngày 12–14)
-- [ ] Deploy + env production
-- [ ] Healthcheck, logging
-- [ ] Reset/seed script cho demo day
-- [ ] Không expose Food Log routes
+### Won't (vòng này) — Food Log (→ `specs/09-food-log-adherence.md`, ADR-009)
+- [ ] Giữ nguyên `routes_food_log.py`/`models/food_log.py` là placeholder, **không mount** vào `main.py`.
+- [ ] Nếu implement sau: dùng `slot` 3-giá-trị đã chốt (`morning|noon|evening`, khác 4-slot meal plan); nhớ sửa `FoodLogCreate.profile_id` sang `str` (UUID) trước khi dùng, không giữ `int` như hiện tại.
 
----
+## Definition of Done
+- [ ] Test liên quan pass (`pytest tests/api`, `tests/services`).
+- [ ] Mọi endpoint mới có mặt trong `contracts/api-v1.md` trước khi merge code.
+- [ ] Không lint error, migration (nếu có) idempotent theo pattern `db/init_db.py` hiện tại.
 
-## Handoff artifacts phải giao FE
-
-| Artefact | Khi |
-|---|---|
-| Swagger ổn định auth/profile/meal-plan | Ngày 7 |
-| Alerts API | Ngày 10 |
-| Notifications API + sample payloads | Ngày 11 sáng |
-| Demo accounts | Ngày 13 |
-
-## Handoff nhận từ BE1
-
-- `run_agent(...)` callable
-- Sample meal plan + interaction JSON
-- Env keys: LLM, embedding, Qdrant
-
-## Commands
-
-```bash
-cd backend
-uvicorn app.main:app --reload
-pytest tests/test_api.py tests/test_compliance_notification.py -q
-```
+## Owner
+BE2 (Platform).

@@ -47,7 +47,7 @@ Bắt đầu: 2026-08-08
 - Đã tạo các thư mục phân quyền: `app/patient`, `app/doctor`, `components/patient`, `components/doctor`, `components/shared`.
 - Chuyển các page hiện có vào đúng thư mục:
   - `dashboard`, `food-log`, `meal-plan`, `onboarding` -> `app/patient/`
-  - `dietitian` -> `app/doctor/`
+  - `doctor` -> `app/doctor/`
 - Đã fix lỗi file `next.config.ts` (đổi thành `next.config.mjs`) và copy `eslint.config.mjs` từ `fe_old` sang để hỗ trợ lint/build.
 - Sửa lại file `app/page.tsx` để có redirect link theo vai trò.
 - Thêm các layout cơ bản `app/patient/layout.tsx` và `app/doctor/layout.tsx`.

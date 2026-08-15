@@ -1,4 +1,4 @@
-"""Meal plan orchestration: mock path (DEMO_MOCK) or BE1 run_agent facade."""
+"""Meal plan orchestration: catalog + optional LLM, then persist."""
 
 from __future__ import annotations
 
@@ -6,15 +6,13 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
-from app.schemas.meal_plan import AgentRunInput, InteractionCheckInput, MealPlanOutput
+from app.schemas.meal_plan import InteractionCheckInput, MealPlanOutput
 from app.schemas.profile import PatientProfile
-from app.services.meal_plan_demo import build_mock_meal_plan, check_interactions
+from app.services.meal_plan_demo import check_interactions
 from app.services.notification import NotificationService
 
 
@@ -29,9 +27,18 @@ def get_profile(db: Session, user_id: str) -> PatientProfile:
         medications=row.medications or [],
         allergies=row.allergies or [],
         bmi=row.bmi,
+        weight=row.weight,
+        height=row.height,
+        age=row.age,
+        gender=row.gender,
+        phone=row.phone,
+        address=row.address,
+        blood_pressure=row.blood_pressure,
+        blood_glucose=row.blood_glucose,
         target_kcal=row.target_kcal or 1800,
         restrictions=row.restrictions or {},
         preferences=row.preferences or [],
+        treatment_goals=row.treatment_goals or [],
     )
 
 
@@ -43,8 +50,8 @@ def _persist_plan(db: Session, user_id: str, plan: MealPlanOutput) -> MealPlan:
         total_variants=plan.total_variants,
         user_id=user_id,
         profile_snapshot=plan.profile_snapshot,
-        days=[day.model_dump() for day in plan.days],
-        swaps=[swap.model_dump() for swap in plan.swaps],
+        days=[day.model_dump(mode="json") for day in plan.days],
+        swaps=[swap.model_dump(mode="json", by_alias=True) for swap in plan.swaps],
         citations=plan.citations,
         status=plan.status,
     )
@@ -65,6 +72,7 @@ def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
         swaps=row.swaps or [],
         citations=row.citations or [],
         status=row.status,
+        created_at=row.created_at.isoformat() if row.created_at else None,
     )
 
 
@@ -99,36 +107,21 @@ def _persist_interaction_alerts(db: Session, user: User, plan: MealPlanOutput) -
         notifications.on_alert_created(alert)
 
 
-def generate_meal_plan(db: Session, user: User) -> MealPlanOutput:
-    """Generate + persist a meal plan. Returns the persisted plan."""
+def generate_meal_plan(
+    db: Session,
+    user: User,
+    notes: str = "",
+    priorities: list[str] | None = None,
+) -> MealPlanOutput:
+    """Generate + persist a meal plan from catalog (+ LLM when API key is set)."""
+    from app.agents.meal_planner_agent import generate_meal_plan as build_plan
+
     profile = get_profile(db, user.id)
-
-    if settings.DEMO_MOCK:
-        plan = build_mock_meal_plan(profile)
-        plan.id = str(uuid.uuid4())
-        plan.user_id = user.id
-        _persist_plan(db, user.id, plan)
-        _persist_interaction_alerts(db, user, plan)
-        NotificationService(db).materialize_from_meal_plan(plan)
-        db.commit()
-        return plan
-
-    from app.agents.graph import run_agent
-
-    output = run_agent(
-        AgentRunInput(
-            user_id=user.id,
-            message="Tạo thực đơn 7 ngày cho tôi",
-            force_intent="meal_plan",
-        )
-    )
-    if not output.meal_plan_id:
-        raise APIError(
-            501,
-            "MEAL_PLAN_NOT_READY",
-            "MealPlannerAgent chưa sẵn sàng. Bật DEMO_MOCK hoặc chờ BE1 hoàn thiện.",
-        )
-    row = db.get(MealPlan, output.meal_plan_id)
-    if row is None:
-        raise APIError(500, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy meal plan do agent trả về.")
-    return meal_plan_from_row(row)
+    plan = build_plan(profile, notes=notes, priorities=priorities or [])
+    plan.id = str(uuid.uuid4())
+    plan.user_id = user.id
+    _persist_plan(db, user.id, plan)
+    _persist_interaction_alerts(db, user, plan)
+    NotificationService(db).materialize_from_meal_plan(plan)
+    db.commit()
+    return plan

@@ -1,32 +1,95 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
-import { MOCK_PATIENTS } from "@/lib/mock-data";
-import { usePlansStore, MealPlanItem } from "@/lib/plans-store";
+import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import { mealPlanToUiItem } from "@/lib/meal-plan-mappers";
+import { shortCondition } from "@/lib/format";
+import { MealPlanItem } from "@/lib/plans-store";
+import { ApiError, type DoctorPatientSummary } from "@/lib/types";
+import { asRouteId } from "@/lib/route-params";
+
+function toUiPatient(row: DoctorPatientSummary): Patient {
+  const ui = doctorPatientToUi(row);
+  return { ...ui, avatar: assetUrl(ui.avatar) || ui.avatar };
+}
 
 export default function PatientMealPlansListPage() {
   const params = useParams();
   const router = useRouter();
-  const patientId = (params?.patientId as string) || "BN-10293";
+  const patientId = asRouteId(params?.patientId);
 
-  const patient =
-    MOCK_PATIENTS.find((p) => p.id === patientId) || MOCK_PATIENTS[0];
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
 
-  const { getPlansByPatientId } = usePlansStore();
-  const allPatientPlans = getPlansByPatientId(patient.id);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [allPatientPlans, setAllPatientPlans] = useState<MealPlanItem[]>([]);
 
-  // Filter tabs: "pending", "approved", "rejected", "unselected", "all"
+  // Filter tabs: "pending", "approved", "rejected", "all"
   const [activeTab, setActiveTab] = useState<
-    "all" | "pending" | "approved" | "rejected" | "unselected"
+    "all" | "pending" | "approved" | "rejected"
   >("pending");
 
   // State to track which variant groups are expanded (dropdown open)
   // By default, groups are open so doctor sees them, or click to collapse/expand
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!token || role !== "doctor") return;
+    if (!patientId) {
+      setLoading(false);
+      setLoadError("Thiếu mã bệnh nhân.");
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [patientRow, planRows] = await Promise.all([
+        api.getDoctorPatient(patientId),
+        api.listDoctorMealPlans("all"),
+      ]);
+      setPatient(toUiPatient(patientRow));
+      const items = planRows
+        .filter((row) => row.user_id === patientRow.id)
+        .map((row) =>
+          mealPlanToUiItem(row, {
+            patientName: patientRow.name,
+            patientCode: patientRow.id,
+            condition: patientRow.condition_label,
+          })
+        );
+      setAllPatientPlans(items);
+    } catch (err) {
+      setLoadError(
+        err instanceof ApiError
+          ? err.message
+          : "Không tải được danh sách thực đơn của bệnh nhân."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [token, role, patientId]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token || role !== "doctor") {
+      router.replace("/login");
+      return;
+    }
+    void load();
+  }, [hydrated, token, role, router, load]);
 
   const toggleGroupExpand = (groupId: string) => {
     setExpandedGroups((prev) => ({
@@ -43,7 +106,6 @@ export default function PatientMealPlansListPage() {
   const pendingCount = allPatientPlans.filter((p) => p.status === "pending").length;
   const approvedCount = allPatientPlans.filter((p) => p.status === "approved").length;
   const rejectedCount = allPatientPlans.filter((p) => p.status === "rejected").length;
-  const unselectedCount = allPatientPlans.filter((p) => p.status === "unselected").length;
 
   // Group filtered plans by variantGroupId (or standalone if no group id)
   const groupMap = new Map<string, MealPlanItem[]>();
@@ -68,6 +130,40 @@ export default function PatientMealPlansListPage() {
     duration: plans[0]?.duration || "7 ngày",
   }));
 
+  if (!hydrated || !token || role !== "doctor") {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <>
+        <TopBar title="Danh sách thực đơn" />
+        <main className="p-lg text-sm text-on-surface-variant">
+          Đang tải thực đơn của bệnh nhân…
+        </main>
+      </>
+    );
+  }
+
+  if (loadError || !patient) {
+    return (
+      <>
+        <TopBar title="Danh sách thực đơn" />
+        <main className="p-lg">
+          <p className="text-sm text-error mb-md">
+            {loadError || "Không tìm thấy bệnh nhân."}
+          </p>
+          <Link
+            href="/doctor/reviews"
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            Quay lại danh sách thực đơn
+          </Link>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <TopBar title={`Danh sách thực đơn - ${patient.name}`} />
@@ -80,7 +176,7 @@ export default function PatientMealPlansListPage() {
             className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Quay lại Danh sách bệnh nhân
+            Quay lại Danh sách thực đơn
           </Link>
         </div>
 
@@ -102,9 +198,10 @@ export default function PatientMealPlansListPage() {
                 </span>
               </div>
               <p className="text-xs text-on-surface-variant mt-1">
-                {patient.age} tuổi • {patient.gender} • Chẩn đoán:{" "}
+                {patient.age > 0 ? `${patient.age} tuổi • ` : ""}
+                Chẩn đoán:{" "}
                 <strong className="text-on-surface font-semibold">
-                  {patient.condition}
+                  {shortCondition(patient.condition)}
                 </strong>
               </p>
             </div>
@@ -112,7 +209,7 @@ export default function PatientMealPlansListPage() {
 
           <div className="flex items-center gap-sm">
             <Link
-              href={`/doctor/patients/${patient.id}/generate`}
+              href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
               className="bg-emerald-700 hover:bg-emerald-800 text-white font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-xs transition-all cursor-pointer active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">
@@ -155,18 +252,6 @@ export default function PatientMealPlansListPage() {
           >
             Đã từ chối ({rejectedCount})
           </button>
-          {unselectedCount > 0 && (
-            <button
-              onClick={() => setActiveTab("unselected")}
-              className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
-                activeTab === "unselected"
-                  ? "border-primary text-primary font-bold"
-                  : "border-transparent text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              Không chọn ({unselectedCount})
-            </button>
-          )}
           <button
             onClick={() => setActiveTab("all")}
             className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
@@ -248,8 +333,8 @@ export default function PatientMealPlansListPage() {
                           className={`bg-surface-container-lowest border rounded-xl p-md shadow-xs transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
                             plan.status === "approved"
                               ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20"
-                              : plan.status === "unselected"
-                              ? "border-gray-200 opacity-75 bg-gray-50/50"
+                              : plan.status === "rejected"
+                              ? "border-red-200 opacity-75 bg-red-50/30"
                               : "border-outline-variant hover:border-primary/50"
                           }`}
                         >
@@ -257,7 +342,7 @@ export default function PatientMealPlansListPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-xs mb-1 flex-wrap">
                               <span className="px-2 py-0.5 rounded-md bg-emerald-700 text-white font-bold text-[11px] shadow-2xs">
-                                Phương án {plan.variantIndex || 1}/{plan.totalVariants || 3}
+                                Phương án {plan.variantIndex || 1}/{plan.totalVariants || 1}
                               </span>
                               <span className="font-mono text-xs font-semibold text-on-surface-variant">
                                 {plan.id}
@@ -310,7 +395,7 @@ export default function PatientMealPlansListPage() {
                                   <span className="material-symbols-outlined text-[14px]">
                                     check_circle
                                   </span>
-                                  Đã chọn duyệt
+                                  Đã duyệt
                                 </span>
                               )}
                               {plan.status === "rejected" && (
@@ -321,19 +406,13 @@ export default function PatientMealPlansListPage() {
                                   Đã từ chối
                                 </span>
                               )}
-                              {plan.status === "unselected" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    remove_done
-                                  </span>
-                                  Không chọn
-                                </span>
-                              )}
                             </div>
 
                             <button
                               onClick={() =>
-                                router.push(`/doctor/reviews/${patient.id}/${plan.id}`)
+                                router.push(
+                                  `/doctor/reviews/${encodeURIComponent(patient.id)}/${encodeURIComponent(plan.id)}`
+                                )
                               }
                               className={`px-md py-1.5 rounded-lg font-body-bold text-xs font-semibold transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 ${
                                 plan.status === "approved"
@@ -359,7 +438,7 @@ export default function PatientMealPlansListPage() {
             {standalonePlans.length > 0 && (
               <div className="space-y-sm pt-md">
                 <h3 className="font-h2 text-h2 font-bold text-on-surface text-sm">
-                  Thực đơn đơn lẻ khác
+                  Thực đơn của bệnh nhân
                 </h3>
                 {standalonePlans.map((plan) => (
                   <div
@@ -367,15 +446,23 @@ export default function PatientMealPlansListPage() {
                     className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-md"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs font-bold text-primary mb-1">{plan.id}</p>
+                      <p className="font-mono text-xs font-bold text-primary mb-1">
+                        {plan.id}
+                      </p>
                       <h4 className="font-h2 text-h2 font-semibold text-on-surface text-sm mb-xs">
                         {plan.planTitle}
                       </h4>
-                      <p className="text-xs text-on-surface-variant">Calo: {plan.calories} • Muối: {plan.salt}</p>
+                      <p className="text-xs text-on-surface-variant">
+                        {plan.daysCount || 7} ngày • Calo: {plan.calories} • Muối: {plan.salt}
+                      </p>
                     </div>
 
                     <button
-                      onClick={() => router.push(`/doctor/reviews/${patient.id}/${plan.id}`)}
+                      onClick={() =>
+                        router.push(
+                          `/doctor/reviews/${encodeURIComponent(patient.id)}/${encodeURIComponent(plan.id)}`
+                        )
+                      }
                       className="px-md py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold"
                     >
                       Xem chi tiết →

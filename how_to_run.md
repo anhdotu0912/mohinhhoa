@@ -34,7 +34,16 @@ Backend được xây dựng bằng Python và FastAPI.
    pip install -r requirements.txt
    ```
 
-4. **Khởi chạy server FastAPI:**
+4. **Cấu hình LLM (tùy chọn) trong `backend/.env`:**
+   ```bash
+   LLM_PROVIDER=deepseek
+   LLM_MODEL=deepseek-chat
+   DEEPSEEK_API_KEY=sk-...
+   ```
+   Thiếu key → gen thực đơn vẫn chạy (xoay vòng catalog, không gọi LLM).
+   OpenAI: `LLM_PROVIDER=openai`, `LLM_MODEL=gpt-4o-mini`, `OPENAI_API_KEY=sk-...`
+
+5. **Khởi chạy server FastAPI:**
    ```bash
    uvicorn app.main:app --reload
    ```
@@ -80,3 +89,10 @@ Nếu bạn muốn chạy cả Frontend và Backend cùng lúc thông qua Docker
    docker-compose up --build
    ```
 3. Sau khi build xong, hệ thống sẽ tự động khởi chạy cả hai dịch vụ.
+
+
+ │ Role      │ Email                      │ Password │
+  ├───────────┼────────────────────────────┼──────────┤
+  │ Bệnh nhân │ demo_patient_1@example.com │ demo1234 │
+  ├───────────┼────────────────────────────┼──────────┤
+  │ Bác sĩ    │ demo_doctor@example.com    │ demo1234 │

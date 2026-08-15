@@ -10,10 +10,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Hermetic tests: no LLM calls, demo mode on.
 os.environ["OPENAI_API_KEY"] = ""
+os.environ["DEEPSEEK_API_KEY"] = ""
+os.environ["LLM_API_KEY"] = ""
 os.environ["DEMO_MOCK"] = "true"
 
 import pytest  # noqa: E402
-from app.db.init_db import seed_demo_accounts  # noqa: E402
+from app.db.init_db import seed_catalog, seed_demo_accounts  # noqa: E402
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -39,8 +41,13 @@ def db_session():
 
 @pytest.fixture()
 def client():
+    # Isolate each test: wipe rows then reseed demo accounts.
     with TestingSessionLocal() as db:
+        for table in reversed(Base.metadata.sorted_tables):
+            db.execute(table.delete())
+        db.commit()
         seed_demo_accounts(db)
+        seed_catalog(db)
 
     def override_get_db():
         db = TestingSessionLocal()

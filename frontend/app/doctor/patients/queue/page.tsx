@@ -221,7 +221,7 @@ export default function QueuePage() {
                       {job.status === "completed" && (
                         <div className="text-xs">
                           <span className="font-bold text-emerald-800 block">
-                            Đã tạo {job.variantsCount || 3} phương án ({job.daysCount || 7} ngày)
+                            Đã tạo {job.planIds?.length || 1} thực đơn ({job.daysCount || 7} ngày)
                           </span>
                           <span className="font-mono text-on-surface-variant text-[11px]">
                             Mã nhóm: {job.variantGroupId || job.id}
@@ -235,7 +235,7 @@ export default function QueuePage() {
                       )}
                       {(job.status === "queued" || job.status === "processing") && (
                         <span className="text-xs text-on-surface-variant">
-                          Tự động sinh {job.variantsCount || 3} phương án ({job.daysCount || 7} ngày) theo FIFO...
+                          Đang tạo thực đơn ({job.daysCount || 7} ngày) theo FIFO...
                         </span>
                       )}
                     </td>

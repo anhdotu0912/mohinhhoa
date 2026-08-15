@@ -7,6 +7,7 @@ from datetime import date, datetime, time
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import APIError
 from app.core.security import require_roles
 from app.db.session import get_db
@@ -47,6 +48,13 @@ def simulate_demo_notifications(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> list[Notification]:
+    # Spec 04 rule 5 / TASK-06: demo seeding endpoints must be guarded in production.
+    if settings.APP_ENV == "production":
+        raise APIError(
+            403,
+            "DEMO_DISABLED",
+            "Endpoint demo không khả dụng ở production.",
+        )
     today = date.today()
     samples = [
         Notification(

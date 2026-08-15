@@ -8,8 +8,10 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=sqlite:///./app.db
-      - CHROMA_DIR=./chroma_db
+      # Pass-through từ .env — set DATABASE_URL=postgresql://... để dùng Postgres
+      # (mặc định SQLite file cho local dev không có network)
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./app.db}
+      - CHROMA_DIR=${CHROMA_DIR:-./chroma_db}
     volumes:
       - ./backend/data:/app/data
       - ./backend/chroma_db:/app/chroma_db

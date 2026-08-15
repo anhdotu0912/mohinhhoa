@@ -1,47 +1,63 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { homePathForRole, useAuthStore } from "@/lib/auth-store";
+import { ApiError } from "@/lib/types";
+
+const DEMO = {
+  doctor: { email: "demo_doctor@example.com", password: "demo1234" },
+  patient: { email: "demo_patient_1@example.com", password: "demo1234" },
+} as const;
 
 export default function LoginPage() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-
-    // Auto-detect role based on email/identifier or default to doctor/patient
-    if (
-      cleanEmail.includes("doctor") ||
-      cleanEmail.includes("bacsi") ||
-      cleanEmail.startsWith("bs")
-    ) {
-      router.push("/doctor");
-    } else {
-      router.push("/patient");
+  const completeLogin = async (loginEmail: string, loginPassword: string) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const tokenRes = await api.login(loginEmail, loginPassword);
+      setSession({
+        token: tokenRes.access_token,
+        role: tokenRes.role,
+        userId: tokenRes.user_id,
+        email: loginEmail.trim().toLowerCase(),
+      });
+      router.push(homePathForRole(tokenRes.role));
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Không kết nối được máy chủ. Kiểm tra backend đang chạy.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    void completeLogin(email, password);
+  };
+
   const handleDemoLogin = (targetRole: "doctor" | "patient") => {
-    if (targetRole === "doctor") {
-      setEmail("bacsi.minh@vmec.vn");
-      setPassword("12345678");
-      router.push("/doctor");
-    } else {
-      setEmail("nguyenvana@gmail.com");
-      setPassword("12345678");
-      router.push("/patient");
-    }
+    const creds = DEMO[targetRole];
+    setEmail(creds.email);
+    setPassword(creds.password);
+    void completeLogin(creds.email, creds.password);
   };
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-md font-body">
       <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl shadow-md max-w-md w-full">
-        {/* Brand Header */}
         <div className="text-center mb-lg">
           <Link href="/" className="inline-block mb-xs">
             <h1 className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
@@ -53,34 +69,30 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Unified Login Form */}
         <form onSubmit={handleLogin} className="space-y-md">
           <div>
             <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
-              Email / Mã định danh
+              Email
             </label>
             <input
-              type="text"
+              type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Nhập email hoặc mã định danh của bạn..."
+              placeholder="demo_patient_1@example.com"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-xs">
-              <label className="font-label text-label text-on-surface text-xs font-semibold">
-                Mật khẩu
-              </label>
-              <a href="#" className="font-caption text-caption text-primary hover:underline text-xs">
-                Quên mật khẩu?
-              </a>
-            </div>
+            <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
+              Mật khẩu
+            </label>
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -88,33 +100,41 @@ export default function LoginPage() {
             />
           </div>
 
+          {error && (
+            <div className="rounded-xl border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md"
+            disabled={loading}
+            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Đăng nhập
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
 
-        {/* Demo Quick Access */}
         <div className="mt-md p-sm bg-surface-container-low rounded-xl border border-outline-variant/40">
           <p className="text-[11px] text-on-surface-variant font-semibold mb-xs text-center">
-            💡 TRUY CẬP NHANH DEMO (ĐÃ CÓ TÀI KHOẢN):
+            TRUY CẬP NHANH DEMO
           </p>
           <div className="flex gap-xs">
             <button
               type="button"
+              disabled={loading}
               onClick={() => handleDemoLogin("doctor")}
-              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer"
+              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer disabled:opacity-60"
             >
-              👨‍⚕️ Demo Bác sĩ
+              Demo Bác sĩ
             </button>
             <button
               type="button"
+              disabled={loading}
               onClick={() => handleDemoLogin("patient")}
-              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer"
+              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer disabled:opacity-60"
             >
-              🧑‍🤝‍🧑 Demo Bệnh nhân
+              Demo Bệnh nhân
             </button>
           </div>
         </div>

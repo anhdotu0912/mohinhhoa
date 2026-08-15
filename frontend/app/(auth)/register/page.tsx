@@ -1,64 +1,67 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dropdown } from "@/components/shared/Dropdown";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import { ApiError } from "@/lib/types";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
 
-  // Form states
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [condition, setCondition] = useState("Tiểu đường type 2");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const conditionOptions = [
-    {
-      value: "Tiểu đường type 2",
-      label: "Tiểu đường type 2",
-      icon: "bloodtype",
-      description: "Cần kiểm soát chỉ số đường huyết & carbohydrate",
-    },
-    {
-      value: "Tăng huyết áp",
-      label: "Tăng huyết áp",
-      icon: "favorite",
-      description: "Cần kiểm soát lượng natri / muối tiêu thụ",
-    },
-    {
-      value: "Suy thận mạn",
-      label: "Suy thận mạn",
-      icon: "medical_services",
-      description: "Giới hạn protein, muối và phốt pho",
-    },
-    {
-      value: "Rối loạn lipid máu",
-      label: "Rối loạn lipid máu",
-      icon: "monitor_heart",
-      description: "Hạn chế chất béo bão hòa & cholesterol",
-    },
-    {
-      value: "Gout",
-      label: "Bệnh Gout",
-      icon: "health_and_safety",
-      description: "Hạn chế thực phẩm chứa purin cao",
-    },
-  ];
-
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Redirect new patient to onboarding wizard
-    router.push("/patient/onboarding");
+    setError(null);
+
+    if (password.length < 6) {
+      setError("Mật khẩu tối thiểu 6 ký tự.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.register({
+        email: email.trim(),
+        password,
+        role: "patient",
+        full_name: fullName.trim() || undefined,
+      });
+      const tokenRes = await api.login(email.trim(), password);
+      setSession({
+        token: tokenRes.access_token,
+        role: tokenRes.role,
+        userId: tokenRes.user_id,
+        email: email.trim().toLowerCase(),
+        displayName: fullName.trim(),
+      });
+      router.push("/patient/onboarding");
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Không kết nối được máy chủ. Kiểm tra backend đang chạy.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-md py-xl font-body">
       <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg md:p-xl shadow-md max-w-md w-full">
-        {/* Brand Header */}
         <div className="text-center mb-lg">
           <Link href="/" className="inline-block mb-xs">
             <h1 className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
@@ -66,11 +69,10 @@ export default function RegisterPage() {
             </h1>
           </Link>
           <p className="font-caption text-caption text-on-surface-variant text-xs">
-            Đăng ký tài khoản hệ thống Trợ lý Dinh dưỡng & Y tế AI
+            Đăng ký tài khoản bệnh nhân — sau đó khai báo hồ sơ sức khỏe (3 bước)
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleRegister} className="space-y-md">
           <div>
             <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
@@ -88,26 +90,18 @@ export default function RegisterPage() {
 
           <div>
             <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
-              Email / Số điện thoại <span className="text-error">*</span>
+              Email <span className="text-error">*</span>
             </label>
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="example@vmec.vn"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
-
-          {/* Reusable Dropdown Component for Pathology Condition */}
-          <Dropdown
-            label="Bệnh lý nền chính (cần theo dõi)"
-            options={conditionOptions}
-            value={condition}
-            onChange={setCondition}
-            placeholder="Chọn bệnh lý nền"
-          />
 
           <div>
             <label className="block font-label text-label text-on-surface mb-xs text-xs font-semibold">
@@ -116,9 +110,11 @@ export default function RegisterPage() {
             <input
               type="password"
               required
+              minLength={6}
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Tối thiểu 6 ký tự"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -130,6 +126,8 @@ export default function RegisterPage() {
             <input
               type="password"
               required
+              minLength={6}
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
@@ -137,17 +135,24 @@ export default function RegisterPage() {
             />
           </div>
 
+          {error && (
+            <div className="rounded-xl border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md"
+            disabled={loading}
+            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Đăng ký tài khoản
+            {loading ? "Đang tạo tài khoản..." : "Đăng ký & tiếp tục hồ sơ"}
           </button>
         </form>
 
         <div className="mt-lg pt-md border-t border-outline-variant/40 text-center">
           <p className="font-caption text-caption text-on-surface-variant text-xs">
-            Đã có tài khoản hệ thống?{" "}
+            Đã có tài khoản?{" "}
             <Link href="/login" className="text-primary font-bold hover:underline">
               Đăng nhập ngay
             </Link>

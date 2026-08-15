@@ -61,18 +61,12 @@ def _classify_by_keywords(message: str) -> str:
 def _classify_by_llm(message: str) -> str:
     """Classify intent using LLM (OpenAI GPT)."""
     try:
-        from langchain_openai import ChatOpenAI
-        from app.core.config import settings
+        from app.core.llm import get_chat_llm
 
-        if not settings.OPENAI_API_KEY:
-            logger.debug("No OpenAI API key, falling back to keyword classification")
+        llm = get_chat_llm(temperature=0)
+        if llm is None:
+            logger.debug("No LLM API key, falling back to keyword classification")
             return _classify_by_keywords(message)
-
-        llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            temperature=0,
-            api_key=settings.OPENAI_API_KEY,
-        )
 
         prompt = f"""Phân loại intent của tin nhắn bệnh nhân sau vào ĐÚNG MỘT trong các loại:
 - meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng

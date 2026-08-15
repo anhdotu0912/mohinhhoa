@@ -1,8 +1,8 @@
 # CLAUDE.md — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
 
 > File này là "nguồn sự thật" (single source of truth) cho AI coding agent khi làm việc trên repo này.
-> Đọc toàn bộ file này TRƯỚC khi code bất kỳ task nào.
-
+> Đọc toàn bộ file này TRƯỚC khi code bất kỳ task nào. Pointer ngắn: [`AGENTS.md`](AGENTS.md).
+> Hạn chế thay đổi Frontend đã thiết kế
 ---
 
 ## 1. Tổng quan dự án
@@ -35,87 +35,79 @@
 
 ---
 
-## 3. Tech Stack
+## 3. Tech Stack (as-built)
+
+> Chi tiết quyết định: `/adrs/`. Tổng quan hệ thống: `/docs/MO_TA_HE_THONG.md`.
 
 **AI/ML Layer**
-- LLM: GPT-4o-mini hoặc DeepSeek (cấu hình `MODEL_LLM`, `LLM_PROVIDER` trong env)
-- Orchestration: LangGraph (Python)
-- Embedding: Gemini Embedding 2 (có API key rotation; tên model trong env)
-- Vector DB: Qdrant
-- RAG: LangChain + custom retriever (hybrid dense + BM25)
+- LLM: GPT-4o-mini mặc định (`LLM_MODEL` + `OPENAI_API_KEY` trong env)
+- Orchestration: LangGraph (Python) — facade `run_agent`
+- Embedding: `paraphrase-multilingual-MiniLM-L12-v2` (local SentenceTransformer) — ADR-003
+- Vector DB: **ChromaDB** persist (`CHROMA_PERSIST_DIR` / `chroma_db/`) — ADR-001 (giữ Chroma cho prototype)
+- RAG: dense retrieval (+ BM25 hybrid trong retriever)
+- Demo flag: `DEMO_MOCK=true` (mặc định) — meal plan / interaction HTTP dùng mock ổn định — ADR-005
 
 **Backend**
 - Framework: FastAPI (Python)
-- Database: PostgreSQL
-- Auth: JWT + python-jose, 2 role (`patient`, `dietitian`)
-- Deploy: Railway
+- Database: **SQLite** mặc định (`DATABASE_URL`); Postgres-ready — ADR-006
+- Auth: JWT, 2 role API (`patient`, `doctor`)
+- Deploy hiện tại: `docker-compose` local; target prod Railway/Vercel vẫn là mục tiêu gap-closure
 
 **Frontend**
 - Framework: Next.js 14 (App Router)
-- Styling: Tailwind CSS + shadcn/ui
-- State: Zustand
-- Deploy: Vercel
+- Styling: Tailwind CSS
+- State: Zustand (stores cục bộ / mock; `lib/api.ts` là backlog TASK-01)
+- Shell: `/patient/*` (bệnh nhân) · `/doctor/*` (role API `doctor`)
 
 ---
 
-## 4. Cấu trúc thư mục chuẩn
+## 4. Cấu trúc thư mục chuẩn (as-built)
 
 ```
 P-014/
-├── CLAUDE.md                       # file này
-├── .claude/skills/                 # rag-indexing, langgraph-agent-node, interaction-checker...
-│
-├── specs/                          # đặc tả nghiệp vụ — "cái gì, tại sao"
-│   ├── meal-planner.md
-│   ├── interaction-checker.md
-│   └── compliance-notification.md
-├── adrs/                           # quyết định kiến trúc — "như thế nào"
-│   ├── 001-vector-db-choice.md
-│   ├── 002-langgraph-vs-chain.md
+├── CLAUDE.md
+├── docs/MO_TA_HE_THONG.md          # mô tả chức năng + kiến trúc + luồng to-be
+├── specs/                          # đặc tả nghiệp vụ (to-be + ghi chú as-built)
+│   ├── 01-patient-profile.md
+│   ├── 02-meal-plan-generation.md
+│   ├── 03-interaction-check.md
+│   ├── 04-compliance-notification.md
+│   ├── 05-doctor-review.md
+│   └── 06-chat-rag-qa.md
+├── adrs/
+│   ├── 001-vector-db-qdrant.md     # Chroma hiện tại / Qdrant không còn target MVP
+│   ├── 002-langgraph-orchestration.md
 │   ├── 003-embedding-model.md
-│   └── 004-compliance-notification.md
+│   ├── 004-compliance-notification-strategy.md
+│   ├── 005-demo-mock-flag.md
+│   └── 006-sqlite-dev-postgres-prod.md
 ├── contracts/
-│   └── agent-io-schema.md          # input/output schema từng Agent + API boundary
-├── tasks/                          # roadmap 14 ngày + phân công BE1/BE2/FE
-│   ├── README.md
-│   ├── roadmap-14-days.md
+│   ├── agent-io-schema.md          # Agent facade + core schemas (versioned)
+│   └── api-v1.md                   # FE ↔ BE HTTP
+├── tasks/
+│   ├── README.md                   # ownership + pointer backlog
+│   ├── roadmap-gap-closure.md      # backlog đóng gap as-built → to-be (SSOT hiện tại)
 │   ├── be1-ai-core.md
 │   ├── be2-platform.md
 │   └── fe-frontend.md
 │
-├── backend/                        # ── FastAPI ──
-│   └── app/
-│       ├── main.py
-│       ├── core/                   # config.py, security.py (JWT)
-│       ├── api/v1/                 # routes_profile, routes_meal_plan,
-│       │                           # routes_chat, routes_dietitian,
-│       │                           # routes_alerts, routes_notifications
-│       ├── agents/                 # ── LangGraph ──
-│       │   ├── graph.py
-│       │   ├── nodes/              # profile_loader, intent_classifier, rag_tool
-│       │   ├── meal_planner_agent.py
-│       │   └── interaction_checker_agent.py
-│       ├── rag/                    # indexer.py, retriever.py, embeddings.py
-│       ├── guardrails/             # rules.py, source_check.py
-│       ├── models/                 # user, profile, meal_plan, alert, notification
-│       ├── schemas/                # Pydantic — contract với frontend
-│       ├── services/               # nutrition_calculator.py, notification.py
-│       └── db/
-│   ├── data/                       # food_db_vn.json, guidelines/, drug_food_interactions.json
-│   ├── tests/                      # test_rag, test_meal_planner, test_interaction_checker,
-│   │                               # test_compliance_notification
-│   └── qdrant_data/                # local vector store (gitignore)
-│
-├── frontend/                       # ── Next.js 14 App Router ──
-│   └── app/
-│       ├── onboarding/             # Screen 1: hồ sơ bệnh nhân
-│       ├── meal-plan/              # Screen 2: thực đơn 7 ngày
-│       ├── dashboard/              # Screen 3: alerts + compliance notifications
-│       └── dietitian/              # Screen 4: dietitian review
-│   ├── components/                 # ui/, meal-plan/, chat/, alerts/, notifications/
-│   ├── lib/                        # api.ts, types.ts (đồng bộ với backend/schemas)
-│   └── store/                      # useProfileStore, useMealPlanStore, useNotificationStore
-│
+├── backend/app/
+│   ├── main.py
+│   ├── core/                       # config.py, security.py
+│   ├── api/v1/                     # auth, profile, meal_plan, chat, interactions,
+│   │                               # alerts, notifications, doctor
+│   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
+│   ├── rag/                        # indexer, retriever, embeddings (Chroma)
+│   ├── guardrails/                 # rules.py / source_check — đang placeholder (TASK-04)
+│   ├── models/ · schemas/ · services/ · db/
+├── backend/data/                   # food_db_vn.json, drug_food_interactions.json, guidelines/
+├── backend/chroma_db/              # vector store local (gitignore)
+├── frontend/app/
+│   ├── (auth)/                     # login, register
+│   ├── patient/                    # home, onboarding, meals, notifications, assistant...
+│   └── doctor/                     # patients, reviews, compliance, history, messages
+├── frontend/components/            # shared/, doctor/
+├── frontend/lib/                   # nav-config, mock-data, *-store (api.ts = backlog)
 └── docker-compose.yml
 ```
 
@@ -126,22 +118,22 @@ P-014/
 | Role | Owner modules | Không đụng (trừ khi thống nhất) |
 |---|---|---|
 | **BE1 — AI Core** | `agents/`, `rag/`, `guardrails/`, `services/nutrition_calculator.py`, data KB (`data/`), tests AI | Frontend, JWT/auth wiring chi tiết, notification scheduler |
-| **BE2 — Platform** | `api/`, `models/`, `schemas/`, `db/`, `core/`, `services/notification.py`, routes dietitian/alerts/notifications | Logic prompt/RAG internals, FE components |
+| **BE2 — Platform** | `api/`, `models/`, `schemas/`, `db/`, `core/`, `services/notification.py`, routes doctor/alerts/notifications | Logic prompt/RAG internals, FE components |
 | **FE — Frontend** | `frontend/**`, types đồng bộ contract, UX 4 screens | Backend agent logic, DB migrations |
 
-**Handoff rule:** mọi thay đổi schema Agent/API → sửa `/contracts/agent-io-schema.md` trước, rồi mới code. BE1 ↔ BE2 giao tiếp qua contract + Pydantic schemas; FE chỉ phụ thuộc OpenAPI/schemas đã ổn định.
+**Handoff rule:** đổi schema Agent → sửa `/contracts/agent-io-schema.md` trước; đổi HTTP FE↔BE → sửa `/contracts/api-v1.md` trước (hoặc đồng bộ từ Swagger). BE1 ↔ BE2 qua contract + Pydantic; FE phụ thuộc `api-v1` / OpenAPI đã ổn định.
 
-Chi tiết backlog từng role: `/tasks/be1-ai-core.md`, `/tasks/be2-platform.md`, `/tasks/fe-frontend.md`.
+Backlog hiện tại: `/tasks/roadmap-gap-closure.md`. Ownership rút gọn: `/tasks/be1-ai-core.md`, `/tasks/be2-platform.md`, `/tasks/fe-frontend.md`.
 
 ---
 
 ## 6. Quy trình làm việc mỗi Task
 
-1. **Đọc context trước** — bắt buộc: `/specs/<feature>.md` liên quan, `/adrs/` nếu động tới kiến trúc, `/contracts/agent-io-schema.md` nếu chạm ranh giới Agent↔Backend↔Frontend.
-2. **Bám contract** — không tự sáng tạo format input/output giữa các Agent/API. Sửa contract trước, code sau.
-3. **Code theo boundary của role/task** — không lan sang module của người khác ngoài phạm vi đã phân công.
-4. **Test trước khi coi là xong** — chạy `pytest tests/<module>`, bắt buộc với: RAG accuracy, guardrails, interaction checker, compliance notification scheduler.
-5. **Git kỷ luật** — nhánh `feature/<role>-*`, commit theo `feat(scope): mô tả`, không push thẳng `main`. PR nhỏ, có reviewer từ role liên quan khi chạm contract.
+1. **Đọc context trước** — `/specs/0x-*.md` liên quan, `/adrs/` nếu động kiến trúc, contracts nếu chạm ranh giới Agent↔API↔FE; đọc `/docs/MO_TA_HE_THONG.md` nếu cần big picture.
+2. **Bám contract** — không tự sáng tạo format I/O. Sửa contract trước, code sau; bump version `agent-io-schema` khi breaking.
+3. **Code theo boundary của role/task** — không lan sang module ngoài phạm vi.
+4. **Test trước khi coi là xong** — `pytest tests/<module>` (RAG, interaction, compliance, API).
+5. **Git kỷ luật** — nhánh `feature/<role>-*`, commit `feat(scope): …`, không push thẳng `main`.
 
 ---
 
@@ -151,7 +143,7 @@ Chi tiết backlog từng role: `/tasks/be1-ai-core.md`, `/tasks/be2-platform.md
 - Guardrails: AI **không** được tự ý khuyến nghị đổi thuốc/liều lượng — luôn redirect bác sĩ.
 - Mọi Agent mới phải khớp schema đã định nghĩa trong `contracts/agent-io-schema.md`.
 - Danh sách câu AI phải từ chối & redirect bác sĩ → định nghĩa trong `backend/app/guardrails/rules.py`.
-- **Không** implement Food Log trong MVP này (kể cả endpoint stub lộ ra FE demo) trừ khi team thống nhất đổi MoSCoW và cập nhật CLAUDE.md + specs.
+- **Không** implement Food Log trong MVP này. Route/stub có thể tồn tại trong code nhưng **không** hiện trong nav demo; không mount food-log API trong `main.py` trừ khi team đổi MoSCoW + cập nhật CLAUDE/specs.
 
 ---
 
@@ -194,26 +186,21 @@ Chi tiết backlog từng role: `/tasks/be1-ai-core.md`, `/tasks/be2-platform.md
 
 ---
 
-## 9. Roadmap 14 ngày (tóm tắt)
+## 9. Roadmap & backlog hiện tại
 
-**Tuần 1 — Validate + Foundation**
-| Ngày | Nội dung | Owner chính | Deliverable |
-|---|---|---|---|
-| 1-2 | Research & Data: CSDL ≥300 thực phẩm VN, guideline ADA/AHA/ACR/BYT, ≥10 survey | BE1 + cả team | CSDL + 5 insight |
-| 3-4 | AI Core: index Qdrant, LangGraph skeleton, guardrails, test 20 câu | BE1 | RAG pass ≥80% |
-| 5 | MealPlannerAgent + NutritionCalculator, 3 profile mẫu | BE1 | Thực đơn 7 ngày × 3 |
-| 6-7 | Backend API nền (auth, profile, meal plan), DB PostgreSQL, JWT | BE2 | API chạy được (Swagger) |
+Roadmap 14 ngày gốc đã **superseded**. Backlog đóng gap as-built → North Star:
 
-**Tuần 2 — Build + Polish + Demo**
-| Ngày | Nội dung | Owner chính | Deliverable |
-|---|---|---|---|
-| 8-9 | Frontend 4 screens: Onboarding, Meal Plan, Dashboard (alerts+compliance), Dietitian shell | FE | 4 màn hình chạy được |
-| 10 | Interaction KB ≥20 cặp + InteractionCheckerAgent + Alert API | BE1 + BE2 | Checker ≥20 cặp |
-| 11 | Compliance Notification service + Dietitian approve/edit/reject + trust badge | BE2 + FE | Nhắc tuân thủ + BS duyệt |
-| 12-13 | E2E integration, fix bugs, polish UX, perf (RAG <5s, meal plan <15s), deploy | Cả team | App live URL |
-| 14 | Demo script (5 scene) + data demo + rehearse ×3 | Cả team | Demo sẵn sàng |
+→ **`/tasks/roadmap-gap-closure.md`** (FE↔API wiring, `DEMO_MOCK=false` ổn định, guardrails, Food Log ẩn, deploy, docs).
 
-Chi tiết ngày-ngày: `/tasks/roadmap-14-days.md`.
+Tóm tắt ưu tiên:
+
+| Ưu tiên | Việc | Owner |
+|---|---|---|
+| P0 | FE JWT + `lib/api.ts` nối North Star | FE |
+| P0 | Persist plan khi `DEMO_MOCK=false`; wire interaction agent | BE1 + BE2 |
+| P1 | Guardrails `rules.py` / `source_check` thật | BE1 |
+| P1 | Chốt vector = Chroma (đã ghi ADR-001) | BE1 |
+| P2 | Deploy Railway/Vercel + Postgres | BE2 + FE |
 
 ---
 
@@ -222,13 +209,12 @@ Chi tiết ngày-ngày: `/tasks/roadmap-14-days.md`.
 | Rủi ro | Xác suất | Plan B |
 |---|---|---|
 | CSDL thực phẩm VN thiếu/khó collect | Cao | USDA FoodData + map tên VN |
-| LangGraph phức tạp, delay | Trung bình | Simple LangChain chain trước, migrate sau |
-| RAG tiếng Việt accuracy thấp | Trung bình | Hybrid dense + BM25 |
-| Qdrant setup chậm trên deploy | Trung bình | Qdrant Cloud free tier / Docker local trước |
-| Gemini embedding rate-limit | Trung bình | Key rotation (đã thiết kế) + cache embedding |
-| Compliance cron/scheduler phức tạp | Trung bình | Generate notifications khi tạo/duyệt meal plan (event-driven), chưa cần worker riêng |
-| API cost LLM vượt budget | Thấp | Cache responses, model nhỏ hơn cho dev |
-| Scope creep (Food Log quay lại) | Trung bình | Giữ Won't Have; ghi vào backlog post-demo |
+| LangGraph / LLM không ổn định khi demo | Trung bình | Giữ `DEMO_MOCK=true` cho pitch; test nhánh thật riêng |
+| RAG tiếng Việt accuracy thấp | Trung bình | Hybrid dense + BM25; eval query mẫu |
+| Chroma đủ cho prototype / không migrate Qdrant | Thấp | Giữ Chroma (ADR-001 superseded) |
+| Compliance không có cron thật | Trung bình | Event-driven materialize + `demo/simulate` seed mẫu |
+| API cost LLM vượt budget | Thấp | Cache, model nhỏ, mock mặc định |
+| Scope creep (Food Log quay lại) | Trung bình | Giữ Won't Have; ẩn nav |
 
 ---
 
@@ -272,7 +258,7 @@ Chi tiết ngày-ngày: `/tasks/roadmap-14-days.md`.
 
 | Skill | Trigger | Mục đích |
 |---|---|---|
-| `rag-indexing` | Index CSDL thực phẩm/guideline vào Qdrant | Chuẩn hoá format chunk/metadata |
+| `rag-indexing` | Index CSDL thực phẩm/guideline vào Chroma | Chuẩn hoá format chunk/metadata |
 | `langgraph-agent-node` | Tạo node mới trong LangGraph | Pattern input/output/error handling |
 | `interaction-checker` | Thêm cặp thuốc–thực phẩm | Format `{drug, food, mechanism, severity, recommendation}` |
 | `compliance-notification` | Thêm loại nhắc tuân thủ | Format type/schedule/status + API |

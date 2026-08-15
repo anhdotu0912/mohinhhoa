@@ -1,94 +1,47 @@
-# FE — Frontend backlog
+# FE — Frontend
 
-> Modules: `frontend/**`  
-> Specs: tất cả (consume) · đặc biệt UI cho meal plan, alerts, compliance  
-> Contract: mirror `contracts/agent-io-schema.md` → `lib/types.ts`
+## Mục tiêu
+Đảm bảo mọi màn hình dùng đúng dữ liệu thật từ API theo `contracts/api-v1.md`, không tự bịa field/endpoint không tồn tại, và các màn hình đang mock (Compliance, Constraints, Food Log) được gắn nhãn rõ trạng thái "demo/chưa nối API" cho tới khi BE2 hoàn thành phần Planned tương ứng.
 
----
+## Ownership
+Toàn bộ `frontend/**`.
 
-## Trách nhiệm
+**Không đụng:** Backend agent logic (`backend/app/agents/`, `backend/app/rag/`), DB migrations (`backend/app/db/`).
 
-- 4 screens MVP: **Onboarding · Meal Plan · Dashboard · Dietitian**
-- Auth UX (login/register patient & dietitian)
-- Zustand: profile, meal plan, notifications (alerts có thể nằm chung dashboard store)
-- Đồng bộ types với contract; gọi API qua `lib/api.ts`
-- Demo UX: loading, empty, error, trust badge, severity colors
-- Deploy Vercel
+## Nguyên tắc bắt buộc
+1. **`contracts/api-v1.md` là nguồn sự thật duy nhất** khi gọi API — không tự thêm field response không có trong contract, không tự đoán field khi backend chưa trả (nếu thiếu, báo BE2 để cập nhật contract trước).
+2. Khi 1 màn hình đang dùng mock data (`MOCK_PATIENTS`, hard-code SVG chart...) mà backend endpoint tương ứng vẫn là `[Planned]` — giữ nguyên mock, **không** âm thầm coi mock là dữ liệu thật khi demo cho người ngoài xem.
+3. Đổi field/shape request-response phải đối chiếu lại `contracts/api-v1.md` — nếu phát hiện lệch giữa contract và code BE thật, báo lại BE2 trước khi tự sửa FE để né lỗi tạm.
 
-## Không làm
+## Sub-tasks (checkbox)
 
-- Food Log page/route/component (xoá stub nếu còn từ boilerplate)
-- Tự gọi LLM / Qdrant từ browser
-- Đổi severity enum / status string lệch contract
+### Must — Giữ North Star flow mượt
+- [ ] Xác nhận toàn bộ 6 bước North Star flow (`tasks/README.md`) hoạt động không lỗi UI: đăng nhập bác sĩ → thêm/generate → duyệt → bệnh nhân xem → chat.
+- [ ] Đảm bảo `lib/api.ts` có đủ method cho các endpoint đã Done (đối chiếu `contracts/api-v1.md` — đã phát hiện thiếu method cho `checkInteraction`/`simulateNotifications` khi audit, cần bổ sung nếu UI có nút gọi tới các action này).
 
----
+### P1 — Chuẩn bị UI cho Clinical Constraints (khi BE2 hoàn thành, → `specs/04`, quyết định 2026-08-15)
+- [ ] Field đã chốt: giữ nguyên UI hiện có (`salt`/`sugar`/`protein` ở `frontend/app/doctor/patients/constraints/page.tsx`) — BE2 sẽ mở rộng schema để khớp, **không cần đổi UI**.
+- [ ] Sau khi BE2 xong, nối `PUT /doctor/patients/{patient_id}/constraints`, bỏ `MOCK_PATIENTS`/local state.
+- [ ] Thêm hiển thị badge "Chờ bác sĩ xác nhận" khi `PatientProfile.constraints_status === "pending_doctor_review"` (patient tự sửa ràng buộc); thêm nút "Xác nhận" gọi `POST /doctor/patients/{patient_id}/constraints/approve` trên UI doctor.
 
-## Screens & DoD
+### P1 — Chuẩn bị UI cho Doctor Compliance View (khi BE2 hoàn thành, → `specs/10`)
+- [ ] Nối `frontend/app/doctor/patients/compliance/page.tsx` với `GET /doctor/patients/{patient_id}/compliance` thật, bỏ dữ liệu SVG/timeline hard-code.
+- [ ] Nối nút "Gửi nhắc nhở" với `POST /doctor/patients/{patient_id}/compliance/remind` (tạo notification type mới `manual_reminder` — nếu UI patient hiển thị icon/label riêng theo type, cần thêm case cho type này).
 
-### Screen 1 — Onboarding (`/onboarding`)
-- [ ] Form đúng field `PatientProfile`
-- [ ] Submit → `POST /profile` → redirect meal-plan hoặc dashboard
-- [ ] Validation cơ bản (disease ≥1, target_kcal >0)
+### P2 — Yêu cầu điều chỉnh plan (khi BE2 hoàn thành, → `specs/07`, quyết định 2026-08-15)
+- [ ] Thêm nút "Yêu cầu điều chỉnh" trên màn xem plan đã `approved`, gọi `POST /meal-plans/{meal_plan_id}/request-adjustment`; hiển thị trạng thái "Đang chờ bác sĩ duyệt lại" khi plan quay về `pending_review` sau khi gửi yêu cầu.
 
-### Screen 2 — Meal Plan (`/meal-plan`)
-- [ ] Nút generate + hiển thị 7 ngày / slots
-- [ ] Citations visible
-- [ ] Status + trust badge khi `approved`
-- [ ] Warnings / swaps (nếu có)
+### P3 — Auth: quên mật khẩu (khi BE2 hoàn thành, → `specs/01`, quyết định 2026-08-15)
+- [ ] Thêm màn "Quên mật khẩu" gọi `POST /auth/forgot-password` + `POST /auth/reset-password` — cần trước khi mở khảo sát người dùng thật.
 
-### Screen 3 — Dashboard (`/dashboard`)
-- [ ] Alert list (severity badge)
-- [ ] Notification inbox (filter type/status)
-- [ ] Actions: read / dismiss / done (adherence)
-- [ ] Demo simulate button (hidden unless demo flag)
+### Won't (vòng này) — Food Log
+- [ ] Giữ route `/patient/meals/log` tồn tại nhưng **ẩn khỏi nav** (`frontend/lib/nav-config.ts`) — không được tự ý hiện lại nav item này.
+- [ ] Không gọi bất kỳ API `/food-log` nào (chưa mount ở backend) — giữ local state mock hiện tại nếu route còn được truy cập trực tiếp qua URL. UI hiện tại đã dùng đúng 3-slot (sáng/trưa/tối) khớp quyết định 2026-08-15 — **không cần đổi** khi BE2 implement thật.
 
-### Screen 4 — Dietitian (`/dietitian`)
-- [ ] Login role dietitian
-- [ ] List `pending_review`
-- [ ] Approve / Reject / Edit (edit tối thiểu: notes + optional JSON/simple fields)
-- [ ] Sau approve, patient side phản ánh badge (verify E2E)
+## Definition of Done
+- [ ] Không có request nào gọi field/endpoint không có trong `contracts/api-v1.md`.
+- [ ] Demo flow North Star không bị gãy khi chạy thử end-to-end trên UI thật.
+- [ ] Không lint/type error (`npm run lint`/`tsc`).
 
----
-
-## Checklist theo milestone
-
-### M1 (ngày 1–7)
-- [ ] App shell + NavBar + auth
-- [ ] Types + API client
-- [ ] Onboarding + Meal Plan mock → real API
-
-### M2 (ngày 8–9)
-- [ ] 4 screens click-through
-- [ ] Dashboard layout alerts + notifications
-
-### M3 (ngày 10–11)
-- [ ] Alerts thật
-- [ ] Notification actions thật
-- [ ] Dietitian review UI
-
-### M4 (ngày 12–14)
-- [ ] Polish + mobile
-- [ ] Vercel deploy
-- [ ] Rehearse click-path ≤5 phút
-
----
-
-## Handoff / blockers cần báo sớm
-
-| Cần từ | Nội dung |
-|---|---|
-| BE2 | CORS, cookie/token scheme, exact error shape |
-| BE2 | Notification sample + simulate |
-| BE1/BE2 | 1 meal plan JSON “đẹp” cho demo |
-
-## Commands
-
-```bash
-cd frontend
-npm run dev
-npm run build
-```
-
-## Explicit removals
-
-- Route `/food-log` và copy “log bữa ăn” trên North Star / landing → thay bằng Compliance / Dashboard.
+## Owner
+FE (Frontend).

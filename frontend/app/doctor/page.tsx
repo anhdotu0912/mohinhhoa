@@ -1,11 +1,16 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
-import { usePlansStore } from "@/lib/plans-store";
 import { MOCK_PATIENTS } from "@/lib/mock-data";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import { mealPlanToUiItem } from "@/lib/meal-plan-mappers";
+import type { MealPlanItem } from "@/lib/plans-store";
+import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 
 interface DayCompliance {
   day: string;
@@ -36,13 +41,100 @@ const LAST_WEEK_DATA: DayCompliance[] = [
   { day: "CN", date: "06/10", rate: 70, meals: "2/3 bữa", calories: "82%", salt: "72%" },
 ];
 
+/** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
 export default function DoctorDashboardPage() {
-  const { plans, updatePlanStatus } = usePlansStore();
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
+  const [plans, setPlans] = useState<MealPlanItem[]>([]);
+  const [patientSummaries, setPatientSummaries] = useState<DoctorPatientSummary[]>(
+    []
+  );
+  const [expiryTab, setExpiryTab] = useState<"expiring" | "expired">("expiring");
+  const [demoBusy, setDemoBusy] = useState(false);
   const [timeframe, setTimeframe] = useState<"this_week" | "last_week">("this_week");
   const [hoveredDay, setHoveredDay] = useState<DayCompliance | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const loadPlans = useCallback(async () => {
+    if (!token || role !== "doctor") return;
+    try {
+      const [planRows, patientRows] = await Promise.all([
+        api.listDoctorMealPlans("all"),
+        api.listDoctorPatients().catch(() => [] as DoctorPatientSummary[]),
+      ]);
+      const patientMap = new Map(patientRows.map((p) => [p.id, p]));
+      const items = planRows.map((row) => {
+        const p = patientMap.get(row.user_id);
+        return mealPlanToUiItem(row, {
+          patientName: p?.name || "Bệnh nhân",
+          patientCode: p?.id || row.user_id,
+          condition: p?.condition_label || "—",
+        });
+      });
+      setPlans(items);
+      setPatientSummaries(patientRows);
+    } catch {
+      setPlans([]);
+      setPatientSummaries([]);
+    }
+  }, [token, role]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token || role !== "doctor") {
+      router.replace("/login");
+      return;
+    }
+    void loadPlans();
+  }, [hydrated, token, role, router, loadPlans]);
+
   const pendingPlans = plans.filter((p) => p.status === "pending");
+  // Chỉ hiển thị 5 thực đơn chờ duyệt mới nhất trên dashboard
+  const visiblePendingPlans = pendingPlans.slice(0, 5);
+
+  // Cảnh báo hạn thực đơn: sắp ăn xong (expiring) / đã ăn xong (expired)
+  const expiringPatients = patientSummaries.filter(
+    (p) => p.plan_expiry === "expiring"
+  );
+  const expiredPatients = patientSummaries.filter(
+    (p) => p.plan_expiry === "expired"
+  );
+  const expiryList = expiryTab === "expiring" ? expiringPatients : expiredPatients;
+
+  // Demo: giả lập thực đơn sắp/đã hết hạn (backend chặn ở production)
+  const handleDemoExpiry = async (mode: "expiring" | "expired") => {
+    if (demoBusy) return;
+    setDemoBusy(true);
+    try {
+      await api.demoPlanExpiry(mode);
+      showToast(
+        mode === "expiring"
+          ? "Đã giả lập: các thực đơn đã duyệt còn 1 ngày (sắp ăn xong)."
+          : "Đã giả lập: các thực đơn đã duyệt hết hạn."
+      );
+      await loadPlans();
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : "Không giả lập được hạn thực đơn."
+      );
+    } finally {
+      setDemoBusy(false);
+    }
+  };
   const chartData = timeframe === "this_week" ? THIS_WEEK_DATA : LAST_WEEK_DATA;
   const avgCompliance = Math.round(
     chartData.reduce((acc, curr) => acc + curr.rate, 0) / chartData.length
@@ -55,9 +147,14 @@ export default function DoctorDashboardPage() {
     }, 3500);
   };
 
-  const handleQuickApprove = (patientId: string, planId: string, planTitle: string) => {
-    updatePlanStatus(patientId, planId, "approved");
-    showToast(`Đã duyệt nhanh kế hoạch: ${planTitle}`);
+  const handleQuickApprove = async (planId: string, planTitle: string) => {
+    try {
+      await api.reviewMealPlan(planId, { action: "approve" });
+      showToast(`Đã duyệt nhanh thực đơn: ${planTitle}`);
+      await loadPlans();
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
+    }
   };
 
   return (
@@ -462,7 +559,7 @@ export default function DoctorDashboardPage() {
                   </p>
                 </div>
               ) : (
-                pendingPlans.map((plan) => (
+                visiblePendingPlans.map((plan) => (
                   <div
                     key={plan.id}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md border border-outline-variant rounded-xl bg-surface hover:bg-surface-bright transition-colors gap-md"
@@ -511,13 +608,165 @@ export default function DoctorDashboardPage() {
 
                       <button
                         onClick={() =>
-                          handleQuickApprove(plan.patientId, plan.id, plan.planTitle)
+                          handleQuickApprove(plan.id, plan.planTitle)
                         }
                         className="h-8 px-md bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary-container hover:text-on-primary-container transition-all text-xs shadow-xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
                       >
                         <span className="material-symbols-outlined text-[16px]">check</span>
                         <span>Duyệt nhanh</span>
                       </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Cảnh báo thực đơn hết hạn */}
+        <section className="mt-section-gap">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs">
+            <div className="p-card-padding border-b border-outline-variant bg-surface flex justify-between items-center rounded-t-xl">
+              <div>
+                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-sm font-semibold">
+                  <span className="material-symbols-outlined text-tertiary">
+                    event_busy
+                  </span>
+                  Cảnh báo thực đơn hết hạn
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Bệnh nhân sắp ăn xong / đã ăn xong thực đơn — cần tạo thực đơn tiếp
+                </p>
+              </div>
+
+              <div className="flex items-center gap-sm shrink-0">
+                <button
+                  type="button"
+                  onClick={() => void handleDemoExpiry("expiring")}
+                  disabled={demoBusy}
+                  className="px-md py-1.5 border border-outline-variant rounded-lg text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                  title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
+                >
+                  <span className="material-symbols-outlined text-[16px]">schedule</span>
+                  Giả lập: sắp hết hạn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDemoExpiry("expired")}
+                  disabled={demoBusy}
+                  className="px-md py-1.5 border border-outline-variant rounded-lg text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                  title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
+                >
+                  <span className="material-symbols-outlined text-[16px]">event_busy</span>
+                  Giả lập: đã hết hạn
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-md px-md border-b border-outline-variant/60">
+              <button
+                type="button"
+                onClick={() => setExpiryTab("expiring")}
+                className={`font-label text-label pb-sm pt-sm px-sm border-b-2 transition-all cursor-pointer ${
+                  expiryTab === "expiring"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Sắp ăn xong ({expiringPatients.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpiryTab("expired")}
+                className={`font-label text-label pb-sm pt-sm px-sm border-b-2 transition-all cursor-pointer ${
+                  expiryTab === "expired"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Đã ăn xong ({expiredPatients.length})
+              </button>
+            </div>
+
+            <div className="p-md space-y-sm">
+              {expiryList.length === 0 ? (
+                <div className="p-lg text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-xs">
+                    {expiryTab === "expiring" ? "upcoming" : "check_circle"}
+                  </span>
+                  <p className="font-body-bold text-sm">
+                    {expiryTab === "expiring"
+                      ? "Không có bệnh nhân nào sắp ăn xong thực đơn"
+                      : "Không có bệnh nhân nào hết hạn thực đơn"}
+                  </p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {expiryTab === "expiring"
+                      ? "Các thực đơn đã duyệt đều còn nhiều ngày sử dụng."
+                      : "Tất cả bệnh nhân đều còn thực đơn đang sử dụng."}
+                  </p>
+                </div>
+              ) : (
+                expiryList.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md border border-outline-variant rounded-xl bg-surface hover:bg-surface-bright transition-colors gap-md"
+                  >
+                    <div className="flex items-center gap-md">
+                      {/* Avatar — chuẩn theo trang /doctor/patients */}
+                      <div className="relative w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                        {initials(p.name)}
+                        {p.avatar &&
+                          !p.avatar.startsWith("https://api.dicebear.com") && (
+                          <img
+                            src={assetUrl(p.avatar)}
+                            alt={p.name}
+                            className="absolute inset-0 w-10 h-10 rounded-full object-cover border border-outline-variant bg-surface-container"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-xs">
+                          <p className="font-body-bold text-on-surface font-semibold text-sm">
+                            {p.name}
+                          </p>
+                          <span className="font-mono text-xs text-on-surface-variant">
+                            ({p.id})
+                          </span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant mt-0.5">
+                          {p.condition_label}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-sm shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+                      {p.plan_expiry === "expiring" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                          Còn {p.plan_days_left ?? "?"} ngày (đến {p.plan_end_date ?? "—"})
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                          <span className="material-symbols-outlined text-[14px]">
+                            event_busy
+                          </span>
+                          Hết hạn {p.plan_end_date ?? "—"}
+                        </span>
+                      )}
+
+                      <Link
+                        href={`/doctor/patients/${encodeURIComponent(p.id)}/generate`}
+                        className="h-8 px-md bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary-container transition-all text-xs shadow-xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          auto_awesome
+                        </span>
+                        <span>Tạo thực đơn mới</span>
+                      </Link>
                     </div>
                   </div>
                 ))

@@ -47,6 +47,12 @@ class TestMealPlanSchema:
             assert day.day_index == i
             assert len(day.meals) >= 3  # breakfast, lunch, dinner (+ snack)
             assert day.totals.kcal > 0
+            for meal in day.meals:
+                for item in meal.items:
+                    assert item.alternatives is not None
+                    for alt in item.alternatives:
+                        assert alt.name
+                        assert alt.alternatives == []
 
     def test_demo_profiles_generation(self):
         """Should successfully generate 7-day plans for all 3 demo profiles."""

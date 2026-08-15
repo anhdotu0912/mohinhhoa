@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import (
     routes_alerts,
     routes_auth,
     routes_chat,
-    routes_dietitian,
+    routes_doctor,
     routes_interactions,
     routes_meal_plan,
     routes_notifications,
@@ -21,6 +23,9 @@ from app.core.config import settings
 from app.core.errors import register_error_handlers
 from app.db.init_db import init_db
 
+STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +34,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="P-014 Nutrition Agent API", version="0.1.0", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +55,7 @@ for router in (
     routes_interactions.router,
     routes_alerts.router,
     routes_notifications.router,
-    routes_dietitian.router,
+    routes_doctor.router,
 ):
     app.include_router(router, prefix="/api/v1")
 

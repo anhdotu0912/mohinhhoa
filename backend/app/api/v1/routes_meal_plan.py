@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
@@ -10,7 +10,7 @@ from app.core.security import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.meal_plan import MealPlan
 from app.models.user import User
-from app.schemas.meal_plan import MealPlanOutput
+from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
 from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
 
 router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
@@ -18,10 +18,12 @@ router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
 
 @router.post("/generate", response_model=MealPlanOutput)
 def generate_plan(
+    payload: GenerateMealPlanRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> MealPlanOutput:
-    return generate_meal_plan(db, user)
+    req = payload or GenerateMealPlanRequest()
+    return generate_meal_plan(db, user, notes=req.notes, priorities=req.priorities)
 
 
 @router.get("/me", response_model=MealPlanOutput)

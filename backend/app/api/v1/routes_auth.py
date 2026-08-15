@@ -26,11 +26,17 @@ def register(
         email=email,
         hashed_password=hash_password(payload.password),
         role=payload.role,
+        full_name=(payload.full_name or "").strip() or None,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return RegisterResponse(id=user.id, email=user.email, role=user.role)
+    return RegisterResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        full_name=user.full_name,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

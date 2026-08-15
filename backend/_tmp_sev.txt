@@ -1,0 +1,1 @@
+{'Nguy hiểm': 11, 'Cần chú ý': 16, 'An toàn': 1}
