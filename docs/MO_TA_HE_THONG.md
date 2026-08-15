@@ -16,14 +16,14 @@
 5. **Duyệt thực đơn bởi chuyên gia dinh dưỡng / bác sĩ** (approve / edit / reject)
 
 **North Star (demo end-to-end):**  
-Bệnh nhân đăng nhập → (tuỳ chọn) onboarding hồ sơ → tạo thực đơn 7 ngày → nhận alerts + notifications → dietitian duyệt → bệnh nhân thấy trạng thái đã duyệt / `plan_approved`.
+Bệnh nhân đăng nhập → (tuỳ chọn) onboarding hồ sơ → tạo thực đơn 7 ngày → nhận alerts + notifications → doctor duyệt → bệnh nhân thấy trạng thái đã duyệt / `plan_approved`.
 
 **Nguyên tắc thiết kế:** ưu tiên **một demo flow mượt** hơn việc thêm nhiều tính năng nửa vời.
 
 | Vai trò API | Vai trò UI Frontend | Mô tả |
 |---|---|---|
 | `patient` | Bệnh nhân (`/patient/*`) | Nhập hồ sơ, xem thực đơn, alerts, thông báo, chat trợ lý |
-| `dietitian` | Bác sĩ / chuyên gia (`/doctor/*`) | Danh sách bệnh nhân, duyệt kế hoạch, theo dõi tuân thủ |
+| `doctor` | Bác sĩ / chuyên gia (`/doctor/*`) | Danh sách bệnh nhân, duyệt kế hoạch, theo dõi tuân thủ |
 
 ---
 
@@ -39,7 +39,7 @@ Bệnh nhân đăng nhập → (tuỳ chọn) onboarding hồ sơ → tạo th�
 | Compliance Notification (in-app) | Nhắc bữa, follow-up tương tác, plan approved, check-in tuân thủ |
 | Nutrition calculator | Tổng kcal/macro theo ngày, so với target & restrictions |
 | Guardrails + nguồn trích dẫn | Không kê/đổi thuốc; số liệu dinh dưỡng phải có citation |
-| Dietitian review UI | Approve / edit / reject + trust badge |
+| doctor review UI | Approve / edit / reject + trust badge |
 
 ### 2.2 Should / Could (sau demo hoặc nâng cao)
 
@@ -58,13 +58,13 @@ Adaptive feedback, memory preferences, chat Q&A sâu hơn, cảnh báo ngưỡng
 | Thành phần | Trạng thái | Ghi chú |
 |---|---|---|
 | FastAPI entry (`app/main.py`) | ✅ | CORS, health, mount `/api/v1/*` |
-| Auth JWT (register/login) | ✅ | Role `patient` / `dietitian`, seed demo accounts |
+| Auth JWT (register/login) | ✅ | Role `patient` / `doctor`, seed demo accounts |
 | Profile upsert/get | ✅ | `POST/GET /api/v1/profile` |
 | Meal plan generate/get | ✅ | `DEMO_MOCK=true` (mặc định) trả mock ổn định; `false` gọi LangGraph |
 | Interaction check API | ✅ | `POST /api/v1/interactions/check` |
 | Alerts list | ✅ | Persist khi generate plan |
 | Notifications CRUD-lite | ✅ | Materialize event-driven; demo simulate |
-| Dietitian review | ✅ | approve / reject / edit |
+| doctor review | ✅ | approve / reject / edit |
 | Chat → `run_agent` | ✅ | Thin wrapper LangGraph |
 | LangGraph graph | ✅ | profile → intent → route (meal/interaction/RAG/refuse…) |
 | MealPlannerAgent | ✅ (code) | RAG foods/guidelines + NutritionCalculator + swap |
@@ -113,7 +113,7 @@ DEMO_MOCK=true → meal plan mock cho pitch ổn định
 graph TB
     subgraph Clients
         P[Bệnh nhân<br/>Next.js /patient]
-        D[Dietitian / Bác sĩ<br/>Next.js /doctor]
+        D[doctor / Bác sĩ<br/>Next.js /doctor]
     end
 
     subgraph API["Platform API — FastAPI"]
@@ -123,7 +123,7 @@ graph TB
         INT[Interactions]
         ALT[Alerts]
         NOTI[Notifications]
-        DIET[Dietitian Review]
+        DIET[doctor Review]
         CHAT[Chat]
     end
 
@@ -171,7 +171,7 @@ graph TB
 | Tầng | Công nghệ | Owner | Trách nhiệm |
 |---|---|---|---|
 | Presentation | Next.js 14 App Router, Tailwind, Zustand | FE | 2 shell role, UX 4+ màn North Star |
-| Application / API | FastAPI, Pydantic, JWT | BE2 | Routes, persist, notification service, dietitian |
+| Application / API | FastAPI, Pydantic, JWT | BE2 | Routes, persist, notification service, doctor |
 | AI / Domain agents | LangGraph, LangChain-style RAG | BE1 | Graph, agents, indexer/retriever, nutrition calc |
 | Data | SQLAlchemy models; vector store; JSON KB | BE2 (RDB) · BE1 (KB/vector) | Users, profiles, plans, alerts, notifications |
 
@@ -199,7 +199,7 @@ P-014/
 ├── backend/app/
 │   ├── main.py                 # FastAPI app
 │   ├── api/v1/                 # auth, profile, meal_plan, chat,
-│   │                           # interactions, alerts, notifications, dietitian
+│   │                           # interactions, alerts, notifications, doctor
 │   ├── agents/                 # LangGraph graph + nodes + agents
 │   ├── rag/                    # indexer, retriever, embeddings
 │   ├── guardrails/             # rules, source_check
@@ -288,12 +288,12 @@ erDiagram
 | GET | `/api/v1/meal-plans/me` | patient | Plan mới nhất |
 | GET | `/api/v1/meal-plans/{id}` | auth | Chi tiết plan |
 | POST | `/api/v1/interactions/check` | auth | Check thuốc–thực phẩm |
-| GET | `/api/v1/alerts` | patient/dietitian | Danh sách alert |
+| GET | `/api/v1/alerts` | patient/doctor | Danh sách alert |
 | GET | `/api/v1/notifications` | patient | Lọc theo status/type |
 | POST | `/api/v1/notifications/{id}/read\|dismiss\|done` | patient | Cập nhật trạng thái |
 | POST | `/api/v1/notifications/demo/simulate` | demo | Hiện noti ngay khi pitch |
-| GET | `/api/v1/dietitian/meal-plans` | dietitian | Hàng đợi duyệt |
-| POST | `/api/v1/dietitian/meal-plans/{id}/review` | dietitian | approve/reject/edit |
+| GET | `/api/v1/doctor/meal-plans` | doctor | Hàng đợi duyệt |
+| POST | `/api/v1/doctor/meal-plans/{id}/review` | doctor | approve/reject/edit |
 | POST | `/api/v1/chat` | patient | Chạy agent theo message |
 | GET | `/health` | public | Healthcheck |
 
@@ -361,7 +361,7 @@ Các luồng dưới đây mô tả **hành vi hệ thống hoàn chỉnh theo N
 ```mermaid
 sequenceDiagram
     actor BN as Bệnh nhân
-    actor BS as Dietitian
+    actor BS as doctor
     participant FE as Frontend
     participant API as FastAPI
     participant AG as LangGraph / Agents
@@ -385,8 +385,8 @@ sequenceDiagram
     BN->>FE: Xem Dashboard alerts + notifications
     FE->>API: GET /alerts, GET /notifications
 
-    BS->>FE: Login dietitian
-    FE->>API: GET /dietitian/meal-plans?status=pending_review
+    BS->>FE: Login doctor
+    FE->>API: GET /doctor/meal-plans?status=pending_review
     BS->>FE: Approve / Edit / Reject
     FE->>API: POST .../review
     API->>DB: Update status + trust_badge
@@ -398,10 +398,10 @@ sequenceDiagram
 
 ### 6.2 Auth & phân quyền
 
-1. User đăng ký với `role` ∈ {`patient`, `dietitian`} hoặc dùng tài khoản seed.  
+1. User đăng ký với `role` ∈ {`patient`, `doctor`} hoặc dùng tài khoản seed.  
 2. Login trả `access_token` (Bearer).  
-3. Mọi API nghiệp vụ yêu cầu JWT; dietitian routes dùng `require_roles("dietitian")`.  
-4. FE map `dietitian` → shell `/doctor/*`, `patient` → `/patient/*`.
+3. Mọi API nghiệp vụ yêu cầu JWT; doctor routes dùng `require_roles("doctor")`.  
+4. FE shell `/doctor/*` khớp role API `doctor`; `/patient/*` khớp `patient`.
 
 **Tài khoản demo seed:**
 
@@ -410,7 +410,7 @@ sequenceDiagram
 | `demo_patient_1@example.com` | `demo1234` | patient (T2DM + HTN, metformin + warfarin) |
 | `demo_patient_2@example.com` | `demo1234` | patient |
 | `demo_patient_3@example.com` | `demo1234` | patient (gout) |
-| `demo_dietitian@example.com` | `demo1234` | dietitian |
+| `demo_doctor@example.com` | `demo1234` | doctor |
 
 ### 6.3 Hồ sơ bệnh nhân (Onboarding)
 
@@ -439,7 +439,7 @@ sequenceDiagram
 
 ### 6.4 Sinh thực đơn 7 ngày
 
-**Actor:** Bệnh nhân (tự generate) hoặc Dietitian (generate hộ trên `/doctor/patients/{id}/generate`)
+**Actor:** Bệnh nhân (tự generate) hoặc doctor (generate hộ trên `/doctor/patients/{id}/generate`)
 
 **Luồng hoàn chỉnh:**
 
@@ -487,17 +487,17 @@ sequenceDiagram
 4. Check-in tuân thủ → `done` kèm `adherence: yes|partial|no`  
 5. Demo pitch: `POST .../demo/simulate` để đẩy `pending → sent` ngay  
 
-### 6.7 Dietitian review
+### 6.7 doctor review
 
-**Actor:** Dietitian  
+**Actor:** doctor  
 
 **Luồng:**
 
 1. Login → `/doctor/reviews`  
-2. `GET /dietitian/meal-plans?status=pending_review`  
+2. `GET /doctor/meal-plans?status=pending_review`  
 3. Xem plan + citations + alerts liên quan  
 4. `POST .../review` với `action`:
-   - **approve** → status `approved`, `trust_badge=dietitian_reviewed`, noti `plan_approved`  
+   - **approve** → status `approved`, `trust_badge=doctor_reviewed`, noti `plan_approved`  
    - **reject** → status `rejected`, cancel notifications tương lai  
    - **edit** → cập nhật `days/swaps/citations`, status `edited`, gắn trust badge  
 5. Bệnh nhân refresh → thấy trạng thái + badge tin cậy  
@@ -521,7 +521,7 @@ Khi hoàn chỉnh, `/patient` hợp nhất:
 - Notification chưa đọc / đến giờ  
 - CTA tới assistant, meals, notifications  
 
-### 6.10 Dashboard / workspace dietitian
+### 6.10 Dashboard / workspace doctor
 
 Khi hoàn chỉnh, `/doctor` hợp nhất:
 
@@ -577,7 +577,7 @@ Swagger: `http://localhost:8000/docs`
 
 | Biến | Ý nghĩa |
 |---|---|
-| `DATABASE_URL` | SQLite / PostgreSQL |
+| `DATABASE_URL` | `sqlite:///./app.db` cho dev local; `postgresql://user:pass@host:5432/db` cho Postgres (prod / external) |
 | `DEMO_MOCK` | Mock meal plan cho demo ổn định |
 | `CHROMA_PERSIST_DIR` / Qdrant URL | Vector store |
 | `OPENAI_API_KEY` / LLM provider | Gọi model thật |
@@ -602,7 +602,7 @@ pytest tests/test_api.py \
 - [ ] Thực đơn 7 ngày phù hợp T2DM + có citation  
 - [ ] Interaction ≥10 cặp thuốc (KB target ≥20)  
 - [ ] Compliance: tạo + hiển thị in-app  
-- [ ] Dietitian duyệt được ≥1 plan  
+- [ ] doctor duyệt được ≥1 plan  
 - [ ] Không hallucinate số liệu không nguồn  
 
 ---

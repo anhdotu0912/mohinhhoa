@@ -22,7 +22,7 @@ Là **bệnh nhân**, tôi muốn nhận nhắc giờ ăn, check-in tuân thủ,
 | Alert Nguy hiểm / Cần chú ý | `interaction_followup` (`sent`) |
 
 4. Types / status như contract.
-5. **`POST /notifications/demo/simulate` (as-built):** insert 3 notification mẫu cho user (không bulk `pending→sent`). Cần env guard trước production (TASK-06).
+5. **`POST /notifications/demo/simulate` (as-built):** insert 3 notification mẫu cho user (không bulk `pending→sent`). **Env guard đã implement (2026-08-13):** khi `APP_ENV=production` → `403 DEMO_DISABLED` (TASK-06 sub-item).
 
 ## 4. Luồng FE (to-be)
 1. `/patient/notifications` fetch `GET /notifications`.
@@ -31,7 +31,7 @@ Là **bệnh nhân**, tôi muốn nhận nhắc giờ ăn, check-in tuân thủ,
 
 ## 5. Edge cases
 - Reject sau khi một số reminder đã `sent` → chỉ cancel tương lai.
-- Adherence `no` lặp → chỉ lưu payload (chưa escalate dietitian).
+- Adherence `no` lặp → chỉ lưu payload (chưa escalate doctor).
 
 ## 6. Ngoài phạm vi
 - FCM/APNs; cron production (post-demo optional tick `pending→sent`).

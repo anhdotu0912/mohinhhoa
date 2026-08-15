@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
+from app.models.catalog import Allergy, Diagnosis, Medicine
 from app.models.profile import Profile
 from app.models.user import User
 
@@ -25,9 +26,22 @@ DEMO_ACCOUNTS = [
             "medications": ["metformin", "warfarin"],
             "allergies": ["hải sản"],
             "bmi": 26.5,
+            "weight": 72,
+            "height": 170,
+            "age": 45,
+            "gender": "Nam",
+            "phone": "0901 234 567",
+            "address": "Quận 1, TP. Hồ Chí Minh",
+            "blood_pressure": "130/80 mmHg",
+            "blood_glucose": "135 mg/dL",
             "target_kcal": 1800,
             "restrictions": {"carb_per_meal": 45, "sodium_daily": 1500},
             "preferences": ["thích ăn cơm", "không ăn thịt bò"],
+            "treatment_goals": [
+                "Kiểm soát đường huyết ổn định (HbA1c < 7%).",
+                "Giảm cân 2kg trong 1 tháng thông qua chế độ ăn và tập thể dục.",
+                "Duy trì huyết áp dưới 130/80 mmHg.",
+            ],
         },
     },
     {
@@ -39,9 +53,22 @@ DEMO_ACCOUNTS = [
             "medications": ["amlodipine", "metformin", "atorvastatin"],
             "allergies": [],
             "bmi": 28.0,
+            "weight": 58,
+            "height": 162,
+            "age": 52,
+            "gender": "Nữ",
+            "phone": "0912 345 678",
+            "address": "Quận 3, TP. Hồ Chí Minh",
+            "blood_pressure": "120/80 mmHg",
+            "blood_glucose": "105 mg/dL",
             "target_kcal": 1600,
             "restrictions": {"carb_per_meal": 40, "sodium_daily": 1500},
             "preferences": ["ăn chay 2 ngày/tuần"],
+            "treatment_goals": [
+                "Hạ Triglyceride máu xuống dưới 1.7 mmol/L.",
+                "Giảm natri trong khẩu phần ăn dưới 2000mg/ngày.",
+                "Duy trì chỉ số Creatinine máu ở mức an toàn.",
+            ],
         },
     },
     {
@@ -53,43 +80,220 @@ DEMO_ACCOUNTS = [
             "medications": ["allopurinol"],
             "allergies": [],
             "bmi": 24.0,
+            "weight": 70,
+            "height": 170,
+            "age": 60,
+            "gender": "Nam",
+            "phone": "0923 456 789",
+            "address": "Bình Thạnh, TP. Hồ Chí Minh",
+            "blood_pressure": "145/95 mmHg",
+            "blood_glucose": "6.2 mmol/L",
             "target_kcal": 2000,
             "restrictions": {"carb_per_meal": 60, "sodium_daily": 2300},
             "preferences": ["thích ăn cá"],
+            "treatment_goals": ["Duy trì acid uric dưới 360 µmol/L."],
         },
     },
     {
-        "user_id": "demo_dietitian",
-        "email": "demo_dietitian@example.com",
-        "role": "dietitian",
+        "user_id": "demo_doctor",
+        "email": "demo_doctor@example.com",
+        "role": "doctor",
         "profile": None,
     },
 ]
 
 DEMO_PASSWORD = "demo1234"
 
+CATALOG_MEDICINES = [
+    "Metformin 500mg",
+    "Amlodipine 5mg",
+    "Atorvastatin 10mg",
+    "Warfarin 5mg",
+    "Allopurinol 100mg",
+    "Losartan 50mg",
+    "Glimepiride 2mg",
+    "Insulin (tiêm)",
+    "Perindopril 5mg",
+    "Febuxostat 80mg",
+    "Aspirin 81mg",
+    "Furosemide 40mg",
+]
+
+CATALOG_ALLERGIES = [
+    "Hải sản",
+    "Đậu phộng",
+    "Sữa (lactose)",
+    "Trứng",
+    "Gluten",
+    "Penicillin",
+    "Sulfonamides",
+    "Phấn hoa",
+    "Bụi mịn",
+    "Hạt mè",
+]
+
+CATALOG_DIAGNOSES = [
+    ("diabetes_t2", "Tiểu đường type 2"),
+    ("hypertension", "Tăng huyết áp"),
+    ("ckd", "Suy thận mạn"),
+    ("gout", "Gout"),
+    ("dyslipidemia", "Rối loạn lipid máu"),
+    ("nafld", "Gan nhiễm mỡ"),
+    ("obesity", "Béo phì"),
+    ("asthma", "Hen phế quản"),
+]
+
+
+def _migrate_legacy_dietitian(db: Session) -> None:
+    """Map legacy role/account `dietitian` → `doctor` (idempotent)."""
+    for user in db.query(User).filter(User.role == "dietitian").all():
+        user.role = "doctor"
+        logger.info("Migrated role dietitian → doctor for %s", user.email)
+
+    legacy = db.get(User, "demo_dietitian")
+    if legacy is not None:
+        legacy.role = "doctor"
+        doctor_exists = db.get(User, "demo_doctor") is not None
+        email_taken = (
+            db.query(User)
+            .filter(User.email == "demo_doctor@example.com", User.id != legacy.id)
+            .first()
+            is not None
+        )
+        if not doctor_exists and not email_taken:
+            legacy.email = "demo_doctor@example.com"
+            logger.info("Renamed demo_dietitian email → demo_doctor@example.com")
+
+    db.commit()
+
 
 def seed_demo_accounts(db: Session) -> None:
+    _migrate_legacy_dietitian(db)
     for account in DEMO_ACCOUNTS:
-        if db.get(User, account["user_id"]) is not None:
-            continue
-        user = User(
-            id=account["user_id"],
-            email=account["email"],
-            hashed_password=hash_password(DEMO_PASSWORD),
-            role=account["role"],
-        )
-        db.add(user)
-        db.flush()
+        user = db.get(User, account["user_id"])
+        if user is not None:
+            user.role = account["role"]
+            user.email = account["email"]
+        else:
+            by_email = db.query(User).filter(User.email == account["email"]).first()
+            if by_email is not None:
+                by_email.role = account["role"]
+                user = by_email
+            else:
+                user = User(
+                    id=account["user_id"],
+                    email=account["email"],
+                    hashed_password=hash_password(DEMO_PASSWORD),
+                    role=account["role"],
+                )
+                db.add(user)
+                db.flush()
         profile_data = account["profile"]
         if profile_data is not None:
-            db.add(Profile(user_id=user.id, **profile_data))
+            profile = (
+                db.query(Profile).filter(Profile.user_id == user.id).first()
+            )
+            if profile is None:
+                profile = Profile(user_id=user.id)
+                db.add(profile)
+            # Upsert deterministic demo profile fields (idempotent)
+            for key, value in profile_data.items():
+                setattr(profile, key, value)
+            db.flush()
         logger.info("Seeded demo account %s", account["email"])
     db.commit()
+
+
+def _migrate_add_full_name(db: Session) -> None:
+    """Add users.full_name to existing SQLite DBs (idempotent).
+
+    `create_all` only creates missing tables, so old DB files need ALTER.
+    """
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("users")]
+    if "full_name" in columns:
+        return
+    db.execute(text("ALTER TABLE users ADD COLUMN full_name VARCHAR(255)"))
+    db.commit()
+    logger.info("Added users.full_name column")
+
+
+def _migrate_add_body_metrics(db: Session) -> None:
+    """Add profiles.weight/height to existing SQLite DBs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("profiles")]
+    missing = [col for col in ("weight", "height") if col not in columns]
+    if not missing:
+        return
+    for col in missing:
+        db.execute(text(f"ALTER TABLE profiles ADD COLUMN {col} FLOAT"))
+    db.commit()
+    logger.info("Added profiles columns: %s", ", ".join(missing))
+
+
+def _migrate_add_profile_detail(db: Session) -> None:
+    """Add profiles detail columns to existing SQLite DBs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("profiles")]
+    new_columns = {
+        "age": "INTEGER",
+        "gender": "VARCHAR(20)",
+        "phone": "VARCHAR(32)",
+        "address": "VARCHAR(255)",
+        "blood_pressure": "VARCHAR(32)",
+        "blood_glucose": "VARCHAR(32)",
+        "treatment_goals": "JSON",
+    }
+    missing = {col: dtype for col, dtype in new_columns.items() if col not in columns}
+    if not missing:
+        return
+    for col, dtype in missing.items():
+        db.execute(text(f"ALTER TABLE profiles ADD COLUMN {col} {dtype}"))
+    db.commit()
+    logger.info("Added profiles columns: %s", ", ".join(missing))
+
+
+def _migrate_add_user_avatar(db: Session) -> None:
+    """Add users.avatar to existing SQLite DBs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("users")]
+    if "avatar" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN avatar VARCHAR(500)"))
+        db.commit()
+        logger.info("Added users.avatar column")
+
+
+def seed_catalog(db: Session) -> None:
+    """Seed danh mục thuốc/dị ứng/chẩn đoán (idempotent theo tên/code)."""
+    for name in CATALOG_MEDICINES:
+        if db.query(Medicine).filter(Medicine.name == name).first() is None:
+            db.add(Medicine(name=name))
+    for name in CATALOG_ALLERGIES:
+        if db.query(Allergy).filter(Allergy.name == name).first() is None:
+            db.add(Allergy(name=name))
+    for code, label in CATALOG_DIAGNOSES:
+        if db.query(Diagnosis).filter(Diagnosis.code == code).first() is None:
+            db.add(Diagnosis(code=code, name=label))
+    db.commit()
+    logger.info(
+        "Seeded catalog: %d medicines, %d allergies, %d diagnoses",
+        len(CATALOG_MEDICINES),
+        len(CATALOG_ALLERGIES),
+        len(CATALOG_DIAGNOSES),
+    )
 
 
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
+        _migrate_add_full_name(db)
+        _migrate_add_user_avatar(db)
+        _migrate_add_body_metrics(db)
+        _migrate_add_profile_detail(db)
         seed_demo_accounts(db)
+        seed_catalog(db)

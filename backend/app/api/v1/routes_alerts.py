@@ -22,9 +22,9 @@ def list_alerts(
     user: User = Depends(get_current_user),
 ) -> list[Alert]:
     query = db.query(Alert)
-    if user.role == "dietitian":
+    if user.role == "doctor":
         if patient_id is None:
-            raise APIError(400, "PATIENT_ID_REQUIRED", "Dietitian cần truyền patient_id.")
+            raise APIError(400, "PATIENT_ID_REQUIRED", "Doctor cần truyền patient_id.")
         query = query.filter(Alert.user_id == patient_id)
     else:
         query = query.filter(Alert.user_id == user.id)

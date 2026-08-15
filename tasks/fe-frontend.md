@@ -6,10 +6,10 @@
 
 ## Trách nhiệm
 
-- Shell bệnh nhân `/patient/*` và bác sĩ `/doctor/*` (role API `dietitian`)
+- Shell bệnh nhân `/patient/*` và bác sĩ `/doctor/*` (role API `doctor`)
 - Auth UI → JWT thật (TASK-01)
 - `lib/api.ts` + types theo api-v1 (thiếu → backlog)
-- Onboarding, meals, notifications, dietitian review nối API
+- Onboarding, meals, notifications, doctor review nối API
 - **Ẩn Food Log** khỏi nav (Won't Have)
 
 ## Không làm

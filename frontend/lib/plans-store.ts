@@ -6,6 +6,8 @@ export interface MealDishItem {
   calories: number;
   salt: number;
   sugar: number;
+  foodId?: string | null;
+  alternatives?: MealDishItem[];
 }
 
 export interface DayMealPlan {

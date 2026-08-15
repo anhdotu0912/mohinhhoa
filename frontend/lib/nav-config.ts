@@ -13,7 +13,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
     { id: "patients", label: "Bệnh nhân", href: "/doctor/patients", icon: "group" },
     {
       id: "reviews",
-      label: "Duyệt kế hoạch",
+      label: "Thực đơn",
       href: "/doctor/reviews",
       icon: "assignment_turned_in",
     },

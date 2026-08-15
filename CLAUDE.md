@@ -2,7 +2,7 @@
 
 > File này là "nguồn sự thật" (single source of truth) cho AI coding agent khi làm việc trên repo này.
 > Đọc toàn bộ file này TRƯỚC khi code bất kỳ task nào. Pointer ngắn: [`AGENTS.md`](AGENTS.md).
-
+> Hạn chế thay đổi Frontend đã thiết kế
 ---
 
 ## 1. Tổng quan dự án
@@ -50,14 +50,14 @@
 **Backend**
 - Framework: FastAPI (Python)
 - Database: **SQLite** mặc định (`DATABASE_URL`); Postgres-ready — ADR-006
-- Auth: JWT, 2 role API (`patient`, `dietitian`)
+- Auth: JWT, 2 role API (`patient`, `doctor`)
 - Deploy hiện tại: `docker-compose` local; target prod Railway/Vercel vẫn là mục tiêu gap-closure
 
 **Frontend**
 - Framework: Next.js 14 (App Router)
 - Styling: Tailwind CSS
 - State: Zustand (stores cục bộ / mock; `lib/api.ts` là backlog TASK-01)
-- Shell: `/patient/*` (bệnh nhân) · `/doctor/*` (UI map từ role `dietitian`)
+- Shell: `/patient/*` (bệnh nhân) · `/doctor/*` (role API `doctor`)
 
 ---
 
@@ -72,7 +72,7 @@ P-014/
 │   ├── 02-meal-plan-generation.md
 │   ├── 03-interaction-check.md
 │   ├── 04-compliance-notification.md
-│   ├── 05-dietitian-review.md
+│   ├── 05-doctor-review.md
 │   └── 06-chat-rag-qa.md
 ├── adrs/
 │   ├── 001-vector-db-qdrant.md     # Chroma hiện tại / Qdrant không còn target MVP
@@ -95,7 +95,7 @@ P-014/
 │   ├── main.py
 │   ├── core/                       # config.py, security.py
 │   ├── api/v1/                     # auth, profile, meal_plan, chat, interactions,
-│   │                               # alerts, notifications, dietitian
+│   │                               # alerts, notifications, doctor
 │   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
 │   ├── rag/                        # indexer, retriever, embeddings (Chroma)
 │   ├── guardrails/                 # rules.py / source_check — đang placeholder (TASK-04)
@@ -118,7 +118,7 @@ P-014/
 | Role | Owner modules | Không đụng (trừ khi thống nhất) |
 |---|---|---|
 | **BE1 — AI Core** | `agents/`, `rag/`, `guardrails/`, `services/nutrition_calculator.py`, data KB (`data/`), tests AI | Frontend, JWT/auth wiring chi tiết, notification scheduler |
-| **BE2 — Platform** | `api/`, `models/`, `schemas/`, `db/`, `core/`, `services/notification.py`, routes dietitian/alerts/notifications | Logic prompt/RAG internals, FE components |
+| **BE2 — Platform** | `api/`, `models/`, `schemas/`, `db/`, `core/`, `services/notification.py`, routes doctor/alerts/notifications | Logic prompt/RAG internals, FE components |
 | **FE — Frontend** | `frontend/**`, types đồng bộ contract, UX 4 screens | Backend agent logic, DB migrations |
 
 **Handoff rule:** đổi schema Agent → sửa `/contracts/agent-io-schema.md` trước; đổi HTTP FE↔BE → sửa `/contracts/api-v1.md` trước (hoặc đồng bộ từ Swagger). BE1 ↔ BE2 qua contract + Pydantic; FE phụ thuộc `api-v1` / OpenAPI đã ổn định.

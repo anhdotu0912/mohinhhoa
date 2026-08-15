@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 class RegisterRequest(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=6, max_length=128)
-    role: Literal["patient", "dietitian"] = "patient"
+    role: Literal["patient", "doctor"] = "patient"
+    full_name: str | None = Field(default=None, max_length=255)
 
 
 class LoginRequest(BaseModel):
@@ -29,3 +30,4 @@ class RegisterResponse(BaseModel):
     id: str
     email: str
     role: str
+    full_name: str | None = None
