@@ -64,7 +64,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
     """InteractionChecker node — checks drug-food interactions from user query or state."""
     profile_data = state.get("profile", {})
     profile = PatientProfile(**profile_data) if isinstance(profile_data, dict) else profile_data
-    medications = profile.medications or ["metformin", "warfarin", "amlodipine"]
+    medications = profile.medications or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
 
     # Extract foods from message if mentioned, otherwise use common foods
     message = state.get("message", "")

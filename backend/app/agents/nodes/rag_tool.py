@@ -45,6 +45,10 @@ def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[st
             "source": chunk.source,
             "score": chunk.score,
         })
+        # Add food citation to list (matches contract format com_trang#food_db_vn)
+        source_citation = f"{chunk.source}#{chunk.chunk_id}"
+        if source_citation not in citations:
+            citations.append(source_citation)
 
     return rag_context, citations
 
