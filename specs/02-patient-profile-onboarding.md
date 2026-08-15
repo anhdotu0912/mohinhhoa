@@ -1,0 +1,52 @@
+# Spec: Hồ sơ Bệnh nhân & Onboarding
+
+## Status
+Done — `POST /profile` (upsert) và `GET /profile/me` hoạt động đúng thiết kế; không có bước "hoàn tất onboarding" tách biệt ở backend (chỉ là 1 form upsert). **Cập nhật 2026-08-15:** rule 4 (mở rộng pattern `preferences`) và rule 7 (HITL cho `target_kcal`/`restrictions`) là **Planned**, chưa implement.
+
+## 1. Mục tiêu (Why)
+Hồ sơ bệnh nhân (bệnh lý, thuốc, dị ứng, mục tiêu dinh dưỡng) là input bắt buộc để AI sinh thực đơn cá nhân hoá và kiểm tra tương tác thuốc–thực phẩm đúng. Không có hồ sơ, AI chỉ dùng giá trị mặc định chung (`target_kcal=1800`, không bệnh lý/dị ứng) — không sai kỹ thuật nhưng vô nghĩa lâm sàng.
+
+## 2. User story
+Là **bệnh nhân**, tôi muốn khai báo bệnh lý, thuốc đang dùng, dị ứng, mục tiêu calo và sở thích ăn uống, để AI lập thực đơn phù hợp và an toàn với tình trạng của tôi.
+
+## 3. Business rules
+1. **1 user – 1 profile** (upsert theo `user_id`, không có nhiều hồ sơ/user) — `POST /profile` tạo mới nếu chưa có, ghi đè toàn bộ field nếu đã có (không phải patch từng field).
+2. Không có field nào bị Pydantic validate bắt buộc (mọi field default) — nhưng về nghiệp vụ: `disease/medications/allergies/bmi/target_kcal` **nên** được điền đầy đủ trước khi bấm "Lập thực đơn" để kết quả có ý nghĩa (business rule khuyến nghị ở FE, không phải validation cứng ở BE).
+3. **`allergies` = hard filter** — món ăn khớp bất kỳ allergy nào **bị loại tuyệt đối** khỏi thực đơn và khỏi danh sách món thay thế (`meal_planner_agent._is_allergic`, áp dụng cả khi lọc catalog gốc lẫn khi lọc `alternatives[]` sau khi sinh). Không có ngoại lệ, không có "cảnh báo nhưng vẫn cho chọn".
+4. **`preferences` = soft filter** — as-built hiện chỉ 1 pattern cụ thể được code nhận diện: câu chứa `"không ăn thịt bò"` (hoặc biến thể không dấu) sẽ loại món có `"bò"` trong tên. **Quyết định (2026-08-15): mở rộng thêm pattern** — bổ sung nhận diện các câu phổ biến khác, đề xuất tối thiểu: `"ăn chay"`/`"chay"` (loại toàn bộ món có thịt/hải sản), `"không ăn hải sản"`, `"không ăn heo"`/`"không ăn lợn"`, `"không ăn gà"`. Danh sách cụ thể + cách xử lý overlap với `allergies` (ví dụ "không ăn hải sản" trùng ý nghĩa với 1 allergy) do BE1 chốt khi implement (`tasks/be1-ai-core.md`). Các câu preference khác ngoài danh sách đã hỗ trợ vẫn chỉ được lưu, không ảnh hưởng logic sinh thực đơn.
+5. Điều kiện tiên quyết để `POST /meal-plans/generate` có kết quả tốt: đã có ít nhất `target_kcal` (luôn có default 1800) — **không** có validation chặn generate nếu chưa điền `disease`/`allergies`; hệ thống vẫn chạy, chỉ kém cá nhân hoá.
+6. `restrictions.carb_per_meal`/`restrictions.sodium_daily` optional; nếu điền, được dùng để tạo `warnings[]` trong `DayPlan.totals` khi vượt ngưỡng (không chặn sinh plan, chỉ cảnh báo). **[Planned]** khi `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` được thêm (xem `specs/04`), áp dụng cùng cơ chế cảnh báo.
+7. **HITL cho ràng buộc lâm sàng — `[Planned]`, quyết định 2026-08-15:** khi patient tự sửa `target_kcal`/`restrictions` qua `POST /profile` (khác các field khác, chỉ 2 field này), giá trị mới **vẫn có hiệu lực ngay** (không block patient) nhưng `PatientProfile.constraints_status` chuyển thành `"pending_doctor_review"` để báo cho bác sĩ biết cần xem lại — patient **có thể tự ghi** giá trị mới, nhưng thay đổi cần được bác sĩ xác nhận (`POST /doctor/patients/{id}/constraints/approve`, xem `specs/04-clinical-constraints.md`) để chuyển lại `"confirmed"`. Khi doctor tự sửa trực tiếp (`PUT /doctor/patients/{id}/constraints`), không cần bước duyệt này (doctor là người xác nhận trực tiếp).
+
+## 4. Luồng chính (happy path)
+1. Patient đăng nhập, được redirect tới onboarding (FE `frontend/app/patient/onboarding/page.tsx`).
+2. FE gọi `POST /profile` với toàn bộ field hồ sơ.
+3. BE upsert vào bảng `profiles`, trả lại `PatientProfile` đã lưu.
+4. FE có thể gọi lại `GET /profile/me` bất kỳ lúc nào để hiển thị/sửa hồ sơ (ví dụ ở trang cài đặt).
+5. Sau khi có hồ sơ, patient có thể sang `POST /meal-plans/generate` (`specs/05-meal-plan-generation.md`).
+
+## 5. Edge cases
+- Patient gọi `GET /profile/me` trước khi từng `POST /profile` → BE trả `PatientProfile` với toàn field default (`target_kcal=1800`, list rỗng), **không** trả lỗi 404 (khác với `GET /meal-plans/me` khi chưa có plan, endpoint này không raise lỗi — xem `services/meal_plan_service.get_profile`).
+- Patient sửa hồ sơ (`POST /profile` lần 2) sau khi đã có 1+ meal plan cũ → plan cũ **không** tự động cập nhật (mỗi `MealPlanOutput.profile_snapshot` là bản chụp tại thời điểm generate, không tham chiếu động tới `profiles` hiện tại).
+- Patient tự sửa `target_kcal`/`restrictions` nhiều lần liên tiếp trước khi doctor kịp duyệt lần đầu → `constraints_status` giữ `"pending_doctor_review"` (không cộng dồn nhiều "lần chờ duyệt" khác nhau, chỉ có 1 cờ trạng thái hiện tại).
+- Field `bmi` do patient tự nhập tay (không tự tính từ `weight/height` ở endpoint patient, khác với endpoint doctor `PUT /doctor/patients/{id}/metrics` có tự tính) — patient có thể nhập `bmi` không khớp `weight/height` đã nhập, không có validation chéo.
+
+## 6. Ngoài phạm vi (Out of scope)
+- Validate lâm sàng nội dung `disease`/`medications` (không kiểm tra tên bệnh/thuốc có hợp lệ theo danh mục — patient tự nhập text tự do; doctor có danh mục chuẩn hoá riêng qua `GET /doctor/catalog`, xem `specs/03`).
+- Onboarding nhiều bước có wizard/progress bar ở BE — đây là chi tiết UI của FE, backend chỉ có 1 endpoint upsert duy nhất.
+- Lịch sử thay đổi hồ sơ (chỉ lưu bản mới nhất, xem `adrs/010-patient-metrics-history-strategy.md` cho phần chỉ số cơ thể).
+
+## 7. Schema tham chiếu
+- `PatientProfile`/`ProfileUpsert`/`Restrictions` — `contracts/agent-io-schema.md` §1.
+
+## 8. API liên quan
+| Method | Path | Role |
+|---|---|---|
+| POST | `/profile` | patient |
+| GET | `/profile/me` | patient |
+
+## 9. Liên quan
+- `specs/05-meal-plan-generation.md` — dùng `PatientProfile` làm input chính.
+- `specs/04-clinical-constraints.md` — phần bác sĩ sửa/duyệt `restrictions`/`target_kcal` (Planned, workflow HITL đầy đủ).
+- `adrs/006-hitl-guardrails-strategy.md` — nguyên tắc HITL mở rộng sang ràng buộc lâm sàng.
+- `contracts/agent-io-schema.md` §1.

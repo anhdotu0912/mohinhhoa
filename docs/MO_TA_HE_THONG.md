@@ -1,636 +1,267 @@
-# Mô tả hệ thống — AI Trợ lý Dinh dưỡng & Lối sống theo bệnh lý (P-014)
+# Mô tả chức năng — VMEC-10 (P-014)
 
-> Tài liệu kỹ thuật hệ thống: chức năng hiện có, kiến trúc as-built, và luồng hoạt động khi phát triển hoàn chỉnh (to-be / North Star demo).  
-> Ngày tổng hợp: **2026-08-12** · Nguồn: codebase `backend/`, `frontend/`, `CLAUDE.md`, contract Agent/API.
-
----
-
-## 1. Tổng quan sản phẩm
-
-**P-014** là prototype AI Agent hỗ trợ bệnh nhân mắc bệnh mạn tính (tiểu đường type 2, tăng huyết áp, gout, tim mạch…) nhận:
-
-1. **Hồ sơ sức khỏe / dinh dưỡng** cá nhân hoá  
-2. **Thực đơn 7 ngày** theo bệnh lý, thuốc, dị ứng và mục tiêu kcal  
-3. **Cảnh báo tương tác thuốc–thực phẩm**  
-4. **Nhắc tuân thủ (Compliance Notification)** in-app  
-5. **Duyệt thực đơn bởi chuyên gia dinh dưỡng / bác sĩ** (approve / edit / reject)
-
-**North Star (demo end-to-end):**  
-Bệnh nhân đăng nhập → (tuỳ chọn) onboarding hồ sơ → tạo thực đơn 7 ngày → nhận alerts + notifications → doctor duyệt → bệnh nhân thấy trạng thái đã duyệt / `plan_approved`.
-
-**Nguyên tắc thiết kế:** ưu tiên **một demo flow mượt** hơn việc thêm nhiều tính năng nửa vời.
-
-| Vai trò API | Vai trò UI Frontend | Mô tả |
-|---|---|---|
-| `patient` | Bệnh nhân (`/patient/*`) | Nhập hồ sơ, xem thực đơn, alerts, thông báo, chat trợ lý |
-| `doctor` | Bác sĩ / chuyên gia (`/doctor/*`) | Danh sách bệnh nhân, duyệt kế hoạch, theo dõi tuân thủ |
+> Tài liệu này chuyển hoá sơ đồ Use Case + bảng tác nhân trong `UML_VinMec_10.docx` thành đặc tả chức năng chi tiết, có luồng hoạt động (step-by-step) cho từng use case, để AI coding agent hoặc dev đọc và triển khai trực tiếp.
+> Đối chiếu với repo hiện tại: `CLAUDE.md` (nguồn sự thật stack + MoSCoW), `specs/01-06` (đặc tả as-built của 6 khu vực đã code), `contracts/api-v1.md` + `agent-io-schema.md`.
+> Quy ước Status mỗi use case: `New` (chưa có trong specs hiện tại — cần agent thiết kế mới) · `Đã có spec` (trỏ tới file spec tương ứng, dùng tài liệu này để bổ sung góc nhìn use-case) · `Ngoài MVP` (không làm ở bản demo này, giữ nav ẩn / stub).
 
 ---
 
-## 2. Phạm vi chức năng (MoSCoW)
+## 0. Tác nhân hệ thống
 
-### 2.1 Must Have (MVP / demo)
-
-| Chức năng | Mô tả ngắn |
+| Tác nhân | Vai trò |
 |---|---|
-| Hồ sơ bệnh nhân | Disease, medications, allergies, BMI, target_kcal, restrictions, preferences |
-| Meal plan 7 ngày (RAG) | Sinh thực đơn cá nhân hoá + citations |
-| Drug–food interaction + Alert | Kiểm tra KB tương tác, tạo alert, swap món nguy hiểm |
-| Compliance Notification (in-app) | Nhắc bữa, follow-up tương tác, plan approved, check-in tuân thủ |
-| Nutrition calculator | Tổng kcal/macro theo ngày, so với target & restrictions |
-| Guardrails + nguồn trích dẫn | Không kê/đổi thuốc; số liệu dinh dưỡng phải có citation |
-| doctor review UI | Approve / edit / reject + trust badge |
+| **Bác sĩ / Chuyên gia dinh dưỡng** (`role=doctor`) | Quản lý bệnh nhân, duyệt thực đơn AI sinh ra, theo dõi tuân thủ, quản lý ràng buộc lâm sàng |
+| **Bệnh nhân** (`role=patient`) | Khai báo hồ sơ, tương tác với AI để nhận thực đơn/tư vấn, ghi nhận chỉ số & tuân thủ |
+| **AI** (tác nhân hệ thống, không phải actor login) | LangGraph Agent: RAG, sinh thực đơn, kiểm tra tương tác thuốc–thực phẩm, tính toán dinh dưỡng, cảnh báo, guardrails HITL |
+| **Chức năng dùng chung** | Đăng nhập, Đăng ký, Liên hệ — không phân role |
 
-### 2.2 Should / Could (sau demo hoặc nâng cao)
-
-Adaptive feedback, memory preferences, chat Q&A sâu hơn, cảnh báo ngưỡng dinh dưỡng, food recognition ảnh, danh sách đi chợ, export PDF, push FCM/APNs, wearable sync.
-
-### 2.3 Won't Have (MVP này)
-
-**Food Log** (text/search/NLP) — stub/route có thể còn trong repo nhưng **đã ẩn khỏi nav demo**. Billing, multi-language, social.
+**Nguyên tắc HITL bắt buộc (từ đề bài, khớp CLAUDE §7):** AI không được tự chẩn đoán bệnh, không tự ý khuyến nghị đổi thuốc/liều lượng. Mọi kế hoạch dinh dưỡng cho bệnh nhân **phải** qua bác sĩ/chuyên gia duyệt trước khi coi là chính thức. Mọi số liệu AI trả về phải grounded + có citation từ RAG, không hallucinate.
 
 ---
 
-## 3. Trạng thái hiện tại (As-built)
+## 1. Sơ đồ luồng use case tổng quan
 
-### 3.1 Backend — đã có khung chạy được
+```mermaid
+flowchart TB
+  subgraph Shared[Chức năng dùng chung]
+    Register[Đăng ký]
+    Login[Đăng nhập]
+    Contact[Liên hệ]
+  end
 
-| Thành phần | Trạng thái | Ghi chú |
-|---|---|---|
-| FastAPI entry (`app/main.py`) | ✅ | CORS, health, mount `/api/v1/*` |
-| Auth JWT (register/login) | ✅ | Role `patient` / `doctor`, seed demo accounts |
-| Profile upsert/get | ✅ | `POST/GET /api/v1/profile` |
-| Meal plan generate/get | ✅ | `DEMO_MOCK=true` (mặc định) trả mock ổn định; `false` gọi LangGraph |
-| Interaction check API | ✅ | `POST /api/v1/interactions/check` |
-| Alerts list | ✅ | Persist khi generate plan |
-| Notifications CRUD-lite | ✅ | Materialize event-driven; demo simulate |
-| doctor review | ✅ | approve / reject / edit |
-| Chat → `run_agent` | ✅ | Thin wrapper LangGraph |
-| LangGraph graph | ✅ | profile → intent → route (meal/interaction/RAG/refuse…) |
-| MealPlannerAgent | ✅ (code) | RAG foods/guidelines + NutritionCalculator + swap |
-| InteractionCheckerAgent | ✅ | KB `drug_food_interactions.json` |
-| RAG (ChromaDB) | ✅ (code) | Dense retrieval; hybrid BM25 trong retriever |
-| Guardrails `rules.py` | ⚠️ | Hiện còn placeholder; logic refuse nằm trong graph node |
-| Food Log routes/agent | 🚫 / stub | Ngoài MVP; node stub trong graph |
-| PostgreSQL prod | ⚠️ | Dev mặc định **SQLite** (`app.db`) |
-| Vector DB theo ADR (Qdrant) | ⚠️ | Code hiện dùng **ChromaDB**; ADR chọn Qdrant (target) |
+  subgraph Doctor[Bác sĩ]
+    D1[Quản lý bệnh nhân]
+    D2[Quản lý thực đơn]
+    D3[Xem tuân thủ]
+    D4[Quản lý ràng buộc lâm sàng]
+    D5[Cập nhật & theo dõi chỉ số]
+  end
 
-### 3.2 Frontend — UI shell theo 2 role, phần lớn mock
+  subgraph Patient[Bệnh nhân]
+    P1[Đăng ký hồ sơ ban đầu]
+    P2[Cập nhật & theo dõi chỉ số]
+    P3[Quản lý nhật ký ăn uống *]
+    P4[Xem thực đơn]
+    P5[Tương tác với AI]
+  end
 
-| Khu vực | Route chính | Trạng thái |
-|---|---|---|
-| Auth | `/login`, `/register` | UI có; demo buttons map tài khoản seed |
-| Patient home | `/patient` | Dashboard mock (kế hoạch hôm nay, alerts…) |
-| Onboarding | `/patient/onboarding` | Form hồ sơ |
-| Meals | `/patient/meals` | Xem / tạo thực đơn (UI) |
-| Food log UI | `/patient/meals/log` | Có route nhưng **ẩn khỏi MVP** |
-| Notifications | `/patient/notifications` | Trung tâm thông báo |
-| Assistant | `/patient/assistant` | Chat trợ lý |
-| Messages | `/patient/messages` | **Mock local** |
-| Doctor dashboard | `/doctor` | Tổng quan |
-| Patients / queue | `/doctor/patients/*` | Danh sách, generate plan, constraints, compliance |
-| Reviews | `/doctor/reviews/...` | Duyệt kế hoạch |
-| History / messages | `/doctor/history`, `/doctor/messages` | UI + mock |
+  subgraph AI[AI Agent]
+    A1[Cảnh báo dị ứng & tương tác]
+    A2[Sinh/duyệt thực đơn]
+  end
 
-**Lưu ý kỹ thuật FE hiện tại:** chưa thấy lớp `fetch`/`api.ts` gắn chặt REST backend trong `frontend/lib`; state dùng Zustand store cục bộ / mock-data. Hướng đích khi hoàn thiện: FE chỉ phụ thuộc OpenAPI/schemas ổn định.
-
-### 3.3 Infra hiện tại
-
+  Login --> D1 & D2 & D3 & D4 & D5
+  Login --> P2 & P3 & P4 & P5
+  Register --> P1
+  D2 -->|include| A2
+  P5 -->|include| A1
+  D2 -->|include| A1
+  D2 -->|include| D3
+  P4 -->|include| A1
 ```
-docker-compose: backend (8000) + frontend (3000)
-DB: SQLite volume/file
-Vector: Chroma persist dir (chroma_db)
-DEMO_MOCK=true → meal plan mock cho pitch ổn định
-```
+
+*`Quản lý nhật ký ăn uống` (Food Log) nằm trong đề bài gốc nhưng đang là **Won't Have** trong MoSCoW hiện tại của repo (CLAUDE §2, §7) — xem mục 5.3 để biết cách xử lý lệch pha này.*
 
 ---
 
-## 4. Kiến trúc hệ thống
+## 2. Nhóm chức năng: Bác sĩ / Chuyên gia dinh dưỡng
 
-### 4.1 Sơ đồ tổng thể (target / khi hoàn chỉnh)
+### 2.1 Quản lý bệnh nhân
+**Status:** Đã có spec → `specs/01-patient-profile.md` (khai báo hồ sơ), bổ sung góc nhìn bác sĩ ở đây.
 
-```mermaid
-graph TB
-    subgraph Clients
-        P[Bệnh nhân<br/>Next.js /patient]
-        D[doctor / Bác sĩ<br/>Next.js /doctor]
-    end
-
-    subgraph API["Platform API — FastAPI"]
-        AUTH[Auth JWT]
-        PROF[Profile]
-        MP[Meal Plans]
-        INT[Interactions]
-        ALT[Alerts]
-        NOTI[Notifications]
-        DIET[doctor Review]
-        CHAT[Chat]
-    end
-
-    subgraph AI["AI Core — LangGraph"]
-        G[Agent Graph]
-        PL[profile_loader]
-        IC[intent_classifier]
-        MP_A[MealPlannerAgent]
-        IX_A[InteractionCheckerAgent]
-        RAG_N[RAG Q&A node]
-        GR[Guardrails / refuse]
-    end
-
-    subgraph Data
-        RDB[(PostgreSQL / SQLite)]
-        VS[(Vector Store<br/>Chroma hiện tại / Qdrant theo ADR)]
-        KB[(KB files<br/>food_db_vn.json<br/>drug_food_interactions.json<br/>guidelines)]
-    end
-
-    subgraph Ext
-        LLM[LLM GPT-4o-mini / DeepSeek]
-        EMB[Embedding model]
-    end
-
-    P -->|REST + Bearer| API
-    D -->|REST + Bearer| API
-    API --> RDB
-    MP --> G
-    CHAT --> G
-    INT --> IX_A
-    G --> PL --> IC
-    IC --> MP_A & IX_A & RAG_N & GR
-    MP_A --> VS
-    MP_A --> IX_A
-    RAG_N --> VS
-    VS --> EMB
-    MP_A & RAG_N --> LLM
-    IX_A --> KB
-    NOTI --> RDB
-    ALT --> RDB
-```
-
-### 4.2 Phân tầng & ownership
-
-| Tầng | Công nghệ | Owner | Trách nhiệm |
-|---|---|---|---|
-| Presentation | Next.js 14 App Router, Tailwind, Zustand | FE | 2 shell role, UX 4+ màn North Star |
-| Application / API | FastAPI, Pydantic, JWT | BE2 | Routes, persist, notification service, doctor |
-| AI / Domain agents | LangGraph, LangChain-style RAG | BE1 | Graph, agents, indexer/retriever, nutrition calc |
-| Data | SQLAlchemy models; vector store; JSON KB | BE2 (RDB) · BE1 (KB/vector) | Users, profiles, plans, alerts, notifications |
-
-**Handoff rule:** đổi schema Agent/API → cập nhật contract trước, rồi mới code.
-
-### 4.3 Tech stack chi tiết
-
-| Layer | Lựa chọn thực tế trong repo | Ghi chú ADR / CLAUDE |
-|---|---|---|
-| Frontend | Next.js 14, Tailwind, Zustand | Deploy Vercel |
-| Backend | FastAPI + Uvicorn | Deploy Railway |
-| Auth | JWT (`python-jose` / bcrypt hash) | 2 role |
-| ORM / DB | SQLAlchemy; SQLite default | Prod: PostgreSQL |
-| Agent | LangGraph StateGraph | Intent routing |
-| LLM | `LLM_MODEL` (mặc định gpt-4o-mini) | Có thể DeepSeek qua env |
-| Embedding | `paraphrase-multilingual-MiniLM-L12-v2` | CLAUDE đề cập Gemini Embedding 2 |
-| Vector DB | **ChromaDB** persist | ADR 001: **Qdrant** (target) |
-| RAG | Dense retrieve (+ BM25 hybrid trong module) | Citations bắt buộc |
-| Orchestration demo | `DEMO_MOCK` flag | Tắt để chạy agent thật |
-
-### 4.4 Cấu trúc thư mục lõi
-
-```
-P-014/
-├── backend/app/
-│   ├── main.py                 # FastAPI app
-│   ├── api/v1/                 # auth, profile, meal_plan, chat,
-│   │                           # interactions, alerts, notifications, doctor
-│   ├── agents/                 # LangGraph graph + nodes + agents
-│   ├── rag/                    # indexer, retriever, embeddings
-│   ├── guardrails/             # rules, source_check
-│   ├── models/                 # User, Profile, MealPlan, Alert, Notification
-│   ├── schemas/                # Pydantic contract mirror
-│   ├── services/               # meal_plan_service, notification, nutrition_calculator
-│   └── db/                     # session, init_db + seed demo
-├── backend/data/               # food_db_vn.json, drug_food_interactions.json, guidelines/
-├── frontend/app/
-│   ├── (auth)/                 # login, register
-│   ├── patient/                # dashboard, meals, notifications, assistant...
-│   └── doctor/                 # patients, reviews, compliance, messages...
-├── frontend/components/        # shared shell, doctor widgets
-├── frontend/lib/               # nav-config, stores, mock-data
-├── contracts/                  # agent-io-schema (boundary FE↔BE↔Agent)
-├── specs/ · adrs/ · tasks/     # đặc tả, quyết định kiến trúc, roadmap
-└── docker-compose.yml
-```
-
-### 4.5 Mô hình dữ liệu chính
-
-```mermaid
-erDiagram
-    User ||--o| Profile : has
-    User ||--o{ MealPlan : owns
-    User ||--o{ Alert : receives
-    User ||--o{ Notification : receives
-    MealPlan ||--o{ Alert : may_spawn
-    MealPlan ||--o{ Notification : materializes
-    Alert ||--o| Notification : interaction_followup
-
-    User {
-        string id PK
-        string email
-        string role
-    }
-    Profile {
-        string user_id FK
-        json disease
-        json medications
-        json allergies
-        float bmi
-        int target_kcal
-        json restrictions
-        json preferences
-    }
-    MealPlan {
-        string id PK
-        string user_id
-        json days
-        json swaps
-        json citations
-        string status
-        string trust_badge
-    }
-    Alert {
-        string id PK
-        string drug
-        string food
-        string severity
-        string meal_plan_id
-    }
-    Notification {
-        string id PK
-        string type
-        string status
-        datetime scheduled_at
-        json related_ids
-    }
-```
-
-**Status meal plan:** `pending_review` → `approved` | `rejected` | `edited`  
-**Severity interaction:** `Nguy hiểm` | `Cần chú ý` | `An toàn`  
-**Notification types:** `meal_reminder` | `interaction_followup` | `plan_approved` | `adherence_checkin`  
-**Notification status:** `pending` | `sent` | `read` | `dismissed` | `done` | `cancelled`
-
-### 4.6 API surface (v1)
-
-| Method | Path | Role | Mục đích |
-|---|---|---|---|
-| POST | `/api/v1/auth/register` | public | Đăng ký |
-| POST | `/api/v1/auth/login` | public | JWT |
-| POST | `/api/v1/profile` | patient | Upsert hồ sơ |
-| GET | `/api/v1/profile/me` | patient | Lấy hồ sơ |
-| POST | `/api/v1/meal-plans/generate` | patient | Sinh + persist plan |
-| GET | `/api/v1/meal-plans/me` | patient | Plan mới nhất |
-| GET | `/api/v1/meal-plans/{id}` | auth | Chi tiết plan |
-| POST | `/api/v1/interactions/check` | auth | Check thuốc–thực phẩm |
-| GET | `/api/v1/alerts` | patient/doctor | Danh sách alert |
-| GET | `/api/v1/notifications` | patient | Lọc theo status/type |
-| POST | `/api/v1/notifications/{id}/read\|dismiss\|done` | patient | Cập nhật trạng thái |
-| POST | `/api/v1/notifications/demo/simulate` | demo | Hiện noti ngay khi pitch |
-| GET | `/api/v1/doctor/meal-plans` | doctor | Hàng đợi duyệt |
-| POST | `/api/v1/doctor/meal-plans/{id}/review` | doctor | approve/reject/edit |
-| POST | `/api/v1/chat` | patient | Chạy agent theo message |
-| GET | `/health` | public | Healthcheck |
-
----
-
-## 5. Kiến trúc AI Agent (LangGraph)
-
-### 5.1 Luồng graph
-
-```mermaid
-flowchart TD
-    START([Start]) --> PL[profile_loader]
-    PL --> IC[intent_classifier]
-    IC -->|meal_plan| MP[meal_plan_node<br/>MealPlannerAgent]
-    IC -->|interaction_check| IX[interaction_check_node]
-    IC -->|rag_qa| RAG[rag_qa_node]
-    IC -->|refuse| RF[refuse_node<br/>guardrail]
-    IC -->|food_log| FL[food_log_node stub]
-    IC -->|unknown| UN[unknown_node]
-    MP --> END([End])
-    IX --> END
-    RAG --> END
-    RF --> END
-    FL --> END
-    UN --> END
-```
-
-**Facade:** `run_agent(AgentRunInput) → AgentRunOutput` — BE2 gọi từ chat / (khi `DEMO_MOCK=false`) từ generate meal plan.
-
-### 5.2 MealPlannerAgent — pipeline nội bộ
-
-```
-PatientProfile
-  → RAG retrieve guidelines + foods
-  → Draft 7 ngày × slots (breakfast/lunch/dinner[/snack])
-  → Hard filter allergies
-  → Soft apply preferences + restrictions
-  → NutritionCalculator (totals, ±10% target, warnings)
-  → InteractionChecker (Nguy hiểm → swap + ghi swaps[])
-  → Citations / source check
-  → MealPlanOutput status=pending_review
-```
-
-### 5.3 InteractionCheckerAgent
-
-- Input: `medications[]`, `foods[]`  
-- KB: `backend/data/drug_food_interactions.json`  
-- Match accent-insensitive + alias  
-- Output: `interactions[]` → persist thành `Alert` khi gắn với meal plan
-
-### 5.4 Guardrails (nguyên tắc cứng)
-
-- Không khuyến nghị đổi thuốc / đổi liều / kê đơn / chẩn đoán → redirect bác sĩ  
-- Mọi số liệu dinh dưỡng AI trả về **phải có citation** từ RAG/KB  
-- Intent ngoài phạm vi → `refuse` / `unknown` với message hướng dẫn
-
----
-
-## 6. Luồng hoạt động khi phát triển xong (To-be)
-
-Các luồng dưới đây mô tả **hành vi hệ thống hoàn chỉnh theo North Star**, không chỉ phần UI mock hiện tại.
-
-### 6.1 North Star end-to-end (5 scene demo)
-
-```mermaid
-sequenceDiagram
-    actor BN as Bệnh nhân
-    actor BS as doctor
-    participant FE as Frontend
-    participant API as FastAPI
-    participant AG as LangGraph / Agents
-    participant DB as Database
-
-    BN->>FE: Login (patient)
-    FE->>API: POST /auth/login
-    API-->>FE: JWT + role
-    BN->>FE: Onboarding hồ sơ (tuỳ chọn)
-    FE->>API: POST /profile
-    API->>DB: Upsert Profile
-
-    BN->>FE: Tạo thực đơn 7 ngày
-    FE->>API: POST /meal-plans/generate
-    API->>AG: MealPlanner (+ InteractionChecker)
-    AG-->>API: MealPlanOutput
-    API->>DB: Persist MealPlan + Alerts
-    API->>DB: Materialize Notifications
-    API-->>FE: Plan pending_review
-
-    BN->>FE: Xem Dashboard alerts + notifications
-    FE->>API: GET /alerts, GET /notifications
-
-    BS->>FE: Login doctor
-    FE->>API: GET /doctor/meal-plans?status=pending_review
-    BS->>FE: Approve / Edit / Reject
-    FE->>API: POST .../review
-    API->>DB: Update status + trust_badge
-    API->>DB: plan_approved hoặc cancel reminders
-
-    BN->>FE: Thấy plan approved + thông báo
-    FE->>API: GET /meal-plans/me, GET /notifications
-```
-
-### 6.2 Auth & phân quyền
-
-1. User đăng ký với `role` ∈ {`patient`, `doctor`} hoặc dùng tài khoản seed.  
-2. Login trả `access_token` (Bearer).  
-3. Mọi API nghiệp vụ yêu cầu JWT; doctor routes dùng `require_roles("doctor")`.  
-4. FE shell `/doctor/*` khớp role API `doctor`; `/patient/*` khớp `patient`.
-
-**Tài khoản demo seed:**
-
-| Email | Password | Role |
-|---|---|---|
-| `demo_patient_1@example.com` | `demo1234` | patient (T2DM + HTN, metformin + warfarin) |
-| `demo_patient_2@example.com` | `demo1234` | patient |
-| `demo_patient_3@example.com` | `demo1234` | patient (gout) |
-| `demo_doctor@example.com` | `demo1234` | doctor |
-
-### 6.3 Hồ sơ bệnh nhân (Onboarding)
-
-**Actor:** Bệnh nhân  
-
-**Luồng:**
-
-1. Vào `/patient/onboarding`  
-2. Nhập disease, medications, allergies, BMI, target_kcal, restrictions, preferences  
-3. `POST /api/v1/profile` upsert  
-4. Profile trở thành input chuẩn cho mọi Agent  
-
-**Schema tham chiếu:**
-
-```json
-{
-  "disease": ["diabetes_t2", "hypertension"],
-  "medications": ["metformin", "amlodipine"],
-  "allergies": ["hải sản"],
-  "bmi": 26.5,
-  "target_kcal": 1800,
-  "restrictions": { "carb_per_meal": 45, "sodium_daily": 1500 },
-  "preferences": ["thích ăn cơm", "không ăn thịt bò"]
-}
-```
-
-### 6.4 Sinh thực đơn 7 ngày
-
-**Actor:** Bệnh nhân (tự generate) hoặc doctor (generate hộ trên `/doctor/patients/{id}/generate`)
-
-**Luồng hoàn chỉnh:**
-
-1. Client gọi `POST /api/v1/meal-plans/generate`  
-2. Platform load `PatientProfile` từ DB  
-3. **Nhánh demo:** `DEMO_MOCK=true` → `build_mock_meal_plan` (ổn định cho pitch)  
-4. **Nhánh production/agent:** `run_agent(force_intent=meal_plan)` → MealPlannerAgent + RAG  
-5. Persist `MealPlan` (`status=pending_review`)  
-6. Chạy InteractionChecker trên danh sách món → tạo `Alert`  
-7. `NotificationService.materialize_from_meal_plan`:
-   - `meal_reminder` theo từng slot/ngày (scheduled_at)  
-   - `adherence_checkin` cuối ngày (~21:00)  
-8. Với alert severity ∈ {Nguy hiểm, Cần chú ý} → thêm `interaction_followup`  
-9. FE hiển thị thực đơn 7 ngày, citations, swaps, badge chờ duyệt  
-
-**SLA mục tiêu:** generate < 15s (p95).
-
-### 6.5 Kiểm tra tương tác thuốc–thực phẩm (độc lập + gắn plan)
-
-**A. Gắn meal plan (tự động)** — như bước 6–8 ở §6.4.  
-
-**B. Kiểm tra ad-hoc / chat:**
-
-1. User hỏi “warfarin ăn rau muống được không?” hoặc gọi `POST /interactions/check`  
-2. Intent → `interaction_check`  
-3. Agent match KB → trả mechanism, severity, recommendation, sources  
-4. FE Dashboard hiển thị Alert list  
-
-### 6.6 Compliance Notification
-
-**Chiến lược (ADR 004):** in-app only; **event-driven materialize-ahead** (không bắt buộc cron/FCM trong MVP).
-
-| Sự kiện | Notification tạo ra |
+| Use case | Mô tả |
 |---|---|
-| Meal plan generated | `meal_reminder` × slots × days (`pending`) + `adherence_checkin` × 7 |
-| Plan approved | `plan_approved` (`sent`) |
-| Plan rejected | Huỷ (`cancelled`) các reminder/checkin tương lai của plan đó |
-| Alert Nguy hiểm / Cần chú ý | `interaction_followup` (`sent`) |
+| Thêm bệnh nhân | Bác sĩ tạo hồ sơ bệnh nhân mới, nhập: thông tin tài khoản cơ bản, hồ sơ bệnh lý (disease, medications), dị ứng & không dung nạp, mục tiêu cân nặng/dinh dưỡng |
+| Cập nhật thông tin bệnh nhân | Sửa hồ sơ đã có |
+| Điều chỉnh mục tiêu dinh dưỡng | Sửa `target_kcal`, `restrictions` |
 
-**Hành vi user trên FE:**
+**Luồng chính — Thêm bệnh nhân:**
+1. Bác sĩ vào `/doctor/patients` → bấm "Thêm bệnh nhân".
+2. Nhập tài khoản cơ bản (email, họ tên) → hệ thống gọi `POST /api/v1/auth/register` với `role=patient` (hoặc BE tạo trực tiếp record patient nếu bác sĩ tạo hộ — **cần chốt**: hiện `api-v1.md` chưa có endpoint "doctor tạo bệnh nhân hộ", chỉ có `PUT /doctor/patients/{id}/profile` để sửa. Nếu cần bác sĩ tự tạo tài khoản bệnh nhân, đây là **gap cần agent bổ sung endpoint mới** `POST /api/v1/doctor/patients`).
+3. Nhập hồ sơ bệnh lý + dị ứng + mục tiêu → map vào schema Profile chuẩn (CLAUDE §8: `disease`, `medications`, `allergies`, `bmi`, `target_kcal`, `restrictions`, `preferences`).
+4. Lưu → Profile persist, patient xuất hiện trong danh sách `GET /api/v1/doctor/patients`.
 
-1. Mở `/patient/notifications` (poll / fetch on focus)  
-2. Đọc → `POST .../read`  
-3. Bỏ qua → `dismiss`  
-4. Check-in tuân thủ → `done` kèm `adherence: yes|partial|no`  
-5. Demo pitch: `POST .../demo/simulate` để đẩy `pending → sent` ngay  
+**Edge case:**
+- Trùng email khi đăng ký → trả lỗi rõ ràng, không tạo bản ghi trùng.
+- Thiếu trường bắt buộc (disease/medications) → cho phép lưu nháp nhưng cảnh báo "chưa đủ dữ liệu để sinh thực đơn an toàn" (chặn ở bước generate, không chặn ở bước tạo hồ sơ).
 
-### 6.7 doctor review
+### 2.2 Quản lý thực đơn
+**Status:** Đã có spec → `specs/02-meal-plan-generation.md` (sinh thực đơn) + `specs/05-doctor-review.md` (duyệt). Dùng use-case dưới đây làm lớp mô tả luồng nghiệp vụ, chi tiết kỹ thuật xem 2 spec gốc.
 
-**Actor:** doctor  
-
-**Luồng:**
-
-1. Login → `/doctor/reviews`  
-2. `GET /doctor/meal-plans?status=pending_review`  
-3. Xem plan + citations + alerts liên quan  
-4. `POST .../review` với `action`:
-   - **approve** → status `approved`, `trust_badge=doctor_reviewed`, noti `plan_approved`  
-   - **reject** → status `rejected`, cancel notifications tương lai  
-   - **edit** → cập nhật `days/swaps/citations`, status `edited`, gắn trust badge  
-5. Bệnh nhân refresh → thấy trạng thái + badge tin cậy  
-
-### 6.8 Chat / RAG Q&A dinh dưỡng
-
-**Actor:** Bệnh nhân tại `/patient/assistant`
-
-1. Gửi message → `POST /api/v1/chat`  
-2. Graph: load profile → classify intent  
-3. `rag_qa`: retrieve guideline/food chunks → LLM trả lời kèm citations  
-4. Intent ngoài scope y khoa (đổi thuốc…) → `refuse`  
-5. Intent meal/interaction → tái sử dụng agent tương ứng  
-
-### 6.9 Dashboard bệnh nhân (tổng hợp)
-
-Khi hoàn chỉnh, `/patient` hợp nhất:
-
-- Thực đơn hôm nay (từ plan đã duyệt hoặc pending)  
-- Alerts tương tác thuốc–thực phẩm  
-- Notification chưa đọc / đến giờ  
-- CTA tới assistant, meals, notifications  
-
-### 6.10 Dashboard / workspace doctor
-
-Khi hoàn chỉnh, `/doctor` hợp nhất:
-
-- Hàng đợi duyệt kế hoạch  
-- Danh sách bệnh nhân + generate plan  
-- Compliance overview  
-- Ràng buộc lâm sàng (constraints)  
-- Lịch sử review  
-- Messages (có thể vẫn mock ở giai đoạn đầu; post-MVP nối realtime)
-
----
-
-## 7. Quyết định kiến trúc quan trọng (ADR tóm tắt)
-
-| ADR | Quyết định | Hệ quả |
+| Use case | Include | Mô tả |
 |---|---|---|
-| 001 Vector DB | Chọn **Qdrant** (target) | Code hiện vẫn Chroma — cần migrate khi ổn định deploy |
-| 002 LangGraph vs Chain | **LangGraph** cho routing đa intent | Graph có conditional edges theo intent |
-| 003 Embedding | Model đa ngôn ngữ / Gemini (theo env) | Rotation key nếu rate-limit |
-| 004 Compliance | Event-driven in-app, không FCM | `NotificationService` không nằm trong LangGraph |
+| Tạo thực đơn bằng AI | `<<include>> A2 Sinh thực đơn` | Bác sĩ generate hộ bệnh nhân qua `/doctor/patients/{id}/generate` |
+| Cập nhật thực đơn | | Sửa món/ngày trong plan trước khi duyệt |
+| Tạo lại thực đơn | | Yêu cầu AI sinh lại toàn bộ 7 ngày (khi bác sĩ từ chối) |
+| Duyệt/Từ chối thực đơn | | `approve` / `reject` (có ghi chú) |
+| Cảnh báo dị ứng và tương tác | `<<include>> A1` | Hiển thị các cảnh báo AI phát hiện trước khi bác sĩ quyết định duyệt |
+| Phản hồi và điều chỉnh | | Bác sĩ để lại feedback → dùng làm dữ liệu tinh chỉnh lần generate sau (Should Have — "Adaptive feedback") |
 
----
+**Luồng chính — Tạo & duyệt thực đơn (North Star flow, khớp `roadmap-gap-closure.md` demo flow):**
+1. Bác sĩ vào `/doctor/patients/{id}/generate` → bấm "Tạo thực đơn AI".
+2. FE gọi `POST /api/v1/doctor/patients/{id}/meal-plans/generate`.
+3. BE load Profile bệnh nhân → gọi Agent (`run_agent` hoặc mock nếu `DEMO_MOCK=true`) → sinh 7 ngày, mỗi món có citation.
+4. Agent tự động chạy `InteractionCheckerAgent` trên các món trong plan → nếu phát hiện cặp thuốc–thực phẩm mức "Nguy hiểm" → tự swap món + ghi `swaps[]`; mức "Cần chú ý" → gắn cảnh báo hiển thị, không swap.
+5. Plan persist với `status=pending_review`.
+6. Bác sĩ xem danh sách `GET /api/v1/doctor/meal-plans?status=pending_review` → mở chi tiết → xem cảnh báo dị ứng/tương tác đính kèm.
+7. Bác sĩ chọn:
+   - **Duyệt** → `POST /doctor/meal-plans/{id}/review` `{decision: approve}` → plan chuyển `approved` → tạo Notification `plan_approved` cho bệnh nhân + materialize `meal_reminder`/`adherence_checkin`.
+   - **Từ chối** → `{decision: reject, note}` → plan chuyển `rejected`, bệnh nhân/bác sĩ có thể trigger "Tạo lại thực đơn" (lặp lại bước 2–5, giữ note làm ngữ cảnh bổ sung cho lần sinh sau).
+   - **Sửa tay** → cập nhật trực tiếp món ăn trong plan (cần endpoint `PUT` cấp món — nếu chưa có trong `api-v1.md`, đây là gap TASK mới cho BE2).
 
-## 8. Bảo mật & an toàn lâm sàng
+### 2.3 Xem tuân thủ
+**Status:** New — chưa có spec riêng trong `specs/`. Gần nhất là `specs/04-compliance-notification.md` (tạo/gửi notification), nhưng "xem biểu đồ tuân thủ" ở góc nhìn bác sĩ thì chưa có.
 
-- API keys / JWT secret chỉ trong `.env` (không commit)  
-- Input validate bằng Pydantic  
-- CORS giới hạn origin FE  
-- Role-based access trên route nhạy cảm  
-- Guardrail: AI **không** thay thế bác sĩ; disclaimer trên recommendation  
-- Citation bắt buộc với số liệu dinh dưỡng (chống hallucinate)
-
----
-
-## 9. Triển khai & vận hành
-
-### 9.1 Local
-
-```bash
-# Backend
-cd backend && uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd frontend && npm run dev   # http://localhost:3000
-
-# Full stack
-docker-compose up --build
-```
-
-Swagger: `http://localhost:8000/docs`
-
-### 9.2 Env quan trọng
-
-| Biến | Ý nghĩa |
+| Use case | Mô tả |
 |---|---|
-| `DATABASE_URL` | `sqlite:///./app.db` cho dev local; `postgresql://user:pass@host:5432/db` cho Postgres (prod / external) |
-| `DEMO_MOCK` | Mock meal plan cho demo ổn định |
-| `CHROMA_PERSIST_DIR` / Qdrant URL | Vector store |
-| `OPENAI_API_KEY` / LLM provider | Gọi model thật |
-| `JWT_SECRET` | Ký token |
-| `CORS_ORIGINS` | Origin FE |
-| `NEXT_PUBLIC_API_BASE_URL` | FE → BE |
+| Xem biểu đồ tuân thủ bệnh nhân | Bác sĩ xem % tuân thủ meal plan / thuốc theo thời gian |
+| Cảnh báo tuân thủ | Hệ thống nổi cảnh báo khi bệnh nhân tuân thủ thấp (VD <60% trong 7 ngày) |
+| Cảnh báo/nhắc nhở bệnh nhân | Bác sĩ chủ động gửi nhắc nhở thủ công |
+| Xem nhật ký ăn uống của bệnh nhân | **Phụ thuộc Food Log — xem mục 5.3, hiện Won't Have** |
 
-### 9.3 Kiểm thử tối thiểu trước khi coi DoD
+**Luồng chính — Xem biểu đồ tuân thủ:**
+1. Bác sĩ vào `/doctor/patients/{id}/history` (đã có UI grid tuần theo memory dự án).
+2. FE gọi API tổng hợp adherence từ Notification có `type=adherence_checkin` với `status=done` + field `adherence` (yes/partial/no) — **cần endpoint tổng hợp mới**, ví dụ `GET /api/v1/doctor/patients/{id}/compliance-summary` trả về `{daily: [...], weekly_rate: number}`. Hiện `api-v1.md` chưa có endpoint này → **gap cần bổ sung**.
+3. FE vẽ biểu đồ (line/bar theo ngày).
+4. Nếu `weekly_rate < ngưỡng` (cấu hình, VD 60%) → hiển thị badge cảnh báo trên danh sách bệnh nhân + có thể trigger Notification loại mới `low_adherence_alert` cho bác sĩ.
 
-```bash
-cd backend
-pytest tests/test_api.py \
-       tests/test_interaction_checker.py \
-       tests/test_compliance_notification.py \
-       tests/test_meal_planner.py \
-       tests/test_rag.py -q
-```
+### 2.4 Quản lý ràng buộc lâm sàng
+**Status:** New — use case mới, chưa có trong specs hiện tại.
 
-### 9.4 Success metrics (sau khi hoàn thiện MVP)
+| Use case | Mô tả |
+|---|---|
+| Xem ràng buộc lâm sàng | Xem danh sách ràng buộc áp dụng cho bệnh nhân (giới hạn carb/bữa, sodium/ngày — đã có trong Profile.restrictions theo CLAUDE §8) |
+| Cập nhật ràng buộc lâm sàng | Sửa `restrictions.carb_per_meal`, `restrictions.sodium_daily`, hoặc thêm ràng buộc theo bệnh lý cụ thể (VD purine cho gout) |
 
-- [ ] Demo E2E không crash  
-- [ ] Thực đơn 7 ngày phù hợp T2DM + có citation  
-- [ ] Interaction ≥10 cặp thuốc (KB target ≥20)  
-- [ ] Compliance: tạo + hiển thị in-app  
-- [ ] doctor duyệt được ≥1 plan  
-- [ ] Không hallucinate số liệu không nguồn  
+**Luồng chính:**
+1. Bác sĩ mở tab "Ràng buộc lâm sàng" trong hồ sơ bệnh nhân.
+2. Hiển thị `restrictions` hiện tại từ Profile (đã có field này — spec 01).
+3. Sửa → gọi `PUT /api/v1/doctor/patients/{id}/profile` (endpoint đã tồn tại trong `api.ts` — `updateDoctorPatientProfile`) với payload chứa `restrictions` mới.
+4. Ràng buộc mới có hiệu lực ngay từ lần generate thực đơn tiếp theo (Agent đọc `restrictions` khi build prompt/filter).
+
+**Lưu ý dữ liệu gap đã biết (memory dự án):** bảng "serving-size conversion" và "purine content" cho gout còn thiếu trong KB — cần bổ sung trước khi ràng buộc lâm sàng cho bệnh gout hoạt động chính xác.
+
+### 2.5 Cập nhật và theo dõi chỉ số (góc nhìn bác sĩ)
+**Status:** Đã có spec một phần → API `updatePatientMetrics`, `updatePatientGoals` đã tồn tại trong `lib/api.ts`.
+
+| Use case | Mô tả |
+|---|---|
+| Theo dõi chỉ số bệnh nhân | Xem lịch sử cân nặng/chiều cao/huyết áp theo thời gian |
+| Phân tích xu hướng dinh dưỡng | So sánh chỉ số theo tuần/tháng, phát hiện xu hướng bất thường (VD BMI tăng liên tục) |
+
+**Luồng chính:**
+1. Bác sĩ xem `PatientMetrics` hiện tại (`weight`, `height`, `bmi`, `bmi_category`) — đã có backend (thấy trong `reasonix.toml` log có smoke test BMI).
+2. Với "phân tích xu hướng" — cần lưu lịch sử theo thời gian (hiện có vẻ chỉ lưu giá trị mới nhất, không phải time-series). **Gap:** cần bảng `patient_metrics_history` nếu muốn vẽ xu hướng thật; nếu MVP demo chỉ cần snapshot, ghi rõ "Nice to have — không chặn North Star".
 
 ---
 
-## 10. Ranh giới hoàn thiện (gap as-built → to-be)
+## 3. Nhóm chức năng: Bệnh nhân
 
-Backlog chi tiết: [`tasks/roadmap-gap-closure.md`](../tasks/roadmap-gap-closure.md).
+### 3.1 Đăng ký hồ sơ ban đầu (Onboarding)
+**Status:** Đã có spec → `specs/01-patient-profile.md`.
 
-| Hạng mục | Hiện tại | Khi xong / quyết định |
+| Use case | Mô tả |
+|---|---|
+| Khai báo thông tin cơ bản | Họ tên, tuổi, giới tính |
+| Khai báo hồ sơ bệnh lý | `disease[]`, `medications[]` |
+| Khai báo dị ứng & không dung nạp | `allergies[]` |
+| Đặt mục tiêu cân nặng/dinh dưỡng | `target_kcal`, mục tiêu cân nặng |
+
+**Luồng chính:** Đăng ký (`POST /auth/register`) → login → `/patient/onboarding` → điền form nhiều bước → `POST /api/v1/profile` (upsert) → redirect `/patient/home`.
+
+### 3.2 Cập nhật và theo dõi chỉ số
+**Status:** Đã có API (`getProfile`, `upsertProfile`), luồng UI ở `/patient/*`.
+
+| Use case | Mô tả |
+|---|---|
+| Ghi nhận chỉ số mới | Cân nặng, huyết áp định kỳ |
+| Theo dõi chỉ số | Xem lại lịch sử đã ghi |
+| Nhận lời khuyên theo thay đổi chỉ số | AI đưa gợi ý ngắn khi chỉ số thay đổi bất thường (VD cân nặng tăng nhanh) |
+
+**Luồng chính — Nhận lời khuyên theo thay đổi chỉ số:**
+1. Bệnh nhân cập nhật cân nặng mới trong `/patient/profile`.
+2. BE so sánh với giá trị cũ → nếu delta vượt ngưỡng (VD >2kg/tuần) → gọi Agent với intent `metric_feedback` (node mới trong LangGraph nếu chưa có — hiện graph có `profile_loader → intent → meal_plan / interaction / rag_qa / refuse / food_log stub`, cần bổ sung nhánh này hoặc route qua `rag_qa` với prompt system khác).
+3. Agent trả lời ngắn (grounded, có citation nếu liên quan dinh dưỡng) → hiển thị dạng notification/toast trong `/patient`.
+4. Guardrails: nếu câu trả lời chạm tới thay đổi thuốc → redirect bác sĩ (không tự khuyến nghị).
+
+### 3.3 Quản lý nhật ký ăn uống — ⚠️ Ngoài MVP
+**Status:** Ngoài MVP — Xem mục 5.3.
+
+Đề bài gốc có: Khai báo tuân thủ, Xem nhật ký ăn uống và thực đơn, Cảnh báo vượt ngưỡng, Nhận cảnh báo dị ứng và tương tác. Trong đó **"Nhận cảnh báo dị ứng và tương tác"** không phụ thuộc Food Log — nó thuộc luồng xem thực đơn (mục 3.4) và vẫn nằm trong MVP.
+
+### 3.4 Xem thực đơn
+**Status:** Đã có spec → `specs/02-meal-plan-generation.md` (phần sinh) + cần bổ sung phần "xem/tương tác" ở đây.
+
+| Use case | Include | Mô tả |
 |---|---|---|
-| FE ↔ API | UI/mock stores | Client API + JWT (TASK-01) |
-| Meal plan thật | `DEMO_MOCK=true` path ổn định | Persist + SLA khi mock off (TASK-02) |
-| Interaction HTTP | Mock KB khi mock on; **501** khi mock off | Wire agent KB ~28 cặp |
-| Dual interaction KB | Mock 2 cặp vs file KB đầy đủ | Gộp path hoặc document rõ (đã ghi spec 03) |
-| `demo/simulate` | **Seed** notification mẫu | Không nhầm với flip pending→sent; guard prod (TASK-06) |
-| Vector DB | **Chroma** (ADR-001 superseded) | Không migrate Qdrant trong MVP |
-| Guardrails | Placeholder files | `rules.py` + source_check (TASK-04) |
-| Messages | Mock local | Optional post-MVP |
-| Food Log | Route còn; **đã ẩn nav** | Won't Have (TASK-05 done phần demo) |
-| Deploy | Local / compose | Railway + Vercel (TASK-06) |
-| Docs | Đồng bộ as-built 2026-08-12 | Commit khi team sẵn sàng (TASK-07) |
+| Xem chi tiết thực đơn | | `GET /api/v1/meal-plans/me` — xem 7 ngày, từng món kèm citation |
+| Xem thực đơn thay thế | | Khi 1 món bị swap do tương tác nguy hiểm, hiển thị lý do + món thay thế |
+| Tạo danh sách đi chợ | | **Ngoài MVP hiện tại** — nằm ở "Could Have" trong CLAUDE §2 (đã có Stitch prompt thiết kế UI theo memory dự án, nhưng backend chưa build) |
+| Phản hồi và điều chỉnh | | Bệnh nhân feedback món không thích → dùng cho lần generate sau (Should Have — "Adaptive feedback") |
+| Gợi ý khu vực bán nguyên liệu | | **Could Have**, cần tích hợp map (đã có Stitch prompt "shopping location map" theo memory dự án) — chưa có backend |
+
+**Luồng chính — Xem thực đơn thay thế:**
+1. Bệnh nhân mở plan detail → thấy badge "⚠️ Đã thay thế" trên món bị swap.
+2. Bấm vào → hiển thị: món gốc, lý do (`mechanism` + `severity` từ format tương tác thuốc–thực phẩm CLAUDE §8), món thay thế, nguồn trích dẫn.
+3. Đây chính là dữ liệu `swaps[]` sinh ra ở bước 4, mục 2.2 — FE chỉ cần render, không cần logic mới ở BE.
+
+### 3.5 Tương tác với AI
+**Status:** Đã có spec → `specs/06-chat-rag-qa.md`.
+
+| Use case | Mô tả |
+|---|---|
+| Yêu cầu xem thực đơn | Chat: "cho tôi xem thực đơn hôm nay" → route intent `meal_plan` |
+| Yêu cầu xem thực đơn thay thế | Chat hỏi vì sao món bị đổi |
+| Yêu cầu tạo danh sách đi chợ | Ngoài MVP (như 3.4) |
+| Gợi ý khu vực bán nguyên liệu | Ngoài MVP |
+| Tra cứu thông tin thực phẩm | Chat RAG Q&A — route intent `rag_qa`, luôn kèm citation |
+| Phân tích nhu cầu dinh dưỡng | Chat hỏi "tôi cần bao nhiêu kcal/ngày" → NutritionCalculator + trả lời có căn cứ |
+
+**Luồng chính (đã khớp `POST /api/v1/chat` hiện có trong `lib/api.ts`):**
+1. Bệnh nhân gõ câu hỏi tự do trong `/patient/assistant`.
+2. `POST /api/v1/chat {message}` → LangGraph: `profile_loader` (load context bệnh nhân) → `intent` classifier → route tới 1 trong các node: `meal_plan`, `interaction`, `rag_qa`, `refuse`.
+3. Guardrails chạy **trước khi trả response**: nếu câu hỏi thuộc nhóm bị cấm (đổi thuốc/liều, chẩn đoán bệnh) → node `refuse` trả lời cố định + redirect bác sĩ (danh sách câu refuse định nghĩa trong `guardrails/rules.py` — hiện đang placeholder, xem đề xuất TASK-04 trong khảo sát trước).
+4. Nếu không bị chặn → trả `AgentRunOutput` gồm câu trả lời + `citations[]`.
+5. FE render trong chat UI (đã có "collapsible chat rail pattern" theo memory dự án).
 
 ---
 
-## 11. Tóm tắt một câu
+## 4. Nhóm chức năng: Chức năng dùng chung
 
-**P-014** là hệ thống 3 tầng (Next.js · FastAPI · LangGraph/RAG trên Chroma) giúp bệnh nhân nhận thực đơn y tế cá nhân hoá có kiểm tra tương tác thuốc–thực phẩm và nhắc tuân thủ, với chuyên gia dinh dưỡng duyệt trước khi tin dùng — hướng tới một **demo North Star end-to-end** ổn định trong khung prototype 2 tuần.
+| Use case | Mô tả | API hiện có |
+|---|---|---|
+| Đăng ký | Tạo tài khoản `patient` hoặc `doctor` | `POST /api/v1/auth/register` |
+| Đăng nhập | Cấp JWT | `POST /api/v1/auth/login` |
+| Liên hệ | Form liên hệ (hỗ trợ/feedback) — chưa thấy endpoint trong `api-v1.md`, nếu cần cho demo có thể làm form gửi email tĩnh phía FE, không cần backend riêng |
 
 ---
 
-*Tài liệu này mô tả kiến trúc & luồng nghiệp vụ. Schema: `contracts/agent-io-schema.md` + `contracts/api-v1.md`. Specs: `specs/0x-*.md`. Backlog: `tasks/roadmap-gap-closure.md`.*
+## 5. Ghi chú đối chiếu với hiện trạng codebase (quan trọng cho agent trước khi code)
+
+### 5.1 Use case đã có backend/API sẵn — chỉ cần nối luồng
+Quản lý bệnh nhân (đọc), sinh thực đơn, duyệt thực đơn, chat RAG, cập nhật chỉ số cơ bản, notifications.
+
+### 5.2 Use case cần bổ sung endpoint mới (gap thật sự, ưu tiên thấp hơn TASK-04/TASK-02 đã nêu trước đó)
+- `POST /api/v1/doctor/patients` — bác sĩ tự tạo tài khoản bệnh nhân (nếu quy trình yêu cầu bác sĩ nhập hộ, thay vì bệnh nhân tự đăng ký).
+- `GET /api/v1/doctor/patients/{id}/compliance-summary` — tổng hợp tuân thủ cho biểu đồ.
+- `PUT` cấp món ăn trong plan — nếu muốn bác sĩ sửa tay từng món thay vì chỉ approve/reject nguyên plan.
+- Node LangGraph mới cho "lời khuyên theo thay đổi chỉ số" (metric_feedback intent).
+
+### 5.3 Lệch pha giữa đề bài gốc và MoSCoW hiện tại — cần team chốt lại
+Đề bài/UML có nhóm **"Quản lý nhật ký ăn uống"** (Food Log) ở cả 2 phía bác sĩ và bệnh nhân, nhưng `CLAUDE.md §2` và `AGENTS.md` đang xếp Food Log vào **Won't Have MVP** (route/stub có thể tồn tại nhưng ẩn nav, không mount API). Có 2 hướng:
+1. **Giữ nguyên quyết định Won't Have** (khuyến nghị, đúng "nguyên tắc vàng" — ưu tiên demo mượt) → khi trình bày lại đề bài/UML cho giảng viên, ghi chú rõ đây là scope cắt giảm có chủ đích cho prototype 2 tuần.
+2. Nếu bắt buộc phải có trong UML nộp bài → chỉ cần giữ Food Log **trên diagram** (đã có sẵn), không bắt buộc phải implement — UML mô tả thiết kế đầy đủ, code là tập con ưu tiên theo MoSCoW, đây là thực hành bình thường.
+
+### 5.4 Use case "Cảnh báo dị ứng và tương tác" (A1) — đã có, đóng vai trò include dùng chung
+Đây là use case được nhiều luồng khác `<<include>>` (sinh thực đơn, xem thực đơn, chat). Về code, nó tương ứng 1 service dùng chung: `InteractionCheckerAgent` + KB `drug_food_interactions.json` (`specs/03-interaction-check.md`). Khi implement bất kỳ use case nào ở trên có include A1, **tái dùng service này**, không viết logic tương tác thuốc–thực phẩm riêng lẻ ở nơi khác.
+
+---
+
+## 6. Thứ tự triển khai đề xuất cho agent (khớp ưu tiên đã thống nhất trước đó)
+
+1. Hoàn thiện Guardrails thật (chặn trước khi mở rộng use case mới) — TASK-04.
+2. Ổn định `DEMO_MOCK=false` cho luồng sinh/duyệt thực đơn (2.2, 3.4) — TASK-02.
+3. Bổ sung "Xem tuân thủ" (2.3) — cần endpoint compliance-summary mới, thuộc BE2.
+4. Bổ sung "Quản lý ràng buộc lâm sàng" (2.4) — phần lớn đã có field, chỉ cần UI + endpoint update rõ ràng.
+5. "Lời khuyên theo thay đổi chỉ số" (3.2) — node LangGraph mới, ưu tiên thấp (Should Have).
+6. Danh sách đi chợ / gợi ý khu vực bán nguyên liệu (3.4, 3.5) — Could Have, chỉ làm nếu còn thời gian sau North Star.

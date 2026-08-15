@@ -1,50 +1,31 @@
-# Tasks — Tổng quan phân công
+# Tasks — VMEC-10 (P-014)
 
-> **Backlog hiện tại (SSOT):** [`roadmap-gap-closure.md`](roadmap-gap-closure.md)  
-> Ownership rút gọn: `be1-ai-core.md` · `be2-platform.md` · `fe-frontend.md`  
-> Scope sản phẩm: `/CLAUDE.md` · Kiến trúc: `/docs/MO_TA_HE_THONG.md`  
-> Contracts: `/contracts/agent-io-schema.md` + `/contracts/api-v1.md`
+Tổng quan phân công & North Star demo flow. Backlog chi tiết theo MoSCoW: [`roadmap-mvp.md`](roadmap-mvp.md). Ownership rút gọn theo role: [`be1-ai-core.md`](be1-ai-core.md) · [`be2-platform.md`](be2-platform.md) · [`fe-frontend.md`](fe-frontend.md).
 
-> `roadmap-14-days.md` (timeline ngày 1–14) đã **superseded** bởi gap-closure. Không khôi phục trừ khi team cần lịch sử.
+## Phân công 3 người
 
----
-
-## Team (3 người)
-
-| Role | Codename | Trách nhiệm chính |
+| Role | Ranh giới module (thư mục code thật) | Không đụng (trừ khi thống nhất) |
 |---|---|---|
-| **BE1** | AI Core | Chroma RAG, embeddings MiniLM, LangGraph, MealPlanner, InteractionChecker, Guardrails, NutritionCalculator, KB data |
-| **BE2** | Platform API | Auth/JWT, SQLAlchemy models, REST routes, Alert/Notification, Dietitian APIs, wiring `run_agent` / `DEMO_MOCK` |
-| **FE** | Frontend | Shell `/patient/*` + `/doctor/*`, Zustand, `lib/api.ts` (backlog), UX North Star |
+| **BE1 — AI Core** | `backend/app/agents/`, `backend/app/rag/`, `backend/app/guardrails/`, `backend/data/` (KB thuốc-thực phẩm, catalog món ăn, guideline) | `backend/app/api/`, `backend/app/models/`, `frontend/**` |
+| **BE2 — Platform** | `backend/app/api/`, `backend/app/models/`, `backend/app/schemas/`, `backend/app/services/`, `backend/app/db/`, `backend/app/core/` | Logic prompt/RAG/agent nội bộ, `frontend/**` |
+| **FE — Frontend** | `frontend/**` | Backend agent logic, DB migrations |
 
----
+**Handoff rule (không đổi so với `CLAUDE.md`):** đổi schema Agent (`AgentState`/`AgentRunInput`/`AgentRunOutput`/`MealPlanOutput`/...) → sửa `contracts/agent-io-schema.md` trước; đổi HTTP FE↔BE → sửa `contracts/api-v1.md` trước. BE1 ↔ BE2 giao tiếp qua contract + Pydantic schema, không qua code trực tiếp giữa 2 module.
 
-## Ranh giới module
+## North Star demo flow (end-to-end)
 
-```
-BE1  → backend/app/agents/**, rag/**, guardrails/**,
-       services/nutrition_calculator.py, data/**,
-       tests/test_rag*.py, test_meal_planner.py, test_interaction_checker.py
+1. **Bác sĩ đăng nhập** (`specs/01-account-auth.md`) → thêm bệnh nhân mới nếu cần (`specs/03-doctor-patient-management.md`).
+2. **Bệnh nhân (hoặc bác sĩ hộ) khai hồ sơ** (`specs/02-patient-profile-onboarding.md`) — bệnh lý, thuốc, dị ứng, mục tiêu calo.
+3. **Sinh thực đơn 7 ngày** (`specs/05-meal-plan-generation.md`) — pipeline lọc dị ứng → soft preference → tính dinh dưỡng → kiểm tra tương tác thuốc-thực phẩm (`specs/08-drug-food-interaction-check.md`) → swap nếu nguy hiểm → citation.
+4. **Bác sĩ duyệt** (`specs/06-meal-plan-review.md`) — approve/reject/edit, side-effect notification.
+5. **Bệnh nhân xem thực đơn đã duyệt** (`specs/07-patient-meal-plan-view.md`) + nhận Compliance Notification theo lịch (`specs/11-compliance-notification-delivery.md`).
+6. **Bệnh nhân hỏi lại qua chat** (`specs/13-ai-chat-assistant.md`) — ví dụ hỏi lại về tương tác thuốc hoặc kiến thức dinh dưỡng (RAG).
 
-BE2  → backend/app/api/**, models/**, schemas/**, db/**, core/**,
-       services/notification.py, meal_plan_service.py, meal_plan_demo.py,
-       main.py, tests/test_api.py, test_compliance_notification.py
+Đây là luồng **duy nhất** phải chạy mượt không crash khi demo (`CLAUDE.md` Mục 11 — Success Metrics). Mọi tính năng khác (Food Log, Doctor Compliance View, Clinical Constraints UI...) là bổ trợ — theo nguyên tắc vàng, ưu tiên giữ luồng này mượt hơn là thêm tính năng mới.
 
-FE   → frontend/**
-```
+## Ghi chú quan trọng khi bắt đầu bất kỳ task nào
 
-**Shared:** contracts (breaking cần ACK), specs, adrs, CLAUDE.md, docker-compose.yml
-
----
-
-## Demo flow (North Star)
-
-1. Patient login  
-2. Onboarding hồ sơ  
-3. Generate meal plan 7 ngày  
-4. Alerts tương tác  
-5. Compliance notifications  
-6. Dietitian approve/edit/reject  
-7. Patient thấy `plan_approved`  
-
-**Không có bước Food Log** (nav Ghi nhận đã ẩn).
+- Đọc `CLAUDE.md` + `AGENTS.md` trước — đặc biệt luật cứng Mục 7 (guardrails, citation, không đổi thuốc).
+- Đọc spec liên quan trong `specs/` — mỗi spec có mục `Status` cho biết đây là hành vi **đã có** (Done/Partial) hay **thiết kế đề xuất chưa code** (Planned).
+- Sửa `contracts/*.md` trước khi đổi schema/endpoint thật.
+- **Không** implement Food Log trong MVP này (Won't Have, xem `adrs/009-food-log-scope-strategy.md` và `specs/09-food-log-adherence.md`) — trừ khi team họp lại và cập nhật `CLAUDE.md`.

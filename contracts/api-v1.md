@@ -1,346 +1,460 @@
-# Contract: API v1 (Frontend ↔ Backend)
+# API v1 Contract — VMEC-10 (FE ↔ BE)
 
-> Nguồn sự thật cho ranh giới FE↔BE. Đổi field/response ở đây trước, code sau (Handoff rule).
-> Chi tiết đầy đủ, tự-generate, tham khảo thêm: `http://localhost:8000/docs` (Swagger, luôn đồng bộ với code — nếu lệch với file này thì Swagger là nguồn đúng và file này cần cập nhật lại).
+**Version:** 1.1 (2026-08-15 — bổ sung quyết định team sau vòng review đầu, xem changelog ở mục Versioning cuối file)
+**Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
+**Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
+**Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
+**Đánh dấu trạng thái:** endpoint không ghi gì = **as-built, đang hoạt động**. Endpoint có nhãn `[Planned]` = chưa tồn tại trong code, là thiết kế đề xuất cho spec liên quan.
 
-## Auth
+---
 
-### POST /api/v1/auth/register
-**Role:** public
+## 1. Auth
+
+### `POST /auth/register`
+**Role:** Không cần auth (public). Dùng cho cả patient tự đăng ký lẫn doctor tạo hộ tài khoản patient.
 ```json
 // Request
-{ "email": "string", "password": "string", "role": "patient | doctor", "full_name": "string | null" }
+{ "email": "patient1@example.com", "password": "matkhau123", "role": "patient", "full_name": "Nguyễn Văn A" }
 // Response 201
-{ "id": "string", "email": "string", "role": "patient | doctor", "full_name": "string | null" }
+{ "id": "user_uuid", "email": "patient1@example.com", "role": "patient", "full_name": "Nguyễn Văn A" }
+// Error 409
+{ "code": "EMAIL_EXISTS", "detail": "Email đã được đăng ký." }
 ```
-> `full_name` là optional (nullable) — dùng khi doctor tạo tài khoản patient từ dashboard; nếu bỏ trống, tên hiển thị suy ra từ email.
+`role` ∈ `{"patient","doctor"}`, default `"patient"`. `full_name` optional.
 
-### POST /api/v1/auth/login
-**Role:** public
+### `POST /auth/login`
+**Role:** Không cần auth.
 ```json
 // Request
-{ "email": "string", "password": "string" }
+{ "email": "patient1@example.com", "password": "matkhau123" }
 // Response 200
-{ "access_token": "string", "token_type": "bearer", "role": "patient | doctor" }
+{ "access_token": "eyJ...", "token_type": "bearer", "role": "patient", "user_id": "user_uuid" }
+// Error 401
+{ "code": "INVALID_CREDENTIALS", "detail": "Email hoặc mật khẩu không đúng." }
 ```
-Mọi API nghiệp vụ khác yêu cầu header `Authorization: Bearer <access_token>`.
 
-## Profile
+### `POST /auth/forgot-password` `[Planned]`
+**Role:** Không cần auth. **Quyết định 2026-08-15:** cần trước khi mở khảo sát người dùng thật (`CLAUDE.md` Mục 11 — ≥5 responses), không chỉ demo nội bộ với tài khoản cố định.
+```json
+// Request
+{ "email": "patient1@example.com" }
+// Response 200 (luôn 200 dù email có tồn tại hay không — tránh lộ thông tin tồn tại email)
+{ "message": "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi." }
+```
 
-### POST /api/v1/profile
-**Role:** patient — upsert
+### `POST /auth/reset-password` `[Planned]`
+**Role:** Không cần auth, dùng token gửi qua email ở bước trên.
+```json
+// Request
+{ "token": "reset_token_string", "new_password": "matkhaumoi123" }
+// Response 200
+{ "message": "Đặt lại mật khẩu thành công." }
+// Error 400 { "code": "INVALID_OR_EXPIRED_TOKEN", "detail": "Token không hợp lệ hoặc đã hết hạn." }
+```
+
+**Rate-limit `POST /auth/login` `[Planned]`:** quyết định 2026-08-15 — cần thêm giới hạn số lần thử đăng nhập sai (đề xuất: tối đa 5 lần/15 phút theo `email`+IP, sau đó `429 TOO_MANY_ATTEMPTS`) trước khi mở khảo sát người dùng thật.
+
+---
+
+## 2. Profile
+
+### `POST /profile`
+**Role:** `patient`. Upsert (1 user – 1 profile).
+```json
+// Request (mọi field optional/default, xem contracts/agent-io-schema.md §1)
+{ "disease": ["diabetes_t2"], "medications": ["metformin"], "allergies": ["hải sản"], "bmi": 26.5, "weight": 72, "height": 170, "target_kcal": 1800, "restrictions": { "carb_per_meal": 45, "sodium_daily": 1500 }, "preferences": ["thích ăn cơm"] }
+// Response 200 → PatientProfile (xem contracts/agent-io-schema.md §1)
+```
+**`[Planned]`, quyết định 2026-08-15:** nếu request thay đổi `target_kcal`/`restrictions` so với giá trị đang lưu, BE set `constraints_status="pending_doctor_review"` (giá trị mới vẫn áp dụng ngay cho lần generate kế tiếp, chỉ là cờ hiển thị cho doctor) — xem `contracts/agent-io-schema.md` §1 và `specs/04-clinical-constraints.md`.
+
+### `GET /profile/me`
+**Role:** `patient`. Response 200 → `PatientProfile`.
+
+---
+
+## 3. Clinical Constraints `[Planned]`
+
+Chưa tồn tại as-built — patient tự set `restrictions`/`target_kcal` qua `POST /profile`, doctor **chưa** có cách set hộ (`PUT /doctor/patients/{id}/profile` hiện không nhận 2 field này). Thiết kế đề xuất, xem `specs/04-clinical-constraints.md`.
+
+**Quyết định 2026-08-15 (đã chốt, thay cho `[CẦN XÁC NHẬN]` trước đây):**
+- **Mở rộng schema `Restrictions`** thêm `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` để khớp UI `frontend/app/doctor/patients/constraints/page.tsx` — giữ nguyên song song `carb_per_meal`/`sodium_daily` cũ, không xoá.
+- **HITL cho ràng buộc lâm sàng:** patient tự sửa qua `POST /profile` → có hiệu lực ngay nhưng gắn `constraints_status="pending_doctor_review"`; doctor sửa qua endpoint này → có hiệu lực ngay và giữ `constraints_status="confirmed"` (doctor là người xác nhận trực tiếp, không cần duyệt lại).
+
+### `PUT /doctor/patients/{patient_id}/constraints` `[Planned]`
+**Role:** `doctor`. Partial update — chỉ field gửi lên mới bị ghi đè.
 ```json
 // Request
 {
-  "disease": ["string"],
-  "medications": ["string"],
-  "allergies": ["string"],
-  "bmi": 0.0,
-  "weight": 0.0,
-  "height": 0.0,
-  "age": 0,
-  "gender": "Nam | Nữ | Khác",
-  "phone": "string | null",
-  "address": "string | null",
-  "blood_pressure": "string | null",
-  "blood_glucose": "string | null",
-  "target_kcal": 0,
-  "restrictions": { "carb_per_meal": 0, "sodium_daily": 0 },
-  "preferences": ["string"],
-  "treatment_goals": ["string"]
-}
-// Response 200 — trả lại Profile đã lưu
-```
-
-### GET /api/v1/profile/me
-**Role:** patient — trả Profile hiện tại hoặc 404 nếu chưa tạo.
-
-## Meal Plans
-
-### POST /api/v1/meal-plans/generate
-**Role:** patient (doctor gọi `POST /api/v1/doctor/patients/{patient_id}/meal-plans/generate` — cùng body + response)
-```json
-// Request (tùy chọn, body rỗng vẫn hợp lệ)
-{ "notes": "ưu tiên hấp luộc", "priorities": ["Đa dạng món ăn"] }
-// Response 200
-{
-  "id": "string",
-  "user_id": "string",
-  "status": "pending_review",
-  "days": [ /* 7 phần tử; FoodItem có alternatives[] (món thay thế) */ ],
-  "swaps": [ /* món đã bị swap do interaction nguy hiểm */ ],
-  "citations": [ /* nguồn cho số liệu dinh dưỡng */ ],
-  "trust_badge": null
-}
-```
-Luôn 1 plan / 7 ngày. `notes` + `priorities` đưa vào prompt LLM (catalog mock). Thiếu API key (`LLM_API_KEY` / `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` tùy `LLM_PROVIDER`) → fallback rule-based cùng catalog.
-
-### GET /api/v1/meal-plans/me
-**Role:** patient — trả plan mới nhất của user hiện tại.
-
-### GET /api/v1/meal-plans/{id}
-**Role:** auth (patient chỉ xem plan của mình; doctor xem plan bệnh nhân trong hàng đợi)
-
-## Interactions
-
-### POST /api/v1/interactions/check
-**Role:** patient (as-built)
-```json
-// Request
-{ "medications": ["string"], "foods": ["string"], "profile_user_id": "string | null" }
-// Response 200 — khi DEMO_MOCK=true (mock KB rút gọn)
-{
-  "interactions": [
-    {
-      "drug": "string",
-      "food": "string",
-      "mechanism": "string",
-      "severity": "Nguy hiểm | Cần chú ý | An toàn",
-      "recommendation": "string",
-      "sources": ["string"]
-    }
-  ]
-}
-```
-Khi `DEMO_MOCK=false`: **501** `INTERACTION_CHECK_NOT_READY` (chưa wire agent — gap-closure TASK-02).
-
-## Alerts
-
-### GET /api/v1/alerts
-**Role:** patient/doctor
-```json
-// Response 200
-[
-  {
-    "id": "string",
-    "drug": "string",
-    "food": "string",
-    "severity": "Nguy hiểm | Cần chú ý | An toàn",
-    "meal_plan_id": "string"
+  "target_kcal": 1700,
+  "restrictions": {
+    "carb_per_meal": 40,
+    "sodium_daily": 1400,
+    "salt_daily_g": 5,
+    "sugar_daily_g": 20,
+    "protein_daily_g": 65
   }
-]
-```
-
-## Notifications
-
-### GET /api/v1/notifications
-**Role:** patient — hỗ trợ filter query param `status`, `type`
-```json
-// Response 200
-[
-  {
-    "id": "string",
-    "type": "meal_reminder | interaction_followup | plan_approved | adherence_checkin",
-    "status": "pending | sent | read | dismissed | done | cancelled",
-    "scheduled_at": "ISO datetime",
-    "related_ids": { "meal_plan_id": "string", "alert_id": "string" }
-  }
-]
-```
-
-### POST /api/v1/notifications/{id}/read
-**Role:** patient — chuyển status → `read`
-
-### POST /api/v1/notifications/{id}/dismiss
-**Role:** patient — chuyển status → `dismissed`
-
-### POST /api/v1/notifications/{id}/done
-**Role:** patient — chỉ áp dụng cho `adherence_checkin`
-```json
-// Request
-{ "adherence": "yes | partial | no" }
-// Response 200 — status → done
-```
-
-### POST /api/v1/notifications/demo/simulate
-**Role:** patient (demo) — **as-built:** insert vài notification mẫu cho user hiện tại (seed). **Không** bulk-update mọi `pending → sent`. ✅ Guard production đã implement (TASK-06): `APP_ENV=production` → `403 {"detail": "...", "code": "DEMO_DISABLED"}`.
-
-## Doctor Review
-
-### GET /api/v1/doctor/patients
-**Role:** doctor — danh sách bệnh nhân (+ profile tóm tắt, trạng thái plan/alert)
-```json
-// Query optional: ?q=keyword&status=attention|warning|stable|pending|all
-// Response 200 — DoctorPatientSummary[]
-[
-  {
-    "id": "demo_patient_1",
-    "email": "demo_patient_1@example.com",
-    "name": "Nguyễn Văn A",
-    "disease": ["diabetes_t2", "hypertension"],
-    "condition_label": "Tiểu đường type 2, Tăng huyết áp",
-    "status": "Cảnh báo | Cần chú ý | Ổn định | Chờ duyệt",
-    "status_key": "warning | attention | stable | pending",
-    "latest_plan_id": "string | null",
-    "latest_plan_status": "pending_review | approved | ...",
-    "plan_pending": 0,
-    "plan_total": 0,
-    "alert_count": 0,
-    "bmi": 26.5,
-    "weight": 72.5,
-    "height": 170,
-    "age": 45,
-    "gender": "Nam",
-    "phone": "0901 234 567",
-    "address": "Quận 1, TP. Hồ Chí Minh",
-    "blood_pressure": "130/80 mmHg",
-    "blood_glucose": "135 mg/dL",
-    "treatment_goals": ["string"],
-    "last_update": "12/08/2026",
-    "avatar": "string",
-    "plan_end_date": "16/08/2026 | null",
-    "plan_days_left": 2,
-    "plan_expiry": "expiring | expired | ok | none"
-  }
-]
-```
-> `plan_pending` / `plan_total`: số thực đơn chưa duyệt (`pending_review`) và tổng số thực đơn của bệnh nhân — dùng cho cột "Thực đơn" (`plan_pending/plan_total`) trên màn danh sách.
->
-> **Hạn thực đơn (mới)** — `plan_end_date` / `plan_days_left` / `plan_expiry` chỉ có ý nghĩa khi `latest_plan_status == "approved"` (plan đang có hiệu lực):
-> - Thời lượng = số ngày trong `days` (mặc định 7); ngày bắt đầu = `reviewed_at` (fallback `created_at`); `plan_days_left = (end_date − hôm nay).days`
-> - `plan_expiry`: `expiring` (còn ≤ 2 ngày — sắp ăn xong) · `expired` (đã hết hạn, bệnh nhân không còn thực đơn) · `ok` (còn nhiều ngày) · `none` (chưa có plan approved / không xác định được)
-> - FE dùng cho card cảnh báo "sắp/đã ăn xong" trên Dashboard bác sĩ → bấm "Tạo thực đơn mới".
-
-### GET /api/v1/doctor/patients/{patient_id}
-**Role:** doctor — chi tiết 1 bệnh nhân (cùng schema DoctorPatientSummary)
-
-### PUT /api/v1/doctor/patients/{patient_id}/metrics
-**Role:** doctor — cập nhật chỉ số cơ thể (inline edit)
-```json
-// Request
-{ "weight": 72.5, "height": 170 }
-// Response 200
-{
-  "weight": 72.5,
-  "height": 170.0,
-  "bmi": 25.1,
-  "bmi_category": "Thừa cân nhẹ",
-  "updated_at": "12/10/2023"
 }
-```
-> Validate: `weight > 0`, `height > 0` (sai → 422). BMI do backend tính lại: `weight(kg) / (height(m))^2`, làm tròn 1 chữ số thập phân. `bmi_category` chuẩn Châu Á: <18.5 Thiếu cân · 18.5–22.9 Bình thường · 23–24.9 Thừa cân nhẹ · ≥25 Béo phì.
-
-### PUT /api/v1/doctor/patients/{patient_id}/goals
-**Role:** doctor — cập nhật danh sách mục tiêu điều trị (thay toàn bộ)
-```json
-// Request
-{ "goals": ["Kiểm soát đường huyết (HbA1c < 7%).", "Giảm cân 2kg trong 1 tháng."] }
-// Response 200
-{ "goals": ["string"] }
+// Response 200 → PatientProfile (target_kcal + restrictions đã cập nhật, constraints_status="confirmed")
 ```
 
-### PUT /api/v1/doctor/patients/{patient_id}/profile
-**Role:** doctor — cập nhật thông tin chung của bệnh nhân (tên, avatar, email, tuổi, giới tính, liên hệ, chẩn đoán, thuốc, dị ứng, dinh dưỡng, mục tiêu)
+### `POST /doctor/patients/{patient_id}/constraints/approve` `[Planned]`
+**Role:** `doctor`. Xác nhận thay đổi ràng buộc mà **patient tự sửa** trước đó (không đổi giá trị, chỉ chuyển `constraints_status` từ `"pending_doctor_review"` → `"confirmed"`).
 ```json
-// Request — field KHÔNG gửi → giữ nguyên; field gửi null → xóa (avatar/full_name → mặc định)
-{
-  "full_name": "Nguyễn Văn A",
-  "email": "nguyenvana@gmail.com",
-  "avatar": "https://.../avatar.png",
-  "age": 45,
-  "gender": "Nam",
-  "phone": "0901 234 567",
-  "address": "Quận 1, TP. Hồ Chí Minh",
-  "blood_pressure": "130/80 mmHg",
-  "blood_glucose": "135 mg/dL",
-  "disease": ["diabetes_t2", "hypertension"],
-  "medications": ["metformin"],
-  "allergies": ["hải sản"],
-  "preferences": ["thích ăn cơm", "không ăn thịt bò"],
-  "treatment_goals": ["Kiểm soát đường huyết (HbA1c < 7%)."]
-}
-// Response 200 — DoctorPatientSummary (mới nhất)
-```
-> Email trùng tài khoản khác → 409 `EMAIL_EXISTS`. `age` ngoài 0–130 → 422.
-
-### GET /api/v1/doctor/catalog
-**Role:** doctor, patient — danh mục có sẵn để chọn tags (thuốc, dị ứng, chẩn đoán)
-```json
-// Response 200
-{
-  "medicines": [{ "id": "uuid", "name": "Metformin 500mg" }],
-  "allergies": [{ "id": "uuid", "name": "Hải sản" }],
-  "diagnoses": [{ "code": "diabetes_t2", "name": "Tiểu đường type 2" }]
-}
-```
-
-### POST /api/v1/doctor/patients/{patient_id}/avatar
-**Role:** doctor — upload ảnh đại diện (multipart/form-data, field `file`, ảnh ≤ 2MB, png/jpg/webp/gif)
-```json
-// Response 200
-{ "avatar": "/static/avatars/{patient_id}.png" }
-```
-> File không phải ảnh → 415 `INVALID_IMAGE`; quá 2MB → 413 `IMAGE_TOO_LARGE`.
-
-### POST /api/v1/doctor/patients/{patient_id}/meal-plans/generate
-**Role:** doctor — tạo 1 thực đơn 7 ngày (kèm `alternatives[]` trên từng món). Body tùy chọn giống patient generate: `{ "notes", "priorities" }`.
-
-### GET /api/v1/doctor/meal-plans
-**Role:** doctor — filter `?status=pending_review` (mặc định) hoặc `?status=all` (tất cả plan); response `MealPlanOutput` (thêm `created_at: "ISO-8601 | null"`)
-
-### POST /api/v1/doctor/meal-plans/{id}/review
-**Role:** doctor
-```json
-// Request (as-built ReviewRequest)
-{
-  "action": "approve | reject | edit",
-  "notes": "string",
-  "edited_plan": { /* MealPlanOutput fields — bắt buộc khi action=edit */ }
-}
-// Response 200 (ReviewResponse)
-{
-  "meal_plan_id": "string",
-  "status": "approved | rejected | edited",
-  "trust_badge": "doctor_reviewed | null",
-  "reviewed_at": "ISO-8601",
-  "reviewer_id": "string"
-}
-```
-
-### POST /api/v1/doctor/demo/plan-expiry
-**Role:** doctor — demo: giả lập thực đơn sắp/đã hết hạn (đẩy `reviewed_at` của plan approved mới nhất mỗi bệnh nhân về quá khứ). Chỉ khả dụng ngoài production (guard `DEMO_DISABLED`).
-```json
-// Request (PlanExpiryDemoRequest — optional body)
-{ "mode": "expiring | expired" }  // mặc định "expired"
-// Response 200 (PlanExpiryDemoOut)
-{
-  "updated": ["demo_patient_1"],   // patient có plan approved đã bị backdate
-  "skipped": ["demo_patient_2"]    // patient không có plan approved
-}
-```
-
-## Chat
-
-### POST /api/v1/chat
-**Role:** patient
-```json
-// Request
-{ "message": "string" }
-// Response 200 — AgentRunOutput (contracts/agent-io-schema.md)
-{
-  "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown",
-  "message": "string",
-  "meal_plan_id": "string | null",
-  "food_log_id": "string | null",
-  "alert_ids": ["string"],
-  "citations": ["string"],
-  "guardrail_triggered": false
-}
-```
-
-## Health
-
-### GET /health
-**Role:** public
-```json
-{ "status": "ok" }
+// Request: rỗng (không cần body)
+// Response 200 → PatientProfile (constraints_status="confirmed")
+// Error 400 { "code": "NOTHING_TO_APPROVE", "detail": "Không có thay đổi nào đang chờ duyệt." } — khi constraints_status đã là "confirmed"
 ```
 
 ---
 
-## Enum tham chiếu (dùng chung toàn hệ thống)
-- `MealPlan.status`: `pending_review → approved | rejected | edited`
-- `Alert.severity`: `Nguy hiểm | Cần chú ý | An toàn`
-- `Notification.type`: `meal_reminder | interaction_followup | plan_approved | adherence_checkin`
-- `Notification.status`: `pending | sent | read | dismissed | done | cancelled`
-- `User.role`: `patient | doctor`
+## 4. Meal Plans
+
+### `POST /meal-plans/generate`
+**Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`.
+```json
+// Request (optional body)
+{ "notes": "Bệnh nhân thích ăn cá", "priorities": ["giảm natri"] }
+// Response 200 → MealPlanOutput (xem contracts/agent-io-schema.md §2)
+```
+
+### `GET /meal-plans/me`
+**Role:** `patient`. Trả plan mới nhất (`ORDER BY created_at DESC LIMIT 1`).
+```json
+// Response 200 → MealPlanOutput
+// Error 404
+{ "code": "NO_MEAL_PLAN", "detail": "Bạn chưa có thực đơn nào." }
+```
+
+### `GET /meal-plans/{meal_plan_id}`
+**Role:** bất kỳ user đã đăng nhập (`get_current_user`). Patient chỉ xem plan của chính mình (403 nếu không phải chủ plan); doctor xem được plan của bất kỳ patient nào (không giới hạn ownership).
+```json
+// Response 200 → MealPlanOutput
+// Error 403 { "code": "FORBIDDEN", "detail": "Bạn không có quyền xem thực đơn này." }
+// Error 404 { "code": "MEAL_PLAN_NOT_FOUND", "detail": "Không tìm thấy thực đơn." }
+```
+
+### `POST /doctor/patients/{patient_id}/meal-plans/generate`
+**Role:** `doctor`. Doctor sinh plan hộ 1 patient cụ thể — cùng pipeline với `POST /meal-plans/generate`.
+```json
+// Request (optional body, giống GenerateMealPlanRequest)
+{ "notes": "", "priorities": [] }
+// Response 200 → MealPlanOutput
+// Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
+```
+
+### `POST /meal-plans/{meal_plan_id}/request-adjustment` `[Planned]`
+**Role:** `patient`, chỉ chủ plan. **Quyết định 2026-08-15:** patient có thể yêu cầu điều chỉnh 1 plan đã `approved`, nhưng yêu cầu **phải qua bác sĩ duyệt lại** — không tự động regenerate. Tái sử dụng luồng review sẵn có: set `status` plan về lại `"pending_review"` kèm `adjustment_note`, plan sẽ xuất hiện lại trong `GET /doctor/meal-plans` (default filter) để doctor xử lý qua `POST /doctor/meal-plans/{id}/review` như bình thường.
+```json
+// Request
+{ "adjustment_note": "Tôi không ăn được nhiều rau ngót, xin đổi món khác cho ngày 3." }
+// Response 200 → MealPlanOutput (status="pending_review", adjustment_note lưu lại)
+// Error 400 { "code": "PLAN_NOT_APPROVED", "detail": "Chỉ yêu cầu điều chỉnh trên thực đơn đã được duyệt." } — khi plan đang pending_review/rejected/edited
+```
+
+**Ghi chú đồng bộ persist qua `/chat` (quyết định 2026-08-15):** meal plan sinh qua `POST /chat` (intent `meal_plan`) **phải được persist** vào bảng `meal_plans` giống `POST /meal-plans/generate` (đóng gap as-built đã ghi ở `contracts/agent-io-schema.md` §5.2) — `meal_plan_id` trả về từ `/chat` phải dùng lại được với `GET /meal-plans/{id}`. Đây là thay đổi hành vi **Planned**, chưa implement.
+
+---
+
+## 5. Interactions
+
+### `POST /interactions/check`
+**Role:** `patient`. Kiểm tra ad-hoc (không gắn plan cụ thể).
+```json
+// Request
+{ "medications": ["warfarin"], "foods": ["rau muống", "bưởi"], "profile_user_id": null }
+// Response 200 (khi DEMO_MOCK=true) → InteractionCheckOutput (xem contracts/agent-io-schema.md §6, gồm unmatched_pairs[] [Planned])
+// Error 501 (khi DEMO_MOCK=false)
+{ "code": "INTERACTION_CHECK_NOT_READY", "detail": "InteractionCheckerAgent chưa sẵn sàng. Bật DEMO_MOCK hoặc chờ BE1 hoàn thiện." }
+```
+Mỗi interaction phát hiện được cũng tự động tạo 1 `Alert` (persist DB) + có thể tạo `Notification(type="interaction_followup")` nếu severity ∈ `{Nguy hiểm, Cần chú ý}`. **Quyết định 2026-08-15:** cặp `drug`×`food` không tìm thấy dữ liệu trong KB phải xuất hiện trong `unmatched_pairs[]` (`[Planned]`) — không im lặng bỏ qua như as-built hiện tại.
+
+**Gap KB đầy đủ vs KB rút gọn (xem `contracts/agent-io-schema.md` §6):** đã được team chấp nhận là hạn chế biết trước cho vòng demo hiện tại (2026-08-15), không nằm trong backlog ưu tiên cao — xem `tasks/roadmap-mvp.md`.
+
+---
+
+## 6. Alerts
+
+### `GET /alerts`
+**Role:** bất kỳ user đã đăng nhập. Patient: chỉ alert của chính mình. Doctor: **bắt buộc** query `patient_id`.
+```
+GET /alerts                      (patient — tự động lấy alert của mình)
+GET /alerts?patient_id=user_uuid (doctor)
+```
+```json
+// Response 200 → list[Alert] (xem contracts/agent-io-schema.md §4)
+// Error 400 (doctor thiếu patient_id) { "code": "PATIENT_ID_REQUIRED", "detail": "Doctor cần truyền patient_id." }
+```
+
+---
+
+## 7. Notifications
+
+### `GET /notifications`
+**Role:** `patient` **chỉ** (doctor hiện chưa gọi được endpoint này — gap, xem §9 Doctor Compliance).
+```
+GET /notifications?status=pending&type=meal_reminder
+```
+```json
+// Response 200 → list[NotificationOut]
+[
+  {
+    "id": "notif_uuid", "user_id": "user_uuid", "type": "meal_reminder",
+    "title": "Nhắc bữa trưa — Ngày 1", "body": "Đến giờ bữa trưa...",
+    "scheduled_at": "2026-08-15T11:30:00", "status": "pending",
+    "related_ids": { "meal_plan_id": "plan_uuid", "day_index": 1, "slot": "lunch" },
+    "payload": {}, "created_at": "2026-08-15T09:00:00", "updated_at": "2026-08-15T09:00:00"
+  }
+]
+```
+
+### `POST /notifications/demo/simulate`
+**Role:** `patient`. Seed đúng 3 bản ghi mẫu cố định (`meal_reminder` pending, `adherence_checkin` pending, `plan_approved` sent) cho user hiện tại. **Không** bulk-flip trạng thái các bản ghi khác.
+```json
+// Response 200 → list[NotificationOut] (3 phần tử)
+// Error 403 (khi APP_ENV=production) { "code": "DEMO_DISABLED", "detail": "Endpoint demo không khả dụng ở production." }
+```
+**Quyết định 2026-08-15 (Planned fix):** hành vi hiện tại khi gọi lại nhiều lần cần được xác minh/sửa lại cho hợp lý — mỗi lần gọi lại chỉ nên tạo bản ghi mẫu mới nếu **chưa có** bản ghi mẫu cùng loại đang `pending`/`sent` cho user đó (tránh nhân bản notification giả khi demo bấm nút nhiều lần). BE2 cần audit lại implementation hiện tại và điều chỉnh cho idempotent hơn.
+
+### `POST /notifications/{notification_id}/read`
+**Role:** `patient`, chỉ chủ notification. Response 200 → `NotificationOut` (status → `"read"` nếu đang `pending/sent`).
+
+### `POST /notifications/{notification_id}/dismiss`
+**Role:** `patient`, chỉ chủ notification. Response 200 → `NotificationOut` (status → `"dismissed"`).
+
+### `POST /notifications/{notification_id}/done`
+**Role:** `patient`, chỉ chủ notification.
+```json
+// Request (adherence bắt buộc nếu type="adherence_checkin")
+{ "adherence": "partial" }
+// Response 200 → NotificationOut (status → "done", payload.adherence lưu lại)
+// Error 400 (thiếu adherence cho adherence_checkin) { "code": "ADHERENCE_REQUIRED", "detail": "Cần cung cấp adherence cho check-in." }
+```
+
+---
+
+## 8. Doctor Patient Management
+
+### `GET /doctor/patients`
+**Role:** `doctor`. Query optional: `q` (tìm theo tên/id/email/bệnh lý), `status` (lọc theo `status_key`).
+```json
+// Response 200 → list[DoctorPatientSummary]
+```
+
+### `GET /doctor/patients/{patient_id}`
+**Role:** `doctor`. Response 200 → `DoctorPatientSummary`. Error 404 `PATIENT_NOT_FOUND`.
+
+### `PUT /doctor/patients/{patient_id}/metrics`
+**Role:** `doctor`. Cập nhật weight/height, BMI tự tính lại server-side.
+```json
+// Request
+{ "weight": 70, "height": 168 }
+// Response 200
+{ "weight": 70, "height": 168, "bmi": 24.8, "bmi_category": "Bình thường", "updated_at": "15/08/2026" }
+```
+`bmi_category` ngưỡng châu Á: `<18.5 Thiếu cân`, `<23 Bình thường`, `<25 Thừa cân nhẹ`, `≥25 Béo phì`.
+
+**Quyết định 2026-08-15 (Planned validation):** `weight` và `height` **phải gửi đầy đủ cả 2** trong cùng 1 request — không cho phép cập nhật riêng lẻ 1 trong 2 (tránh tính BMI sai do dùng giá trị cũ/thiếu ngữ cảnh). Thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
+```json
+// Error 400 (thiếu 1 trong 2 field) { "code": "METRICS_INCOMPLETE", "detail": "Cần cung cấp đầy đủ cả weight và height." }
+```
+
+### `PUT /doctor/patients/{patient_id}/goals`
+**Role:** `doctor`. Thay toàn bộ danh sách mục tiêu điều trị.
+```json
+// Request
+{ "goals": ["Giảm cân 2kg trong 1 tháng.", "Duy trì huyết áp dưới 130/80 mmHg."] }
+// Response 200
+{ "goals": ["Giảm cân 2kg trong 1 tháng.", "Duy trì huyết áp dưới 130/80 mmHg."] }
+```
+
+### `PUT /doctor/patients/{patient_id}/profile`
+**Role:** `doctor`. Partial update (chỉ field có mặt trong request mới được ghi đè). **Không nhận `target_kcal`/`restrictions`** (xem §3 Clinical Constraints — Planned riêng).
+```json
+// Request (mọi field optional, chỉ field gửi lên mới đổi)
+{ "full_name": "Nguyễn Văn A", "email": "a.nguyen@example.com", "age": 46, "gender": "Nam", "disease": ["diabetes_t2", "hypertension"], "allergies": ["hải sản"] }
+// Response 200 → DoctorPatientSummary
+// Error 409 { "code": "EMAIL_EXISTS", "detail": "Email đã được đăng ký." }
+// Error 422 { "code": "INVALID_EMAIL", "detail": "Email không được để trống." }
+```
+`age` validate `0 ≤ age ≤ 130` (Pydantic `ge=0, le=130`) — chỉ áp dụng ở endpoint này, **không** áp dụng ở `POST /auth/register` (register không có field `age`).
+
+### `GET /doctor/catalog`
+**Role:** `doctor` hoặc `patient`. Danh mục thuốc/dị ứng/chẩn đoán dùng cho dropdown UI.
+```json
+// Response 200
+{ "medicines": [{"id": "med_uuid", "name": "Metformin 500mg"}], "allergies": [{"id": "alg_uuid", "name": "Hải sản"}], "diagnoses": [{"code": "diabetes_t2", "name": "Tiểu đường type 2"}] }
+```
+
+### `POST /doctor/patients/{patient_id}/avatar`
+**Role:** `doctor`. Multipart form upload (`file`), ảnh ≤ 2MB, mime `image/*`.
+```json
+// Response 200
+{ "avatar": "/static/avatars/<patient_id>.png" }
+// Error 415 { "code": "INVALID_IMAGE", "detail": "File phải là ảnh (png/jpg/webp/gif)." }
+// Error 413 { "code": "IMAGE_TOO_LARGE", "detail": "Ảnh tối đa 2MB." }
+```
+
+---
+
+## 9. Doctor Review
+
+### `GET /doctor/meal-plans`
+**Role:** `doctor`. Query `status` (default `"pending_review"`, dùng `"all"` để lấy hết).
+```json
+// Response 200 → list[MealPlanOutput]
+```
+
+### `POST /doctor/meal-plans/{meal_plan_id}/review`
+**Role:** `doctor`.
+```json
+// Request — action = "approve"
+{ "action": "approve", "notes": "Thực đơn phù hợp, đã duyệt." }
+// Request — action = "reject"
+{ "action": "reject", "notes": "Cần điều chỉnh lượng natri bữa tối." }
+// Request — action = "edit" (bắt buộc edited_plan, full replace days/swaps/citations)
+{ "action": "edit", "notes": "Đã sửa bữa trưa ngày 2.", "edited_plan": { "days": [ /* DayPlan[7] đầy đủ */ ], "swaps": [], "citations": ["byt_vn_notes.md"] } }
+// Response 200
+{ "meal_plan_id": "plan_uuid", "status": "approved", "trust_badge": "doctor_reviewed", "reviewed_at": "2026-08-15T09:10:00+07:00", "reviewer_id": "doctor_uuid" }
+// Error 400 (edit thiếu edited_plan) { "code": "EDITED_PLAN_REQUIRED", "detail": "Cần edited_plan khi action=edit." }
+// Error 404 { "code": "MEAL_PLAN_NOT_FOUND", "detail": "Không tìm thấy thực đơn." }
+// Error 409 [Planned] (plan không còn ở pending_review) { "code": "PLAN_ALREADY_REVIEWED", "detail": "Thực đơn này đã được xử lý (status hiện tại: approved). Tải lại danh sách để xem trạng thái mới nhất." }
+```
+**Side-effect theo action (as-built chính xác):**
+- `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")`.
+- `reject`: `status="rejected"` (không set `trust_badge`) → cancel (set `status="cancelled"`) các `Notification` **đang `pending`** có `related_ids.meal_plan_id` khớp plan này (không đụng notification `sent/read/done`, không đụng plan khác).
+- `edit`: `status="edited"`, `trust_badge="doctor_reviewed"` → **không** tạo/cancel notification nào.
+
+**Optimistic lock `[Planned]`, quyết định 2026-08-15:** để tránh race condition khi 2 doctor cùng review 1 plan (`specs/06-meal-plan-review.md` §5), endpoint này **phải** kiểm tra `MealPlan.status == "pending_review"` (hoặc `"pending_review"` do action `request-adjustment` set lại) ngay trước khi áp dụng thay đổi — nếu plan đã bị doctor khác xử lý trước đó (không còn ở trạng thái chờ), trả `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm như as-built hiện tại.
+
+### `POST /doctor/demo/plan-expiry`
+**Role:** `doctor`. Demo-only — backdate `reviewed_at` của plan `approved` mới nhất mỗi patient để giả lập trạng thái "sắp hết hạn"/"đã hết hạn" trên `GET /doctor/patients` (`plan_expiry`/`plan_days_left`/`plan_end_date`).
+```json
+// Request
+{ "mode": "expiring" }
+// Response 200
+{ "updated": ["patient_uuid_1"], "skipped": ["patient_uuid_2"] }
+// Error 403 (production) { "code": "DEMO_DISABLED", "detail": "Endpoint demo không khả dụng ở production." }
+```
+
+---
+
+## 10. Doctor Compliance `[Planned]`
+
+Chưa tồn tại as-built. Doctor hiện chỉ có thể xem gián tiếp qua `GET /alerts?patient_id=` (raw alert list) hoặc `plan_pending`/`alert_count` trong `DoctorPatientSummary` — chưa có tổng hợp adherence riêng. Thiết kế đề xuất theo `adrs/008-compliance-summary-aggregation-strategy.md` (on-the-fly, không bảng riêng), xem `specs/10-doctor-compliance-view.md`.
+
+### `GET /doctor/patients/{patient_id}/compliance` `[Planned]`
+**Role:** `doctor`. Query optional `days` (default 14, khớp UI mock hiện có).
+```json
+// Response 200 (đề xuất)
+{
+  "patient_id": "user_uuid",
+  "daily_series": [ { "date": "2026-08-01", "adherence_pct": 100 }, { "date": "2026-08-02", "adherence_pct": 50 } ],
+  "events": [ { "type": "alert", "severity": "Nguy hiểm", "title": "Tương tác warfarin × rau muống", "at": "2026-08-02T12:30:00" } ]
+}
+```
+
+### `POST /doctor/patients/{patient_id}/compliance/remind` `[Planned]`
+**Role:** `doctor`. Gửi nhắc nhở tuân thủ thủ công tới patient. **Quyết định 2026-08-15:** tạo `Notification` với **type mới `"manual_reminder"`** (không dùng lại `adherence_checkin`/`meal_reminder` — cần phân biệt rõ đây là nhắc nhở chủ động từ doctor, khác nhắc tự động theo lịch).
+```json
+// Request
+{ "message": "Bác sĩ nhắc bạn ghi nhận bữa tối hôm nay nhé." }
+// Response 200 → NotificationOut (type="manual_reminder", status="sent")
+```
+
+**Ngưỡng "tuân thủ thấp" (quyết định 2026-08-15):** giá trị số cụ thể vẫn là **quyết định lâm sàng/sản phẩm** (chưa chốt số trong tài liệu này) — nhưng thiết kế kỹ thuật đã chốt: ngưỡng phải là **1 giá trị cấu hình được** (ví dụ `COMPLIANCE_LOW_THRESHOLD_PCT` trong `backend/app/core/config.py`, default đề xuất `50`), không hard-code trong logic, để team lâm sàng/sản phẩm chỉnh được mà không cần đổi code.
+
+---
+
+## 11. Chat
+
+### `POST /chat`
+**Role:** `patient` **hoặc** `doctor` (cả 2 role được phép gọi, khác với hầu hết endpoint patient-only khác).
+```json
+// Request
+{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
+// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] [Planned])
+// Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
+```
+**Multi-intent `[Planned]`, quyết định 2026-08-15:** `intent_classifier` cần nâng cấp để phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
+
+---
+
+## 12. Food Log `[Planned]`
+
+Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeholder, không mount trong `main.py`). Thiết kế đề xuất theo `adrs/009-food-log-scope-strategy.md`, xem `specs/09-food-log-adherence.md`.
+
+### `POST /food-log` `[Planned]`
+**Role:** `patient`.
+```json
+// Request
+{ "meal_plan_id": "plan_uuid", "day_index": 3, "slot": "noon", "type": "custom", "note": "Ăn phở bò ngoài quán" }
+// Response 200 → FoodLogEntry (xem contracts/agent-io-schema.md §3)
+```
+**Quyết định 2026-08-15:** `slot` dùng đúng 3-giá-trị theo UI (`"morning" | "noon" | "evening"`), **không** dùng 4-slot của meal plan — xem `contracts/agent-io-schema.md` §3 và `adrs/009-food-log-scope-strategy.md`.
+
+### `GET /food-log` `[Planned]`
+**Role:** `patient`. Query optional `date`/`meal_plan_id`.
+```json
+// Response 200 → list[FoodLogEntry]
+```
+
+---
+
+## 13. Health
+
+### `GET /health`
+**Role:** không cần auth. **Không** có prefix `/api/v1` (root-level).
+```json
+// Response 200
+{ "status": "ok" }
+```
+
+### `GET /`
+**Role:** không cần auth. Root check.
+```json
+// Response 200
+{ "Hello": "World" }
+```
+
+---
+
+## Enum tham chiếu dùng chung
+
+| Enum | Giá trị | Nguồn |
+|---|---|---|
+| `User.role` | `patient` \| `doctor` | `models/user.py`, `schemas/auth.py::RegisterRequest.role` |
+| `MealPlan.status` | `pending_review` \| `approved` \| `rejected` \| `edited` | `models/meal_plan.py`, set qua `meal_planner_agent`/`routes_doctor.review_meal_plan` |
+| `Alert.severity` / `InteractionItem.severity` | `Nguy hiểm` \| `Cần chú ý` \| `An toàn` | `data/drug_food_interactions.json`, `services/meal_plan_demo.py` |
+| `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `interaction_followup` \| `manual_reminder` `[Planned]` | `services/notification.py` |
+| `Notification.status` | `pending` \| `sent` \| `read` \| `dismissed` \| `done` \| `cancelled` | `services/notification.py`, `models/notification.py` |
+| `NotificationActionRequest.adherence` | `yes` \| `partial` \| `no` | `schemas/notification.py` |
+| `ReviewRequest.action` | `approve` \| `reject` \| `edit` | `schemas/doctor.py` |
+| `DoctorPatientSummary.status_key` | `attention` \| `stable` \| `warning` \| `pending` | `schemas/doctor.py` |
+| `PlanExpiryDemoRequest.mode` / `DoctorPatientSummary.plan_expiry` | `expiring` \| `expired` (request) — `expiring` \| `expired` \| `ok` \| `none` (summary field) | `schemas/doctor.py`, `services/plan_expiry.py` |
+| Meal slot (`Meal.slot`, `Swap.slot`) | `breakfast` \| `lunch` \| `dinner` \| `snack` | `schemas/meal_plan.py` — **khác** `FoodLogEntry.slot` (xem dòng dưới) |
+| Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` | `agents/nodes/intent_classifier.py::VALID_INTENTS` |
+| `AgentRunOutput.secondary_intents[]` `[Planned]` | cùng enum intent phía trên, dạng mảng | Quyết định 2026-08-15, đáp ứng multi-intent |
+| `FoodLogEntry.type` `[Planned]` | `as_planned` \| `custom` | Đề xuất, theo `frontend/app/patient/meals/log/page.tsx` |
+| `FoodLogEntry.status` `[Planned]` | `logged` \| `adjusted` | Đề xuất, `adrs/009-food-log-scope-strategy.md` |
+| `FoodLogEntry.slot` `[Planned]` | `morning` \| `noon` \| `evening` | Quyết định 2026-08-15, khớp UI 3-slot (khác 4-slot meal plan) |
+| `PatientProfile.constraints_status` `[Planned]` | `confirmed` \| `pending_doctor_review` | Quyết định 2026-08-15, `specs/04-clinical-constraints.md` |
+
+---
+
+## Versioning
+
+- Version hiện tại: **1.1**.
+- **Changelog 1.0 → 1.1 (2026-08-15) — tổng hợp quyết định team sau vòng review đầu:**
+  1. Thêm `POST /auth/forgot-password`, `POST /auth/reset-password` `[Planned]` + rate-limit `POST /auth/login` `[Planned]`.
+  2. `PUT /doctor/patients/{id}/constraints` mở rộng field (`salt_daily_g`/`sugar_daily_g`/`protein_daily_g`); thêm `POST /doctor/patients/{id}/constraints/approve` `[Planned]`; `POST /profile` set `constraints_status` khi patient tự sửa.
+  3. Thêm `POST /meal-plans/{id}/request-adjustment` `[Planned]`; ghi nhận quyết định persist meal plan sinh qua `/chat`.
+  4. `InteractionCheckOutput` thêm `unmatched_pairs[]` `[Planned]`.
+  5. `POST /doctor/meal-plans/{id}/review` thêm optimistic lock + `409 PLAN_ALREADY_REVIEWED` `[Planned]`.
+  6. `POST /doctor/patients/{id}/compliance/remind` đổi type notification sang `manual_reminder` (mới) `[Planned]`; threshold tuân thủ thấp thành config value.
+  7. `POST /chat` thêm `secondary_intents[]` `[Planned]` cho multi-intent.
+  8. `POST /food-log` đổi `slot` sang 3-giá-trị `morning|noon|evening` `[Planned]`.
+  9. `PUT /doctor/patients/{id}/metrics` thêm validation bắt buộc gửi đủ `weight`+`height` `[Planned]`.
+  10. `POST /notifications/demo/simulate` — ghi nhận cần sửa lại cho idempotent hơn `[Planned fix]`.
+  - Toàn bộ đều optional/không breaking với client hiện tại → minor bump (1.0 → 1.1).
+- Mọi thay đổi endpoint/response phải bump version + note lý do, đồng bộ với `contracts/agent-io-schema.md` khi field Agent bị ảnh hưởng.
+- Luật cứng: sửa contract trước, code sau.
