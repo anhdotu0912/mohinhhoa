@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -313,6 +314,51 @@ def seed_catalog(db: Session) -> None:
     )
 
 
+def _migrate_add_meal_plan_dates(db: Session) -> None:
+    """Add meal_plans.starts_on/ends_on; one-time backfill only when columns are new."""
+    from sqlalchemy import inspect, text
+
+    from app.models.meal_plan import MealPlan
+    from app.services import plan_expiry
+    from app.services.plan_apply import reconcile_overlapping_applied_plans
+
+    try:
+        columns = [c["name"] for c in inspect(engine).get_columns("meal_plans")]
+    except Exception:
+        return
+    missing = [col for col in ("starts_on", "ends_on") if col not in columns]
+    for col in missing:
+        db.execute(text(f"ALTER TABLE meal_plans ADD COLUMN {col} DATE"))
+    if missing:
+        db.commit()
+        logger.info("Added meal_plans columns: %s", ", ".join(missing))
+        # Legacy approve==apply: stamp windows only the first time columns appear.
+        # Re-running this on every startup would re-apply unassigned approved plans.
+        rows = (
+            db.query(MealPlan)
+            .filter(
+                MealPlan.status.in_(plan_expiry.EXPIRY_ELIGIBLE_STATUSES),
+                MealPlan.starts_on.is_(None),
+            )
+            .all()
+        )
+        for row in rows:
+            duration = plan_expiry.duration_days(len(row.days or []))
+            start = plan_expiry.start_date(row.reviewed_at, row.created_at)
+            if start is None:
+                continue
+            row.starts_on = start
+            row.ends_on = start + timedelta(days=duration - 1)
+        if rows:
+            db.commit()
+            logger.info("Backfilled meal plan dates for %d rows", len(rows))
+
+    n = reconcile_overlapping_applied_plans(db)
+    if n:
+        db.commit()
+        logger.info("Unapplied %d overlapping meal plans (one plan per week)", n)
+
+
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     Base.metadata.create_all(bind=engine)
@@ -322,5 +368,6 @@ def init_db() -> None:
         _migrate_add_body_metrics(db)
         _migrate_add_profile_detail(db)
         _migrate_widen_alert_severity(db)
+        _migrate_add_meal_plan_dates(db)
         seed_demo_accounts(db)
         seed_catalog(db)

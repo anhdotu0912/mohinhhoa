@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
@@ -14,8 +16,25 @@ from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
 from app.services import plan_expiry
 from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
 from app.services.notification import NotificationService
+from app.services.plan_apply import find_active_plan, find_upcoming_plan
 
 router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
+
+
+def _resolve_patient_plan(db: Session, user_id: str) -> MealPlan | None:
+    today = date.today()
+    active = find_active_plan(db, user_id, today)
+    if active is not None:
+        return active
+    upcoming = find_upcoming_plan(db, user_id, today)
+    if upcoming is not None:
+        return upcoming
+    return (
+        db.query(MealPlan)
+        .filter(MealPlan.user_id == user_id)
+        .order_by(MealPlan.created_at.desc())
+        .first()
+    )
 
 
 @router.post("/generate", response_model=MealPlanOutput)
@@ -33,18 +52,20 @@ def get_my_latest_plan(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> MealPlanOutput:
-    row = (
-        db.query(MealPlan)
-        .filter(MealPlan.user_id == user.id)
-        .order_by(MealPlan.created_at.desc())
-        .first()
-    )
+    row = _resolve_patient_plan(db, user.id)
     if row is None:
         raise APIError(404, "NO_MEAL_PLAN", "Bạn chưa có thực đơn nào.")
 
-    if row.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES:
+    if (
+        row.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES
+        and row.starts_on is not None
+    ):
         expiry_bucket = plan_expiry.bucket(
-            row.reviewed_at, row.created_at, len(row.days or [])
+            row.reviewed_at,
+            row.created_at,
+            len(row.days or []),
+            starts_on=row.starts_on,
+            ends_on=row.ends_on,
         )
         notification = NotificationService(db).ensure_plan_expiry_notification(
             row, expiry_bucket

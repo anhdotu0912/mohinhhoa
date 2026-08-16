@@ -71,6 +71,8 @@ def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
         swaps=row.swaps or [],
         citations=row.citations or [],
         status=row.status,
+        starts_on=row.starts_on.isoformat() if row.starts_on else None,
+        ends_on=row.ends_on.isoformat() if row.ends_on else None,
         created_at=row.created_at.isoformat() if row.created_at else None,
     )
 

@@ -18,6 +18,7 @@ Là **bác sĩ**, tôi muốn thêm bệnh nhân mới vào hệ thống, xem da
 6. `PUT /doctor/patients/{id}/goals` sửa mục tiêu sức khoẻ chung (tách biệt khỏi `target_kcal` — xem field cụ thể trong `contracts/api-v1.md` §8).
 7. `GET /doctor/catalog` trả danh mục chuẩn hoá (bệnh lý/thuốc) để FE gợi ý autocomplete khi doctor nhập — không bắt buộc chọn từ danh mục, vẫn có thể nhập text tự do ở các field liên quan.
 8. `POST /doctor/patients/{id}/avatar` upload ảnh đại diện hộ bệnh nhân — không giới hạn nghiệp vụ đặc biệt ngoài giới hạn kỹ thuật (kích thước/định dạng file, xem `contracts/api-v1.md`).
+9. `GET /doctor/patients?plan_usage=` lọc theo trạng thái áp dụng thực đơn: `none` (chưa từng apply), `active` (đang/upcoming), `finished` (đã hết chu kỳ). Summary trả thêm `active_plan_id`, `plan_starts_on`, `plan_usage` (ADR-011). FE tab lọc trên `/doctor/patients` và `/doctor/history` (ADR-012).
 
 ## 4. Luồng chính (happy path)
 1. Doctor đăng nhập, vào trang danh sách bệnh nhân → FE gọi `GET /doctor/patients`.

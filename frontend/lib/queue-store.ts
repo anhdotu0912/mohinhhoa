@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "./api";
 import { DEFAULT_VARIANTS_PER_JOB, DEFAULT_PLAN_DAYS } from "./config";
+import type { MealPlanSlotIntent } from "./plan-slot-intent";
 
 export type JobLogItem = {
   text: string;
@@ -27,6 +28,7 @@ export interface GenerationJob {
   daysCount?: number;
   notes?: string;
   priorities?: string[];
+  slotIntent?: MealPlanSlotIntent;
   errorMessage?: string;
   /** Tiến trình UI (0–100) — chỉ tăng, không giảm khi job còn active. */
   progress: number;
@@ -53,6 +55,7 @@ interface QueueState {
       condition?: string;
       notes?: string;
       priorities?: string[];
+      slotIntent?: MealPlanSlotIntent;
     }[],
     options?: { daysCount?: number; variantsCount?: number }
   ) => string[];
@@ -216,6 +219,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       variantsCount,
       notes: p.notes,
       priorities: p.priorities,
+      slotIntent: p.slotIntent,
       progress: 12,
       activeStep: 0,
       logs: [

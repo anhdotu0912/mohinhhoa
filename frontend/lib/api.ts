@@ -17,6 +17,7 @@ import {
   type PatientProfile,
   type PatientComplianceOut,
   type PlanExpiryDemoOut,
+  type MealPlanScheduleOut,
   type ProfileUpsert,
   type RegisterResponse,
   type ReviewRequest,
@@ -185,10 +186,12 @@ export const api = {
   listDoctorPatients(params?: {
     q?: string;
     status?: string;
+    plan_usage?: string;
   }): Promise<DoctorPatientSummary[]> {
     const search = new URLSearchParams();
     if (params?.q) search.set("q", params.q);
     if (params?.status) search.set("status", params.status);
+    if (params?.plan_usage) search.set("plan_usage", params.plan_usage);
     const qs = search.toString() ? `?${search}` : "";
     return request(`/api/v1/doctor/patients${qs}`);
   },
@@ -199,6 +202,29 @@ export const api = {
       return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
     }
     return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}`);
+  },
+
+  listPatientMealPlans(
+    patientId: string,
+    status = "all"
+  ): Promise<MealPlanOutput[]> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(id)}/meal-plans?status=${encodeURIComponent(status)}`
+    );
+  },
+
+  getPatientMealPlanSchedule(patientId: string): Promise<MealPlanScheduleOut> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(id)}/meal-plan-schedule`
+    );
   },
 
   getPatientCompliance(
@@ -325,6 +351,20 @@ export const api = {
 
   reviewMealPlan(id: string, payload: ReviewRequest): Promise<ReviewResponse> {
     return request(`/api/v1/doctor/meal-plans/${id}/review`, {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  applyMealPlan(
+    planId: string,
+    payload: {
+      start_date: string;
+      replace_active?: boolean;
+      slot_key?: "current" | "next" | "empty";
+    }
+  ): Promise<MealPlanOutput> {
+    return request(`/api/v1/doctor/meal-plans/${encodeURIComponent(planId)}/apply`, {
       method: "POST",
       body: payload,
     });

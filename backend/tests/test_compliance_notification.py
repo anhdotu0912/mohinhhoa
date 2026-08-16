@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, timedelta
 
 import pytest
 from app.core.errors import APIError
@@ -37,7 +38,8 @@ def _sample_plan(user_id: str) -> MealPlanOutput:
 def test_materialize_from_meal_plan(db_session):
     service = NotificationService(db_session)
     plan = _sample_plan("user_x")
-    created = service.materialize_from_meal_plan(plan)
+    start = date.today() + timedelta(days=1)
+    created = service.materialize_from_meal_plan(plan, start_date=start)
     db_session.flush()
 
     reminders = [n for n in created if n.type == "meal_reminder"]
@@ -61,7 +63,8 @@ def test_plan_approved_notification(db_session):
 def test_plan_rejected_cancels_future_notifications(db_session):
     service = NotificationService(db_session)
     plan = _sample_plan("user_x")
-    service.materialize_from_meal_plan(plan)
+    start = date.today() + timedelta(days=1)
+    service.materialize_from_meal_plan(plan, start_date=start)
     db_session.flush()
 
     cancelled = service.on_plan_rejected(plan)
@@ -106,7 +109,8 @@ def test_alert_creates_followup_only_for_warning_severities(db_session):
 def test_mark_status_transitions(db_session):
     service = NotificationService(db_session)
     plan = _sample_plan("user_x")
-    service.materialize_from_meal_plan(plan)
+    start = date.today() + timedelta(days=1)
+    service.materialize_from_meal_plan(plan, start_date=start)
     db_session.flush()
 
     checkin = (

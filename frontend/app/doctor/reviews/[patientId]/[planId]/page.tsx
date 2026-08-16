@@ -27,6 +27,16 @@ import {
 import { MealDishItem, MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type FoodCatalogItem, type MealPlanOutput } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
+import { formatDateIso } from "@/lib/plan-expiry";
+import { firstEmptyScheduleSlot } from "@/lib/plan-schedule-helpers";
+import {
+  clearSlotIntent,
+  loadSlotIntent,
+  saveSlotIntent,
+  type MealPlanSlotIntent,
+  type SlotIntentKey,
+} from "@/lib/plan-slot-intent";
+import { useQueueStore } from "@/lib/queue-store";
 
 type MealSlot = MealSlotKey;
 
@@ -108,6 +118,15 @@ export default function PlanReviewDetailPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [showApplyPrompt, setShowApplyPrompt] = useState(false);
+  const [applyStartDate, setApplyStartDate] = useState(() =>
+    formatDateIso(new Date())
+  );
+  const [applyingPlan, setApplyingPlan] = useState(false);
+  const [slotIntent, setSlotIntent] = useState<MealPlanSlotIntent | null>(null);
+  const [suggestedSlotKey, setSuggestedSlotKey] = useState<SlotIntentKey | null>(
+    null
+  );
 
   const [addingToSlot, setAddingToSlot] = useState<MealSlot | null>(null);
   const [foodQuery, setFoodQuery] = useState("");
@@ -275,7 +294,39 @@ export default function PlanReviewDetailPage() {
 
   useEffect(() => {
     setHydrated(true);
-  }, []);
+    if (!patientId) return;
+
+    const fromStorage = loadSlotIntent(patientId);
+    if (fromStorage) {
+      setSlotIntent(fromStorage);
+      setApplyStartDate(fromStorage.startsOn);
+      return;
+    }
+
+    const job = useQueueStore
+      .getState()
+      .jobs.find(
+        (j) =>
+          j.patientId === patientId &&
+          j.slotIntent &&
+          j.planIds?.includes(planId ?? "") &&
+          (j.status === "completed" || j.status === "processing")
+      );
+    if (job?.slotIntent) {
+      setSlotIntent(job.slotIntent);
+      setApplyStartDate(job.slotIntent.startsOn);
+      saveSlotIntent(job.slotIntent);
+      return;
+    }
+
+    void api.getPatientMealPlanSchedule(patientId).then((sched) => {
+      const emptySlot = firstEmptyScheduleSlot(sched);
+      if (emptySlot) {
+        setApplyStartDate(emptySlot.starts_on);
+        setSuggestedSlotKey(emptySlot.slot_key);
+      }
+    });
+  }, [patientId, planId]);
 
   const load = useCallback(async () => {
     if (!planId || !patientId) return;
@@ -375,13 +426,59 @@ export default function PlanReviewDetailPage() {
       await api.reviewMealPlan(planId, { action: "approve" });
       setStatus("approved");
       showToast("Đã duyệt thực đơn.");
-      setTimeout(() => {
-        router.push("/doctor/reviews");
-      }, 1200);
+      if (slotIntent) {
+        setApplyingPlan(true);
+        try {
+          await api.applyMealPlan(planId, {
+            start_date: slotIntent.startsOn,
+            replace_active: slotIntent.replaceActive,
+            slot_key: slotIntent.slotKey,
+          });
+          clearSlotIntent();
+          showToast("Đã áp dụng thực đơn vào lịch tuần.");
+          router.push(`/doctor/history/${patientId}`);
+        } catch (applyErr) {
+          showToast(
+            applyErr instanceof ApiError
+              ? applyErr.message
+              : "Không áp dụng được thực đơn."
+          );
+          setShowApplyPrompt(true);
+        } finally {
+          setApplyingPlan(false);
+        }
+      } else {
+        setShowApplyPrompt(true);
+      }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleApplyAfterApprove = async () => {
+    if (!applyStartDate) return;
+    const slotKey = slotIntent?.slotKey ?? suggestedSlotKey ?? undefined;
+    const replaceActive =
+      slotIntent?.replaceActive ?? (slotKey === "current");
+    setApplyingPlan(true);
+    try {
+      await api.applyMealPlan(planId, {
+        start_date: applyStartDate,
+        replace_active: replaceActive,
+        slot_key: slotKey,
+      });
+      clearSlotIntent();
+      showToast("Đã áp dụng thực đơn.");
+      setShowApplyPrompt(false);
+      router.push(`/doctor/history/${patientId}`);
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : "Không áp dụng được thực đơn."
+      );
+    } finally {
+      setApplyingPlan(false);
     }
   };
 
@@ -905,6 +1002,57 @@ export default function PlanReviewDetailPage() {
             </div>
           </div>
         </div>
+
+        {showApplyPrompt && (
+          <div className="mb-lg p-md rounded-xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-end gap-md">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-on-surface">
+                {slotIntent
+                  ? "Áp dụng thực đơn vào lịch tuần?"
+                  : "Áp dụng thực đơn từ ngày nào?"}
+              </p>
+              <p className="text-xs text-on-surface-variant mt-0.5 mb-sm">
+                {slotIntent
+                  ? `Thực đơn đã duyệt — sẽ gán từ ${applyStartDate} (7 ngày) hoặc bỏ qua để xếp lịch sau trên trang lịch sử.`
+                  : suggestedSlotKey
+                    ? `Tuần này đang có thực đơn — đề xuất gán từ ${applyStartDate} (tuần trống tiếp theo). Có thể bỏ qua và gán sau trên trang lịch sử.`
+                    : "Thực đơn đã duyệt — chọn ngày bắt đầu (7 ngày) hoặc bỏ qua để xếp lịch sau trên trang lịch sử."}
+              </p>
+              {!slotIntent && !suggestedSlotKey && (
+                <input
+                  type="date"
+                  value={applyStartDate}
+                  onChange={(e) => setApplyStartDate(e.target.value)}
+                  className="rounded-lg border border-outline-variant px-sm py-xs text-sm bg-surface"
+                />
+              )}
+            </div>
+            <div className="flex gap-xs shrink-0">
+              <button
+                type="button"
+                disabled={applyingPlan}
+                onClick={() => void handleApplyAfterApprove()}
+                className="px-md py-sm rounded-lg bg-primary text-on-primary text-xs font-semibold disabled:opacity-50 cursor-pointer"
+              >
+                {applyingPlan ? "Đang áp dụng..." : "Áp dụng luôn"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowApplyPrompt(false);
+                  router.push(
+                    slotIntent
+                      ? `/doctor/history/${patientId}`
+                      : "/doctor/reviews"
+                  );
+                }}
+                className="px-md py-sm rounded-lg border border-outline-variant text-xs cursor-pointer"
+              >
+                Bỏ qua
+              </button>
+            </div>
+          </div>
+        )}
 
         {daysList.length > 0 && (
           <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-sm mb-lg shadow-2xs overflow-x-auto">

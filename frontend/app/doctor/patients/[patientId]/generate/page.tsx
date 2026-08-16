@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/shared/TopBar";
 import { PatientCard, truncatePatientId } from "@/components/doctor/PatientCard";
@@ -12,6 +12,16 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useQueueStore } from "@/lib/queue-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
+import {
+  formatDateFull,
+  parseFlexibleDate,
+} from "@/lib/plan-expiry";
+import {
+  saveSlotIntent,
+  type MealPlanSlotIntent,
+  type SlotIntentAction,
+  type SlotIntentKey,
+} from "@/lib/plan-slot-intent";
 
 const PRIORITY_OPTIONS = [
   "Ưu tiên món quen thuộc",
@@ -49,6 +59,7 @@ function toUiPatient(row: DoctorPatientSummary): Patient {
 export default function DoctorGenerateMealPlanPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const patientId = asRouteId(params?.patientId);
 
   const token = useAuthStore((s) => s.token);
@@ -86,6 +97,37 @@ export default function DoctorGenerateMealPlanPage() {
         : undefined,
     [jobs, patientId]
   );
+
+  const slotIntent = useMemo((): MealPlanSlotIntent | null => {
+    const intent = searchParams.get("intent");
+    const slot = searchParams.get("slot");
+    const startsOn = searchParams.get("starts_on");
+    if (!patientId || !intent || !slot || !startsOn) return null;
+    if (intent !== "add" && intent !== "replace") return null;
+    if (slot !== "current" && slot !== "next" && slot !== "empty") return null;
+    return {
+      patientId,
+      action: intent as SlotIntentAction,
+      slotKey: slot as SlotIntentKey,
+      startsOn,
+      replaceActive: intent === "replace",
+    };
+  }, [patientId, searchParams]);
+
+  const slotIntentLabel = useMemo(() => {
+    if (!slotIntent) return null;
+    const start = parseFlexibleDate(slotIntent.startsOn);
+    const end = start ? new Date(start) : null;
+    if (end) end.setDate(end.getDate() + 6);
+    const range =
+      start && end
+        ? `${formatDateFull(start)} – ${formatDateFull(end)}`
+        : slotIntent.startsOn;
+    if (slotIntent.action === "replace") {
+      return `Sẽ thay thế thực đơn tuần ${slotIntent.slotKey === "current" ? "này" : "sau"} (${range})`;
+    }
+    return `Sẽ gán vào tuần trống (${range})`;
+  }, [slotIntent]);
 
   useEffect(() => {
     setHydrated(true);
@@ -172,6 +214,9 @@ export default function DoctorGenerateMealPlanPage() {
     ];
 
     setEnqueueing(true);
+    if (slotIntent) {
+      saveSlotIntent(slotIntent);
+    }
     useQueueStore.getState().addJobs([
       {
         id: patientId,
@@ -182,6 +227,7 @@ export default function DoctorGenerateMealPlanPage() {
         gender: patient.gender,
         notes: aiNotes.trim() || undefined,
         priorities,
+        slotIntent: slotIntent ?? undefined,
       },
     ]);
     openDrawer();
@@ -223,13 +269,25 @@ export default function DoctorGenerateMealPlanPage() {
       <TopBar title="Tạo thực đơn mới bằng AI" />
 
       <main className="p-lg max-w-[1400px]">
+        {slotIntentLabel && (
+          <div className="mb-md p-md rounded-xl border border-primary/30 bg-primary/5 text-sm text-on-surface">
+            <span className="material-symbols-outlined text-primary text-[18px] align-middle mr-xs">
+              event_available
+            </span>
+            {slotIntentLabel}
+          </div>
+        )}
         <div className="mb-md flex items-center justify-between">
           <Link
-            href={`/doctor/patients/${patient.id}`}
+            href={
+              slotIntent
+                ? `/doctor/history/${patient.id}`
+                : `/doctor/patients/${patient.id}`
+            }
             className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Quay lại Hồ sơ bệnh nhân
+            {slotIntent ? "Quay lại Lịch sử tuần" : "Quay lại Hồ sơ bệnh nhân"}
           </Link>
         </div>
 

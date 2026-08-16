@@ -8,6 +8,7 @@ import { useRouter, useParams } from "next/navigation";
 import { asRouteId } from "@/lib/route-params";
 import { TopBar } from "@/components/shared/TopBar";
 import { PatientMetricsCard } from "@/components/doctor/PatientMetricsCard";
+import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { statusColorFor, type Patient } from "@/lib/mock-data";
@@ -19,8 +20,11 @@ import {
   type DoctorPatientUpdate,
   type MealPlanOutput,
 } from "@/lib/types";
-import { useMealLogsStore } from "@/lib/meal-logs-store";
 import { DEFAULT_PLAN_DAYS } from "@/lib/config";
+import {
+  isReviewedPlanStatus,
+  patientUsageLabel,
+} from "@/lib/plan-expiry";
 
 const DISEASE_OPTIONS: { code: string; label: string }[] = [
   { code: "diabetes_t2", label: "Tiểu đường type 2" },
@@ -178,9 +182,6 @@ export default function PatientDetailPage() {
   const [showAllAllergies, setShowAllAllergies] = useState(false);
   const MAX_LIST_ITEMS = 3;
 
-  // Stores data for History tab summary (meal logs — demo store)
-  const { getLogsByPatientId } = useMealLogsStore();
-
   useEffect(() => {
     setHydrated(true);
   }, []);
@@ -201,11 +202,11 @@ export default function PatientDetailPage() {
     try {
       const [patient, allPlans] = await Promise.all([
         api.getDoctorPatient(patientId),
-        api.listDoctorMealPlans("all").catch(() => [] as MealPlanOutput[]),
+        api.listPatientMealPlans(patientId, "all").catch(() => [] as MealPlanOutput[]),
       ]);
       setSummary(patient);
       setGoals(patient.treatment_goals || []);
-      setPlans(allPlans.filter((p) => p.user_id === patientId));
+      setPlans(allPlans);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -237,9 +238,22 @@ export default function PatientDetailPage() {
     [summary]
   );
 
-  const allLogs = getLogsByPatientId(patientId);
-  const recentMealLogs = allLogs.slice(0, 4);
-  const allPlans = plans;
+  const reviewedPlans = useMemo(
+    () => plans.filter((p) => isReviewedPlanStatus(p.status)),
+    [plans]
+  );
+
+  const activePlan = useMemo(() => {
+    if (!summary?.active_plan_id) return null;
+    return plans.find((p) => p.id === summary.active_plan_id) ?? null;
+  }, [summary, plans]);
+
+  const activePlanUsage = useMemo(() => {
+    if (!summary) return "none" as const;
+    if (summary.plan_usage === "active") return "active" as const;
+    if (summary.plan_usage === "finished") return "finished" as const;
+    return "none" as const;
+  }, [summary]);
 
   const recentPlans = useMemo(
     () =>
@@ -893,14 +907,14 @@ export default function PatientDetailPage() {
                 </div>
               </div>
 
-              {/* Card 4: Lịch sử ăn uống & thực đơn (Tóm tắt) */}
+              {/* Card 4: Lịch sử thực đơn (Tóm tắt) */}
               <div className="bg-surface rounded-xl border border-outline-variant shadow-subtle flex flex-col">
                 <div className="p-card-padding border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
                   <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-sm font-semibold text-base">
                     <span className="material-symbols-outlined text-primary">
                       history
                     </span>
-                    Lịch sử ăn uống & thực đơn gần đây
+                    Lịch sử thực đơn gần đây
                   </h4>
                   <Link
                     href={`/doctor/history/${patientId}`}
@@ -913,61 +927,42 @@ export default function PatientDetailPage() {
                   </Link>
                 </div>
 
-                <div className="p-card-padding grid grid-cols-1 lg:grid-cols-2 gap-section-gap">
-                  {/* Left Column: Recent Diet Logs */}
-                  <div className="space-y-sm">
-                    <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider flex items-center gap-xs">
-                      <span className="material-symbols-outlined text-[16px] text-primary">
-                        restaurant
-                      </span>
-                      Nhật ký ăn uống gần đây ({recentMealLogs.length})
-                    </h5>
-
-                    {recentMealLogs.length === 0 ? (
-                      <p className="text-xs text-on-surface-variant italic py-sm">
-                        Chưa có nhật ký ghi nhận.
-                      </p>
-                    ) : (
-                      <div className="space-y-xs">
-                        {recentMealLogs.map((log) => (
-                          <div
-                            key={log.id}
-                            className="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-sm flex items-center justify-between gap-sm text-xs"
+                <div className="p-card-padding space-y-md">
+                  {summary && summary.active_plan_id && activePlanUsage === "active" ? (
+                    <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-lg p-md flex flex-wrap items-center justify-between gap-sm">
+                      <div>
+                        <p className="text-xs font-semibold text-on-surface">
+                          Thực đơn đang áp dụng
+                        </p>
+                        <p className="text-[11px] text-on-surface-variant mt-0.5">
+                          {patientUsageLabel(activePlanUsage)}
+                          {summary.plan_starts_on && summary.plan_end_date
+                            ? ` · ${summary.plan_starts_on} – ${summary.plan_end_date}`
+                            : ""}
+                        </p>
+                        {activePlan && (
+                          <Link
+                            href={`/doctor/reviews/${patientId}/${activePlan.id}`}
+                            className="text-[11px] text-primary font-semibold hover:underline mt-1 inline-block"
                           >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-xs mb-0.5">
-                                <span className="font-semibold text-on-surface">
-                                  {log.mealLabel}
-                                </span>
-                                <span className="text-on-surface-variant font-caption text-[11px]">
-                                  • {log.loggedAt}
-                                </span>
-                              </div>
-                              <p className="text-on-surface-variant truncate text-[11px]">
-                                {log.foodItems.map((f) => f.name).join(", ") ||
-                                  "Ghi nhận sự kiện tuân thủ"}
-                              </p>
-                            </div>
-
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${log.complianceType === "custom" ||
-                                log.sourceBadgeText === "Ăn khác"
-                                ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                : "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                                }`}
-                            >
-                              {log.complianceType === "custom" ||
-                                log.sourceBadgeText === "Ăn khác"
-                                ? "Ăn khác"
-                                : "Ăn đúng"}
-                            </span>
-                          </div>
-                        ))}
+                            Xem nội dung
+                          </Link>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      <PlanExpiryBadge
+                        expiry={{
+                          plan_expiry: summary.plan_expiry ?? "none",
+                          plan_days_left: summary.plan_days_left ?? null,
+                          plan_end_date: summary.plan_end_date ?? null,
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-on-surface-variant italic">
+                      Chưa có thực đơn đang áp dụng.
+                    </p>
+                  )}
 
-                  {/* Right Column: Recent Menu Plans */}
                   <div className="space-y-sm">
                     <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider flex items-center gap-xs">
                       <span className="material-symbols-outlined text-[16px] text-primary">
@@ -1027,8 +1022,8 @@ export default function PatientDetailPage() {
                     className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline cursor-pointer"
                   >
                     <span>
-                      Xem toàn bộ dòng thời gian lịch sử ({allLogs.length} nhật ký,{" "}
-                      {allPlans.length} thực đơn)
+                      Xem lịch sử theo tuần ({reviewedPlans.length} thực đơn đã duyệt,{" "}
+                      {plans.length} tổng)
                     </span>
                     <span className="material-symbols-outlined text-[16px]">
                       arrow_forward

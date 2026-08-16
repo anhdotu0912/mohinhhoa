@@ -33,15 +33,28 @@ class NotificationService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def materialize_from_meal_plan(self, plan: MealPlanOutput) -> list[Notification]:
+    def materialize_from_meal_plan(
+        self, plan: MealPlanOutput, start_date: date | None = None
+    ) -> list[Notification]:
         """Create meal_reminder per slot/day + adherence_checkin per day."""
         created: list[Notification] = []
-        today = date.today()
+        base = start_date
+        if base is None and plan.starts_on:
+            base = date.fromisoformat(plan.starts_on)
+        if base is None and plan.days:
+            first_date = plan.days[0].date if hasattr(plan.days[0], "date") else plan.days[0].get("date")
+            if first_date:
+                base = date.fromisoformat(str(first_date))
+        if base is None:
+            base = date.today()
+        now = datetime.now()
         for day in plan.days:
-            day_date = today + timedelta(days=day.day_index - 1)
+            day_date = base + timedelta(days=day.day_index - 1)
             for meal in day.meals:
                 hh, mm = SLOT_TIMES.get(meal.slot, (12, 0))
                 scheduled_at = datetime.combine(day_date, time(hh, mm))
+                if scheduled_at < now:
+                    continue
                 slot_label = SLOT_LABELS.get(meal.slot, meal.slot)
                 created.append(self._add(
                     user_id=plan.user_id,
@@ -56,28 +69,34 @@ class NotificationService:
                     },
                 ))
             checkin_at = datetime.combine(day_date, time(21, 0))
-            created.append(self._add(
-                user_id=plan.user_id,
-                type="adherence_checkin",
-                title=f"Kiểm tra tuân thủ — Ngày {day.day_index}",
-                body="Hôm nay bạn đã tuân thủ thực đơn như thế nào?",
-                scheduled_at=checkin_at,
-                related_ids={"meal_plan_id": plan.id, "day_index": day.day_index},
-            ))
+            if checkin_at >= now:
+                created.append(self._add(
+                    user_id=plan.user_id,
+                    type="adherence_checkin",
+                    title=f"Kiểm tra tuân thủ — Ngày {day.day_index}",
+                    body="Hôm nay bạn đã tuân thủ thực đơn như thế nào?",
+                    scheduled_at=checkin_at,
+                    related_ids={"meal_plan_id": plan.id, "day_index": day.day_index},
+                ))
         self.db.flush()
         return created
 
     def on_plan_approved(self, plan: MealPlanOutput) -> Notification:
-        self.materialize_from_meal_plan(plan)
+        """Plan approved — no meal reminders until apply."""
         return self._add(
             user_id=plan.user_id,
             type="plan_approved",
             title="Thực đơn đã được chuyên gia duyệt",
-            body="Chuyên gia dinh dưỡng đã duyệt thực đơn 7 ngày của bạn.",
+            body="Chuyên gia dinh dưỡng đã duyệt thực đơn 7 ngày của bạn. Chờ áp dụng lịch.",
             scheduled_at=datetime.now(),
             status="sent",
             related_ids={"meal_plan_id": plan.id},
         )
+
+    def on_plan_applied(self, plan: MealPlanOutput, start_date: date) -> list[Notification]:
+        """Materialize reminders when doctor applies validity window."""
+        self.materialize_from_meal_plan(plan, start_date=start_date)
+        return []
 
     def on_plan_rejected(self, plan: MealPlanOutput) -> int:
         """Cancel future reminders/checkins of a rejected plan."""
