@@ -21,14 +21,16 @@ export function foodItemToDish(item: FoodItem): MealDishItem {
     name: item.name,
     calories: Math.round(item.kcal),
     salt: sodiumToSaltG(item.macros?.sodium_mg ?? 0),
-    sugar: 0,
+    sugar: item.macros?.sugar_g ?? 0,
+    fat: Math.round((item.macros?.fat_g ?? 0) * 10) / 10,
     carbG: item.macros?.carb_g ?? 0,
     foodId: item.food_id,
     alternatives: (item.alternatives || []).map((alt) => ({
       name: alt.name,
       calories: Math.round(alt.kcal),
       salt: sodiumToSaltG(alt.macros?.sodium_mg ?? 0),
-      sugar: 0,
+      sugar: alt.macros?.sugar_g ?? 0,
+      fat: Math.round((alt.macros?.fat_g ?? 0) * 10) / 10,
       carbG: alt.macros?.carb_g ?? 0,
       foodId: alt.food_id,
       alternatives: [],
@@ -41,6 +43,16 @@ function slotItems(meals: Meal[], slot: string): MealDishItem[] {
   return (meal?.items || []).map(foodItemToDish);
 }
 
+function sumDaySugar(day: DayPlan): number {
+  let total = 0;
+  for (const meal of day.meals) {
+    for (const item of meal.items) {
+      total += item.macros?.sugar_g ?? 0;
+    }
+  }
+  return Math.round(total * 10) / 10;
+}
+
 export function dayPlanToUi(day: DayPlan): DayMealPlan {
   return {
     dayIndex: day.day_index,
@@ -51,7 +63,7 @@ export function dayPlanToUi(day: DayPlan): DayMealPlan {
     snack: slotItems(day.meals, "snack"),
     totalCalories: Math.round(day.totals?.kcal ?? 0),
     totalSalt: sodiumToSaltG(day.totals?.sodium_mg ?? 0),
-    totalSugar: 0,
+    totalSugar: sumDaySugar(day),
     warnings: day.warnings || [],
   };
 }

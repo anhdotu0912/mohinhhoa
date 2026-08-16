@@ -6,6 +6,8 @@ export interface MealDishItem {
   calories: number;
   salt: number;
   sugar: number;
+  /** Fat (g) — hiển thị macro chip trên thực đơn bệnh nhân. */
+  fat?: number;
   /** Carb (g) — dùng tính cảnh báo carb/bữa khi có dữ liệu catalog. */
   carbG?: number;
   foodId?: string | null;

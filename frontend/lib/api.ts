@@ -150,6 +150,10 @@ export const api = {
     return request("/api/v1/meal-plans/me");
   },
 
+  getMyMealPlanSchedule(): Promise<MealPlanScheduleOut> {
+    return request("/api/v1/meal-plans/schedule");
+  },
+
   getMealPlan(id: string): Promise<MealPlanOutput> {
     return request(`/api/v1/meal-plans/${id}`);
   },

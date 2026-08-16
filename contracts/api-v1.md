@@ -135,6 +135,12 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 { "code": "NO_MEAL_PLAN", "detail": "Bạn chưa có thực đơn nào." }
 ```
 
+### `GET /meal-plans/schedule`
+**Role:** `patient`. Lịch tuần thực đơn của chính mình — cùng schema với `GET /doctor/patients/{patient_id}/meal-plan-schedule` (ADR-012); `patient_id` trong response = `user_id` của patient đang đăng nhập.
+```json
+// Response 200 → MealPlanScheduleOut (xem § GET /doctor/patients/{patient_id}/meal-plan-schedule)
+```
+
 ### `GET /meal-plans/{meal_plan_id}`
 **Role:** bất kỳ user đã đăng nhập (`get_current_user`). Patient chỉ xem plan của chính mình (403 nếu không phải chủ plan); doctor xem được plan của bất kỳ patient nào (không giới hạn ownership).
 ```json
