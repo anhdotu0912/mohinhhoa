@@ -43,6 +43,8 @@ class DoctorPatientSummary(BaseModel):
     blood_glucose: str | None = None
     treatment_goals: list[str] = Field(default_factory=list)
     target_kcal: int = 1800
+    salt_daily_g: float | None = None
+    sugar_daily_g: float | None = None
     preferences: list[str] = Field(default_factory=list)
     status: Literal["Cần chú ý", "Ổn định", "Cảnh báo", "Chờ duyệt"] = "Ổn định"
     status_key: Literal["attention", "stable", "warning", "pending"] = "stable"
@@ -108,6 +110,14 @@ class DoctorPatientUpdate(BaseModel):
     treatment_goals: list[str] | None = None
 
 
+class DoctorConstraintsUpdate(BaseModel):
+    """PUT /doctor/patients/{id}/constraints — partial update."""
+
+    target_kcal: int | None = Field(default=None, ge=500, le=4000)
+    salt_daily_g: float | None = Field(default=None, ge=0, le=20)
+    sugar_daily_g: float | None = Field(default=None, ge=0, le=150)
+
+
 class CatalogItem(BaseModel):
     id: str
     name: str
@@ -131,6 +141,7 @@ class FoodCatalogMacros(BaseModel):
     protein_g: float = 0
     fat_g: float = 0
     sodium_mg: float = 0
+    sugar_g: float = 0
 
 
 class FoodCatalogItem(BaseModel):

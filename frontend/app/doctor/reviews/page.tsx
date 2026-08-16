@@ -173,9 +173,20 @@ const STATUS_BADGE: Record<
   },
 };
 
+function resolveAvatar(raw?: string | null): string {
+  if (
+    !raw ||
+    raw.startsWith("https://api.dicebear.com") ||
+    raw.includes("googleusercontent.com")
+  ) {
+    return "";
+  }
+  return assetUrl(raw) || "";
+}
+
 function toUiPatient(row: DoctorPatientSummary): Patient {
   const ui = doctorPatientToUi(row);
-  return { ...ui, avatar: assetUrl(ui.avatar) || ui.avatar };
+  return { ...ui, avatar: resolveAvatar(ui.avatar) };
 }
 
 /** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
@@ -493,6 +504,10 @@ export default function DoctorReviewsPage() {
           return {
             id: p.id,
             name: p.name,
+            avatar: p.avatar,
+            condition: p.condition,
+            age: p.age,
+            gender: p.gender,
             notes: payload.notes,
             priorities: payload.priorities,
           };

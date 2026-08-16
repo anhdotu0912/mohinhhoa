@@ -14,9 +14,55 @@ import { MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "bg-sky-100 text-sky-800 border-sky-200",
+  "bg-purple-100 text-purple-800 border-purple-200",
+  "bg-amber-100 text-amber-800 border-amber-200",
+  "bg-teal-100 text-teal-800 border-teal-200",
+  "bg-rose-100 text-rose-800 border-rose-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function resolvePatientAvatar(raw: string | null | undefined): string {
+  if (
+    !raw ||
+    raw.startsWith("https://api.dicebear.com") ||
+    raw.includes("googleusercontent.com")
+  ) {
+    return "";
+  }
+  return assetUrl(raw) || "";
+}
+
+function bmiCategoryOf(bmi: number | null | undefined): string {
+  if (bmi == null || bmi <= 0) return "—";
+  if (bmi < 18.5) return "Thiếu cân";
+  if (bmi < 23) return "Bình thường";
+  if (bmi < 25) return "Thừa cân nhẹ";
+  return "Béo phì";
+}
+
 function toUiPatient(row: DoctorPatientSummary): Patient {
   const ui = doctorPatientToUi(row);
-  return { ...ui, avatar: assetUrl(ui.avatar) || ui.avatar };
+  return { ...ui, avatar: resolvePatientAvatar(ui.avatar) };
 }
 
 export default function PatientMealPlansListPage() {
@@ -30,6 +76,7 @@ export default function PatientMealPlansListPage() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<DoctorPatientSummary | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [allPatientPlans, setAllPatientPlans] = useState<MealPlanItem[]>([]);
 
@@ -60,6 +107,7 @@ export default function PatientMealPlansListPage() {
         api.getDoctorPatient(patientId),
         api.listDoctorMealPlans("all"),
       ]);
+      setSummary(patientRow);
       setPatient(toUiPatient(patientRow));
       const items = planRows
         .filter((row) => row.user_id === patientRow.id)
@@ -169,6 +217,10 @@ export default function PatientMealPlansListPage() {
     );
   }
 
+  const diagnoses = patient.condition
+    ? patient.condition.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
   return (
     <>
       <TopBar title={`Danh sách thực đơn - ${patient.name}`} />
@@ -185,43 +237,189 @@ export default function PatientMealPlansListPage() {
           </Link>
         </div>
 
-        {/* Header Patient Info */}
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg mb-section-gap flex flex-col md:flex-row md:items-center justify-between gap-md shadow-xs">
-          <div className="flex items-center gap-md">
-            <img
-              src={patient.avatar}
-              alt={patient.name}
-              className="w-14 h-14 rounded-full object-cover border border-outline-variant shrink-0"
-            />
-            <div>
-              <div className="flex items-center gap-sm">
-                <h2 className="font-h1 text-h1 text-on-surface font-bold text-xl">
-                  {patient.name}
-                </h2>
-                <span className="font-mono bg-surface-container-high px-2 py-0.5 rounded-md text-xs font-semibold text-on-surface-variant">
-                  {patient.id}
-                </span>
+        {/* Header Patient Info - Real Data Clinical Overview */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg mb-section-gap shadow-xs space-y-md">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md pb-md border-b border-outline-variant/60">
+            <div className="flex items-start sm:items-center gap-md">
+              <div className="relative w-16 h-16 shrink-0">
+                <div
+                  className={`w-16 h-16 rounded-full border flex items-center justify-center text-lg font-bold ${getAvatarColor(
+                    patient.name
+                  )}`}
+                >
+                  {initials(patient.name)}
+                </div>
+                {patient.avatar ? (
+                  <img
+                    src={patient.avatar}
+                    alt={patient.name}
+                    className="absolute inset-0 w-16 h-16 rounded-full object-cover border border-outline-variant bg-surface-container"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : null}
               </div>
-              <p className="text-xs text-on-surface-variant mt-1">
-                {patient.age > 0 ? `${patient.age} tuổi • ` : ""}
-                Chẩn đoán:{" "}
-                <strong className="text-on-surface font-semibold">
-                  {shortCondition(patient.condition)}
-                </strong>
-              </p>
+
+              <div>
+                <div className="flex items-center gap-sm flex-wrap">
+                  <h2 className="font-h1 text-h1 text-on-surface font-bold text-xl">
+                    {patient.name}
+                  </h2>
+                  <span className="font-mono bg-surface-container-high px-2 py-0.5 rounded-md text-xs font-semibold text-on-surface-variant">
+                    {patient.id}
+                  </span>
+                  {patient.status && (
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
+                        patient.status === "Cảnh báo"
+                          ? "bg-red-50 text-red-700 border border-red-200"
+                          : patient.status === "Cần chú ý"
+                          ? "bg-amber-50 text-amber-800 border border-amber-200"
+                          : patient.status === "Chờ duyệt"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          patient.status === "Cảnh báo"
+                            ? "bg-red-500 animate-pulse"
+                            : patient.status === "Cần chú ý"
+                            ? "bg-amber-500"
+                            : patient.status === "Chờ duyệt"
+                            ? "bg-blue-500"
+                            : "bg-emerald-500"
+                        }`}
+                      />
+                      {patient.status}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-on-surface-variant mt-1">
+                  {patient.age > 0 ? `${patient.age} tuổi` : ""}
+                  {patient.gender && patient.gender !== "—" ? ` • ${patient.gender}` : ""}
+                  {patient.phone ? ` • SĐT: ${patient.phone}` : ""}
+                  {patient.email ? ` • ${patient.email}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-sm flex-wrap">
+              <Link
+                href={`/doctor/patients/${encodeURIComponent(patient.id)}`}
+                className="px-3.5 py-2 border border-outline-variant hover:bg-surface-variant text-on-surface rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] text-primary">
+                  person
+                </span>
+                <span>Xem hồ sơ bệnh nhân</span>
+              </Link>
+              <Link
+                href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-body-bold px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  auto_awesome
+                </span>
+                <span>Tạo thêm thực đơn mới (AI)</span>
+              </Link>
             </div>
           </div>
 
-          <div className="flex items-center gap-sm">
-            <Link
-              href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-xs transition-all cursor-pointer active:scale-95"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                auto_awesome
-              </span>
-              <span>Tạo thêm phương án mới (AI)</span>
-            </Link>
+          {/* Clinical Metrics & Dietary Targets Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-sm pt-xs">
+            {/* Chẩn đoán */}
+            <div className="bg-surface-container-low/60 border border-outline-variant/60 rounded-xl p-3 col-span-2 sm:col-span-3 lg:col-span-2">
+              <div className="flex items-center gap-1 text-on-surface-variant text-[11px] font-semibold mb-1.5">
+                <span className="material-symbols-outlined text-[15px] text-primary">
+                  medical_information
+                </span>
+                <span>Bệnh lý chẩn đoán</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {diagnoses.length > 0 ? (
+                  diagnoses.map((diag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 bg-tertiary-container/30 text-tertiary border border-tertiary/20 rounded-md text-[11px] font-semibold"
+                    >
+                      {diag}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-on-surface-variant">—</span>
+                )}
+              </div>
+            </div>
+
+            {/* Thể chất & BMI */}
+            <div className="bg-surface-container-low/60 border border-outline-variant/60 rounded-xl p-3">
+              <div className="flex items-center gap-1 text-on-surface-variant text-[11px] font-semibold mb-1">
+                <span className="material-symbols-outlined text-[15px] text-amber-600">
+                  accessibility_new
+                </span>
+                <span>Thể chất & BMI</span>
+              </div>
+              <p className="text-xs font-bold text-on-surface">
+                {patient.bmi ? `BMI ${patient.bmi}` : "—"}
+              </p>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                {patient.weight ? `${patient.weight} kg` : ""}
+                {patient.height ? ` • ${patient.height} cm` : ""}
+                {patient.bmi ? ` (${bmiCategoryOf(patient.bmi)})` : ""}
+              </p>
+            </div>
+
+            {/* Mục tiêu Calo */}
+            <div className="bg-surface-container-low/60 border border-outline-variant/60 rounded-xl p-3">
+              <div className="flex items-center gap-1 text-on-surface-variant text-[11px] font-semibold mb-1">
+                <span className="material-symbols-outlined text-[15px] text-emerald-600">
+                  local_fire_department
+                </span>
+                <span>Mục tiêu Calo</span>
+              </div>
+              <p className="text-xs font-bold text-emerald-800">
+                {patient.targetKcal ? `${patient.targetKcal} kcal` : "1800 kcal"}
+                <span className="text-[10px] font-normal text-on-surface-variant">/ngày</span>
+              </p>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                {patient.saltDailyG ? `Muối ≤ ${patient.saltDailyG}g` : "Muối chuẩn"}
+              </p>
+            </div>
+
+            {/* Huyết áp & Đường huyết */}
+            <div className="bg-surface-container-low/60 border border-outline-variant/60 rounded-xl p-3">
+              <div className="flex items-center gap-1 text-on-surface-variant text-[11px] font-semibold mb-1">
+                <span className="material-symbols-outlined text-[15px] text-rose-600">
+                  monitor_heart
+                </span>
+                <span>Huyết áp / Đường huyết</span>
+              </div>
+              <p className="text-xs font-bold text-on-surface">
+                {patient.bloodPressure || "—"}
+              </p>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                ĐH: {patient.bloodSugar || "—"}
+              </p>
+            </div>
+
+            {/* Dị ứng & Thuốc */}
+            <div className="bg-surface-container-low/60 border border-outline-variant/60 rounded-xl p-3">
+              <div className="flex items-center gap-1 text-on-surface-variant text-[11px] font-semibold mb-1">
+                <span className="material-symbols-outlined text-[15px] text-purple-600">
+                  medication
+                </span>
+                <span>Dị ứng & Thuốc</span>
+              </div>
+              <p className="text-[11px] text-on-surface font-medium truncate" title={patient.allergies?.join(", ") || "Không có"}>
+                Dị ứng: {patient.allergies?.length ? patient.allergies.join(", ") : "Không có"}
+              </p>
+              <p className="text-[11px] text-on-surface-variant truncate mt-0.5" title={patient.medications?.join(", ") || "Chưa có"}>
+                Thuốc: {patient.medications?.length ? patient.medications.join(", ") : "Chưa có"}
+              </p>
+            </div>
           </div>
         </div>
 

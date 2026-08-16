@@ -19,18 +19,21 @@ def calculate_meal_totals(meal: Meal) -> Macros:
     total_protein = 0.0
     total_fat = 0.0
     total_sodium = 0.0
+    total_sugar = 0.0
 
     for item in meal.items:
         total_carb += item.macros.carb_g
         total_protein += item.macros.protein_g
         total_fat += item.macros.fat_g
         total_sodium += item.macros.sodium_mg
+        total_sugar += item.macros.sugar_g
 
     return Macros(
         carb_g=round(total_carb, 1),
         protein_g=round(total_protein, 1),
         fat_g=round(total_fat, 1),
         sodium_mg=round(total_sodium, 1),
+        sugar_g=round(total_sugar, 1),
     )
 
 
@@ -41,6 +44,7 @@ def calculate_day_totals(day: DayPlan) -> DayTotals:
     total_protein = 0.0
     total_fat = 0.0
     total_sodium = 0.0
+    total_sugar = 0.0
 
     for meal in day.meals:
         for item in meal.items:
@@ -49,6 +53,7 @@ def calculate_day_totals(day: DayPlan) -> DayTotals:
             total_protein += item.macros.protein_g
             total_fat += item.macros.fat_g
             total_sodium += item.macros.sodium_mg
+            total_sugar += item.macros.sugar_g
 
     return DayTotals(
         kcal=round(total_kcal, 1),
@@ -56,6 +61,7 @@ def calculate_day_totals(day: DayPlan) -> DayTotals:
         protein_g=round(total_protein, 1),
         fat_g=round(total_fat, 1),
         sodium_mg=round(total_sodium, 1),
+        sugar_g=round(total_sugar, 1),
     )
 
 
@@ -120,5 +126,20 @@ def validate_nutrition(
                         f"{slot_name} có lượng Carb ({meal_macros.carb_g:.1f}g) vượt "
                         f"ngưỡng cho phép ({restrictions.carb_per_meal:.1f}g/bữa)."
                     )
+
+        # 4. Sugar Daily Check
+        if restrictions.sugar_daily_g and totals.sugar_g > restrictions.sugar_daily_g:
+            warnings.append(
+                f"Tổng Đường tự do/ngày ({totals.sugar_g:.1f}g) vượt quá ngưỡng giới hạn "
+                f"({restrictions.sugar_daily_g:.1f}g/ngày)."
+            )
+        elif (
+            restrictions.sugar_daily_g
+            and totals.sugar_g >= restrictions.sugar_daily_g * 0.85
+        ):
+            warnings.append(
+                f"Lượng Đường tự do/ngày ({totals.sugar_g:.1f}g) sắp chạm ngưỡng giới hạn "
+                f"({restrictions.sugar_daily_g:.1f}g/ngày)."
+            )
 
     return warnings

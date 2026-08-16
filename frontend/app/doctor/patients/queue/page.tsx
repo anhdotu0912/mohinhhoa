@@ -1,27 +1,94 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import { useQueueStore } from "@/lib/queue-store";
-import { MOCK_PATIENTS } from "@/lib/mock-data";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import type { DoctorPatientSummary } from "@/lib/types";
+import { shortCondition } from "@/lib/format";
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "bg-sky-100 text-sky-800 border-sky-200",
+  "bg-purple-100 text-purple-800 border-purple-200",
+  "bg-amber-100 text-amber-800 border-amber-200",
+  "bg-teal-100 text-teal-800 border-teal-200",
+  "bg-rose-100 text-rose-800 border-rose-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function resolveAvatar(raw?: string | null): string {
+  if (
+    !raw ||
+    raw.startsWith("https://api.dicebear.com") ||
+    raw.includes("googleusercontent.com")
+  ) {
+    return "";
+  }
+  return assetUrl(raw) || "";
+}
 
 export default function QueuePage() {
   const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
   const { jobs, retryJob, clearCompletedAndFailed } = useQueueStore();
 
+  const [patientsMap, setPatientsMap] = useState<Record<string, DoctorPatientSummary>>({});
   const [statusFilter, setStatusFilter] = useState<
     "all" | "active" | "completed" | "failed"
   >("all");
 
-  const getPatientAvatar = (patientId: string) => {
-    const patient = MOCK_PATIENTS.find((p) => p.id === patientId);
-    return (
-      patient?.avatar ||
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuC66kEeXEpUoXAUDa-eVjaWGucklXyDHyG0BWkYQcXkH3OQPebxVez4samPvA1fKP_po9Omc23Pxx-vQJR1oIf-YvHPIFCajQyXqRLKUZJksJuhXpCWTPDsKa_fN5bLjnK9ZjAhBFEX84oz_drQgFQHb5WaDGrrCXlMCh3z1GxBRZp8t8mViPN4OeChVWmoVFOaLJ_Gpk0YQdYiE8R0LY9vO7gn5W80SIuwv4lCvSAbRcfYwKzJgC8I9A"
-    );
+  useEffect(() => {
+    if (!token || role !== "doctor") return;
+    let cancelled = false;
+    void api
+      .listDoctorPatients()
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<string, DoctorPatientSummary> = {};
+        for (const p of list) {
+          map[p.id] = p;
+        }
+        setPatientsMap(map);
+      })
+      .catch(() => {
+        // Silently fallback to job metadata if patient list fails
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, role]);
+
+  const getPatientAvatar = (patientId: string, fallbackJobAvatar?: string) => {
+    const fromMap = patientsMap[patientId]?.avatar;
+    return resolveAvatar(fromMap || fallbackJobAvatar);
+  };
+
+  const getPatientCondition = (patientId: string, fallbackJobCondition?: string) => {
+    const fromMap = patientsMap[patientId]?.condition_label;
+    return fromMap || fallbackJobCondition || "";
   };
 
   const filteredJobs = jobs.filter((job) => {
@@ -161,14 +228,37 @@ export default function QueuePage() {
                   >
                     <td className="p-md">
                       <div className="flex items-center gap-sm">
-                        <img
-                          src={getPatientAvatar(job.patientId)}
-                          alt={job.patientName}
-                          className="w-10 h-10 rounded-full object-cover border border-outline-variant shrink-0"
-                        />
-                        <p className="font-body-bold text-on-surface font-semibold text-sm">
-                          {job.patientName}
-                        </p>
+                        <div className="relative w-10 h-10 shrink-0">
+                          <div
+                            className={`w-10 h-10 rounded-full border flex items-center justify-center text-xs font-bold ${getAvatarColor(
+                              job.patientName
+                            )}`}
+                          >
+                            {initials(job.patientName)}
+                          </div>
+                          {getPatientAvatar(job.patientId, job.patientAvatar) ? (
+                            <img
+                              src={getPatientAvatar(job.patientId, job.patientAvatar)}
+                              alt={job.patientName}
+                              className="absolute inset-0 w-10 h-10 rounded-full object-cover border border-outline-variant bg-surface-container"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-body-bold text-on-surface font-semibold text-sm truncate">
+                            {job.patientName}
+                          </p>
+                          {getPatientCondition(job.patientId, job.patientCondition) && (
+                            <p className="text-[11px] text-on-surface-variant truncate max-w-[200px]">
+                              {shortCondition(
+                                getPatientCondition(job.patientId, job.patientCondition)
+                              )}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="p-md font-mono text-xs font-medium text-on-surface-variant">

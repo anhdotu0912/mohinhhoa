@@ -1,9 +1,10 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TopBar } from "@/components/shared/TopBar";
-import { MOCK_PATIENTS } from "@/lib/mock-data";
+import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import { PatientCard } from "@/components/doctor/PatientCard";
 
 export interface PatientListPageProps {
@@ -11,6 +12,7 @@ export interface PatientListPageProps {
   headerTitle: string;
   headerSubtitle: string;
   actionLabel?: string;
+  patients?: Patient[];
   onSelectPatient: (patientId: string) => void;
 }
 
@@ -19,12 +21,48 @@ export function PatientListPage({
   headerTitle = "Lịch sử ăn uống & thực đơn bệnh nhân",
   headerSubtitle = "Chọn bệnh nhân để xem toàn bộ nhật ký ghi nhận ăn uống và lịch sử thực đơn theo dòng thời gian",
   actionLabel = "Xem lịch sử",
+  patients: initialPatients,
   onSelectPatient,
 }: PatientListPageProps) {
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [patients, setPatients] = useState<Patient[]>(initialPatients || []);
+  const [loading, setLoading] = useState(!initialPatients || initialPatients.length === 0);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredPatients = MOCK_PATIENTS.filter((patient) => {
+  useEffect(() => {
+    if (initialPatients && initialPatients.length > 0) {
+      setPatients(initialPatients);
+      setLoading(false);
+      return;
+    }
+    if (!token || role !== "doctor") return;
+    let cancelled = false;
+    setLoading(true);
+    void api
+      .listDoctorPatients()
+      .then((rows) => {
+        if (cancelled) return;
+        setPatients(
+          rows.map((r) => {
+            const ui = doctorPatientToUi(r);
+            return { ...ui, avatar: assetUrl(ui.avatar) || ui.avatar };
+          })
+        );
+      })
+      .catch(() => {
+        // Keep current state
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPatients, token, role]);
+
+  const filteredPatients = patients.filter((patient) => {
     const matchesSearch =
       patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,47 +109,47 @@ export function PatientListPage({
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-sm border-b border-outline-variant mb-lg pb-xs">
+        {/* Status Filter Pills */}
+        <div className="flex items-center gap-xs overflow-x-auto pb-sm mb-lg border-b border-outline-variant/60">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
+            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "all"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
+                ? "bg-primary text-on-primary shadow-xs"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
             }`}
           >
-            Tất cả ({MOCK_PATIENTS.length})
+            Tất cả ({patients.length})
           </button>
           <button
             onClick={() => setStatusFilter("attention")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
+            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "attention"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
+                ? "bg-error text-on-error shadow-xs"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
             }`}
           >
-            Cần chú ý ({MOCK_PATIENTS.filter((p) => p.status === "Cần chú ý").length})
+            Cần chú ý ({patients.filter((p) => p.status === "Cần chú ý").length})
           </button>
           <button
             onClick={() => setStatusFilter("warning")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
+            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "warning"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
+                ? "bg-tertiary text-on-tertiary shadow-xs"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
             }`}
           >
-            Cảnh báo ({MOCK_PATIENTS.filter((p) => p.status === "Cảnh báo").length})
+            Cảnh báo ({patients.filter((p) => p.status === "Cảnh báo").length})
           </button>
           <button
             onClick={() => setStatusFilter("stable")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
+            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "stable"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
+                ? "bg-emerald-700 text-white shadow-xs"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
             }`}
           >
-            Ổn định ({MOCK_PATIENTS.filter((p) => p.status === "Ổn định").length})
+            Ổn định ({patients.filter((p) => p.status === "Ổn định").length})
           </button>
         </div>
 

@@ -1,7 +1,7 @@
 # Spec: Bác sĩ Xem/Sửa Ràng buộc Lâm sàng (target_kcal & restrictions)
 
 ## Status
-Planned — **chưa có endpoint nào as-built**. Thiết kế đã được team chốt (2026-08-15) sau vòng review đầu — không còn điểm mơ hồ về field/HITL, chỉ còn chờ implement.
+Partial — **`PUT /doctor/patients/{id}/constraints` as-built (2026-08-16):** doctor ghi trực tiếp `target_kcal`/`salt_daily_g`/`sugar_daily_g`, áp dụng ngay cho lần generate kế tiếp. **HITL patient-tự-sửa (`constraints_status`, `POST .../approve`) vẫn Planned/deferred.** **`protein_daily_g` bỏ khỏi scope** — ràng buộc doctor chỉ còn Calo · Muối · Đường.
 
 ## 1. Mục tiêu (Why)
 Bác sĩ là người có chuyên môn xác định mục tiêu calo và ngưỡng dinh dưỡng phù hợp với bệnh lý — không nên chỉ dựa vào patient tự khai. Thiếu endpoint này, bác sĩ phải yêu cầu bệnh nhân tự sửa hồ sơ theo hướng dẫn miệng, không kiểm soát được trực tiếp — rủi ro sai lệch trong luồng lâm sàng thật.
@@ -14,7 +14,7 @@ Bác sĩ là người có chuyên môn xác định mục tiêu calo và ngưỡ
 1. **Endpoint mới `PUT /doctor/patients/{patient_id}/constraints`** — nhận `target_kcal` (int, optional) và `restrictions` (optional), cập nhật trực tiếp lên `profiles` của patient đó (cùng bảng `PatientProfile`, khác endpoint với `PUT /doctor/patients/{id}/profile`).
 2. **Idempotent & partial update** — chỉ field được gửi mới bị ghi đè (khác với `POST /profile` là full-replace); field không gửi giữ nguyên giá trị cũ.
 3. **Ràng buộc mới chỉ áp dụng từ lần `POST /meal-plans/generate` kế tiếp** — plan đã tồn tại **không** tự động tính lại (nhất quán với `MealPlanOutput.profile_snapshot` là bản chụp tại thời điểm generate).
-4. **Mở rộng schema `Restrictions` (quyết định 2026-08-15):** thêm `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` để khớp UI đã thiết kế sẵn (`frontend/app/doctor/patients/constraints/page.tsx`, dùng field `salt`/`sugar`/`protein`) — giữ **song song** với `carb_per_meal`/`sodium_daily` cũ, không xoá field cũ. Tất cả optional, `null` = không áp giới hạn đó.
+4. **Mở rộng schema `Restrictions` (as-built 2026-08-16):** thêm `salt_daily_g`/`sugar_daily_g` — khớp UI `frontend/app/doctor/patients/constraints/page.tsx`. Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ. **`protein_daily_g` bỏ khỏi scope ràng buộc.**
 5. **HITL — patient tự sửa cần bác sĩ duyệt (quyết định 2026-08-15):**
    - **Doctor sửa** qua `PUT /doctor/patients/{patient_id}/constraints` → có hiệu lực **ngay**, `PatientProfile.constraints_status="confirmed"` (doctor là người xác nhận trực tiếp, không cần bước duyệt thêm).
    - **Patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile` (`specs/02`) → giá trị mới **vẫn áp dụng ngay** cho lần generate kế tiếp (không chặn patient, giữ demo flow mượt), nhưng `constraints_status` chuyển thành `"pending_doctor_review"`.

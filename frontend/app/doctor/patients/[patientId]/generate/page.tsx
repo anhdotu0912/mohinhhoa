@@ -31,7 +31,13 @@ function initials(name: string): string {
 }
 
 function resolvePatientAvatar(raw: string | null | undefined): string {
-  if (!raw || raw.startsWith("https://api.dicebear.com")) return "";
+  if (
+    !raw ||
+    raw.startsWith("https://api.dicebear.com") ||
+    raw.includes("googleusercontent.com")
+  ) {
+    return "";
+  }
   return assetUrl(raw) || "";
 }
 
@@ -170,6 +176,10 @@ export default function DoctorGenerateMealPlanPage() {
       {
         id: patientId,
         name: patient.name,
+        avatar: patient.avatar,
+        condition: patient.condition,
+        age: patient.age,
+        gender: patient.gender,
         notes: aiNotes.trim() || undefined,
         priorities,
       },

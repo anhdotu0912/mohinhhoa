@@ -12,6 +12,10 @@ export interface GenerationJob {
   id: string;
   patientId: string;
   patientName: string;
+  patientAvatar?: string;
+  patientGender?: string;
+  patientAge?: number;
+  patientCondition?: string;
   status: "queued" | "processing" | "completed" | "failed";
   createdAt: Date;
   /** Mốc thời gian UI — set 1 lần khi tạo job, KHÔNG reset khi sang processing (tránh giật lùi). */
@@ -43,6 +47,10 @@ interface QueueState {
     patients: {
       id: string;
       name: string;
+      avatar?: string;
+      gender?: string;
+      age?: number;
+      condition?: string;
       notes?: string;
       priorities?: string[];
     }[],
@@ -197,6 +205,10 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       id: `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       patientId: p.id,
       patientName: p.name,
+      patientAvatar: p.avatar,
+      patientGender: p.gender,
+      patientAge: p.age,
+      patientCondition: p.condition,
       status: "queued",
       createdAt: new Date(now),
       uiStartedAt: now,

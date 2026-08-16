@@ -6,6 +6,7 @@ import {
   type AlertOut,
   type CatalogOut,
   type DoctorPatientSummary,
+  type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
   type FoodCatalogOut,
   type GoalsOut,
@@ -250,6 +251,16 @@ export const api = {
   ): Promise<DoctorPatientSummary> {
     return request(
       `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/profile`,
+      { method: "PUT", body: payload }
+    );
+  },
+
+  updateDoctorConstraints(
+    patientId: string,
+    payload: DoctorConstraintsUpdate
+  ): Promise<DoctorPatientSummary> {
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/constraints`,
       { method: "PUT", body: payload }
     );
   },
