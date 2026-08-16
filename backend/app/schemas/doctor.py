@@ -53,7 +53,7 @@ class DoctorPatientSummary(BaseModel):
     alert_count: int = 0
     last_update: str = ""
     avatar: str = ""
-    # Hạn thực đơn đã duyệt (chỉ có ý nghĩa khi latest_plan_status == "approved")
+    # Hạn thực đơn đã duyệt (có ý nghĩa khi latest_plan_status ∈ {approved, edited})
     plan_end_date: str | None = None
     plan_days_left: int | None = None
     plan_expiry: Literal["expiring", "expired", "ok", "none"] = "none"
@@ -126,6 +126,30 @@ class CatalogOut(BaseModel):
     diagnoses: list[DiagnosisItem] = Field(default_factory=list)
 
 
+class FoodCatalogMacros(BaseModel):
+    carb_g: float = 0
+    protein_g: float = 0
+    fat_g: float = 0
+    sodium_mg: float = 0
+
+
+class FoodCatalogItem(BaseModel):
+    """Món / thành phần từ nutrition catalog — dùng picker «Thêm món»."""
+
+    id: str
+    name: str
+    portion: str = ""
+    kcal: float = 0
+    macros: FoodCatalogMacros = Field(default_factory=FoodCatalogMacros)
+    category: str = ""
+    source: str = "db"
+
+
+class FoodCatalogOut(BaseModel):
+    items: list[FoodCatalogItem] = Field(default_factory=list)
+    total: int = 0
+
+
 class AvatarOut(BaseModel):
     avatar: str
 
@@ -141,3 +165,30 @@ class PlanExpiryDemoOut(BaseModel):
 
     updated: list[str] = Field(default_factory=list)
     skipped: list[str] = Field(default_factory=list)
+
+
+class ComplianceDayPoint(BaseModel):
+    date: str
+    adherence_pct: int | None = None
+
+
+class ComplianceEvent(BaseModel):
+    type: Literal["alert"] = "alert"
+    severity: str
+    title: str
+    at: str
+
+
+class PatientComplianceOut(BaseModel):
+    patient_id: str
+    days: int = 14
+    low_threshold_pct: int = 50
+    overall_adherence_pct: int | None = None
+    checkins_done: int = 0
+    checkins_as_planned: int = 0
+    daily_series: list[ComplianceDayPoint] = Field(default_factory=list)
+    events: list[ComplianceEvent] = Field(default_factory=list)
+
+
+class ComplianceRemindRequest(BaseModel):
+    message: str = Field(default="", max_length=500)

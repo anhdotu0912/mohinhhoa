@@ -8,13 +8,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Hermetic tests: no LLM calls, demo mode on.
+# Hermetic tests: no LLM calls, demo mode on, local SQLite (ignore host .env Postgres).
+os.environ["PYTEST_RUNNING"] = "1"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["DEEPSEEK_API_KEY"] = ""
 os.environ["LLM_API_KEY"] = ""
 os.environ["DEMO_MOCK"] = "true"
+os.environ["DATABASE_URL"] = "sqlite://"
 
 import pytest  # noqa: E402
+import app.models  # noqa: E402,F401 — register nutrition catalog tables
 from app.db.init_db import seed_catalog, seed_demo_accounts  # noqa: E402
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402

@@ -11,7 +11,9 @@ from app.db.session import get_db
 from app.models.meal_plan import MealPlan
 from app.models.user import User
 from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
+from app.services import plan_expiry
 from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
+from app.services.notification import NotificationService
 
 router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
 
@@ -39,6 +41,17 @@ def get_my_latest_plan(
     )
     if row is None:
         raise APIError(404, "NO_MEAL_PLAN", "Bạn chưa có thực đơn nào.")
+
+    if row.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES:
+        expiry_bucket = plan_expiry.bucket(
+            row.reviewed_at, row.created_at, len(row.days or [])
+        )
+        notification = NotificationService(db).ensure_plan_expiry_notification(
+            row, expiry_bucket
+        )
+        if notification is not None:
+            db.commit()
+
     return meal_plan_from_row(row)
 
 

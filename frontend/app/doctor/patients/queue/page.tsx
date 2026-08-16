@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
-import { useQueueStore, GenerationJob } from "@/lib/queue-store";
+import { useQueueStore } from "@/lib/queue-store";
 import { MOCK_PATIENTS } from "@/lib/mock-data";
 
 export default function QueuePage() {
@@ -81,48 +81,44 @@ export default function QueuePage() {
         <div className="flex items-center gap-sm border-b border-outline-variant mb-lg pb-xs">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
-              statusFilter === "all"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
+            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${statusFilter === "all"
+              ? "border-primary text-primary font-bold"
+              : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
           >
             Tất cả ({jobs.length})
           </button>
           <button
             onClick={() => setStatusFilter("active")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
-              statusFilter === "active"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
+            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${statusFilter === "active"
+              ? "border-primary text-primary font-bold"
+              : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
           >
             Đang chờ / Đang xử lý ({activeCount})
           </button>
           <button
             onClick={() => setStatusFilter("completed")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
-              statusFilter === "completed"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
+            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${statusFilter === "completed"
+              ? "border-primary text-primary font-bold"
+              : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
           >
             Hoàn tất ({completedCount})
           </button>
           <button
             onClick={() => setStatusFilter("failed")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${
-              statusFilter === "failed"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
+            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer ${statusFilter === "failed"
+              ? "border-primary text-primary font-bold"
+              : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
           >
             Lỗi ({failedCount})
           </button>
         </div>
 
         {/* Queue Table */}
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-x-auto">
           {filteredJobs.length === 0 ? (
             <div className="p-xl text-center text-on-surface-variant">
               <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
@@ -234,34 +230,92 @@ export default function QueuePage() {
                         </span>
                       )}
                       {(job.status === "queued" || job.status === "processing") && (
-                        <span className="text-xs text-on-surface-variant">
-                          Đang tạo thực đơn ({job.daysCount || 7} ngày) theo FIFO...
-                        </span>
+                        <div className="flex flex-col items-start gap-2">
+                          <span className="text-xs text-on-surface-variant">
+                            {job.status === "processing"
+                              ? `Đang tạo thực đơn… ${typeof job.progress === "number" ? job.progress : 0}%`
+                              : `Đang chờ trong hàng đợi · ${typeof job.progress === "number" ? job.progress : 0}%`}
+                          </span>
+                        </div>
                       )}
                     </td>
-                    <td className="p-md text-right">
-                      {job.status === "completed" && (
+                    <td className="p-md text-right min-w-[160px]">
+                      {job.status === "queued" || job.status === "processing" ? (
                         <button
-                          onClick={() => router.push(`/doctor/reviews/${job.patientId}`)}
-                          className="inline-flex items-center gap-xs px-md py-1.5 bg-emerald-700 text-white font-body-bold rounded-lg hover:bg-emerald-800 transition-all text-xs cursor-pointer active:scale-95 shadow-xs font-medium"
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/doctor/patients/queue/${encodeURIComponent(job.id)}`
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all text-xs cursor-pointer active:scale-95 shadow-xs"
                         >
-                          <span>So sánh & Duyệt</span>
-                          <span className="material-symbols-outlined text-[16px]">
-                            arrow_forward
+                          <span className="material-symbols-outlined text-[16px] leading-none">
+                            account_tree
                           </span>
+                          Xem quy trình
                         </button>
-                      )}
-                      {job.status === "failed" && (
-                        <button
-                          onClick={() => retryJob(job.id)}
-                          className="inline-flex items-center gap-xs px-md py-1.5 bg-red-50 text-red-700 border border-red-200 font-body-bold rounded-lg hover:bg-red-100 transition-all text-xs cursor-pointer active:scale-95 shadow-xs font-medium"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">
-                            refresh
-                          </span>
-                          <span>Thử lại</span>
-                        </button>
-                      )}
+                      ) : null}
+
+                      {job.status === "completed" ? (
+                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/doctor/patients/queue/${encodeURIComponent(job.id)}`
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-2 border border-outline-variant bg-white hover:bg-surface-container-low text-on-surface font-semibold rounded-lg transition-all text-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px] leading-none">
+                              account_tree
+                            </span>
+                            Xem quy trình
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(`/doctor/reviews/${job.patientId}`)
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg transition-all text-xs cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            So sánh &amp; Duyệt
+                            <span className="material-symbols-outlined text-[16px] leading-none">
+                              arrow_forward
+                            </span>
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {job.status === "failed" ? (
+                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/doctor/patients/queue/${encodeURIComponent(job.id)}`
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-2 border border-outline-variant bg-white hover:bg-surface-container-low text-on-surface font-semibold rounded-lg transition-all text-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px] leading-none">
+                              account_tree
+                            </span>
+                            Xem quy trình
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => retryJob(job.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 font-semibold rounded-lg transition-all text-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px] leading-none">
+                              refresh
+                            </span>
+                            Thử lại
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

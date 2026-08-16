@@ -34,9 +34,10 @@ def meal_plan_node(state: AgentState) -> AgentState:
     """MealPlanner node — generates 7-day personalized medical meal plan."""
     profile_data = state.get("profile", {})
     profile = PatientProfile(**profile_data) if isinstance(profile_data, dict) else profile_data
+    db = state.get("db")
 
     try:
-        plan_output = meal_planner_agent(profile)
+        plan_output = meal_planner_agent(profile, db=db)
         summary = (
             f"Đã tạo thành công thực đơn 7 ngày cá nhân hóa cho bệnh nhân "
             f"(Mục tiêu: {profile.target_kcal} kcal/ngày, Bệnh lý: {', '.join(profile.disease or ['bình thường'])}).\n"
@@ -64,6 +65,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
     """InteractionChecker node — checks drug-food interactions from user query or state."""
     profile_data = state.get("profile", {})
     profile = PatientProfile(**profile_data) if isinstance(profile_data, dict) else profile_data
+    db = state.get("db")
     medications = profile.medications or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
 
     # Extract foods from message if mentioned, otherwise use common foods
@@ -77,7 +79,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
     )
 
     try:
-        result = interaction_checker_agent(check_input)
+        result = interaction_checker_agent(check_input, db=db)
         interactions = result.interactions
 
         if interactions:
@@ -225,7 +227,7 @@ def get_compiled_graph():
 
 # --- Facade ---
 
-def run_agent(input_data: AgentRunInput) -> AgentRunOutput:
+def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
     """Run the agent graph with the given input.
 
     This is the main facade function that BE2 calls.
@@ -242,6 +244,7 @@ def run_agent(input_data: AgentRunInput) -> AgentRunOutput:
         "user_id": input_data.user_id,
         "message": input_data.message,
         "force_intent": input_data.force_intent,
+        "db": db,
         "profile": {},
         "intent": "unknown",
         "rag_context": [],

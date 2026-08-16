@@ -19,7 +19,7 @@ class Alert(Base):
     drug: Mapped[str] = mapped_column(String(100))
     food: Mapped[str] = mapped_column(String(100))
     mechanism: Mapped[str] = mapped_column(Text)
-    severity: Mapped[str] = mapped_column(String(20))
+    severity: Mapped[str] = mapped_column(String(100))
     recommendation: Mapped[str] = mapped_column(Text)
     sources: Mapped[list] = mapped_column(JSON, default=list)
     meal_plan_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

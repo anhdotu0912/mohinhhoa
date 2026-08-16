@@ -14,6 +14,8 @@ import json
 import logging
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 try:
     from unidecode import unidecode
 except ImportError:
@@ -66,12 +68,66 @@ def load_interaction_kb() -> list[dict]:
         return []
 
 
-def _load_drug_products() -> list[dict]:
-    """Load drug_products.json — 434 commercial drug product entries.
+def _product_row_to_dict(row) -> dict:
+    return {
+        "productId": row.id,
+        "productName": row.product_name,
+        "normalizedName": row.normalized_name,
+        "aliases": row.aliases or [],
+        "activeIngredientText": row.active_ingredient_text,
+        "activeKey": row.active_key,
+        "drugClass": row.drug_class,
+        "formulationProfile": row.formulation_profile,
+        "ruleId": row.rule_id,
+        "sources": row.sources or {},
+        "isActive": row.is_active,
+    }
 
-    Each entry maps a commercial product name (e.g. 'Medi Gluphag 500')
-    to its active ingredient key (e.g. 'METFORMIN') via the `activeKey` field.
-    """
+
+def _rule_row_to_dict(row) -> dict:
+    return {
+        "ruleId": row.id,
+        "version": row.version,
+        "activeKey": row.active_key,
+        "activeIngredients": row.active_ingredients or [],
+        "drugClass": row.drug_class,
+        "formulationProfile": row.formulation_profile,
+        "applicableDiabetesTypes": row.applicable_diabetes_types or [],
+        "diabetesApplicability": row.diabetes_applicability or {},
+        "mealTiming": row.meal_timing or {},
+        "carbohydrateRule": row.carbohydrate_rule or {},
+        "safety": row.safety or {},
+        "sources": row.sources or {},
+        "isActive": row.is_active,
+    }
+
+
+def _load_drug_products_from_db(db: Session) -> list[dict]:
+    from app.models.nutrition_catalog import DrugProduct
+
+    rows = db.query(DrugProduct).all()
+    if not rows:
+        return []
+    return [_product_row_to_dict(row) for row in rows]
+
+
+def _load_drug_rules_from_db(db: Session) -> list[dict]:
+    from app.models.nutrition_catalog import DrugRule
+
+    rows = db.query(DrugRule).all()
+    if not rows:
+        return []
+    return [_rule_row_to_dict(row) for row in rows]
+
+
+def _load_drug_products(db: Session | None = None) -> list[dict]:
+    """Load drug products from Postgres when available, else JSON file."""
+    if db is not None:
+        products = _load_drug_products_from_db(db)
+        if products:
+            logger.info("Loaded %d drug products from DB", len(products))
+            return products
+
     global _cached_products
     if _cached_products is not None:
         return _cached_products
@@ -83,19 +139,21 @@ def _load_drug_products() -> list[dict]:
     try:
         with open(_DRUG_PRODUCTS_PATH, encoding="utf-8") as f:
             _cached_products = json.load(f)
-        logger.info("Loaded %d drug products", len(_cached_products))
+        logger.info("Loaded %d drug products from JSON", len(_cached_products))
         return _cached_products
     except Exception as e:
         logger.error("Failed to load drug_products.json: %s", e)
         return []
 
 
-def _load_drug_rules() -> list[dict]:
-    """Load drug_rules.json — 49 clinical safety rules.
+def _load_drug_rules(db: Session | None = None) -> list[dict]:
+    """Load drug rules from Postgres when available, else JSON file."""
+    if db is not None:
+        rules = _load_drug_rules_from_db(db)
+        if rules:
+            logger.info("Loaded %d drug rules from DB", len(rules))
+            return rules
 
-    Each rule provides meal timing, hypoglycemia risk, carbohydrate constraints,
-    and AI trigger logic for a given activeKey.
-    """
     global _cached_rules
     if _cached_rules is not None:
         return _cached_rules
@@ -107,7 +165,7 @@ def _load_drug_rules() -> list[dict]:
     try:
         with open(_DRUG_RULES_PATH, encoding="utf-8") as f:
             _cached_rules = json.load(f)
-        logger.info("Loaded %d drug rules", len(_cached_rules))
+        logger.info("Loaded %d drug rules from JSON", len(_cached_rules))
         return _cached_rules
     except Exception as e:
         logger.error("Failed to load drug_rules.json: %s", e)
@@ -143,7 +201,7 @@ def _match_term(term: str, target: str, aliases: list[str]) -> bool:
 # Drug Resolution: Commercial Name → Active Ingredient Key
 # =====================================================================
 
-def resolve_medication(med_name: str) -> dict | None:
+def resolve_medication(med_name: str, db: Session | None = None) -> dict | None:
     """Resolve a medication name (commercial or generic) to its drug product entry.
 
     Lookup strategy (ordered by priority):
@@ -154,7 +212,7 @@ def resolve_medication(med_name: str) -> dict | None:
     Returns:
         The matching drug product dict, or None if no match found.
     """
-    products = _load_drug_products()
+    products = _load_drug_products(db)
     if not products:
         return None
 
@@ -182,7 +240,11 @@ def resolve_medication(med_name: str) -> dict | None:
     return None
 
 
-def get_clinical_rule(active_key: str, rule_id: str | None = None) -> dict | None:
+def get_clinical_rule(
+    active_key: str,
+    rule_id: str | None = None,
+    db: Session | None = None,
+) -> dict | None:
     """Get the clinical safety rule for a given activeKey.
 
     Args:
@@ -192,7 +254,7 @@ def get_clinical_rule(active_key: str, rule_id: str | None = None) -> dict | Non
     Returns:
         The matching drug rule dict, or None if not found.
     """
-    rules = _load_drug_rules()
+    rules = _load_drug_rules(db)
     if not rules:
         return None
 
@@ -217,6 +279,7 @@ def get_clinical_rule(active_key: str, rule_id: str | None = None) -> dict | Non
 def check_interactions(
     medications: list[str],
     foods: list[str],
+    db: Session | None = None,
 ) -> list[InteractionItem]:
     """Check interactions between a list of medications and foods.
 
@@ -246,7 +309,7 @@ def check_interactions(
             continue
 
         # ── Step 1: Resolve medication → activeKey ────────────────
-        product = resolve_medication(med)
+        product = resolve_medication(med, db=db)
         active_key = product.get("activeKey", "") if product else ""
         rule_id = product.get("ruleId") if product else None
         resolved_name = product.get("activeIngredientText", med) if product else med
@@ -258,7 +321,7 @@ def check_interactions(
             )
 
         # ── Step 2: Get clinical safety rule ──────────────────────
-        clinical_rule = get_clinical_rule(active_key, rule_id) if active_key else None
+        clinical_rule = get_clinical_rule(active_key, rule_id, db=db) if active_key else None
 
         # Extract clinical metadata for enrichment
         drug_class = product.get("drugClass", "") if product else ""
@@ -340,7 +403,10 @@ def check_interactions(
     return results
 
 
-def interaction_checker_agent(input_data: InteractionCheckInput) -> InteractionCheckOutput:
+def interaction_checker_agent(
+    input_data: InteractionCheckInput,
+    db: Session | None = None,
+) -> InteractionCheckOutput:
     """Main entry point for InteractionCheckerAgent.
 
     Args:
@@ -352,6 +418,7 @@ def interaction_checker_agent(input_data: InteractionCheckInput) -> InteractionC
     items = check_interactions(
         medications=input_data.medications,
         foods=input_data.foods,
+        db=db,
     )
     return InteractionCheckOutput(interactions=items)
 

@@ -110,17 +110,56 @@ class TestNutritionCalculator:
             assert abs(calculated_totals.kcal - day.totals.kcal) < 1.0
             assert isinstance(day.warnings, list)
 
-    def test_sodium_and_carb_restriction_warnings(self):
-        """High sodium or high carb meals should trigger warnings."""
+    def test_standard_restrictions_have_no_hard_breaches(self):
+        """Demo-like limits should be enforced (scale/repair), not only warned."""
+        profile = PatientProfile(
+            user_id="balanced_user",
+            disease=["diabetes_t2"],
+            target_kcal=1800,
+            restrictions={"carb_per_meal": 45, "sodium_daily": 2300},
+        )
+        plan = generate_meal_plan(profile)
+
+        for day in plan.days:
+            assert 1800 * 0.9 <= day.totals.kcal <= 1800 * 1.1, (
+                f"Day {day.day_index} kcal={day.totals.kcal} outside ±10% band"
+            )
+            assert day.totals.sodium_mg <= 2300
+            for meal in day.meals:
+                meal_carb = sum(i.macros.carb_g for i in meal.items)
+                assert meal_carb <= 45.05, (
+                    f"Day {day.day_index} {meal.slot} carb={meal_carb} > 45"
+                )
+            hard = [w for w in day.warnings if "sắp chạm" not in w]
+            assert hard == [], f"Day {day.day_index} unexpected warnings: {hard}"
+
+    def test_strict_restrictions_comply_or_warn(self):
+        """Strict but feasible limits: repair should comply; else leave warnings."""
         profile = PatientProfile(
             user_id="test_restricted",
-            target_kcal=1200,  # low target to force kcal warning
+            target_kcal=1200,
             restrictions={"carb_per_meal": 30, "sodium_daily": 500},
         )
         plan = generate_meal_plan(profile)
 
-        has_any_warning = any(len(d.warnings) > 0 for d in plan.days)
-        assert has_any_warning, "Expected warnings for very strict restrictions"
+        for day in plan.days:
+            hard = [w for w in day.warnings if "sắp chạm" not in w]
+            if hard:
+                continue
+            assert 1200 * 0.9 <= day.totals.kcal <= 1200 * 1.1
+            assert day.totals.sodium_mg <= 500
+            for meal in day.meals:
+                assert sum(i.macros.carb_g for i in meal.items) <= 30.05
+
+    def test_impossible_restrictions_still_warn(self):
+        """Catalog cannot satisfy tiny carb/sodium budgets — warnings remain."""
+        profile = PatientProfile(
+            user_id="impossible",
+            target_kcal=2200,
+            restrictions={"carb_per_meal": 8, "sodium_daily": 60},
+        )
+        plan = generate_meal_plan(profile)
+        assert any(len(d.warnings) > 0 for d in plan.days)
 
 
 # ============================================================
@@ -202,3 +241,99 @@ class TestFacadeIntegration:
         assert output.intent == "meal_plan"
         assert "thực đơn 7 ngày" in output.message.lower()
         assert output.meal_plan_id is not None
+
+
+# ============================================================
+# Test: DB-backed catalog + JSON fallback
+# ============================================================
+
+class TestDbCatalog:
+    def test_generate_meal_plan_uses_db_catalog(self, db_session):
+        """When nutrition tables are seeded, plan items should cite DB sources."""
+        from app.models.nutrition_catalog import FoodComposition, Recipe
+
+        db_session.add(
+            FoodComposition(
+                id="FOOD_TEST_FISH",
+                name_vi="Cá hồi",
+                food_group="Thủy sản và sản phẩm",
+                basis_g=100,
+                nutrition={
+                    "energy_kcal": 200,
+                    "protein_g": 20,
+                    "fat_g": 10,
+                    "carbohydrate_g": 0,
+                    "sodium_mg": 50,
+                },
+            )
+        )
+        db_session.add(
+            Recipe(
+                id="RECIPE_TEST_001",
+                name_vi="Cá hồi hấp test",
+                category="dam_luoc_hap_nuong",
+                cooking_method="hap",
+                servings=1,
+                ingredients=[
+                    {
+                        "food_id": "FOOD_TEST_FISH",
+                        "role": "protein",
+                        "name_vi": "Cá hồi",
+                    }
+                ],
+                nutrition={
+                    "energy_kcal": 200,
+                    "carbohydrate_g": 0,
+                    "protein_g": 22,
+                    "fat_g": 12,
+                    "sodium_mg": 55,
+                },
+            )
+        )
+        db_session.add(
+            FoodComposition(
+                id="FOOD_TEST_FRUIT",
+                name_vi="Táo test",
+                food_group="Quả chín",
+                basis_g=100,
+                nutrition={
+                    "energy_kcal": 55,
+                    "carbohydrate_g": 14,
+                    "protein_g": 0.3,
+                    "fat_g": 0.2,
+                    "sodium_mg": 1,
+                },
+            )
+        )
+        db_session.commit()
+
+        profile = PatientProfile(user_id="db_catalog_test", target_kcal=1800)
+        plan = generate_meal_plan(profile, db=db_session)
+
+        assert len(plan.days) == 7
+        all_citations = [
+            citation
+            for day in plan.days
+            for meal in day.meals
+            for item in meal.items
+            for citation in item.citations
+        ]
+        assert any("recipes_dm2#" in c for c in all_citations) or any(
+            "foods_vn#" in c for c in all_citations
+        )
+
+    def test_empty_db_falls_back_to_json_catalog(self, db_session):
+        """Empty nutrition tables should fall back to curated JSON catalog."""
+        profile = PatientProfile(user_id="fallback_test", target_kcal=1800)
+        plan = generate_meal_plan(profile, db=db_session)
+
+        assert len(plan.days) == 7
+        assert plan.status == "pending_review"
+        all_citations = [
+            citation
+            for day in plan.days
+            for meal in day.meals
+            for item in meal.items
+            for citation in item.citations
+        ]
+        assert any("food_catalog_demo#" in c for c in all_citations)

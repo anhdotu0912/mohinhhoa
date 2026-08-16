@@ -150,7 +150,10 @@ export type NotificationType =
   | "meal_reminder"
   | "interaction_followup"
   | "plan_approved"
-  | "adherence_checkin";
+  | "plan_expiring"
+  | "plan_expired"
+  | "adherence_checkin"
+  | "manual_reminder";
 
 export type NotificationStatus =
   | "pending"
@@ -177,7 +180,7 @@ export interface NotificationOut {
 export interface ReviewRequest {
   action: "approve" | "reject" | "edit";
   notes?: string;
-  edited_plan?: Record<string, unknown> | null;
+  edited_plan?: MealPlanOutput | Record<string, unknown> | null;
 }
 
 export interface ReviewResponse {
@@ -229,7 +232,7 @@ export interface DoctorPatientSummary {
   alert_count: number;
   last_update: string;
   avatar: string;
-  /** Hạn thực đơn đã duyệt (chỉ có nghĩa khi latest_plan_status === "approved") */
+  /** Hạn thực đơn (có nghĩa khi latest_plan_status ∈ {approved, edited}) */
   plan_end_date?: string | null;
   plan_days_left?: number | null;
   plan_expiry?: "expiring" | "expired" | "ok" | "none";
@@ -238,6 +241,29 @@ export interface DoctorPatientSummary {
 export interface PlanExpiryDemoOut {
   updated: string[];
   skipped: string[];
+}
+
+export interface ComplianceDayPoint {
+  date: string;
+  adherence_pct: number | null;
+}
+
+export interface ComplianceEvent {
+  type: "alert";
+  severity: string;
+  title: string;
+  at: string;
+}
+
+export interface PatientComplianceOut {
+  patient_id: string;
+  days: number;
+  low_threshold_pct: number;
+  overall_adherence_pct: number | null;
+  checkins_done: number;
+  checkins_as_planned: number;
+  daily_series: ComplianceDayPoint[];
+  events: ComplianceEvent[];
 }
 
 export interface PatientMetrics {
@@ -283,6 +309,28 @@ export interface CatalogOut {
   medicines: CatalogItem[];
   allergies: CatalogItem[];
   diagnoses: DiagnosisItem[];
+}
+
+export interface FoodCatalogMacros {
+  carb_g: number;
+  protein_g: number;
+  fat_g: number;
+  sodium_mg: number;
+}
+
+export interface FoodCatalogItem {
+  id: string;
+  name: string;
+  portion: string;
+  kcal: number;
+  macros: FoodCatalogMacros;
+  category: string;
+  source: string;
+}
+
+export interface FoodCatalogOut {
+  items: FoodCatalogItem[];
+  total: number;
 }
 
 export interface AgentRunOutput {

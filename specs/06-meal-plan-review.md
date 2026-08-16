@@ -11,7 +11,7 @@ Là **bác sĩ**, tôi muốn xem danh sách thực đơn đang chờ duyệt, v
 
 ## 3. Business rules
 1. **3 action duy nhất:** `approve | reject | edit` — không có action khác (không có "yêu cầu sửa lại" tách biệt khỏi `reject`; muốn sửa nội dung phải dùng `edit`, không dùng `reject` rồi tạo lại).
-2. **`approve`:** `status → "approved"`, gắn `trust_badge="doctor_reviewed"`. Side-effect: tạo `Notification(type="plan_approved", status="sent")` gửi ngay cho patient.
+2. **`approve`:** `status → "approved"`, gắn `trust_badge="doctor_reviewed"`. Side-effect: tạo `Notification(type="plan_approved", status="sent")` gửi ngay cho patient **và** materialize trước các `meal_reminder`/`adherence_checkin` theo `SLOT_TIMES` cho 7 ngày kể từ ngày duyệt (`reviewed_at`) — không materialize lúc `generate`.
 3. **`reject`:** `status → "rejected"`, **không** gắn `trust_badge`. Side-effect: **huỷ (set `status="cancelled"`) toàn bộ notification tương lai đang ở trạng thái `pending`** có `related_ids.meal_plan_id` khớp plan này — không đụng tới notification đã `sent`/`read`/`done`, không đụng notification của plan khác. Đây là hành vi đúng để tránh bệnh nhân vẫn nhận nhắc nhở cho 1 plan đã bị từ chối.
 4. **`edit`:** bắt buộc gửi `edited_plan` (full replace `days[]`/`swaps[]`/`citations[]`, **không có** API sửa từng món riêng lẻ — bác sĩ phải gửi lại toàn bộ cấu trúc plan). `status → "edited"`, gắn `trust_badge="doctor_reviewed"`. **Không** tạo/cancel notification nào (khác biệt có chủ đích so với `approve`/`reject` — cần lưu ý khi demo vì bác sĩ có thể mong đợi patient được thông báo khi plan bị sửa, nhưng as-built hiện tại **không** gửi thông báo cho action này).
 5. Thiếu `edited_plan` khi `action="edit"` → `400 EDITED_PLAN_REQUIRED`.

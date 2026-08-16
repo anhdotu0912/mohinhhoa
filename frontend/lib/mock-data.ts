@@ -22,6 +22,9 @@ export interface Patient {
   statusKey?: "attention" | "stable" | "warning" | "pending";
   latestPlanId?: string | null;
   latestPlanStatus?: string | null;
+  planExpiry?: "expiring" | "expired" | "ok" | "none";
+  planDaysLeft?: number | null;
+  planEndDate?: string | null;
   planPending?: number;
   planTotal?: number;
   alertCount?: number;
@@ -59,6 +62,9 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     statusKey: p.status_key,
     latestPlanId: p.latest_plan_id,
     latestPlanStatus: p.latest_plan_status,
+    planExpiry: p.plan_expiry,
+    planDaysLeft: p.plan_days_left,
+    planEndDate: p.plan_end_date,
     planPending: p.plan_pending ?? 0,
     planTotal: p.plan_total ?? 0,
     alertCount: p.alert_count,

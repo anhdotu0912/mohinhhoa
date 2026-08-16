@@ -17,6 +17,9 @@ EXPIRING_THRESHOLD_DAYS = 2
 
 PlanExpiryBucket = Literal["expiring", "expired", "ok", "none"]
 
+# Trạng thái plan được tính hạn dùng và gửi notification hết hạn
+EXPIRY_ELIGIBLE_STATUSES = frozenset({"approved", "edited"})
+
 
 def duration_days(days_count: int | None) -> int:
     """Số ngày thực đơn có hiệu lực (mặc định 7)."""
