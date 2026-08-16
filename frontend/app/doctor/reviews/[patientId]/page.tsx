@@ -100,11 +100,16 @@ export default function PatientMealPlansListPage() {
 
   const filteredPlans = allPatientPlans.filter((plan) => {
     if (activeTab === "all") return true;
+    if (activeTab === "approved") {
+      return plan.status === "approved" || plan.status === "edited";
+    }
     return plan.status === activeTab;
   });
 
   const pendingCount = allPatientPlans.filter((p) => p.status === "pending").length;
-  const approvedCount = allPatientPlans.filter((p) => p.status === "approved").length;
+  const approvedCount = allPatientPlans.filter(
+    (p) => p.status === "approved" || p.status === "edited"
+  ).length;
   const rejectedCount = allPatientPlans.filter((p) => p.status === "rejected").length;
 
   // Group filtered plans by variantGroupId (or standalone if no group id)
@@ -331,7 +336,7 @@ export default function PatientMealPlansListPage() {
                         <div
                           key={plan.id}
                           className={`bg-surface-container-lowest border rounded-xl p-md shadow-xs transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
-                            plan.status === "approved"
+                            plan.status === "approved" || plan.status === "edited"
                               ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20"
                               : plan.status === "rejected"
                               ? "border-red-200 opacity-75 bg-red-50/30"
@@ -398,6 +403,14 @@ export default function PatientMealPlansListPage() {
                                   Đã duyệt
                                 </span>
                               )}
+                              {plan.status === "edited" && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                                  <span className="material-symbols-outlined text-[14px]">
+                                    edit_note
+                                  </span>
+                                  Đã chỉnh sửa
+                                </span>
+                              )}
                               {plan.status === "rejected" && (
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-800 border border-red-200">
                                   <span className="material-symbols-outlined text-[14px]">
@@ -415,7 +428,7 @@ export default function PatientMealPlansListPage() {
                                 )
                               }
                               className={`px-md py-1.5 rounded-lg font-body-bold text-xs font-semibold transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 ${
-                                plan.status === "approved"
+                                plan.status === "approved" || plan.status === "edited"
                                   ? "bg-emerald-700 text-white hover:bg-emerald-800"
                                   : "bg-primary text-on-primary hover:bg-primary-container"
                               }`}

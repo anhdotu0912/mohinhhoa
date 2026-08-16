@@ -22,12 +22,17 @@ from app.schemas.doctor import (
     AvatarOut,
     CatalogItem,
     CatalogOut,
+    ComplianceRemindRequest,
     DiagnosisItem,
     DoctorPatientSummary,
     DoctorPatientUpdate,
+    FoodCatalogItem,
+    FoodCatalogMacros,
+    FoodCatalogOut,
     GoalsOut,
     GoalsUpdate,
     MetricsUpdateRequest,
+    PatientComplianceOut,
     PatientMetricsOut,
     PlanExpiryDemoOut,
     PlanExpiryDemoRequest,
@@ -35,7 +40,9 @@ from app.schemas.doctor import (
     ReviewResponse,
 )
 from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
+from app.schemas.notification import NotificationOut
 from app.services import plan_expiry
+from app.services.compliance import ComplianceService
 from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
 from app.services.notification import NotificationService
 
@@ -163,11 +170,14 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
     elif user.created_at:
         last_src = user.created_at
 
-    # Hạn thực đơn: chỉ tính khi có plan đã duyệt (đang có hiệu lực)
+    # Hạn thực đơn: tính khi plan đã duyệt (approved hoặc edited)
     plan_end_date = None
     plan_days_left = None
     plan_expiry_bucket: str = "none"
-    if latest_plan is not None and latest_plan.status == "approved":
+    if (
+        latest_plan is not None
+        and latest_plan.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES
+    ):
         plan_days = len(latest_plan.days or [])
         end = plan_expiry.end_date(
             latest_plan.reviewed_at, latest_plan.created_at, plan_days
@@ -260,6 +270,43 @@ def get_patient(
     if patient is None or patient.role != "patient":
         raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
     return _patient_summary(db, patient)
+
+
+@router.get("/patients/{patient_id}/compliance", response_model=PatientComplianceOut)
+def get_patient_compliance(
+    patient_id: str,
+    days: int = 14,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> PatientComplianceOut:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    return ComplianceService(db).get_patient_compliance(patient_id, days=days)
+
+
+@router.post(
+    "/patients/{patient_id}/compliance/remind",
+    response_model=NotificationOut,
+)
+def remind_patient_compliance(
+    patient_id: str,
+    payload: ComplianceRemindRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> NotificationOut:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    notification = NotificationService(db).create_manual_reminder(
+        patient.id,
+        payload.message,
+    )
+    db.commit()
+    db.refresh(notification)
+    return NotificationOut.model_validate(notification)
 
 
 @router.put("/patients/{patient_id}/metrics", response_model=PatientMetricsOut)
@@ -392,6 +439,54 @@ def get_catalog(
     )
 
 
+@router.get("/foods", response_model=FoodCatalogOut)
+def search_foods(
+    q: str = "",
+    limit: int = 40,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> FoodCatalogOut:
+    """Tra cứu món từ nutrition catalog (DB + JSON fallback) cho UI thêm món."""
+    del user
+    from app.agents.meal_planner_agent import _resolve_catalog
+
+    limit = max(1, min(limit, 100))
+    catalog = _resolve_catalog(db)
+    query = (q or "").strip().lower()
+
+    matched: list[FoodCatalogItem] = []
+    for food in catalog.foods:
+        name = str(food.get("name") or "")
+        food_id = str(food.get("id") or "")
+        aliases = [str(a).lower() for a in (food.get("aliases") or [])]
+        if query:
+            hay = " ".join([name.lower(), food_id.lower(), *aliases])
+            if query not in hay:
+                continue
+        macros_raw = food.get("macros") or {}
+        citation = str(food.get("citation") or "")
+        source = "db" if citation.startswith(("recipes_", "foods_")) else "catalog"
+        matched.append(
+            FoodCatalogItem(
+                id=food_id,
+                name=name,
+                portion=str(food.get("portion") or ""),
+                kcal=float(food.get("kcal") or 0),
+                macros=FoodCatalogMacros(
+                    carb_g=float(macros_raw.get("carb_g") or 0),
+                    protein_g=float(macros_raw.get("protein_g") or 0),
+                    fat_g=float(macros_raw.get("fat_g") or 0),
+                    sodium_mg=float(macros_raw.get("sodium_mg") or 0),
+                ),
+                category=str(food.get("category") or ""),
+                source=source,
+            )
+        )
+
+    matched.sort(key=lambda item: item.name.casefold())
+    return FoodCatalogOut(items=matched[:limit], total=len(matched))
+
+
 @router.post("/patients/{patient_id}/avatar", response_model=AvatarOut)
 async def upload_patient_avatar(
     patient_id: str,
@@ -484,6 +579,7 @@ def review_meal_plan(
         NotificationService(db).on_plan_approved(plan)
     elif payload.action == "reject":
         row.status = "rejected"
+        row.trust_badge = None
         row.reviewer_id = user.id
         row.review_notes = payload.notes
         row.reviewed_at = now

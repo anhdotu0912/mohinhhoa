@@ -189,3 +189,82 @@ def test_demo_plan_expiry_requires_doctor(client):
         json={"mode": "expired"},
     )
     assert response.status_code == 403, response.text
+
+
+def test_get_me_creates_plan_expired_notification(client):
+    patient_headers = _login(client, "demo_patient_1@example.com")
+    plan = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
+    assert plan.status_code == 200, plan.text
+    plan_id = plan.json()["id"]
+
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    _approve_latest_plan(client, doctor_headers, plan_id)
+
+    response = client.post(
+        "/api/v1/doctor/demo/plan-expiry",
+        headers=doctor_headers,
+        json={"mode": "expired"},
+    )
+    assert response.status_code == 200, response.text
+
+    response = client.get("/api/v1/meal-plans/me", headers=patient_headers)
+    assert response.status_code == 200, response.text
+
+    notifications = client.get("/api/v1/notifications", headers=patient_headers)
+    assert notifications.status_code == 200, notifications.text
+    expired = [
+        n
+        for n in notifications.json()
+        if n["type"] == "plan_expired"
+        and n.get("related_ids", {}).get("meal_plan_id") == plan_id
+    ]
+    assert len(expired) == 1
+
+
+def test_get_me_plan_expired_notification_is_idempotent(client):
+    patient_headers = _login(client, "demo_patient_1@example.com")
+    plan = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
+    assert plan.status_code == 200, plan.text
+    plan_id = plan.json()["id"]
+
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    _approve_latest_plan(client, doctor_headers, plan_id)
+    client.post(
+        "/api/v1/doctor/demo/plan-expiry",
+        headers=doctor_headers,
+        json={"mode": "expired"},
+    )
+
+    client.get("/api/v1/meal-plans/me", headers=patient_headers)
+    client.get("/api/v1/meal-plans/me", headers=patient_headers)
+
+    notifications = client.get("/api/v1/notifications", headers=patient_headers)
+    expired = [
+        n
+        for n in notifications.json()
+        if n["type"] == "plan_expired"
+        and n.get("related_ids", {}).get("meal_plan_id") == plan_id
+    ]
+    assert len(expired) == 1
+
+
+def test_doctor_patients_plan_expiry_for_edited_plan(client):
+    patient_headers = _login(client, "demo_patient_1@example.com")
+    plan = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
+    assert plan.status_code == 200, plan.text
+    plan_id = plan.json()["id"]
+    edited = client.get(f"/api/v1/meal-plans/{plan_id}", headers=patient_headers).json()
+
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/review",
+        headers=doctor_headers,
+        json={"action": "edit", "notes": "Chỉnh nhẹ", "edited_plan": edited},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "edited"
+
+    row = _patient_expiry(client, doctor_headers, "demo_patient_1")
+    assert row["latest_plan_status"] == "edited"
+    assert row["plan_expiry"] == "ok"
+    assert row["plan_days_left"] == 6

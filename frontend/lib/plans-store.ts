@@ -6,6 +6,8 @@ export interface MealDishItem {
   calories: number;
   salt: number;
   sugar: number;
+  /** Carb (g) — dùng tính cảnh báo carb/bữa khi có dữ liệu catalog. */
+  carbG?: number;
   foodId?: string | null;
   alternatives?: MealDishItem[];
 }
@@ -20,6 +22,7 @@ export interface DayMealPlan {
   totalCalories?: number;
   totalSalt?: number;
   totalSugar?: number;
+  warnings?: string[];
 }
 
 export interface MealPlanItem {
@@ -33,7 +36,7 @@ export interface MealPlanItem {
   condition: string;
   duration: string;
   daysCount?: number;
-  status: "pending" | "approved" | "rejected" | "unselected";
+  status: "pending" | "approved" | "rejected" | "edited" | "unselected";
   planTitle: string;
   calories: string;
   salt: string;

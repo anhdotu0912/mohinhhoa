@@ -28,7 +28,7 @@ def chat(
     try:
         from app.agents.graph import run_agent
 
-        return run_agent(AgentRunInput(user_id=user.id, message=payload.message))
+        return run_agent(AgentRunInput(user_id=user.id, message=payload.message), db=db)
     except APIError:
         raise
     except Exception as exc:  # noqa: BLE001

@@ -2,19 +2,23 @@
 
 from functools import lru_cache
 from pathlib import Path
+import os
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Load .env từ cwd và tìm lên các thư mục cha (repo root) để chạy được từ
-# cả `backend/` lẫn repo root mà không cần copy .env. Không ghi đè env đã set.
-load_dotenv()
+# Load .env từ cwd, rồi project files. Project `.env` ghi đè User/Machine
+# Windows env để key trong repo (vd. DEEPSEEK_API_KEY) luôn thắng khi chạy local.
+# Pytest sets PYTEST_RUNNING=1 and hermetic env vars first — do not override those.
+_DOTENV_OVERRIDE = os.getenv("PYTEST_RUNNING") != "1"
+load_dotenv(override=_DOTENV_OVERRIDE)
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]  # backend/
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # repo root
-for _env_path in (_BACKEND_DIR / ".env", _REPO_ROOT / ".env"):
+# Root trước, backend/.env sau (nếu có) — backend thắng khi cả hai tồn tại.
+for _env_path in (_REPO_ROOT / ".env", _BACKEND_DIR / ".env"):
     if _env_path.exists():
-        load_dotenv(_env_path, override=False)
+        load_dotenv(_env_path, override=_DOTENV_OVERRIDE)
 
 
 class Settings(BaseSettings):
@@ -51,6 +55,9 @@ class Settings(BaseSettings):
     # Generation defaults
     DEFAULT_VARIANTS_PER_JOB: int = 3
     DEFAULT_PLAN_DAYS: int = 7
+
+    # Doctor compliance view — low adherence threshold (ADR-008)
+    COMPLIANCE_LOW_THRESHOLD_PCT: int = 50
 
     model_config = SettingsConfigDict(
         env_file=".env",

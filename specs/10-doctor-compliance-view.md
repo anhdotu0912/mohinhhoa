@@ -1,7 +1,7 @@
 # Spec: Bác sĩ Xem Tuân thủ Bệnh nhân
 
 ## Status
-Planned — **chưa có endpoint nào as-built** cho bác sĩ đọc tuân thủ tổng hợp. `GET /notifications` hiện chỉ role `patient` gọi được (`require_roles("patient")`). FE đã có UI mock hoàn chỉnh (`frontend/app/doctor/patients/compliance/page.tsx`) nhưng 100% dữ liệu hard-code, chưa gọi API nào.
+Done (core) — `GET/POST /doctor/patients/{id}/compliance*` as-built; FE nối API thật tại `frontend/app/doctor/patients/compliance/page.tsx`. `GET /notifications` vẫn chỉ role `patient`.
 
 ## 1. Mục tiêu (Why)
 Bác sĩ cần 1 cái nhìn tổng hợp về việc bệnh nhân có tuân thủ thực đơn/nhắc nhở hay không, để chủ động can thiệp (gửi nhắc nhở, điều chỉnh ràng buộc) trước khi vấn đề lâm sàng trở nên nghiêm trọng — thay vì đợi tái khám.

@@ -267,6 +267,32 @@ def _migrate_add_user_avatar(db: Session) -> None:
         logger.info("Added users.avatar column")
 
 
+def _migrate_widen_alert_severity(db: Session) -> None:
+    """Widen alerts.severity for extended clinical labels (idempotent).
+
+    Interaction checker may emit values like
+    ``Nguy hiểm — Nguy cơ hạ đường huyết CAO`` (>20 chars).
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        columns = {c["name"]: c for c in inspect(engine).get_columns("alerts")}
+    except Exception:
+        return
+    if "severity" not in columns:
+        return
+    length = getattr(columns["severity"]["type"], "length", None)
+    if length is not None and length >= 100:
+        return
+
+    dialect = engine.dialect.name
+    if dialect == "postgresql":
+        db.execute(text("ALTER TABLE alerts ALTER COLUMN severity TYPE VARCHAR(100)"))
+        db.commit()
+        logger.info("Widened alerts.severity to VARCHAR(100)")
+    # SQLite ignores VARCHAR length at runtime; model change is enough for new DBs.
+
+
 def seed_catalog(db: Session) -> None:
     """Seed danh mục thuốc/dị ứng/chẩn đoán (idempotent theo tên/code)."""
     for name in CATALOG_MEDICINES:
@@ -295,5 +321,6 @@ def init_db() -> None:
         _migrate_add_user_avatar(db)
         _migrate_add_body_metrics(db)
         _migrate_add_profile_detail(db)
+        _migrate_widen_alert_severity(db)
         seed_demo_accounts(db)
         seed_catalog(db)

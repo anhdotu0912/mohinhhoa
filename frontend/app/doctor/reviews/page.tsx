@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import Pagination, { getPageItems } from "@/components/shared/Pagination";
 import { truncatePatientId } from "@/components/doctor/PatientCard";
+import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -16,9 +17,108 @@ import { shortCondition } from "@/lib/format";
 import type { MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 
-type StatusTab = "all" | "pending" | "approved";
+type StatusTab = "all" | "pending" | "approved" | "expiring" | "expired";
+type TimeFilterPreset = "all" | "today" | "week" | "month" | "custom";
 
 const PAGE_SIZE = 10;
+
+function truncateId(id: string): string {
+  if (!id) return "";
+  return id.length > 4 ? `...${id.slice(-4)}` : id;
+}
+
+function parsePlanDate(createdAt: string): Date | null {
+  if (!createdAt) return null;
+  const str = createdAt.trim();
+  const vnMatch = str.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{1,2}))?/
+  );
+  if (vnMatch) {
+    const day = parseInt(vnMatch[1], 10);
+    const month = parseInt(vnMatch[2], 10) - 1;
+    const year = parseInt(vnMatch[3], 10);
+    const hour = vnMatch[4] ? parseInt(vnMatch[4], 10) : 0;
+    const min = vnMatch[5] ? parseInt(vnMatch[5], 10) : 0;
+    return new Date(year, month, day, hour, min);
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function isDateInSameWeek(target: Date, reference: Date): boolean {
+  const monday = new Date(reference);
+  const day = monday.getDay();
+  const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  return target >= monday && target <= sunday;
+}
+
+function matchesTimeFilter(
+  createdAt: string,
+  preset: TimeFilterPreset,
+  startDate: string,
+  endDate: string
+): boolean {
+  if (preset === "all") return true;
+  const planDate = parsePlanDate(createdAt);
+  if (!planDate) return false;
+
+  const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  const planDayStart = new Date(
+    planDate.getFullYear(),
+    planDate.getMonth(),
+    planDate.getDate()
+  ).getTime();
+
+  // Mock reference date (12/10/2023)
+  const mockRefDate = new Date(2023, 9, 12);
+  const mockRefStart = new Date(2023, 9, 12).getTime();
+
+  if (preset === "today") {
+    return planDayStart === todayStart || planDayStart === mockRefStart;
+  }
+
+  if (preset === "week") {
+    return (
+      isDateInSameWeek(planDate, now) || isDateInSameWeek(planDate, mockRefDate)
+    );
+  }
+
+  if (preset === "month") {
+    const isCurrentMonth =
+      planDate.getMonth() === now.getMonth() &&
+      planDate.getFullYear() === now.getFullYear();
+    const isMockMonth =
+      planDate.getMonth() === mockRefDate.getMonth() &&
+      planDate.getFullYear() === mockRefDate.getFullYear();
+    return isCurrentMonth || isMockMonth;
+  }
+
+  if (preset === "custom") {
+    if (startDate) {
+      const s = new Date(startDate + "T00:00:00").getTime();
+      if (planDate.getTime() < s) return false;
+    }
+    if (endDate) {
+      const e = new Date(endDate + "T23:59:59").getTime();
+      if (planDate.getTime() > e) return false;
+    }
+    return true;
+  }
+
+  return true;
+}
 
 // Khớp PRIORITY_OPTIONS bên trang generate (/doctor/patients/[patientId]/generate)
 const PRIORITY_OPTIONS = [
@@ -56,6 +156,11 @@ const STATUS_BADGE: Record<
     className: "bg-emerald-50 text-emerald-800 border-emerald-200",
     icon: "check_circle",
   },
+  edited: {
+    label: "Đã chỉnh sửa",
+    className: "bg-sky-50 text-sky-800 border-sky-200",
+    icon: "edit_note",
+  },
   rejected: {
     label: "Đã từ chối",
     className: "bg-red-50 text-red-800 border-red-200",
@@ -82,6 +187,10 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+function isReviewedStatus(status: MealPlanItem["status"]): boolean {
+  return status === "approved" || status === "edited";
+}
+
 export default function DoctorReviewsPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -95,6 +204,9 @@ export default function DoctorReviewsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
+  const [timePreset, setTimePreset] = useState<TimeFilterPreset>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   // Patient Selection Modal state
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
@@ -164,7 +276,45 @@ export default function DoctorReviewsPage() {
   }, [hydrated, token, role, router, load]);
 
   const pendingCount = plans.filter((p) => p.status === "pending").length;
-  const approvedCount = plans.filter((p) => p.status === "approved").length;
+  const approvedCount = plans.filter((p) => isReviewedStatus(p.status)).length;
+
+  const expiryByPlanId = useMemo(() => {
+    const map = new Map<
+      string,
+      Pick<DoctorPatientSummary, "plan_expiry" | "plan_days_left" | "plan_end_date">
+    >();
+    for (const p of allPatients) {
+      if (
+        p.latestPlanId &&
+        p.planExpiry &&
+        p.planExpiry !== "none" &&
+        (p.latestPlanStatus === "approved" || p.latestPlanStatus === "edited")
+      ) {
+        map.set(p.latestPlanId, {
+          plan_expiry: p.planExpiry,
+          plan_days_left: p.planDaysLeft,
+          plan_end_date: p.planEndDate,
+        });
+      }
+    }
+    return map;
+  }, [allPatients]);
+
+  const expiringCount = useMemo(
+    () =>
+      plans.filter(
+        (plan) => expiryByPlanId.get(plan.id)?.plan_expiry === "expiring"
+      ).length,
+    [plans, expiryByPlanId]
+  );
+
+  const expiredCount = useMemo(
+    () =>
+      plans.filter(
+        (plan) => expiryByPlanId.get(plan.id)?.plan_expiry === "expired"
+      ).length,
+    [plans, expiryByPlanId]
+  );
 
   // Tra cứu bệnh nhân theo patientId (plan.patientId = user_id) — avatar + tuổi
   const patientById = useMemo(() => {
@@ -175,7 +325,18 @@ export default function DoctorReviewsPage() {
 
   const filteredPlans = plans.filter((plan) => {
     if (activeTab === "pending" && plan.status !== "pending") return false;
-    if (activeTab === "approved" && plan.status !== "approved") return false;
+    if (activeTab === "approved" && !isReviewedStatus(plan.status)) return false;
+    if (activeTab === "expiring") {
+      if (expiryByPlanId.get(plan.id)?.plan_expiry !== "expiring") return false;
+    }
+    if (activeTab === "expired") {
+      if (expiryByPlanId.get(plan.id)?.plan_expiry !== "expired") return false;
+    }
+
+    // Lọc theo thời gian
+    if (!matchesTimeFilter(plan.createdAt, timePreset, startDate, endDate)) {
+      return false;
+    }
 
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -188,10 +349,10 @@ export default function DoctorReviewsPage() {
     );
   });
 
-  // Về trang 1 khi đổi tab / từ khóa tìm kiếm
+  // Về trang 1 khi đổi tab / từ khóa tìm kiếm / bộ lọc thời gian
   useEffect(() => {
     setPage(1);
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, timePreset, startDate, endDate]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPlans.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -323,21 +484,7 @@ export default function DoctorReviewsPage() {
     const targets = allPatients.filter((p) => selectedPatientIds.has(p.id));
     if (targets.length === 0) return;
 
-    // Chỉ chọn 1 bệnh nhân → chuyển sang trang tạo thực đơn bình thường
-    // (có đầy đủ thông số: số ngày, ưu tiên, ghi chú...)
-    if (targets.length === 1) {
-      const target = targets[0];
-      setIsSelectModalOpen(false);
-      setIsConfigOpen(false);
-      setConfigTargetPatientId(null);
-      setSelectedPatientIds(new Set());
-      setPatientSearch("");
-      setGenConfigs({});
-      router.push(`/doctor/patients/${encodeURIComponent(target.id)}/generate`);
-      return;
-    }
-
-    // Nhiều bệnh nhân → đưa vào hàng đợi — QueueDrawer hiển thị trạng thái từng người
+    // 1 hoặc nhiều BN đều vào hàng đợi (gen mất thời gian; theo dõi tại /doctor/patients/queue)
     useQueueStore
       .getState()
       .addJobs(
@@ -359,7 +506,12 @@ export default function DoctorReviewsPage() {
     setSelectedPatientIds(new Set());
     setPatientSearch("");
     setGenConfigs({});
-    showToast(`Đã thêm ${targets.length} bệnh nhân vào hàng chờ tạo thực đơn.`);
+    showToast(
+      targets.length === 1
+        ? `Đã thêm ${targets[0].name} vào hàng đợi tạo thực đơn AI.`
+        : `Đã thêm ${targets.length} bệnh nhân vào hàng đợi tạo thực đơn AI.`
+    );
+    router.push("/doctor/patients/queue");
   };
 
   // Tự tải lại danh sách thực đơn khi hàng đợi xử lý xong
@@ -421,7 +573,7 @@ export default function DoctorReviewsPage() {
         ) : (
           <>
             {/* Page Title & Subtitle + Action Button */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-md mb-section-gap">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
               <div>
                 <h2 className="font-h1 text-h1 text-on-surface font-bold">
                   Danh sách thực đơn
@@ -431,9 +583,9 @@ export default function DoctorReviewsPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-sm">
+              <div className="flex flex-wrap items-center gap-sm">
                 {/* Search Box */}
-                <div className="relative min-w-[240px]">
+                <div className="relative min-w-[220px]">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                     search
                   </span>
@@ -446,6 +598,27 @@ export default function DoctorReviewsPage() {
                   />
                 </div>
 
+                {/* Time Filter Select */}
+                <div className="relative min-w-[160px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+                    calendar_month
+                  </span>
+                  <select
+                    value={timePreset}
+                    onChange={(e) => setTimePreset(e.target.value as TimeFilterPreset)}
+                    className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="today">Hôm nay</option>
+                    <option value="week">Tuần này</option>
+                    <option value="month">Tháng này</option>
+                    <option value="custom">Chọn theo khoảng thời gian</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+                    arrow_drop_down
+                  </span>
+                </div>
+
                 <button
                   onClick={() => setIsSelectModalOpen(true)}
                   className="bg-primary text-on-primary px-md py-2 rounded-lg font-body-bold text-sm hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold shrink-0"
@@ -456,11 +629,55 @@ export default function DoctorReviewsPage() {
               </div>
             </div>
 
+            {/* Custom Date Range Picker Bar */}
+            {timePreset === "custom" && (
+              <div className="bg-surface-container-low/80 border border-outline-variant/80 rounded-xl px-md py-sm mb-md flex flex-wrap items-center justify-between gap-sm animate-fadeIn">
+                <div className="flex items-center gap-sm flex-wrap">
+                  <span className="text-xs font-semibold text-on-surface flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-primary">date_range</span>
+                    Lọc theo khoảng ngày tạo:
+                  </span>
+                  <div className="flex items-center gap-xs">
+                    <label className="text-xs text-on-surface-variant">Từ:</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="flex items-center gap-xs">
+                    <label className="text-xs text-on-surface-variant">Đến:</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="text-xs text-red-600 hover:text-red-700 hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">clear</span>
+                    Xóa khoảng ngày
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Filter Tabs */}
-            <div className="flex gap-md border-b border-outline-variant mb-lg pb-sm">
+            <div className="flex gap-md border-b border-outline-variant mb-lg pb-sm overflow-x-auto">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 ${activeTab === "all"
+                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "all"
                     ? "border-primary text-primary font-bold"
                     : "border-transparent text-on-surface-variant hover:text-primary"
                   }`}
@@ -469,7 +686,7 @@ export default function DoctorReviewsPage() {
               </button>
               <button
                 onClick={() => setActiveTab("pending")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 ${activeTab === "pending"
+                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "pending"
                     ? "border-primary text-primary font-bold"
                     : "border-transparent text-on-surface-variant hover:text-primary"
                   }`}
@@ -478,12 +695,30 @@ export default function DoctorReviewsPage() {
               </button>
               <button
                 onClick={() => setActiveTab("approved")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 ${activeTab === "approved"
+                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "approved"
                     ? "border-primary text-primary font-bold"
                     : "border-transparent text-on-surface-variant hover:text-primary"
                   }`}
               >
                 Đã duyệt ({approvedCount})
+              </button>
+              <button
+                onClick={() => setActiveTab("expiring")}
+                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "expiring"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-on-surface-variant hover:text-primary"
+                  }`}
+              >
+                Sắp hết hạn ({expiringCount})
+              </button>
+              <button
+                onClick={() => setActiveTab("expired")}
+                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "expired"
+                    ? "border-primary text-primary font-bold"
+                    : "border-transparent text-on-surface-variant hover:text-primary"
+                  }`}
+              >
+                Hết hạn ({expiredCount})
               </button>
             </div>
 
@@ -501,7 +736,7 @@ export default function DoctorReviewsPage() {
                 <p className="font-caption text-caption text-xs mt-xs">
                   {plans.length === 0
                     ? 'Bấm "Tạo thực đơn mới bằng AI" để tạo thực đơn đầu tiên cho bệnh nhân.'
-                    : "Thử đổi từ khóa tìm kiếm hoặc chọn tab bộ lọc khác."}
+                    : "Thử đổi từ khóa tìm kiếm, chọn lại bộ lọc thời gian hoặc chọn tab khác."}
                 </p>
               </div>
             ) : (
@@ -526,6 +761,9 @@ export default function DoctorReviewsPage() {
                           Trạng thái
                         </th>
                         <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                          Hạn thực đơn
+                        </th>
+                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
                           Ngày tạo
                         </th>
                         <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide text-right">
@@ -546,9 +784,9 @@ export default function DoctorReviewsPage() {
                             <td className="px-md py-3">
                               <span
                                 title={plan.id}
-                                className="inline-block max-w-[140px] truncate font-mono text-xs font-semibold text-primary align-middle"
+                                className="font-mono text-xs font-semibold text-primary"
                               >
-                                {plan.id}
+                                {truncateId(plan.id)}
                               </span>
                             </td>
 
@@ -611,6 +849,11 @@ export default function DoctorReviewsPage() {
                                 )}
                                 {badge.label}
                               </span>
+                            </td>
+
+                            {/* Hạn thực đơn — chỉ hiện với plan đang có hiệu lực (mới nhất đã duyệt/chỉnh) */}
+                            <td className="px-md py-3">
+                              <PlanExpiryBadge expiry={expiryByPlanId.get(plan.id) ?? null} />
                             </td>
 
                             {/* Ngày tạo */}

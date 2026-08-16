@@ -10,9 +10,8 @@ from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
-from app.schemas.meal_plan import InteractionCheckInput, MealPlanOutput
+from app.schemas.meal_plan import MealPlanOutput
 from app.schemas.profile import PatientProfile
-from app.services.meal_plan_demo import check_interactions
 from app.services.notification import NotificationService
 
 
@@ -86,12 +85,16 @@ def _plan_foods(plan: MealPlanOutput) -> list[str]:
 
 
 def _persist_interaction_alerts(db: Session, user: User, plan: MealPlanOutput) -> None:
+    from app.agents.interaction_checker_agent import check_interactions
+
     profile = get_profile(db, user.id)
     result = check_interactions(
-        InteractionCheckInput(medications=profile.medications, foods=_plan_foods(plan))
+        medications=profile.medications,
+        foods=_plan_foods(plan),
+        db=db,
     )
     notifications = NotificationService(db)
-    for item in result.interactions:
+    for item in result:
         alert = Alert(
             user_id=user.id,
             drug=item.drug,
@@ -117,11 +120,10 @@ def generate_meal_plan(
     from app.agents.meal_planner_agent import generate_meal_plan as build_plan
 
     profile = get_profile(db, user.id)
-    plan = build_plan(profile, notes=notes, priorities=priorities or [])
+    plan = build_plan(profile, notes=notes, priorities=priorities or [], db=db)
     plan.id = str(uuid.uuid4())
     plan.user_id = user.id
     _persist_plan(db, user.id, plan)
     _persist_interaction_alerts(db, user, plan)
-    NotificationService(db).materialize_from_meal_plan(plan)
     db.commit()
     return plan

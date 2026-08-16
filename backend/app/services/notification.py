@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
 from app.models.alert import Alert
+from app.models.meal_plan import MealPlan
 from app.models.notification import Notification
 from app.schemas.meal_plan import MealPlanOutput
 
@@ -67,6 +68,7 @@ class NotificationService:
         return created
 
     def on_plan_approved(self, plan: MealPlanOutput) -> Notification:
+        self.materialize_from_meal_plan(plan)
         return self._add(
             user_id=plan.user_id,
             type="plan_approved",
@@ -91,6 +93,45 @@ class NotificationService:
         self.db.flush()
         return cancelled
 
+    def ensure_plan_expiry_notification(
+        self, plan_row: MealPlan, bucket: str
+    ) -> Notification | None:
+        """Tạo plan_expiring/plan_expired một lần (idempotent) cho patient."""
+        if bucket not in ("expiring", "expired"):
+            return None
+        notif_type = f"plan_{bucket}"
+        rows = (
+            self.db.query(Notification)
+            .filter(
+                Notification.user_id == plan_row.user_id,
+                Notification.type == notif_type,
+            )
+            .all()
+        )
+        if any(
+            row.related_ids.get("meal_plan_id") == plan_row.id for row in rows
+        ):
+            return None
+        title = (
+            "Thực đơn sắp hết hạn"
+            if bucket == "expiring"
+            else "Thực đơn đã hết hạn"
+        )
+        body = (
+            "Thực đơn 7 ngày của bạn sắp kết thúc. Hãy liên hệ chuyên gia dinh dưỡng để được tạo thực đơn mới."
+            if bucket == "expiring"
+            else "Thực đơn 7 ngày của bạn đã hết hạn. Hãy liên hệ chuyên gia dinh dưỡng hoặc tạo thực đơn mới."
+        )
+        return self._add(
+            user_id=plan_row.user_id,
+            type=notif_type,
+            title=title,
+            body=body,
+            scheduled_at=datetime.now(),
+            status="sent",
+            related_ids={"meal_plan_id": plan_row.id},
+        )
+
     def on_alert_created(self, alert: Alert) -> Notification | None:
         if alert.severity not in FOLLOWUP_SEVERITIES:
             return None
@@ -102,6 +143,20 @@ class NotificationService:
             scheduled_at=datetime.now(),
             status="sent",
             related_ids={"alert_id": alert.id, "meal_plan_id": alert.meal_plan_id},
+        )
+
+    def create_manual_reminder(self, user_id: str, message: str) -> Notification:
+        """Doctor-initiated adherence reminder (contract §10)."""
+        body = message.strip() or "Bác sĩ nhắc bạn tuân thủ thực đơn hôm nay."
+        return self._add(
+            user_id=user_id,
+            type="manual_reminder",
+            title="Nhắc nhở tuân thủ từ bác sĩ",
+            body=body,
+            scheduled_at=datetime.now(),
+            status="sent",
+            related_ids={},
+            payload={"from_doctor": True},
         )
 
     def mark(
@@ -135,6 +190,7 @@ class NotificationService:
         scheduled_at: datetime | None,
         related_ids: dict,
         status: str = "pending",
+        payload: dict | None = None,
     ) -> Notification:
         row = Notification(
             user_id=user_id,
@@ -144,6 +200,7 @@ class NotificationService:
             scheduled_at=scheduled_at,
             status=status,
             related_ids=related_ids,
+            payload=payload or {},
         )
         self.db.add(row)
         return row

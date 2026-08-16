@@ -4,7 +4,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueueStore, GenerationJob } from "@/lib/queue-store";
+import { useQueueStore } from "@/lib/queue-store";
 import { MOCK_PATIENTS } from "@/lib/mock-data";
 
 export function QueueDrawer() {
@@ -142,6 +142,28 @@ export function QueueDrawer() {
                   </div>
 
                   {/* Actions / Errors per Job */}
+                  {(job.status === "queued" || job.status === "processing") && (
+                    <div className="mt-xs pt-xs border-t border-outline-variant/60 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-on-surface-variant">
+                        {job.progress ?? 0}%
+                      </span>
+                      <button
+                        onClick={() => {
+                          closeDrawer();
+                          router.push(
+                            `/doctor/patients/queue/${encodeURIComponent(job.id)}`
+                          );
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-primary text-on-primary hover:opacity-90 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          account_tree
+                        </span>
+                        <span>Xem quy trình</span>
+                      </button>
+                    </div>
+                  )}
+
                   {job.status === "completed" && (
                     <div className="mt-xs pt-xs border-t border-outline-variant/60 flex items-center justify-between">
                       <span className="text-xs font-semibold text-emerald-800">

@@ -7,12 +7,14 @@ import {
   type CatalogOut,
   type DoctorPatientSummary,
   type DoctorPatientUpdate,
+  type FoodCatalogOut,
   type GoalsOut,
   type GenerateMealPlanRequest,
   type MealPlanOutput,
   type NotificationOut,
   type PatientMetrics,
   type PatientProfile,
+  type PatientComplianceOut,
   type PlanExpiryDemoOut,
   type ProfileUpsert,
   type RegisterResponse,
@@ -198,6 +200,33 @@ export const api = {
     return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}`);
   },
 
+  getPatientCompliance(
+    patientId: string,
+    days = 14
+  ): Promise<PatientComplianceOut> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(id)}/compliance?days=${days}`
+    );
+  },
+
+  remindPatientCompliance(
+    patientId: string,
+    message: string
+  ): Promise<NotificationOut> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(id)}/compliance/remind`,
+      { method: "POST", body: { message } }
+    );
+  },
+
   updatePatientMetrics(
     patientId: string,
     payload: { weight: number; height: number }
@@ -227,6 +256,14 @@ export const api = {
 
   getCatalog(): Promise<CatalogOut> {
     return request("/api/v1/doctor/catalog");
+  },
+
+  searchFoods(params?: { q?: string; limit?: number }): Promise<FoodCatalogOut> {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    const qs = search.toString() ? `?${search}` : "";
+    return request(`/api/v1/doctor/foods${qs}`);
   },
 
   async uploadPatientAvatar(

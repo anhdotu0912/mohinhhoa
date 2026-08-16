@@ -34,13 +34,13 @@ Backend được xây dựng bằng Python và FastAPI.
    pip install -r requirements.txt
    ```
 
-4. **Cấu hình LLM (tùy chọn) trong `backend/.env`:**
+4. **Cấu hình LLM (tùy chọn) trong `.env` ở root repo** (hoặc `backend/.env`):
    ```bash
    LLM_PROVIDER=deepseek
    LLM_MODEL=deepseek-chat
    DEEPSEEK_API_KEY=sk-...
    ```
-   Thiếu key → gen thực đơn vẫn chạy (xoay vòng catalog, không gọi LLM).
+   File `.env` của project **ghi đè** biến môi trường Windows cùng tên. Thiếu key → gen thực đơn vẫn chạy (xoay vòng catalog, không gọi LLM).
    OpenAI: `LLM_PROVIDER=openai`, `LLM_MODEL=gpt-4o-mini`, `OPENAI_API_KEY=sk-...`
 
 5. **Khởi chạy server FastAPI:**

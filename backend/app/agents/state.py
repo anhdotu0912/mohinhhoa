@@ -27,6 +27,7 @@ class AgentState(TypedDict, total=False):
 
     # Profile
     profile: dict  # PatientProfile as dict
+    db: object | None  # SQLAlchemy Session (internal, set by run_agent from POST /chat)
 
     # Classification
     intent: str  # meal_plan | interaction_check | food_log | rag_qa | refuse | unknown

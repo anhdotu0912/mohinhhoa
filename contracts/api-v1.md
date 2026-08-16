@@ -110,7 +110,7 @@ Chưa tồn tại as-built — patient tự set `restrictions`/`target_kcal` qua
 ## 4. Meal Plans
 
 ### `POST /meal-plans/generate`
-**Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`.
+**Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`. **Không** materialize `meal_reminder`/`adherence_checkin` tại thời điểm này — các nhắc nhở chỉ được tạo khi doctor `approve` (xem §9 side-effect `approve`).
 ```json
 // Request (optional body)
 { "notes": "Bệnh nhân thích ăn cá", "priorities": ["giảm natri"] }
@@ -118,7 +118,7 @@ Chưa tồn tại as-built — patient tự set `restrictions`/`target_kcal` qua
 ```
 
 ### `GET /meal-plans/me`
-**Role:** `patient`. Trả plan mới nhất (`ORDER BY created_at DESC LIMIT 1`).
+**Role:** `patient`. Trả plan mới nhất (`ORDER BY created_at DESC LIMIT 1`). Side-effect (lazy, idempotent): nếu plan mới nhất có `status` ∈ `{approved, edited}` và `plan_expiry.bucket()` trả `"expiring"` hoặc `"expired"`, BE tạo **một lần** `Notification(type="plan_expiring"|"plan_expired", status="sent")` gắn `related_ids.meal_plan_id` nếu chưa tồn tại bản ghi cùng type cho plan đó.
 ```json
 // Response 200 → MealPlanOutput
 // Error 404
@@ -191,6 +191,8 @@ GET /alerts?patient_id=user_uuid (doctor)
 
 ### `GET /notifications`
 **Role:** `patient` **chỉ** (doctor hiện chưa gọi được endpoint này — gap, xem §9 Doctor Compliance).
+
+**Plan expiry notifications (lazy):** `plan_expiring` / `plan_expired` được materialize idempotent khi patient gọi `GET /meal-plans/me` và plan đang có hiệu lực (`status` ∈ `{approved, edited}`) với bucket tương ứng — không dùng cron; gọi lại nhiều lần không tạo trùng lặp cho cùng `meal_plan_id` + type.
 ```
 GET /notifications?status=pending&type=meal_reminder
 ```
@@ -285,6 +287,27 @@ GET /notifications?status=pending&type=meal_reminder
 { "medicines": [{"id": "med_uuid", "name": "Metformin 500mg"}], "allergies": [{"id": "alg_uuid", "name": "Hải sản"}], "diagnoses": [{"code": "diabetes_t2", "name": "Tiểu đường type 2"}] }
 ```
 
+### `GET /doctor/foods`
+**Role:** `doctor`. Tra cứu món / thành phần dinh dưỡng từ catalog DB (`recipes` + `food_compositions`, fallback JSON demo nếu DB trống) — dùng cho UI «Thêm món» khi bác sĩ chỉnh thực đơn.
+```json
+// Query: q (optional, tìm theo tên), limit (default 40, max 100)
+// Response 200
+{
+  "items": [
+    {
+      "id": "rcp_001",
+      "name": "Ức gà hấp gừng sả",
+      "portion": "1 phần theo công thức",
+      "kcal": 160,
+      "macros": { "carb_g": 1, "protein_g": 26, "fat_g": 5, "sodium_mg": 70 },
+      "category": "thit",
+      "source": "db"
+    }
+  ],
+  "total": 1
+}
+```
+
 ### `POST /doctor/patients/{patient_id}/avatar`
 **Role:** `doctor`. Multipart form upload (`file`), ảnh ≤ 2MB, mime `image/*`.
 ```json
@@ -320,7 +343,7 @@ GET /notifications?status=pending&type=meal_reminder
 // Error 409 [Planned] (plan không còn ở pending_review) { "code": "PLAN_ALREADY_REVIEWED", "detail": "Thực đơn này đã được xử lý (status hiện tại: approved). Tải lại danh sách để xem trạng thái mới nhất." }
 ```
 **Side-effect theo action (as-built chính xác):**
-- `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")`.
+- `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")` **và** materialize trước các `meal_reminder`/`adherence_checkin` theo `SLOT_TIMES` cho 7 ngày kể từ ngày duyệt (`reviewed_at`).
 - `reject`: `status="rejected"` (không set `trust_badge`) → cancel (set `status="cancelled"`) các `Notification` **đang `pending`** có `related_ids.meal_plan_id` khớp plan này (không đụng notification `sent/read/done`, không đụng plan khác).
 - `edit`: `status="edited"`, `trust_badge="doctor_reviewed"` → **không** tạo/cancel notification nào.
 
@@ -338,30 +361,43 @@ GET /notifications?status=pending&type=meal_reminder
 
 ---
 
-## 10. Doctor Compliance `[Planned]`
+## 10. Doctor Compliance
 
-Chưa tồn tại as-built. Doctor hiện chỉ có thể xem gián tiếp qua `GET /alerts?patient_id=` (raw alert list) hoặc `plan_pending`/`alert_count` trong `DoctorPatientSummary` — chưa có tổng hợp adherence riêng. Thiết kế đề xuất theo `adrs/008-compliance-summary-aggregation-strategy.md` (on-the-fly, không bảng riêng), xem `specs/10-doctor-compliance-view.md`.
+On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `{Nguy hiểm, Cần chú ý}`), không bảng tổng hợp riêng — xem `adrs/008-compliance-summary-aggregation-strategy.md`, `specs/10-doctor-compliance-view.md`.
 
-### `GET /doctor/patients/{patient_id}/compliance` `[Planned]`
-**Role:** `doctor`. Query optional `days` (default 14, khớp UI mock hiện có).
+### `GET /doctor/patients/{patient_id}/compliance`
+**Role:** `doctor`. Query optional `days` (default 14, max 90).
 ```json
-// Response 200 (đề xuất)
+// Response 200
 {
   "patient_id": "user_uuid",
-  "daily_series": [ { "date": "2026-08-01", "adherence_pct": 100 }, { "date": "2026-08-02", "adherence_pct": 50 } ],
-  "events": [ { "type": "alert", "severity": "Nguy hiểm", "title": "Tương tác warfarin × rau muống", "at": "2026-08-02T12:30:00" } ]
+  "days": 14,
+  "low_threshold_pct": 50,
+  "overall_adherence_pct": 75,
+  "checkins_done": 10,
+  "checkins_as_planned": 7,
+  "daily_series": [
+    { "date": "2026-08-01", "adherence_pct": 100 },
+    { "date": "2026-08-02", "adherence_pct": null }
+  ],
+  "events": [
+    { "type": "alert", "severity": "Nguy hiểm", "title": "Tương tác warfarin × rau muống", "at": "2026-08-02T12:30:00" }
+  ]
 }
 ```
+- `overall_adherence_pct`: trung bình các ngày có `adherence_pct` không null; `null` nếu chưa có check-in `done`.
+- `checkins_done` / `checkins_as_planned`: đếm check-in `adherence_checkin` status `done` trong cửa sổ (`yes` = đúng kế hoạch).
+- Ngày không có check-in `done`: `adherence_pct: null` (không tính vào trung bình).
 
-### `POST /doctor/patients/{patient_id}/compliance/remind` `[Planned]`
-**Role:** `doctor`. Gửi nhắc nhở tuân thủ thủ công tới patient. **Quyết định 2026-08-15:** tạo `Notification` với **type mới `"manual_reminder"`** (không dùng lại `adherence_checkin`/`meal_reminder` — cần phân biệt rõ đây là nhắc nhở chủ động từ doctor, khác nhắc tự động theo lịch).
+### `POST /doctor/patients/{patient_id}/compliance/remind`
+**Role:** `doctor`. Gửi nhắc nhở tuân thủ thủ công tới patient — tạo `Notification(type="manual_reminder", status="sent")`.
 ```json
 // Request
 { "message": "Bác sĩ nhắc bạn ghi nhận bữa tối hôm nay nhé." }
 // Response 200 → NotificationOut (type="manual_reminder", status="sent")
 ```
 
-**Ngưỡng "tuân thủ thấp" (quyết định 2026-08-15):** giá trị số cụ thể vẫn là **quyết định lâm sàng/sản phẩm** (chưa chốt số trong tài liệu này) — nhưng thiết kế kỹ thuật đã chốt: ngưỡng phải là **1 giá trị cấu hình được** (ví dụ `COMPLIANCE_LOW_THRESHOLD_PCT` trong `backend/app/core/config.py`, default đề xuất `50`), không hard-code trong logic, để team lâm sàng/sản phẩm chỉnh được mà không cần đổi code.
+**Ngưỡng "tuân thủ thấp":** cấu hình `COMPLIANCE_LOW_THRESHOLD_PCT` trong `backend/app/core/config.py` (default `50`).
 
 ---
 
@@ -425,7 +461,7 @@ Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeh
 | `User.role` | `patient` \| `doctor` | `models/user.py`, `schemas/auth.py::RegisterRequest.role` |
 | `MealPlan.status` | `pending_review` \| `approved` \| `rejected` \| `edited` | `models/meal_plan.py`, set qua `meal_planner_agent`/`routes_doctor.review_meal_plan` |
 | `Alert.severity` / `InteractionItem.severity` | `Nguy hiểm` \| `Cần chú ý` \| `An toàn` | `data/drug_food_interactions.json`, `services/meal_plan_demo.py` |
-| `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `interaction_followup` \| `manual_reminder` `[Planned]` | `services/notification.py` |
+| `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `plan_expiring` \| `plan_expired` \| `interaction_followup` \| `manual_reminder` | `services/notification.py` |
 | `Notification.status` | `pending` \| `sent` \| `read` \| `dismissed` \| `done` \| `cancelled` | `services/notification.py`, `models/notification.py` |
 | `NotificationActionRequest.adherence` | `yes` \| `partial` \| `no` | `schemas/notification.py` |
 | `ReviewRequest.action` | `approve` \| `reject` \| `edit` | `schemas/doctor.py` |
@@ -455,6 +491,7 @@ Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeh
   8. `POST /food-log` đổi `slot` sang 3-giá-trị `morning|noon|evening` `[Planned]`.
   9. `PUT /doctor/patients/{id}/metrics` thêm validation bắt buộc gửi đủ `weight`+`height` `[Planned]`.
   10. `POST /notifications/demo/simulate` — ghi nhận cần sửa lại cho idempotent hơn `[Planned fix]`.
+  11. Thêm `GET /doctor/foods` — tra cứu món từ nutrition catalog DB cho UI chỉnh thực đơn.
   - Toàn bộ đều optional/không breaking với client hiện tại → minor bump (1.0 → 1.1).
 - Mọi thay đổi endpoint/response phải bump version + note lý do, đồng bộ với `contracts/agent-io-schema.md` khi field Agent bị ảnh hưởng.
 - Luật cứng: sửa contract trước, code sau.
