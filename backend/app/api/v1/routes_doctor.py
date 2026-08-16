@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, File, UploadFile
@@ -32,6 +32,7 @@ from app.schemas.doctor import (
     FoodCatalogOut,
     GoalsOut,
     GoalsUpdate,
+    MealPlanScheduleOut,
     MetricsUpdateRequest,
     PatientComplianceOut,
     PatientMetricsOut,
@@ -40,12 +41,19 @@ from app.schemas.doctor import (
     ReviewRequest,
     ReviewResponse,
 )
-from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
+from app.schemas.meal_plan import ApplyMealPlanRequest, GenerateMealPlanRequest, MealPlanOutput
 from app.schemas.notification import NotificationOut
 from app.services import plan_expiry
 from app.services.compliance import ComplianceService
 from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
 from app.services.notification import NotificationService
+from app.services.plan_apply import (
+    apply_meal_plan,
+    find_active_plan,
+    find_upcoming_plan,
+    patient_plan_usage,
+)
+from app.services.plan_schedule import build_meal_plan_schedule, validate_slot_start
 
 router = APIRouter(prefix="/doctor", tags=["doctor"])
 
@@ -174,24 +182,54 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
     elif user.created_at:
         last_src = user.created_at
 
-    # Hạn thực đơn: tính khi plan đã duyệt (approved hoặc edited)
+    # Hạn / usage: ưu tiên plan đang active, không thì upcoming, không thì latest đã apply
+    active_plan = find_active_plan(db, user.id)
+    if active_plan is None:
+        active_plan = find_upcoming_plan(db, user.id)
+
+    display_plan = active_plan or latest_plan
     plan_end_date = None
     plan_days_left = None
     plan_expiry_bucket: str = "none"
+    plan_starts_on = None
+    active_plan_id = None
+    active_plan_status = None
+
+    if active_plan is not None:
+        active_plan_id = active_plan.id
+        active_plan_status = active_plan.status
+
+    usage = patient_plan_usage(db, user.id)
+
     if (
-        latest_plan is not None
-        and latest_plan.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES
+        display_plan is not None
+        and display_plan.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES
+        and display_plan.starts_on is not None
     ):
-        plan_days = len(latest_plan.days or [])
+        plan_days = len(display_plan.days or [])
         end = plan_expiry.end_date(
-            latest_plan.reviewed_at, latest_plan.created_at, plan_days
+            display_plan.reviewed_at,
+            display_plan.created_at,
+            plan_days,
+            starts_on=display_plan.starts_on,
+            ends_on=display_plan.ends_on,
         )
+        start = display_plan.starts_on
+        plan_starts_on = start.strftime("%d/%m/%Y") if start else None
         plan_end_date = end.strftime("%d/%m/%Y") if end else None
         plan_days_left = plan_expiry.days_left(
-            latest_plan.reviewed_at, latest_plan.created_at, plan_days
+            display_plan.reviewed_at,
+            display_plan.created_at,
+            plan_days,
+            starts_on=display_plan.starts_on,
+            ends_on=display_plan.ends_on,
         )
         plan_expiry_bucket = plan_expiry.bucket(
-            latest_plan.reviewed_at, latest_plan.created_at, plan_days
+            display_plan.reviewed_at,
+            display_plan.created_at,
+            plan_days,
+            starts_on=display_plan.starts_on,
+            ends_on=display_plan.ends_on,
         )
 
     return DoctorPatientSummary(
@@ -213,6 +251,9 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         status_key=status_key,  # type: ignore[arg-type]
         latest_plan_id=latest_plan.id if latest_plan else None,
         latest_plan_status=latest_plan.status if latest_plan else None,
+        active_plan_id=active_plan_id,
+        active_plan_status=active_plan_status,
+        plan_starts_on=plan_starts_on,
         plan_pending=plan_pending,
         plan_total=plan_total,
         alert_count=len(alerts),
@@ -228,6 +269,7 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         plan_end_date=plan_end_date,
         plan_days_left=plan_days_left,
         plan_expiry=plan_expiry_bucket,
+        plan_usage=usage,  # type: ignore[arg-type]
     )
 
 
@@ -235,6 +277,7 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
 def list_patients(
     q: str | None = None,
     status: str | None = None,
+    plan_usage: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[DoctorPatientSummary]:
@@ -261,6 +304,9 @@ def list_patients(
 
     if status and status != "all":
         rows = [r for r in rows if r.status_key == status]
+
+    if plan_usage and plan_usage != "all":
+        rows = [r for r in rows if r.plan_usage == plan_usage]
 
     return rows
 
@@ -594,6 +640,44 @@ def list_meal_plans(
     return [meal_plan_from_row(row) for row in rows]
 
 
+@router.get(
+    "/patients/{patient_id}/meal-plans",
+    response_model=list[MealPlanOutput],
+)
+def list_patient_meal_plans(
+    patient_id: str,
+    status: str = "all",
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> list[MealPlanOutput]:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    query = db.query(MealPlan).filter(MealPlan.user_id == patient_id)
+    if status != "all":
+        query = query.filter(MealPlan.status == status)
+    rows = query.order_by(MealPlan.created_at.desc()).all()
+    return [meal_plan_from_row(row) for row in rows]
+
+
+@router.get(
+    "/patients/{patient_id}/meal-plan-schedule",
+    response_model=MealPlanScheduleOut,
+)
+def get_patient_meal_plan_schedule(
+    patient_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> MealPlanScheduleOut:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    data = build_meal_plan_schedule(db, patient_id)
+    return MealPlanScheduleOut(**data)
+
+
 @router.post("/meal-plans/{meal_plan_id}/review", response_model=ReviewResponse)
 def review_meal_plan(
     meal_plan_id: str,
@@ -634,6 +718,7 @@ def review_meal_plan(
         row.reviewer_id = user.id
         row.review_notes = payload.notes
         row.reviewed_at = now
+        NotificationService(db).on_plan_approved(meal_plan_from_row(row))
 
     db.commit()
     db.refresh(row)
@@ -644,6 +729,35 @@ def review_meal_plan(
         reviewed_at=row.reviewed_at.isoformat() if row.reviewed_at else "",
         reviewer_id=row.reviewer_id or "",
     )
+
+
+@router.post("/meal-plans/{meal_plan_id}/apply", response_model=MealPlanOutput)
+def apply_plan_validity(
+    meal_plan_id: str,
+    payload: ApplyMealPlanRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> MealPlanOutput:
+    del user
+    row = db.get(MealPlan, meal_plan_id)
+    if row is None:
+        raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+    validate_slot_start(
+        db,
+        row.user_id,
+        payload.start_date,
+        payload.slot_key,
+        replace_active=payload.replace_active,
+    )
+    result = apply_meal_plan(
+        db,
+        row,
+        payload.start_date,
+        replace_active=payload.replace_active,
+    )
+    db.commit()
+    db.refresh(row)
+    return result
 
 
 @router.post("/demo/plan-expiry", response_model=PlanExpiryDemoOut)
@@ -665,31 +779,38 @@ def simulate_plan_expiry(
             "Endpoint demo không khả dụng ở production.",
         )
     mode = payload.mode if payload else "expired"
-    now = datetime.now(UTC)
     updated: list[str] = []
     skipped: list[str] = []
+    today = date.today()
 
     patients = db.query(User).filter(User.role == "patient").all()
     for patient in patients:
-        plan = (
-            db.query(MealPlan)
-            .filter(
-                MealPlan.user_id == patient.id,
-                MealPlan.status == "approved",
-            )
-            .order_by(MealPlan.created_at.desc())
-            .first()
-        )
+        plan = find_active_plan(db, patient.id, today)
         if plan is None:
-            skipped.append(patient.id)
-            continue
+            plan = (
+                db.query(MealPlan)
+                .filter(
+                    MealPlan.user_id == patient.id,
+                    MealPlan.status.in_(plan_expiry.EXPIRY_ELIGIBLE_STATUSES),
+                )
+                .order_by(MealPlan.created_at.desc())
+                .first()
+            )
+        if plan is None or plan.starts_on is None:
+            if plan is not None and plan.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES:
+                duration = plan_expiry.duration_days(len(plan.days or []))
+                plan.starts_on = today
+                plan.ends_on = today + timedelta(days=duration - 1)
+            else:
+                skipped.append(patient.id)
+                continue
         duration = plan_expiry.duration_days(len(plan.days or []))
         if mode == "expiring":
-            # reviewed_at = hôm nay − (duration − 2) → kết thúc = hôm nay + 1 → còn 1 ngày
-            plan.reviewed_at = now - timedelta(days=max(1, duration - 2))
+            plan.starts_on = today - timedelta(days=max(1, duration - 2))
+            plan.ends_on = today + timedelta(days=1)
         else:
-            # reviewed_at = hôm nay − duration → kết thúc = hôm nay − 1 → đã hết hạn
-            plan.reviewed_at = now - timedelta(days=duration)
+            plan.starts_on = today - timedelta(days=duration)
+            plan.ends_on = today - timedelta(days=1)
         updated.append(patient.id)
 
     db.commit()

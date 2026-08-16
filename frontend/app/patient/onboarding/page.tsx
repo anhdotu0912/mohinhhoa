@@ -44,39 +44,28 @@ export default function PatientOnboardingPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1
-  const [age, setAge] = useState("45");
-  const [gender, setGender] = useState("Nam");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [weight, setWeight] = useState("68");
-  const [height, setHeight] = useState("168");
-  const [bloodPressure, setBloodPressure] = useState("130/80");
-  const [bloodGlucose, setBloodGlucose] = useState("135");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [bloodPressure, setBloodPressure] = useState("");
+  const [bloodGlucose, setBloodGlucose] = useState("");
 
   // Step 2
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([
-    "Tiểu đường type 2",
-    "Tăng huyết áp",
-  ]);
-  const [allergies, setAllergies] = useState<string[]>(["Hải sản"]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [allergies, setAllergies] = useState<string[]>([]);
   const [allergySearch, setAllergySearch] = useState("");
-  const [medications, setMedications] = useState<string[]>([
-    "Metformin 500mg",
-    "Amlodipine 5mg",
-  ]);
+  const [medications, setMedications] = useState<string[]>([]);
   const [medSearch, setMedSearch] = useState("");
   const [catalog, setCatalog] = useState<CatalogOut | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Step 3
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([
-    TREATMENT_GOAL_OPTIONS[0],
-    TREATMENT_GOAL_OPTIONS[1],
-  ]);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [customGoalInput, setCustomGoalInput] = useState("");
-  const [preferencesText, setPreferencesText] = useState(
-    "thích ăn cơm, không ăn thịt bò"
-  );
+  const [preferencesText, setPreferencesText] = useState("");
   const [targetKcalInput, setTargetKcalInput] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -421,6 +410,7 @@ export default function PatientOnboardingPage() {
                     onChange={(e) => setAge(e.target.value)}
                     min={1}
                     max={130}
+                    placeholder="Ví dụ: 45"
                     className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -433,6 +423,9 @@ export default function PatientOnboardingPage() {
                     onChange={(e) => setGender(e.target.value)}
                     className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
                   >
+                    <option value="" disabled>
+                      Chọn giới tính
+                    </option>
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                     <option value="Khác">Khác</option>
@@ -475,6 +468,7 @@ export default function PatientOnboardingPage() {
                     type="number"
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
+                    placeholder="Ví dụ: 68"
                     className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -486,6 +480,7 @@ export default function PatientOnboardingPage() {
                     type="number"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
+                    placeholder="Ví dụ: 168"
                     className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>

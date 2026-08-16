@@ -9,6 +9,10 @@ import Pagination, { getPageItems } from "@/components/shared/Pagination";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
+import {
+  patientUsageLabel,
+  patientUsageStatus,
+} from "@/lib/plan-expiry";
 import { ApiError, type CatalogItem, type CatalogOut } from "@/lib/types";
 
 const ADD_STEP_LABELS = [
@@ -19,6 +23,8 @@ const ADD_STEP_LABELS = [
 ];
 
 const PAGE_SIZE = 10;
+
+type UsageTab = "all" | "none" | "active" | "finished";
 
 function truncateId(id: string): string {
   return id.length > 6 ? `...${id.slice(-4)}` : id;
@@ -44,6 +50,7 @@ export default function PatientsListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [diagnosisFilter, setDiagnosisFilter] = useState<string>("all");
+  const [usageTab, setUsageTab] = useState<UsageTab>("all");
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -129,9 +136,38 @@ export default function PatientsListPage() {
         patient.condition.toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
-      if (diagnosisFilter === "all") return true;
-      return (patient.disease ?? []).includes(diagnosisFilter);
+      if (diagnosisFilter !== "all" && !(patient.disease ?? []).includes(diagnosisFilter)) {
+        return false;
+      }
+      const usage = patientUsageStatus(patient);
+      if (usageTab === "none" && usage !== "none") return false;
+      if (usageTab === "active" && usage !== "active") return false;
+      if (usageTab === "finished" && usage !== "finished") return false;
+      return true;
     });
+  }, [patients, searchQuery, diagnosisFilter, usageTab]);
+
+  const usageTabCounts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const base = patients.filter((patient) => {
+      const matchesSearch =
+        !q ||
+        patient.name.toLowerCase().includes(q) ||
+        patient.id.toLowerCase().includes(q) ||
+        (patient.email || "").toLowerCase().includes(q) ||
+        patient.condition.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (diagnosisFilter !== "all" && !(patient.disease ?? []).includes(diagnosisFilter)) {
+        return false;
+      }
+      return true;
+    });
+    return {
+      all: base.length,
+      none: base.filter((p) => patientUsageStatus(p) === "none").length,
+      active: base.filter((p) => patientUsageStatus(p) === "active").length,
+      finished: base.filter((p) => patientUsageStatus(p) === "finished").length,
+    };
   }, [patients, searchQuery, diagnosisFilter]);
 
   /** Các nhóm chẩn đoán (kèm số BN) để lọc — lấy từ dữ liệu bệnh nhân thật. */
@@ -154,7 +190,7 @@ export default function PatientsListPage() {
   // Về trang 1 khi đổi tab lọc / từ khóa tìm kiếm
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, diagnosisFilter]);
+  }, [searchQuery, diagnosisFilter, usageTab]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -503,6 +539,30 @@ export default function PatientsListPage() {
           ))}
         </div>
 
+        <div className="flex items-center gap-sm border-b border-outline-variant mb-md pb-xs overflow-x-auto">
+          {(
+            [
+              ["all", "Tất cả", usageTabCounts.all],
+              ["none", "Chưa áp dụng", usageTabCounts.none],
+              ["active", "Đang sử dụng", usageTabCounts.active],
+              ["finished", "Đã hoàn thành", usageTabCounts.finished],
+            ] as const
+          ).map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setUsageTab(key)}
+              className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                usageTab === key
+                  ? "border-primary text-primary font-bold"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
           {loading ? (
             <div className="p-xl text-center text-on-surface-variant text-sm">
@@ -541,6 +601,9 @@ export default function PatientsListPage() {
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
                       Thực đơn
+                    </th>
+                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                      Trạng thái TD
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
                       Cập nhật
@@ -615,6 +678,19 @@ export default function PatientsListPage() {
                               <span className="text-on-surface-variant">/ {planTotal}</span>
                             </span>
                           )}
+                        </td>
+                        <td className="p-md text-xs">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              patientUsageStatus(patient) === "active"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : patientUsageStatus(patient) === "finished"
+                                  ? "bg-surface-container-high text-on-surface-variant border-outline-variant"
+                                  : "bg-surface-container-low text-on-surface-variant border-outline-variant"
+                            }`}
+                          >
+                            {patientUsageLabel(patientUsageStatus(patient))}
+                          </span>
                         </td>
                         <td className="p-md text-on-surface-variant text-xs">
                           {patient.lastUpdate}

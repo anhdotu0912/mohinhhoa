@@ -16,6 +16,14 @@ export interface RegisterResponse {
   full_name?: string | null;
 }
 
+export interface UserMeResponse {
+  id: string;
+  email: string;
+  role: UserRole;
+  full_name?: string | null;
+  avatar?: string | null;
+}
+
 export interface Restrictions {
   carb_per_meal?: number | null;
   sodium_daily?: number | null;
@@ -86,6 +94,12 @@ export interface GenerateMealPlanRequest {
   priorities?: string[];
 }
 
+export interface ApplyMealPlanRequest {
+  start_date: string;
+  replace_active?: boolean;
+  slot_key?: "current" | "next" | "empty";
+}
+
 export interface Meal {
   slot: string;
   items: FoodItem[];
@@ -133,6 +147,8 @@ export interface MealPlanOutput {
   citations: string[];
   status: MealPlanStatus | string;
   trust_badge?: string | null;
+  starts_on?: string | null;
+  ends_on?: string | null;
   created_at?: string | null;
 }
 
@@ -232,6 +248,9 @@ export interface DoctorPatientSummary {
   status_key: DoctorPatientStatusKey;
   latest_plan_id?: string | null;
   latest_plan_status?: string | null;
+  active_plan_id?: string | null;
+  active_plan_status?: string | null;
+  plan_starts_on?: string | null;
   plan_pending: number;
   plan_total: number;
   alert_count: number;
@@ -241,11 +260,34 @@ export interface DoctorPatientSummary {
   plan_end_date?: string | null;
   plan_days_left?: number | null;
   plan_expiry?: "expiring" | "expired" | "ok" | "none";
+  plan_usage?: "none" | "active" | "finished";
 }
 
 export interface PlanExpiryDemoOut {
   updated: string[];
   skipped: string[];
+}
+
+export type ScheduleSlotKey = "current" | "next" | "empty";
+export type ScheduleOccupancy = "empty" | "active" | "upcoming" | "past";
+export type ScheduleAction = "add" | "replace" | "view";
+
+export interface MealPlanScheduleSlot {
+  slot_key: ScheduleSlotKey;
+  starts_on: string;
+  ends_on: string;
+  occupancy: ScheduleOccupancy;
+  plan: MealPlanOutput | null;
+  actions: ScheduleAction[];
+}
+
+export interface MealPlanScheduleOut {
+  patient_id: string;
+  today: string;
+  active_plan_id: string | null;
+  active_plan: MealPlanOutput | null;
+  unassigned_plans: MealPlanOutput[];
+  slots: MealPlanScheduleSlot[];
 }
 
 export interface ComplianceDayPoint {

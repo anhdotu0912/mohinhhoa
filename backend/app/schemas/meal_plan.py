@@ -1,5 +1,8 @@
 """Pydantic schemas for MealPlan, Agent I/O — matches contract §1.2, §2."""
 
+from datetime import date
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 # --- Shared types ---
@@ -68,6 +71,13 @@ class GenerateMealPlanRequest(BaseModel):
     priorities: list[str] = Field(default_factory=list)
 
 
+class ApplyMealPlanRequest(BaseModel):
+    """Doctor assigns validity window after HITL approval."""
+    start_date: date
+    replace_active: bool = False
+    slot_key: Literal["current", "next", "empty"] | None = None
+
+
 class MealPlanOutput(BaseModel):
     """Full multi-day meal plan output — contract §1.2."""
     id: str = ""
@@ -80,6 +90,8 @@ class MealPlanOutput(BaseModel):
     swaps: list[Swap] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     status: str = "pending_review"
+    starts_on: str | None = None
+    ends_on: str | None = None
     created_at: str | None = None
 
 

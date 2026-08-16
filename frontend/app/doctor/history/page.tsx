@@ -6,15 +6,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import Pagination, { getPageItems } from "@/components/shared/Pagination";
+import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { doctorPatientToUi, type Patient, MOCK_PATIENTS } from "@/lib/mock-data";
+import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { shortCondition } from "@/lib/format";
+import {
+  matchesValidityTimeFilter,
+  patientUsageLabel,
+  patientUsageStatus,
+  patientValidityRange,
+  type TimeFilterPreset,
+} from "@/lib/plan-expiry";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
-import { useMealLogsStore } from "@/lib/meal-logs-store";
-import { usePlansStore } from "@/lib/plans-store";
 
 const PAGE_SIZE = 10;
+
+type UsageTab = "all" | "none" | "active" | "finished";
 
 function truncateId(id: string): string {
   return id.length > 6 ? `...${id.slice(-4)}` : id;
@@ -33,6 +41,17 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+function usageBadgeClass(status: ReturnType<typeof patientUsageStatus>): string {
+  switch (status) {
+    case "active":
+      return "bg-emerald-50 text-emerald-800 border-emerald-200";
+    case "finished":
+      return "bg-surface-container-high text-on-surface-variant border-outline-variant";
+    default:
+      return "bg-surface-container-low text-on-surface-variant border-outline-variant";
+  }
+}
+
 export default function DoctorHistoryIndexPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -45,11 +64,11 @@ export default function DoctorHistoryIndexPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [diagnosisFilter, setDiagnosisFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [usageTab, setUsageTab] = useState<UsageTab>("all");
+  const [timePreset, setTimePreset] = useState<TimeFilterPreset>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
-
-  const { logs } = useMealLogsStore();
-  const { plans } = usePlansStore();
 
   useEffect(() => {
     setHydrated(true);
@@ -61,13 +80,9 @@ export default function DoctorHistoryIndexPage() {
     setLoadError(null);
     try {
       const rows = await api.listDoctorPatients();
-      if (rows && rows.length > 0) {
-        setPatients(rows.map(toUiPatient));
-      } else {
-        setPatients(MOCK_PATIENTS);
-      }
+      setPatients(rows.map(toUiPatient));
     } catch (err) {
-      setPatients(MOCK_PATIENTS);
+      setPatients([]);
       if (err instanceof ApiError && err.status !== 401) {
         setLoadError(err.message);
       }
@@ -85,7 +100,7 @@ export default function DoctorHistoryIndexPage() {
     void loadPatients();
   }, [hydrated, token, role, router, loadPatients]);
 
-  const filteredPatients = useMemo(() => {
+  const searchFiltered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return patients.filter((patient) => {
       const matchesSearch =
@@ -97,36 +112,53 @@ export default function DoctorHistoryIndexPage() {
       if (!matchesSearch) return false;
 
       if (diagnosisFilter !== "all") {
-        if (!(patient.condition || "").toLowerCase().includes(diagnosisFilter.toLowerCase())) {
+        if (
+          !(patient.condition || "")
+            .toLowerCase()
+            .includes(diagnosisFilter.toLowerCase())
+        ) {
           return false;
         }
       }
 
-      if (statusFilter !== "all") {
-        if (statusFilter === "attention" && patient.status !== "Cần chú ý") return false;
-        if (statusFilter === "warning" && patient.status !== "Cảnh báo") return false;
-        if (statusFilter === "stable" && patient.status !== "Ổn định") return false;
+      return true;
+    });
+  }, [patients, searchQuery, diagnosisFilter]);
+
+  const tabCounts = useMemo(() => {
+    const active = searchFiltered.filter((p) => patientUsageStatus(p) === "active").length;
+    const finished = searchFiltered.filter(
+      (p) => patientUsageStatus(p) === "finished"
+    ).length;
+    const none = searchFiltered.filter((p) => patientUsageStatus(p) === "none").length;
+    return { all: searchFiltered.length, none, active, finished };
+  }, [searchFiltered]);
+
+  const filteredPatients = useMemo(() => {
+    return searchFiltered.filter((patient) => {
+      const usage = patientUsageStatus(patient);
+      if (usageTab === "none" && usage !== "none") return false;
+      if (usageTab === "active" && usage !== "active") return false;
+      if (usageTab === "finished" && usage !== "finished") return false;
+
+      const range = patientValidityRange(patient);
+      if (
+        !matchesValidityTimeFilter(range, timePreset, startDate, endDate)
+      ) {
+        return false;
       }
 
       return true;
     });
-  }, [patients, searchQuery, diagnosisFilter, statusFilter]);
+  }, [searchFiltered, usageTab, timePreset, startDate, endDate]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, diagnosisFilter, statusFilter]);
+  }, [searchQuery, diagnosisFilter, usageTab, timePreset, startDate, endDate]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedPatients = getPageItems(filteredPatients, safePage, PAGE_SIZE);
-
-  const getPatientPlanCount = (patientId: string) => {
-    return plans.filter((p) => p.patientId === patientId).length || 2;
-  };
-
-  const getPatientLogCount = (patientId: string) => {
-    return logs.filter((l) => l.patientId === patientId).length || 14;
-  };
 
   if (!hydrated || !token || role !== "doctor") {
     return null;
@@ -160,19 +192,17 @@ export default function DoctorHistoryIndexPage() {
           </div>
         )}
 
-        {/* Page Title & Subtitle + Toolbar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
           <div>
             <h2 className="font-h1 text-h1 text-on-surface font-bold">
-              Lịch sử ăn uống &amp; thực đơn
+              Lịch sử thực đơn theo tuần
             </h2>
             <p className="font-caption text-caption text-on-surface-variant mt-xs">
-              Tổng hợp lịch sử ghi nhận ăn uống và các thực đơn dinh dưỡng của bệnh nhân theo dòng thời gian
+              Thực đơn đã duyệt theo dòng thời gian và tuân thủ check-in — không phải nhật ký ăn uống chi tiết
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-sm">
-            {/* Search Box */}
             <div className="relative min-w-[240px]">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                 search
@@ -186,7 +216,6 @@ export default function DoctorHistoryIndexPage() {
               />
             </div>
 
-            {/* Diagnosis Filter */}
             <div className="relative min-w-[170px]">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                 filter_alt
@@ -207,70 +236,113 @@ export default function DoctorHistoryIndexPage() {
                 arrow_drop_down
               </span>
             </div>
+
+            <div className="relative min-w-[160px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+                calendar_month
+              </span>
+              <select
+                value={timePreset}
+                onChange={(e) =>
+                  setTimePreset(e.target.value as TimeFilterPreset)
+                }
+                className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+              >
+                <option value="all">Tất cả thời gian</option>
+                <option value="today">Hôm nay</option>
+                <option value="week">Tuần này</option>
+                <option value="month">Tháng này</option>
+                <option value="custom">Chọn khoảng thời gian</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+                arrow_drop_down
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Filter Tabs */}
+        {timePreset === "custom" && (
+          <div className="bg-surface-container-low/80 border border-outline-variant/80 rounded-xl px-md py-sm mb-md flex flex-wrap items-center gap-sm">
+            <span className="text-xs font-semibold text-on-surface flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px] text-primary">
+                date_range
+              </span>
+              Lọc theo khoảng hiệu lực thực đơn:
+            </span>
+            <div className="flex items-center gap-xs">
+              <label className="text-xs text-on-surface-variant">Từ:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex items-center gap-xs">
+              <label className="text-xs text-on-surface-variant">Đến:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="text-xs text-primary font-semibold hover:underline cursor-pointer"
+              >
+                Xóa khoảng
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-sm border-b border-outline-variant mb-lg pb-xs overflow-x-auto">
-          <button
-            onClick={() => setStatusFilter("all")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              statusFilter === "all"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Tất cả ({patients.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter("stable")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              statusFilter === "stable"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Ổn định ({patients.filter((p) => p.status === "Ổn định").length})
-          </button>
-          <button
-            onClick={() => setStatusFilter("attention")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              statusFilter === "attention"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Cần chú ý ({patients.filter((p) => p.status === "Cần chú ý").length})
-          </button>
-          <button
-            onClick={() => setStatusFilter("warning")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              statusFilter === "warning"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Cảnh báo ({patients.filter((p) => p.status === "Cảnh báo").length})
-          </button>
+          {(
+            [
+              ["all", "Tất cả", tabCounts.all],
+              ["none", "Chưa áp dụng", tabCounts.none],
+              ["active", "Đang sử dụng", tabCounts.active],
+              ["finished", "Đã dùng xong", tabCounts.finished],
+            ] as const
+          ).map(([key, label, count]) => (
+            <button
+              key={key}
+              onClick={() => setUsageTab(key)}
+              className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                usageTab === key
+                  ? "border-primary text-primary font-bold"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
         </div>
 
-        {/* History Patients Table */}
         {filteredPatients.length === 0 ? (
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
             <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
               history
             </span>
             <p className="font-body-bold text-body-bold">
-              Không tìm thấy bệnh nhân phù hợp
+              {patients.length === 0
+                ? "Chưa có bệnh nhân"
+                : "Không tìm thấy bệnh nhân phù hợp"}
             </p>
             <p className="font-caption text-caption text-xs mt-xs">
-              Thử thay đổi từ khóa tìm kiếm hoặc chọn lại nhóm trạng thái.
+              Thử thay đổi từ khóa, khoảng thời gian hoặc tab trạng thái thực đơn.
             </p>
           </div>
         ) : (
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[980px]">
+              <table className="w-full text-left border-collapse min-w-[1050px]">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-outline-variant">
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
@@ -280,16 +352,19 @@ export default function DoctorHistoryIndexPage() {
                       Bệnh nhân
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
-                      Chẩn đoán bệnh lý
+                      Chẩn đoán
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center">
                       Thực đơn AI
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center">
-                      Nhật ký bữa ăn
+                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                      Trạng thái
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
-                      Cập nhật gần nhất
+                      Hạn thực đơn
+                    </th>
+                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                      Cập nhật
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-right">
                       Thao tác
@@ -298,15 +373,21 @@ export default function DoctorHistoryIndexPage() {
                 </thead>
                 <tbody className="divide-y divide-outline-variant font-body text-body">
                   {pagedPatients.map((patient) => {
-                    const planCount = getPatientPlanCount(patient.id);
-                    const logCount = getPatientLogCount(patient.id);
+                    const usage = patientUsageStatus(patient);
+                    const expiryFields =
+                      usage !== "none"
+                        ? {
+                            plan_expiry: patient.planExpiry ?? "none",
+                            plan_days_left: patient.planDaysLeft ?? null,
+                            plan_end_date: patient.planEndDate ?? null,
+                          }
+                        : null;
 
                     return (
                       <tr
                         key={patient.id}
                         className="transition-colors hover:bg-surface-bright"
                       >
-                        {/* Mã BN */}
                         <td className="p-md">
                           <span
                             title={patient.id}
@@ -316,35 +397,33 @@ export default function DoctorHistoryIndexPage() {
                           </span>
                         </td>
 
-                        {/* Bệnh nhân Info */}
                         <td className="p-md">
                           <div className="flex items-center gap-sm min-w-0">
                             <div className="relative w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
                               {initials(patient.name)}
-                              {patient.avatar &&
-                                !patient.avatar.startsWith("https://api.dicebear.com") && (
-                                  <img
-                                    src={patient.avatar}
-                                    alt={patient.name}
-                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                    }}
-                                  />
-                                )}
+                              {patient.avatar && (
+                                <img
+                                  src={patient.avatar}
+                                  alt={patient.name}
+                                  className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              )}
                             </div>
                             <div className="min-w-0">
                               <p className="font-body-bold text-on-surface font-semibold text-sm whitespace-nowrap">
                                 {patient.name}
                               </p>
                               <p className="text-xs text-on-surface-variant">
-                                {patient.age ? `${patient.age} tuổi` : "—"} {patient.gender ? `• ${patient.gender}` : ""}
+                                {patient.age ? `${patient.age} tuổi` : "—"}{" "}
+                                {patient.gender ? `• ${patient.gender}` : ""}
                               </p>
                             </div>
                           </div>
                         </td>
 
-                        {/* Chẩn đoán */}
                         <td className="p-md text-on-surface-variant">
                           <span
                             className="bg-tertiary-container/20 text-tertiary px-sm py-xs rounded-full font-caption text-caption border border-tertiary-container/30 text-xs font-medium inline-block max-w-[200px] truncate"
@@ -354,52 +433,53 @@ export default function DoctorHistoryIndexPage() {
                           </span>
                         </td>
 
-                        {/* Thực đơn đã tạo */}
                         <td className="p-md text-center whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200">
                             <span className="material-symbols-outlined text-[14px] text-emerald-600">
                               menu_book
                             </span>
-                            {planCount} thực đơn
+                            {patient.planTotal ?? 0} thực đơn
                           </span>
                         </td>
 
-                        {/* Nhật ký bữa ăn */}
-                        <td className="p-md text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-900 border border-sky-200">
-                            <span className="material-symbols-outlined text-[14px] text-sky-600">
-                              restaurant
-                            </span>
-                            {logCount} nhật ký
+                        <td className="p-md whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${usageBadgeClass(usage)}`}
+                          >
+                            {patientUsageLabel(usage)}
                           </span>
                         </td>
 
-                        {/* Cập nhật gần nhất */}
+                        <td className="p-md whitespace-nowrap">
+                          <PlanExpiryBadge expiry={expiryFields} />
+                        </td>
+
                         <td className="p-md text-on-surface-variant text-xs">
-                          {patient.lastUpdate || "15/10/2023"}
+                          {patient.lastUpdate || "—"}
                         </td>
 
-                        {/* Thao tác */}
                         <td className="p-md text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-xs">
-                            {/* Nút Xem chi tiết */}
                             <Link
                               href={`/doctor/patients/${encodeURIComponent(patient.id)}`}
                               title="Xem hồ sơ bệnh nhân"
                               className="inline-flex items-center gap-1.5 px-md py-1.5 bg-surface-container-lowest border border-outline-variant text-on-surface hover:border-primary hover:text-primary font-body-bold text-xs rounded-lg hover:bg-surface-container-low transition-all cursor-pointer active:scale-95 shadow-xs"
                             >
-                              <span className="material-symbols-outlined text-[16px]">visibility</span>
-                              <span>Xem chi tiết</span>
+                              <span className="material-symbols-outlined text-[16px]">
+                                visibility
+                              </span>
+                              <span>Chi tiết</span>
                             </Link>
 
-                            {/* Nút Xem lịch sử */}
                             <Link
                               href={`/doctor/history/${encodeURIComponent(patient.id)}`}
-                              title="Xem dòng thời gian lịch sử ăn uống & thực đơn"
+                              title="Xem lịch sử thực đơn theo tuần"
                               className="inline-flex items-center gap-1.5 px-md py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs font-semibold"
                             >
-                              <span className="material-symbols-outlined text-[16px]">history</span>
-                              <span>Xem lịch sử</span>
+                              <span className="material-symbols-outlined text-[16px]">
+                                history
+                              </span>
+                              <span>Lịch sử</span>
                             </Link>
                           </div>
                         </td>

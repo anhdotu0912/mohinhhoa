@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_1",
         "email": "demo_patient_1@example.com",
         "role": "patient",
+        "full_name": "Nguyễn Văn A",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["metformin"],
@@ -48,6 +50,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_2",
         "email": "demo_patient_2@example.com",
         "role": "patient",
+        "full_name": "Trần Thị B",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["metformin", "atorvastatin", "amlodipine"],
@@ -75,6 +78,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_3",
         "email": "demo_patient_3@example.com",
         "role": "patient",
+        "full_name": "Lê Văn C",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["glipizide", "lisinopril"],
@@ -98,6 +102,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_doctor",
         "email": "demo_doctor@example.com",
         "role": "doctor",
+        "full_name": "BS. Minh",
         "profile": None,
     },
 ]
@@ -171,13 +176,18 @@ def seed_demo_accounts(db: Session) -> None:
     _migrate_legacy_dietitian(db)
     for account in DEMO_ACCOUNTS:
         user = db.get(User, account["user_id"])
+        full_name = account.get("full_name")
         if user is not None:
             user.role = account["role"]
             user.email = account["email"]
+            if full_name:
+                user.full_name = full_name
         else:
             by_email = db.query(User).filter(User.email == account["email"]).first()
             if by_email is not None:
                 by_email.role = account["role"]
+                if full_name:
+                    by_email.full_name = full_name
                 user = by_email
             else:
                 user = User(
@@ -185,6 +195,7 @@ def seed_demo_accounts(db: Session) -> None:
                     email=account["email"],
                     hashed_password=hash_password(DEMO_PASSWORD),
                     role=account["role"],
+                    full_name=full_name,
                 )
                 db.add(user)
                 db.flush()
@@ -313,6 +324,51 @@ def seed_catalog(db: Session) -> None:
     )
 
 
+def _migrate_add_meal_plan_dates(db: Session) -> None:
+    """Add meal_plans.starts_on/ends_on; one-time backfill only when columns are new."""
+    from sqlalchemy import inspect, text
+
+    from app.models.meal_plan import MealPlan
+    from app.services import plan_expiry
+    from app.services.plan_apply import reconcile_overlapping_applied_plans
+
+    try:
+        columns = [c["name"] for c in inspect(engine).get_columns("meal_plans")]
+    except Exception:
+        return
+    missing = [col for col in ("starts_on", "ends_on") if col not in columns]
+    for col in missing:
+        db.execute(text(f"ALTER TABLE meal_plans ADD COLUMN {col} DATE"))
+    if missing:
+        db.commit()
+        logger.info("Added meal_plans columns: %s", ", ".join(missing))
+        # Legacy approve==apply: stamp windows only the first time columns appear.
+        # Re-running this on every startup would re-apply unassigned approved plans.
+        rows = (
+            db.query(MealPlan)
+            .filter(
+                MealPlan.status.in_(plan_expiry.EXPIRY_ELIGIBLE_STATUSES),
+                MealPlan.starts_on.is_(None),
+            )
+            .all()
+        )
+        for row in rows:
+            duration = plan_expiry.duration_days(len(row.days or []))
+            start = plan_expiry.start_date(row.reviewed_at, row.created_at)
+            if start is None:
+                continue
+            row.starts_on = start
+            row.ends_on = start + timedelta(days=duration - 1)
+        if rows:
+            db.commit()
+            logger.info("Backfilled meal plan dates for %d rows", len(rows))
+
+    n = reconcile_overlapping_applied_plans(db)
+    if n:
+        db.commit()
+        logger.info("Unapplied %d overlapping meal plans (one plan per week)", n)
+
+
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     Base.metadata.create_all(bind=engine)
@@ -322,5 +378,6 @@ def init_db() -> None:
         _migrate_add_body_metrics(db)
         _migrate_add_profile_detail(db)
         _migrate_widen_alert_severity(db)
+        _migrate_add_meal_plan_dates(db)
         seed_demo_accounts(db)
         seed_catalog(db)

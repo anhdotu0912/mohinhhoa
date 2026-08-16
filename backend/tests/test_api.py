@@ -71,6 +71,16 @@ def test_login_wrong_password(client):
     assert response.json()["code"] == "INVALID_CREDENTIALS"
 
 
+def test_auth_me(client):
+    headers = _login(client, DOCTOR)
+    response = client.get("/api/v1/auth/me", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["email"] == DOCTOR
+    assert data["role"] == "doctor"
+    assert data["full_name"] == "BS. Minh"
+
+
 def test_auth_required(client):
     response = client.get("/api/v1/profile/me")
     assert response.status_code == 401

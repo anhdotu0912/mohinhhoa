@@ -91,6 +91,8 @@ def test_doctor_patients_expose_plan_expiry_after_approve(client):
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "approved"
 
+    _apply_plan(client, doctor_headers, plan_id)
+
     rows = client.get("/api/v1/doctor/patients", headers=doctor_headers)
     assert rows.status_code == 200, rows.text
     row = next(x for x in rows.json() if x["id"] == "demo_patient_1")
@@ -113,6 +115,7 @@ def test_doctor_patients_plan_expiry_none_when_pending(client):
     row = next(x for x in rows.json() if x["id"] == "demo_patient_2")
     assert row["latest_plan_status"] == "pending_review"
     assert row["plan_expiry"] == "none"
+    assert row["plan_usage"] == "none"
     assert row["plan_days_left"] is None
     assert row["plan_end_date"] is None
 
@@ -125,6 +128,17 @@ def _approve_latest_plan(client, doctor_headers: dict, plan_id: str):
     )
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "approved"
+
+
+def _apply_plan(client, doctor_headers: dict, plan_id: str):
+    from datetime import date
+
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/apply",
+        headers=doctor_headers,
+        json={"start_date": date.today().isoformat(), "replace_active": True},
+    )
+    assert response.status_code == 200, response.text
 
 
 def _patient_expiry(client, doctor_headers: dict, patient_id: str) -> dict:
@@ -141,6 +155,7 @@ def test_demo_plan_expiry_backdates_reviewed_at(client):
 
     doctor_headers = _login(client, "demo_doctor@example.com")
     _approve_latest_plan(client, doctor_headers, plan_id)
+    _apply_plan(client, doctor_headers, plan_id)
 
     # mode=expired → plan đã hết hạn
     response = client.post(
@@ -199,6 +214,7 @@ def test_get_me_creates_plan_expired_notification(client):
 
     doctor_headers = _login(client, "demo_doctor@example.com")
     _approve_latest_plan(client, doctor_headers, plan_id)
+    _apply_plan(client, doctor_headers, plan_id)
 
     response = client.post(
         "/api/v1/doctor/demo/plan-expiry",
@@ -229,6 +245,7 @@ def test_get_me_plan_expired_notification_is_idempotent(client):
 
     doctor_headers = _login(client, "demo_doctor@example.com")
     _approve_latest_plan(client, doctor_headers, plan_id)
+    _apply_plan(client, doctor_headers, plan_id)
     client.post(
         "/api/v1/doctor/demo/plan-expiry",
         headers=doctor_headers,
@@ -263,6 +280,8 @@ def test_doctor_patients_plan_expiry_for_edited_plan(client):
     )
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "edited"
+
+    _apply_plan(client, doctor_headers, plan_id)
 
     row = _patient_expiry(client, doctor_headers, "demo_patient_1")
     assert row["latest_plan_status"] == "edited"

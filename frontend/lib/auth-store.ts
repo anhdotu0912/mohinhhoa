@@ -10,12 +10,18 @@ export type AuthState = {
   userId: string | null;
   email: string | null;
   displayName: string | null;
+  avatar: string | null;
   setSession: (session: {
     token: string;
     role: UserRole;
     userId: string;
     email: string;
     displayName?: string | null;
+    avatar?: string | null;
+  }) => void;
+  setUserProfile: (profile: {
+    displayName?: string | null;
+    avatar?: string | null;
   }) => void;
   setDisplayName: (name: string) => void;
   logout: () => void;
@@ -30,14 +36,21 @@ export const useAuthStore = create<AuthState>()(
       userId: null,
       email: null,
       displayName: null,
-      setSession: ({ token, role, userId, email, displayName }) =>
+      avatar: null,
+      setSession: ({ token, role, userId, email, displayName, avatar }) =>
         set({
           token,
           role,
           userId,
           email,
           displayName: displayName ?? get().displayName,
+          avatar: avatar ?? get().avatar,
         }),
+      setUserProfile: ({ displayName, avatar }) =>
+        set((state) => ({
+          displayName: displayName !== undefined ? displayName : state.displayName,
+          avatar: avatar !== undefined ? avatar : state.avatar,
+        })),
       setDisplayName: (displayName) => set({ displayName }),
       logout: () =>
         set({
@@ -46,6 +59,7 @@ export const useAuthStore = create<AuthState>()(
           userId: null,
           email: null,
           displayName: null,
+          avatar: null,
         }),
       isAuthenticated: () => Boolean(get().token),
     }),

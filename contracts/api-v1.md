@@ -33,6 +33,14 @@
 { "code": "INVALID_CREDENTIALS", "detail": "Email hoặc mật khẩu không đúng." }
 ```
 
+### `GET /auth/me`
+**Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`).
+```json
+// Response 200
+{ "id": "user_uuid", "email": "demo_doctor@example.com", "role": "doctor", "full_name": "BS. Minh", "avatar": "/static/avatars/demo_doctor.jpg" }
+```
+`full_name` / `avatar` có thể `null`.
+
 ### `POST /auth/forgot-password` `[Planned]`
 **Role:** Không cần auth. **Quyết định 2026-08-15:** cần trước khi mở khảo sát người dùng thật (`CLAUDE.md` Mục 11 — ≥5 responses), không chỉ demo nội bộ với tài khoản cố định.
 ```json
@@ -239,9 +247,46 @@ GET /notifications?status=pending&type=meal_reminder
 ## 8. Doctor Patient Management
 
 ### `GET /doctor/patients`
-**Role:** `doctor`. Query optional: `q` (tìm theo tên/id/email/bệnh lý), `status` (lọc theo `status_key`).
+**Role:** `doctor`. Query optional: `q`, `status` (`status_key`), `plan_usage` (`none` \| `active` \| `finished`).
 ```json
 // Response 200 → list[DoctorPatientSummary]
+// DoctorPatientSummary thêm: active_plan_id, active_plan_status, plan_starts_on, plan_usage
+```
+
+### `GET /doctor/patients/{patient_id}/meal-plans`
+**Role:** `doctor`. Query `status` (default `"all"`).
+```json
+// Response 200 → list[MealPlanOutput] for one patient only
+```
+
+### `GET /doctor/patients/{patient_id}/meal-plan-schedule`
+**Role:** `doctor`. Week schedule slots (ADR-012).
+```json
+// Response 200
+{
+  "patient_id": "demo_patient_1",
+  "today": "2026-08-16",
+  "active_plan_id": "plan_uuid",
+  "active_plan": { /* MealPlanOutput or null */ },
+  "slots": [
+    {
+      "slot_key": "current",
+      "starts_on": "2026-08-16",
+      "ends_on": "2026-08-22",
+      "occupancy": "active",
+      "plan": { /* MealPlanOutput */ },
+      "actions": ["view", "replace"]
+    },
+    {
+      "slot_key": "next",
+      "starts_on": "2026-08-23",
+      "ends_on": "2026-08-29",
+      "occupancy": "empty",
+      "plan": null,
+      "actions": ["add"]
+    }
+  ]
+}
 ```
 
 ### `GET /doctor/patients/{patient_id}`
@@ -344,15 +389,25 @@ GET /notifications?status=pending&type=meal_reminder
 // Error 404 { "code": "MEAL_PLAN_NOT_FOUND", "detail": "Không tìm thấy thực đơn." }
 // Error 409 [Planned] (plan không còn ở pending_review) { "code": "PLAN_ALREADY_REVIEWED", "detail": "Thực đơn này đã được xử lý (status hiện tại: approved). Tải lại danh sách để xem trạng thái mới nhất." }
 ```
-**Side-effect theo action (as-built chính xác):**
-- `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")` **và** materialize trước các `meal_reminder`/`adherence_checkin` theo `SLOT_TIMES` cho 7 ngày kể từ ngày duyệt (`reviewed_at`).
+**Side-effect theo action (as-built, ADR-011):**
+- `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")` only. **Không** materialize `meal_reminder`/`adherence_checkin` — gọi `POST /doctor/meal-plans/{id}/apply` sau khi chọn ngày áp dụng.
 - `reject`: `status="rejected"` (không set `trust_badge`) → cancel (set `status="cancelled"`) các `Notification` **đang `pending`** có `related_ids.meal_plan_id` khớp plan này (không đụng notification `sent/read/done`, không đụng plan khác).
-- `edit`: `status="edited"`, `trust_badge="doctor_reviewed"` → **không** tạo/cancel notification nào.
+- `edit`: `status="edited"`, `trust_badge="doctor_reviewed"` → tạo `plan_approved` notification; reminders khi apply.
 
-**Optimistic lock `[Planned]`, quyết định 2026-08-15:** để tránh race condition khi 2 doctor cùng review 1 plan (`specs/06-meal-plan-review.md` §5), endpoint này **phải** kiểm tra `MealPlan.status == "pending_review"` (hoặc `"pending_review"` do action `request-adjustment` set lại) ngay trước khi áp dụng thay đổi — nếu plan đã bị doctor khác xử lý trước đó (không còn ở trạng thái chờ), trả `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm như as-built hiện tại.
+### `POST /doctor/meal-plans/{meal_plan_id}/apply`
+**Role:** `doctor`. Gán cửa sổ áp dụng 7 ngày cho plan đã `approved|edited`. Generate **không** nhận ngày.
+```json
+// Request
+{ "start_date": "2026-08-16", "replace_active": true, "slot_key": "current" }
+// slot_key optional: "current" | "next" | "empty" — when set, start_date must match that slot (empty = bất kỳ tuần trống đang add được, không chỉ tuần empty đầu tiên)
+// Response 200 → MealPlanOutput (starts_on, ends_on, days[].date đã stamp)
+// Error 400 { "code": "PLAN_NOT_APPLYABLE" | "START_DATE_IN_PAST" | "INVALID_REPLACE_DATE" | "INVALID_SLOT_START" }
+// Error 409 { "code": "PLAN_DATE_OVERLAP" }
+```
+**Side-effect:** materialize `meal_reminder`/`adherence_checkin` theo `start_date` (bỏ qua slot đã qua). `replace_active: true` cắt `ends_on` plan active cũ = `start_date - 1`.
 
 ### `POST /doctor/demo/plan-expiry`
-**Role:** `doctor`. Demo-only — backdate `reviewed_at` của plan `approved` mới nhất mỗi patient để giả lập trạng thái "sắp hết hạn"/"đã hết hạn" trên `GET /doctor/patients` (`plan_expiry`/`plan_days_left`/`plan_end_date`).
+**Role:** `doctor`. Demo-only — dịch `starts_on`/`ends_on` của plan active (hoặc approved mới nhất) để giả lập expiring/expired trên `GET /doctor/patients`.
 ```json
 // Request
 { "mode": "expiring" }

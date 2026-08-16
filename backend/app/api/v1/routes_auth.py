@@ -6,10 +6,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, get_current_user, hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, RegisterResponse, TokenResponse
+from app.schemas.auth import (
+    LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+    UserMeResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -51,4 +57,15 @@ def login(
         access_token=create_access_token(user.id, user.role),
         role=user.role,
         user_id=user.id,
+    )
+
+
+@router.get("/me", response_model=UserMeResponse)
+def get_me(user: User = Depends(get_current_user)) -> UserMeResponse:
+    return UserMeResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        full_name=user.full_name,
+        avatar=user.avatar,
     )

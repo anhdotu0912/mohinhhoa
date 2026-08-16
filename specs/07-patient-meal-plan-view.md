@@ -11,7 +11,7 @@ Là **bệnh nhân**, tôi muốn xem chi tiết thực đơn 7 ngày của mìn
 
 ## 3. Business rules
 1. Patient chỉ xem được **plan của chính mình** qua `GET /meal-plans/{meal_plan_id}` — nếu `id` thuộc plan của user khác → `403 FORBIDDEN` (khác doctor, xem được plan bất kỳ patient).
-2. `GET /meal-plans/me` luôn trả **bản mới nhất** theo `created_at` — không có tham số chọn "plan của tuần trước" qua endpoint này (muốn xem plan cũ cụ thể phải biết đúng `meal_plan_id` và gọi `GET /meal-plans/{id}`).
+2. `GET /meal-plans/me` ưu tiên plan **đang áp dụng hôm nay** (ADR-011); không có thì plan **upcoming** đã apply; cuối cùng fallback bản mới nhất theo `created_at`.
 3. Hiển thị `status` rõ ràng cho patient biết plan đã được duyệt hay chưa (`pending_review`/`approved`/`rejected`/`edited`) — đặc biệt quan trọng để patient không nhầm 1 plan `pending_review` là "chính thức" trước khi bác sĩ duyệt (nguyên tắc HITL, `specs/06`).
 4. `FoodItem.alternatives[]` đã được lọc an toàn từ trước (không dị ứng, không phạm preference cứng, không tương tác nguy hiểm) — patient chọn món thay thế trong danh sách này **không cần gọi thêm API kiểm tra an toàn**, vì đã lọc sẵn ở bước generate (`specs/05` §3.3).
 5. `swaps[]` hiển thị lý do cụ thể (`reason`, ví dụ "Tương tác thuốc (warfarin + rau muống)...") — patient cần thấy rõ vì sao món gốc bị đổi, tăng minh bạch/niềm tin vào AI.

@@ -25,6 +25,15 @@ interface ConversationThread {
   messages: ChatMessage[];
 }
 
+/** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
 const initialConversations: ConversationThread[] = [
   {
     id: "BN-10293",
@@ -181,12 +190,20 @@ export default function DoctorMessagesPage() {
                       : "hover:bg-surface-container-low"
                   }`}
                 >
-                  <div className="relative shrink-0">
-                    <img
-                      src={conv.avatar}
-                      alt={conv.patientName}
-                      className="w-11 h-11 rounded-full object-cover border border-outline-variant"
-                    />
+                  <div className="relative shrink-0 w-11 h-11">
+                    <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                      {initials(conv.patientName)}
+                    </div>
+                    {conv.avatar && (
+                      <img
+                        src={conv.avatar}
+                        alt={conv.patientName}
+                        className="absolute inset-0 w-11 h-11 rounded-full object-cover border border-outline-variant bg-surface-container"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
                     {conv.statusText.includes("Đang hoạt động") && (
                       <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
                     )}
@@ -216,11 +233,21 @@ export default function DoctorMessagesPage() {
           {/* Chat Header */}
           <div className="h-14 px-lg border-b border-outline-variant bg-surface flex justify-between items-center shrink-0">
             <div className="flex items-center gap-sm">
-              <img
-                src={activeConv.avatar}
-                alt={activeConv.patientName}
-                className="w-9 h-9 rounded-full object-cover border border-outline-variant"
-              />
+              <div className="relative w-9 h-9 shrink-0">
+                <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                  {initials(activeConv.patientName)}
+                </div>
+                {activeConv.avatar && (
+                  <img
+                    src={activeConv.avatar}
+                    alt={activeConv.patientName}
+                    className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
+              </div>
               <div>
                 <h2 className="font-h2 text-h2 text-on-surface font-semibold text-sm">
                   {activeConv.patientName}
@@ -263,11 +290,21 @@ export default function DoctorMessagesPage() {
                 >
                   <div className="flex items-end gap-xs mb-0.5">
                     {!isDoctor && (
-                      <img
-                        src={activeConv.avatar}
-                        alt={activeConv.patientName}
-                        className="w-8 h-8 rounded-full object-cover shrink-0 mb-1"
-                      />
+                      <div className="relative w-8 h-8 shrink-0 mb-1">
+                        <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-[10px] font-semibold">
+                          {initials(activeConv.patientName)}
+                        </div>
+                        {activeConv.avatar && (
+                          <img
+                            src={activeConv.avatar}
+                            alt={activeConv.patientName}
+                            className="absolute inset-0 w-8 h-8 rounded-full object-cover bg-surface-container"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                      </div>
                     )}
                     <div
                       className={`px-md py-sm rounded-2xl text-sm leading-relaxed ${

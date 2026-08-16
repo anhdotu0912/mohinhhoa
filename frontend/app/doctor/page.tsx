@@ -311,11 +311,21 @@ export default function DoctorDashboardPage() {
                     <tr key={patient.id} className="hover:bg-surface-bright transition-colors">
                       <td className="p-md">
                         <div className="flex items-center gap-sm">
-                          <img
-                            src={patient.avatar}
-                            alt={patient.name}
-                            className="w-9 h-9 rounded-full object-cover border border-outline-variant"
-                          />
+                          <div className="relative w-9 h-9 shrink-0">
+                            <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                              {initials(patient.name)}
+                            </div>
+                            {patient.avatar && (
+                              <img
+                                src={patient.avatar}
+                                alt={patient.name}
+                                className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            )}
+                          </div>
                           <div>
                             <span className="font-body-bold text-on-surface block text-sm font-semibold">
                               {patient.name}

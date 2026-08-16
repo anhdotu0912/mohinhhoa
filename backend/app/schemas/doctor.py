@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.meal_plan import MealPlanOutput
+
 
 class ReviewRequest(BaseModel):
     action: Literal["approve", "reject", "edit"]
@@ -50,6 +52,9 @@ class DoctorPatientSummary(BaseModel):
     status_key: Literal["attention", "stable", "warning", "pending"] = "stable"
     latest_plan_id: str | None = None
     latest_plan_status: str | None = None
+    active_plan_id: str | None = None
+    active_plan_status: str | None = None
+    plan_starts_on: str | None = None
     plan_pending: int = 0
     plan_total: int = 0
     alert_count: int = 0
@@ -59,6 +64,7 @@ class DoctorPatientSummary(BaseModel):
     plan_end_date: str | None = None
     plan_days_left: int | None = None
     plan_expiry: Literal["expiring", "expired", "ok", "none"] = "none"
+    plan_usage: Literal["none", "active", "finished"] = "none"
 
 
 class MetricsUpdateRequest(BaseModel):
@@ -203,3 +209,23 @@ class PatientComplianceOut(BaseModel):
 
 class ComplianceRemindRequest(BaseModel):
     message: str = Field(default="", max_length=500)
+
+
+class MealPlanScheduleSlotOut(BaseModel):
+    """One week slot on patient meal plan schedule — ADR-012."""
+
+    slot_key: Literal["current", "next", "empty"]
+    starts_on: str
+    ends_on: str
+    occupancy: Literal["empty", "active", "upcoming", "past"]
+    plan: MealPlanOutput | None = None
+    actions: list[Literal["add", "replace", "view"]] = Field(default_factory=list)
+
+
+class MealPlanScheduleOut(BaseModel):
+    patient_id: str
+    today: str
+    active_plan_id: str | None = None
+    active_plan: MealPlanOutput | None = None
+    unassigned_plans: list[MealPlanOutput] = Field(default_factory=list)
+    slots: list[MealPlanScheduleSlotOut] = Field(default_factory=list)
