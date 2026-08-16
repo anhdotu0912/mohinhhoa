@@ -22,17 +22,17 @@ VALID_INTENTS = {
     "unknown",
 }
 
-# Keyword patterns for rule-based fallback
+# Keyword patterns for rule-based fallback (refuse patterns shared with guardrails.rules)
+from app.guardrails.rules import REFUSE_REGEX_PATTERNS
+
 _INTENT_PATTERNS = {
-    "refuse": [
-        r"đổi thuốc", r"thay thuốc", r"đổi liều", r"tăng liều", r"giảm liều",
-        r"ngưng thuốc", r"bỏ thuốc", r"kê thuốc", r"kê đơn",
-        r"chẩn đoán", r"xét nghiệm",
-    ],
+    "refuse": REFUSE_REGEX_PATTERNS,
     "meal_plan": [
         r"thực đơn", r"meal\s*plan", r"lên kế hoạch ăn", r"kế hoạch dinh dưỡng",
         r"gợi ý bữa ăn", r"7 ngày", r"bữa sáng.*bữa trưa.*bữa tối",
-        r"ăn gì", r"nên ăn gì", r"lập thực đơn", r"chế độ ăn",
+        r"ăn gì", r"nên ăn gì", r"lập thực đơn", r"tạo thực đơn", r"chế độ ăn",
+        r"hôm nay", r"sáng nay", r"trưa nay", r"tối nay",
+        r"bữa sáng", r"bữa trưa", r"bữa tối", r"xem thực đơn",
     ],
     "interaction_check": [
         r"tương tác.*thuốc", r"thuốc.*thực phẩm", r"drug.*food",
@@ -40,8 +40,8 @@ _INTENT_PATTERNS = {
         r"kiểm tra tương tác", r"có ăn được không.*đang uống",
     ],
     "food_log": [
-        r"ghi lại", r"log", r"hôm nay ăn", r"sáng nay ăn", r"tối qua ăn",
-        r"vừa ăn", r"bữa.*ăn.*xong",
+        r"ghi lại", r"log", r"vừa ăn", r"đã ăn", r"hôm nay ăn rồi",
+        r"sáng nay ăn rồi", r"tối qua ăn", r"bữa.*ăn.*xong",
     ],
 }
 

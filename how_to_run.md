@@ -90,9 +90,10 @@ Nếu bạn muốn chạy cả Frontend và Backend cùng lúc thông qua Docker
    ```
 3. Sau khi build xong, hệ thống sẽ tự động khởi chạy cả hai dịch vụ.
 
+BÁC SĨ
+Email: demo_doctor@example.com
+Mật khẩu: demo1234
 
- │ Role      │ Email                      │ Password │
-  ├───────────┼────────────────────────────┼──────────┤
-  │ Bệnh nhân │ demo_patient_1@example.com │ demo1234 │
-  ├───────────┼────────────────────────────┼──────────┤
-  │ Bác sĩ    │ demo_doctor@example.com    │ demo1234 │
+Bệnh nhân 1: demo_patient_1@example.com / demo1234 (Nguyễn Văn A)
+Bệnh nhân 2: demo_patient_2@example.com / demo1234 (Trần Thị B)
+Bệnh nhân 3: demo_patient_3@example.com / demo1234 (Lê Văn C)

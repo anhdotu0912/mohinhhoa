@@ -187,8 +187,19 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 {
   "intent": "meal_plan",
   "secondary_intents": [],
-  "message": "Đã tạo thành công thực đơn 7 ngày cá nhân hóa cho bệnh nhân...",
+  "message": "Thực đơn ngày 16/08/2026 (Ngày 3) — Bữa sáng, trưa, tối theo kế hoạch bác sĩ đã duyệt.",
   "meal_plan_id": "plan_uuid",
+  "meal_preview": {
+    "date": "2026-08-16",
+    "day_index": 3,
+    "meal_plan_id": "plan_uuid",
+    "plan_status": "approved",
+    "meals": [
+      { "slot": "breakfast", "label": "Bữa sáng", "items": [ /* FoodItem §1.2 */ ] },
+      { "slot": "lunch", "label": "Bữa trưa", "items": [] },
+      { "slot": "dinner", "label": "Bữa tối", "items": [] }
+    ]
+  },
   "food_log_id": null,
   "alert_ids": [],
   "citations": ["byt_vn_notes.md"],
@@ -205,7 +216,9 @@ meal_plan | interaction_check | food_log | rag_qa | refuse | unknown
 ```
 Không có intent nào khác được thêm trong vòng cập nhật tài liệu này (đề xuất intent mới cho "lời khuyên khi chỉ số cơ thể đổi" ở `specs/12-patient-metrics-tracking.md` là **Planned**, chưa thêm vào enum thật).
 
-**Cảnh báo gap as-built quan trọng:** `meal_plan_id` trả về khi intent = `meal_plan` qua `POST /chat` **KHÔNG được persist vào DB** (khác với `meal_plan_id` trả về qua `POST /meal-plans/generate`, có persist) — xem `specs/05-meal-plan-generation.md` §5 Edge cases và `adrs/002-agent-orchestration-langgraph.md`. FE/BE không nên gọi `GET /meal-plans/{id}` với `meal_plan_id` lấy từ `/chat` response, vì record đó không tồn tại trong bảng `meal_plans`.
+**`meal_preview` — optional:** populated khi intent = `meal_plan` và patient có thực đơn trong DB để hiển thị. FE dùng field này render UI bữa ăn trong chat. `null` khi không có plan hoặc intent khác.
+
+**`meal_plan_id` qua `/chat` (read-only):** khi intent = `meal_plan`, field này là ID plan **đang đọc** từ DB — **không** tạo/persist record mới. Chat **không** gọi meal planner generate; sinh plan chỉ qua `POST /meal-plans/generate` hoặc luồng bác sĩ.
 
 ### 5.3 `AgentState` (nội bộ, không public — tham khảo khi thêm node mới)
 ```json

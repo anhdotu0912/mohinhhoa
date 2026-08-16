@@ -1,7 +1,7 @@
 # Spec: AI Chat Assistant (Entry point `/chat`)
 
 ## Status
-Partial — routing intent hoạt động; `meal_plan`/`interaction_check`/`rag_qa` có logic thật, `food_log` là stub, guardrail citation cho `rag_qa` mô tả ở đây là **kỳ vọng thiết kế**, việc chặn cứng thật (`guardrails/rules.py`, `guardrails/source_check.py`) **hiện là placeholder trống**.
+Partial — routing intent hoạt động; chat intent `meal_plan` **read-only** (đọc plan bác sĩ + `meal_preview` UI); guardrails wired; `profile_loader` đọc DB; **`POST /chat/stream`** (SSE) hiển thị luồng suy nghĩ (status steps) + stream token (`rag_qa` token thật, intent khác chunk mô phỏng) + event `correction` khi guardrail thay đổi câu trả lời. Còn Planned: `secondary_intents[]`.
 
 ## 1. Mục tiêu (Why)
 Chat là điểm chạm tự nhiên nhất cho bệnh nhân hỏi bất kỳ điều gì (lập thực đơn, hỏi tương tác thuốc, hỏi kiến thức dinh dưỡng) mà không cần nhớ đúng màn hình/nút bấm nào — LangGraph agent tự phân loại ý định và định tuyến tới logic xử lý phù hợp.

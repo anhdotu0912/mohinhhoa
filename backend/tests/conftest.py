@@ -15,6 +15,8 @@ os.environ["DEEPSEEK_API_KEY"] = ""
 os.environ["LLM_API_KEY"] = ""
 os.environ["DEMO_MOCK"] = "true"
 os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["EMBEDDING_PROVIDER"] = "local"
+os.environ["GEMINI_API_KEY"] = ""
 
 import pytest  # noqa: E402
 import app.models  # noqa: E402,F401 — register nutrition catalog tables

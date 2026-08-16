@@ -5,6 +5,7 @@ import {
   type AgentRunOutput,
   type AlertOut,
   type CatalogOut,
+  type ChatStreamEvent,
   type DoctorPatientSummary,
   type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
@@ -394,6 +395,83 @@ export const api = {
       body: { message },
     });
   },
+
+  chatStream,
 };
+
+async function* chatStream(message: string): AsyncGenerator<ChatStreamEvent> {
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "Content-Type": "application/json",
+  };
+  const token = getStoredToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}/api/v1/chat/stream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message }),
+  });
+
+  if (!res.ok) {
+    let detail = res.statusText || "Request failed";
+    let code = "HTTP_ERROR";
+    try {
+      const data = (await res.json()) as { detail?: string; code?: string };
+      if (data.detail) detail = data.detail;
+      if (data.code) code = data.code;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, code, detail);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new ApiError(500, "STREAM_ERROR", "Response body is not readable");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith("data:")) continue;
+        const jsonStr = line.slice(5).trim();
+        if (!jsonStr) continue;
+        try {
+          yield JSON.parse(jsonStr) as ChatStreamEvent;
+        } catch {
+          /* skip malformed event */
+        }
+      }
+    }
+
+    const trailing = buffer.trim();
+    if (trailing.startsWith("data:")) {
+      const jsonStr = trailing.slice(5).trim();
+      if (jsonStr) {
+        try {
+          yield JSON.parse(jsonStr) as ChatStreamEvent;
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 export { API_BASE };

@@ -1,7 +1,7 @@
 # ADR-003: Lựa chọn Embedding Model
 
 ## Status
-Accepted (quyết định mới — thay thế quyết định cũ) — **migration chưa thực hiện trong code**. As-built hiện tại (`backend/app/core/config.py:30`, `backend/app/rag/embeddings.py`) vẫn đang dùng local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. ADR này ghi nhận quyết định **mới** của team (2026-08-15): chuyển sang **Gemini Embedding (`gemini-embedding-2`, gọi qua API)** — đây là hướng đi tiếp theo, cần một task migration riêng (xem `tasks/be1-ai-core.md`) trước khi as-built khớp với ADR này.
+Accepted — **đã triển khai** (`backend/app/core/config.py`, `backend/app/rag/embeddings.py`): provider mặc định `gemini`, model `gemini-embedding-2`, fallback local MiniLM. Sau migrate cần **re-index** Chroma (`python -m app.rag.indexer`).
 
 ## Context
 Quyết định cũ (giữ local MiniLM) ưu tiên chi phí = 0 và không phụ thuộc network. Tuy nhiên, chất lượng embedding tiếng Việt của MiniLM (~118M params) bị đánh giá là giới hạn khi RAG cần độ chính xác cao hơn cho retrieval guideline dinh dưỡng/thực phẩm — đặc biệt khi dữ liệu `data/food_db_vn.json`/`data/guidelines/` được bổ sung đầy đủ hơn (xem gap chất lượng RAG đã ghi trong `specs/13-ai-chat-assistant.md` §3 rule 7).

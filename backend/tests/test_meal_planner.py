@@ -229,18 +229,32 @@ class TestPerformance:
 # ============================================================
 
 class TestFacadeIntegration:
-    def test_run_agent_meal_plan(self):
-        """run_agent facade should return meal plan intent and non-empty response."""
+    def test_run_agent_meal_plan(self, db_session):
+        """run_agent meal_plan intent is read-only and returns preview from DB."""
+        from app.agents.graph import reset_compiled_graph
+        from app.db.init_db import seed_demo_accounts
+        from app.services.meal_plan_service import persist_generated_plan
+        from app.agents.meal_planner_agent import generate_meal_plan as build_plan
+        from app.services.meal_plan_service import get_profile
+
+        reset_compiled_graph()
+        seed_demo_accounts(db_session)
+        db_session.commit()
+        profile = get_profile(db_session, "demo_patient_1")
+        plan = build_plan(profile, db=db_session)
+        persist_generated_plan(db_session, "demo_patient_1", plan)
+
         input_data = AgentRunInput(
             user_id="demo_patient_1",
-            message="Lập cho tôi thực đơn 7 ngày",
+            message="Hôm nay ăn gì?",
             force_intent="meal_plan",
         )
-        output = run_agent(input_data)
+        output = run_agent(input_data, db=db_session)
 
         assert output.intent == "meal_plan"
-        assert "thực đơn 7 ngày" in output.message.lower()
+        assert output.meal_preview is not None
         assert output.meal_plan_id is not None
+        assert "thực đơn" in output.message.lower()
 
 
 # ============================================================
