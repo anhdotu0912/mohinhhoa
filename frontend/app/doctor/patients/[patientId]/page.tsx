@@ -31,7 +31,7 @@ const DISEASE_OPTIONS: { code: string; label: string }[] = [
   { code: "nafld", label: "Gan nhiễm mỡ" },
 ];
 
-interface PatientDetailData extends Patient {
+interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
   patientCode: string;
   doctorInCharge: string;
   diagnoses: string[];

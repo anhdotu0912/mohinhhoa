@@ -5,7 +5,45 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueueStore } from "@/lib/queue-store";
-import { MOCK_PATIENTS } from "@/lib/mock-data";
+import { assetUrl } from "@/lib/api";
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BN";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "bg-sky-100 text-sky-800 border-sky-200",
+  "bg-purple-100 text-purple-800 border-purple-200",
+  "bg-amber-100 text-amber-800 border-amber-200",
+  "bg-teal-100 text-teal-800 border-teal-200",
+  "bg-rose-100 text-rose-800 border-rose-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+  }
+  const idx = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function resolveAvatar(raw?: string | null): string {
+  if (
+    !raw ||
+    raw.startsWith("https://api.dicebear.com") ||
+    raw.includes("googleusercontent.com")
+  ) {
+    return "";
+  }
+  return assetUrl(raw) || "";
+}
 
 export function QueueDrawer() {
   const router = useRouter();
@@ -23,14 +61,6 @@ export function QueueDrawer() {
     } else {
       router.push("/doctor/reviews");
     }
-  };
-
-  const getPatientAvatar = (patientId: string) => {
-    const patient = MOCK_PATIENTS.find((p) => p.id === patientId);
-    return (
-      patient?.avatar ||
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuC66kEeXEpUoXAUDa-eVjaWGucklXyDHyG0BWkYQcXkH3OQPebxVez4samPvA1fKP_po9Omc23Pxx-vQJR1oIf-YvHPIFCajQyXqRLKUZJksJuhXpCWTPDsKa_fN5bLjnK9ZjAhBFEX84oz_drQgFQHb5WaDGrrCXlMCh3z1GxBRZp8t8mViPN4OeChVWmoVFOaLJ_Gpk0YQdYiE8R0LY9vO7gn5W80SIuwv4lCvSAbRcfYwKzJgC8I9A"
-    );
   };
 
   const completedCount = jobs.filter((j) => j.status === "completed").length;
@@ -91,17 +121,31 @@ export function QueueDrawer() {
                 >
                   <div className="flex items-center justify-between gap-sm mb-xs">
                     <div className="flex items-center gap-sm min-w-0">
-                      <img
-                        src={getPatientAvatar(job.patientId)}
-                        alt={job.patientName}
-                        className="w-9 h-9 rounded-full object-cover border border-outline-variant shrink-0"
-                      />
+                      <div className="relative w-9 h-9 shrink-0">
+                        <div
+                          className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-bold ${getAvatarColor(
+                            job.patientName
+                          )}`}
+                        >
+                          {initials(job.patientName)}
+                        </div>
+                        {resolveAvatar(job.patientAvatar) ? (
+                          <img
+                            src={resolveAvatar(job.patientAvatar)}
+                            alt={job.patientName}
+                            className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : null}
+                      </div>
                       <div className="min-w-0">
                         <p className="font-body-bold text-on-surface font-semibold text-sm truncate">
                           {job.patientName}
                         </p>
-                        <p className="font-caption text-caption text-on-surface-variant text-xs">
-                          Mã BN: {job.patientId}
+                        <p className="font-caption text-caption text-on-surface-variant text-xs truncate">
+                          {job.patientCondition ? `${job.patientCondition} • ` : ""}Mã BN: {job.patientId}
                         </p>
                       </div>
                     </div>
