@@ -31,3 +31,11 @@ class RegisterResponse(BaseModel):
     email: str
     role: str
     full_name: str | None = None
+
+
+class UserMeResponse(BaseModel):
+    id: str
+    email: str
+    role: str
+    full_name: str | None = None
+    avatar: str | None = None

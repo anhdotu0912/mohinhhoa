@@ -16,6 +16,14 @@ export interface RegisterResponse {
   full_name?: string | null;
 }
 
+export interface UserMeResponse {
+  id: string;
+  email: string;
+  role: UserRole;
+  full_name?: string | null;
+  avatar?: string | null;
+}
+
 export interface Restrictions {
   carb_per_meal?: number | null;
   sodium_daily?: number | null;

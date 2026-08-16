@@ -49,7 +49,7 @@ export default function HomePage() {
                 Cá nhân hóa thực đơn theo bệnh lý với sự phê duyệt của bác sĩ chuyên khoa. Nâng cao hiệu quả điều trị thông qua dinh dưỡng chính xác.
               </p>
               <div className="flex flex-wrap gap-md mt-sm">
-                <Link href="/patient" className="bg-[#2f8f7a] text-white font-body-bold text-body-bold h-12 px-8 rounded-button flex items-center justify-center hover:opacity-90 transition-opacity shadow-subtle text-base">
+                <Link href="/register" className="bg-[#2f8f7a] text-white font-body-bold text-body-bold h-12 px-8 rounded-button flex items-center justify-center hover:opacity-90 transition-opacity shadow-subtle text-base">
                   Bắt đầu miễn phí
                 </Link>
                 <Link href="/patient" className="bg-transparent border border-[#2f8f7a] text-[#2f8f7a] font-body-bold text-body-bold h-12 px-8 rounded-button flex items-center justify-center hover:bg-surface-variant transition-colors text-base">
@@ -61,7 +61,7 @@ export default function HomePage() {
               <img
                 className="w-full h-full object-cover"
                 alt="Clinical nutrition dashboard interface"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgalSU7yIMeLavzaH4X8p2sK2EuWXIJoiNeBzLPpHeGodgnoVRD8cLJzWq4Mre34gKkHqtXYErrILj75MMEuWgBvSYdUBNlhRXEQl_OpiK48n8qx2c1RsT75Rg3uS0hM6zRvFRQdNfq-EEMyrEB8tGwllowGLsyxV-5-ddCXzztEcX81XL8YgHrfIvRAXWPCkZ09LDuLGQT5G8noUsFAcuOEppZcnrguf3U3PXM5mr7aeQx0heHRUoig"
+                src="/images/doctor_review_portal.jpg"
               />
             </div>
           </div>

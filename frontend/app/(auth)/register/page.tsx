@@ -83,7 +83,7 @@ export default function RegisterPage() {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nguyễn Văn A"
+              placeholder="Nhập họ và tên"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -98,7 +98,7 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@vmec.vn"
+              placeholder="Nhập địa chỉ email"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -114,7 +114,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -130,7 +130,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Nhập lại mật khẩu"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>

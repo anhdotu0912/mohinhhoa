@@ -33,6 +33,14 @@
 { "code": "INVALID_CREDENTIALS", "detail": "Email hoặc mật khẩu không đúng." }
 ```
 
+### `GET /auth/me`
+**Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`).
+```json
+// Response 200
+{ "id": "user_uuid", "email": "demo_doctor@example.com", "role": "doctor", "full_name": "BS. Minh", "avatar": "/static/avatars/demo_doctor.jpg" }
+```
+`full_name` / `avatar` có thể `null`.
+
 ### `POST /auth/forgot-password` `[Planned]`
 **Role:** Không cần auth. **Quyết định 2026-08-15:** cần trước khi mở khảo sát người dùng thật (`CLAUDE.md` Mục 11 — ≥5 responses), không chỉ demo nội bộ với tài khoản cố định.
 ```json

@@ -15,6 +15,7 @@ const DEMO = {
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
+  const setUserProfile = useAuthStore((s) => s.setUserProfile);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,15 @@ export default function LoginPage() {
         userId: tokenRes.user_id,
         email: loginEmail.trim().toLowerCase(),
       });
+      try {
+        const me = await api.getCurrentUser(tokenRes.access_token);
+        setUserProfile({
+          displayName: me.full_name?.trim() || me.email,
+          avatar: me.avatar ?? null,
+        });
+      } catch {
+        /* Sidebar sẽ thử fetch lại sau */
+      }
       router.push(homePathForRole(tokenRes.role));
     } catch (err) {
       const message =

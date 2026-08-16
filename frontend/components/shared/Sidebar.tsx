@@ -3,20 +3,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import {
-  DOCTOR_AVATAR_SRC,
   NAV_BY_ROLE,
-  PATIENT_AVATAR_SRC,
   ROLE_META,
   resolveActiveNavId,
   type AppRole,
 } from "@/lib/nav-config";
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
+import { api, assetUrl } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 
 type SidebarProps = {
   role: AppRole;
   activeItem?: string;
 };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = parts[0][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
 
 function NavLinks({
   role,
@@ -67,21 +76,56 @@ function SidebarFooter({
   onNavigate?: () => void;
 }) {
   const meta = ROLE_META[role];
-  const avatarSrc = role === "doctor" ? DOCTOR_AVATAR_SRC : PATIENT_AVATAR_SRC;
+  const token = useAuthStore((s) => s.token);
+  const email = useAuthStore((s) => s.email);
+  const displayName = useAuthStore((s) => s.displayName);
+  const avatar = useAuthStore((s) => s.avatar);
+  const setUserProfile = useAuthStore((s) => s.setUserProfile);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    api
+      .getCurrentUser(token)
+      .then((user) => {
+        if (cancelled) return;
+        setUserProfile({
+          displayName: user.full_name?.trim() || user.email,
+          avatar: user.avatar ?? null,
+        });
+      })
+      .catch(() => {
+        /* giữ fallback local nếu API không khả dụng */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, setUserProfile]);
+
+  const resolvedName = displayName || email || meta.displayName;
+  const avatarSrc = avatar ? assetUrl(avatar) : "";
 
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
       <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
-        <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
-          <img
-            alt={`${meta.roleLabel} Profile`}
-            className="w-full h-full object-cover"
-            src={avatarSrc}
-          />
+        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
+          <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-[10px] font-semibold">
+            {initials(resolvedName)}
+          </div>
+          {avatarSrc ? (
+            <img
+              alt={`${meta.roleLabel} Profile`}
+              className="absolute inset-0 w-full h-full object-cover"
+              src={avatarSrc}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : null}
         </div>
         <div className="overflow-hidden">
           <p className="font-body-bold text-body-bold text-on-surface truncate text-xs font-semibold">
-            {meta.displayName}
+            {resolvedName}
           </p>
           <p className="font-caption text-caption text-on-surface-variant truncate text-[11px]">
             {meta.roleLabel}

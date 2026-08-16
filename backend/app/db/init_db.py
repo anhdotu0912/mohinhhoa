@@ -22,6 +22,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_1",
         "email": "demo_patient_1@example.com",
         "role": "patient",
+        "full_name": "Nguyễn Văn A",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["metformin"],
@@ -49,6 +50,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_2",
         "email": "demo_patient_2@example.com",
         "role": "patient",
+        "full_name": "Trần Thị B",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["metformin", "atorvastatin", "amlodipine"],
@@ -76,6 +78,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_patient_3",
         "email": "demo_patient_3@example.com",
         "role": "patient",
+        "full_name": "Lê Văn C",
         "profile": {
             "disease": ["diabetes_t2"],
             "medications": ["glipizide", "lisinopril"],
@@ -99,6 +102,7 @@ DEMO_ACCOUNTS = [
         "user_id": "demo_doctor",
         "email": "demo_doctor@example.com",
         "role": "doctor",
+        "full_name": "BS. Minh",
         "profile": None,
     },
 ]
@@ -172,13 +176,18 @@ def seed_demo_accounts(db: Session) -> None:
     _migrate_legacy_dietitian(db)
     for account in DEMO_ACCOUNTS:
         user = db.get(User, account["user_id"])
+        full_name = account.get("full_name")
         if user is not None:
             user.role = account["role"]
             user.email = account["email"]
+            if full_name:
+                user.full_name = full_name
         else:
             by_email = db.query(User).filter(User.email == account["email"]).first()
             if by_email is not None:
                 by_email.role = account["role"]
+                if full_name:
+                    by_email.full_name = full_name
                 user = by_email
             else:
                 user = User(
@@ -186,6 +195,7 @@ def seed_demo_accounts(db: Session) -> None:
                     email=account["email"],
                     hashed_password=hash_password(DEMO_PASSWORD),
                     role=account["role"],
+                    full_name=full_name,
                 )
                 db.add(user)
                 db.flush()

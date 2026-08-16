@@ -23,6 +23,7 @@ import {
   type ReviewRequest,
   type ReviewResponse,
   type TokenResponse,
+  type UserMeResponse,
   type UserRole,
 } from "./types";
 import { asRouteId } from "./route-params";
@@ -120,6 +121,10 @@ export const api = {
       body: { email, password },
       auth: false,
     });
+  },
+
+  getCurrentUser(token?: string | null): Promise<UserMeResponse> {
+    return request("/api/v1/auth/me", { token });
   },
 
   getProfile(token?: string | null): Promise<PatientProfile> {
