@@ -91,9 +91,12 @@ def index_food_items(client: chromadb.ClientAPI | None = None) -> int:
         metadata={"description": "Vietnamese food items with nutrition data"},
     )
 
-    from app.agents.meal_planner_agent import _load_food_db
+    if not FOOD_DB_PATH.exists():
+        logger.warning("Food DB not found at %s", FOOD_DB_PATH)
+        return 0
 
-    foods = _load_food_db()
+    with open(FOOD_DB_PATH, encoding="utf-8") as f:
+        foods = json.load(f)
     if not foods:
         logger.warning("No food items loaded for indexing")
         return 0

@@ -12,29 +12,18 @@ from app.core.security import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.meal_plan import MealPlan
 from app.models.user import User
+from app.schemas.doctor import MealPlanScheduleOut
 from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
 from app.services import plan_expiry
-from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
+from app.services.meal_plan_service import (
+    generate_meal_plan,
+    meal_plan_from_row,
+    resolve_patient_plan_row,
+)
 from app.services.notification import NotificationService
-from app.services.plan_apply import find_active_plan, find_upcoming_plan
+from app.services.plan_schedule import build_meal_plan_schedule
 
 router = APIRouter(prefix="/meal-plans", tags=["meal-plans"])
-
-
-def _resolve_patient_plan(db: Session, user_id: str) -> MealPlan | None:
-    today = date.today()
-    active = find_active_plan(db, user_id, today)
-    if active is not None:
-        return active
-    upcoming = find_upcoming_plan(db, user_id, today)
-    if upcoming is not None:
-        return upcoming
-    return (
-        db.query(MealPlan)
-        .filter(MealPlan.user_id == user_id)
-        .order_by(MealPlan.created_at.desc())
-        .first()
-    )
 
 
 @router.post("/generate", response_model=MealPlanOutput)
@@ -52,7 +41,7 @@ def get_my_latest_plan(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> MealPlanOutput:
-    row = _resolve_patient_plan(db, user.id)
+    row = resolve_patient_plan_row(db, user.id)
     if row is None:
         raise APIError(404, "NO_MEAL_PLAN", "Bạn chưa có thực đơn nào.")
 
@@ -74,6 +63,15 @@ def get_my_latest_plan(
             db.commit()
 
     return meal_plan_from_row(row)
+
+
+@router.get("/schedule", response_model=MealPlanScheduleOut)
+def get_my_meal_plan_schedule(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("patient")),
+) -> MealPlanScheduleOut:
+    data = build_meal_plan_schedule(db, user.id)
+    return MealPlanScheduleOut(**data)
 
 
 @router.get("/{meal_plan_id}", response_model=MealPlanOutput)

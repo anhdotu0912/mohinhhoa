@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 
 from app.agents.state import AgentState
 from app.rag.retriever import retrieve_foods, retrieve_guidelines
 
 logger = logging.getLogger(__name__)
+
+
+def retrieve_rag_context(message: str, profile: dict) -> tuple[list[dict], list[str]]:
+    """Public alias for RAG retrieval (used by streaming orchestrator)."""
+    return _build_rag_context(message, profile)
 
 
 def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[str]]:
@@ -53,22 +59,15 @@ def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[st
     return rag_context, citations
 
 
-def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:
-    """Generate RAG answer using LLM or template-based fallback."""
+def _build_rag_prompt(message: str, rag_context: list[dict], profile: dict) -> str:
+    """Build the LLM prompt for RAG answer generation."""
     context_texts = [c["text"] for c in rag_context[:5]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     diseases = ", ".join(profile.get("disease", [])) or "chưa rõ"
     medications = ", ".join(profile.get("medications", [])) or "chưa rõ"
 
-    try:
-        from app.core.llm import get_chat_llm
-
-        llm = get_chat_llm(temperature=0.3)
-        if llm is None:
-            return _template_answer(message, context_str)
-
-        prompt = f"""Bạn là trợ lý dinh dưỡng AI cho bệnh nhân mạn tính. Trả lời câu hỏi dựa trên thông tin được cung cấp.
+    return f"""Bạn là trợ lý dinh dưỡng AI cho bệnh nhân mạn tính. Trả lời câu hỏi dựa trên thông tin được cung cấp.
 
 THÔNG TIN BỆNH NHÂN:
 - Bệnh: {diseases}
@@ -86,12 +85,54 @@ QUY TẮC:
 4. Trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu.
 5. Ghi nguồn tham khảo ở cuối câu trả lời."""
 
+
+def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:
+    """Generate RAG answer using LLM or template-based fallback."""
+    context_texts = [c["text"] for c in rag_context[:5]]
+    context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.3)
+        if llm is None:
+            return _template_answer(message, context_str)
+
+        prompt = _build_rag_prompt(message, rag_context, profile)
         response = llm.invoke(prompt)
         return response.content
 
     except Exception as e:
         logger.warning("LLM answer generation failed: %s", e)
         return _template_answer(message, context_str)
+
+
+def stream_answer_tokens(
+    message: str,
+    rag_context: list[dict],
+    profile: dict,
+) -> Iterator[str]:
+    """Stream RAG answer tokens from LLM, or yield template fallback once."""
+    context_texts = [c["text"] for c in rag_context[:5]]
+    context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.3)
+        if llm is None:
+            yield _template_answer(message, context_str)
+            return
+
+        prompt = _build_rag_prompt(message, rag_context, profile)
+        for chunk in llm.stream(prompt):
+            content = getattr(chunk, "content", None)
+            if content:
+                yield content
+
+    except Exception as e:
+        logger.warning("LLM streaming failed: %s", e)
+        yield _template_answer(message, context_str)
 
 
 def _template_answer(message: str, context: str) -> str:

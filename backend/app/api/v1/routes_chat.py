@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
@@ -34,3 +36,21 @@ def chat(
     except Exception as exc:  # noqa: BLE001
         logger.exception("Agent failed for user %s", user.id)
         raise APIError(503, "AGENT_ERROR", f"Lỗi xử lý agent: {exc}") from exc
+
+
+@router.post("/stream")
+def chat_stream(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("patient", "doctor")),
+) -> StreamingResponse:
+    from app.agents.streaming import stream_agent_events
+
+    def _sse():
+        for event in stream_agent_events(
+            AgentRunInput(user_id=user.id, message=payload.message),
+            db=db,
+        ):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(_sse(), media_type="text/event-stream")

@@ -14,6 +14,34 @@ import re
 
 logger = logging.getLogger(__name__)
 
+REFUSE_MESSAGE = (
+    "Xin lỗi, tôi không thể hỗ trợ yêu cầu này. "
+    "Tôi là trợ lý dinh dưỡng AI và không có quyền:\n"
+    "- Kê đơn thuốc hoặc đổi thuốc\n"
+    "- Thay đổi liều thuốc\n"
+    "- Chẩn đoán bệnh\n\n"
+    "Vui lòng tham vấn bác sĩ trực tiếp cho các vấn đề này."
+)
+
+# Shared refuse patterns for intent_classifier keyword fallback and guardrail checks.
+REFUSE_REGEX_PATTERNS: list[str] = [
+    r"đổi thuốc",
+    r"thay thuốc",
+    r"đổi liều",
+    r"tăng liều",
+    r"giảm liều",
+    r"ngưng thuốc",
+    r"bỏ thuốc",
+    r"kê thuốc",
+    r"kê đơn",
+    r"chẩn đoán",
+    r"xét nghiệm",
+    r"stop medication",
+    r"change dose",
+    r"increase dose",
+    r"decrease dose",
+]
+
 # Forbidden phrases that would constitute medical advice outside scope
 _FORBIDDEN_PATTERNS: list[str] = [
     "ngưng thuốc",
@@ -139,3 +167,35 @@ def sanitize_recommendation(recommendation: str) -> str:
         result = pattern.sub("trao đổi với bác sĩ về vấn đề này", result)
 
     return result
+
+
+def get_refuse_message() -> str:
+    return REFUSE_MESSAGE
+
+
+def message_triggers_refuse(message: str) -> bool:
+    """Return True when user message should route to refuse intent."""
+    if not message:
+        return False
+    message_lower = message.lower()
+    for pattern in REFUSE_REGEX_PATTERNS:
+        if re.search(pattern, message_lower):
+            return True
+    return False
+
+
+def enforce_output_safety(answer: str) -> tuple[str, list[str], bool]:
+    """Sanitize or block unsafe recommendation text in agent answers.
+
+    Returns:
+        (answer, flags, force_refuse)
+    """
+    if not answer:
+        return answer, [], False
+
+    violations = check_recommendation_safety(answer)
+    if not violations:
+        return answer, [], False
+
+    logger.warning("Guardrail blocked unsafe answer phrases: %s", violations)
+    return get_refuse_message(), ["unsafe_recommendation"], True

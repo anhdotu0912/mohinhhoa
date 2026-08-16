@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import uuid
+from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -10,15 +12,28 @@ from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
-from app.schemas.meal_plan import MealPlanOutput
+from app.schemas.meal_plan import (
+    DayPlan,
+    FoodItem,
+    Meal,
+    MealPlanOutput,
+    MealPreviewMeal,
+    MealPreviewOut,
+)
 from app.schemas.profile import PatientProfile
 from app.services.notification import NotificationService
 
+SLOT_LABELS: dict[str, str] = {
+    "breakfast": "Bữa sáng",
+    "lunch": "Bữa trưa",
+    "dinner": "Bữa tối",
+    "snack": "Bữa phụ",
+}
 
-def get_profile(db: Session, user_id: str) -> PatientProfile:
-    row = db.query(Profile).filter(Profile.user_id == user_id).first()
-    if row is None:
-        return PatientProfile(user_id=user_id, target_kcal=1800)
+DEFAULT_MEAL_SLOTS = ["breakfast", "lunch", "dinner"]
+
+
+def _profile_from_row(row: Profile) -> PatientProfile:
     return PatientProfile(
         id=row.id,
         user_id=row.user_id,
@@ -39,6 +54,21 @@ def get_profile(db: Session, user_id: str) -> PatientProfile:
         preferences=row.preferences or [],
         treatment_goals=row.treatment_goals or [],
     )
+
+
+def get_profile_row(db: Session, user_id: str) -> PatientProfile | None:
+    """Return stored profile or None when the user has no profile row."""
+    row = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if row is None:
+        return None
+    return _profile_from_row(row)
+
+
+def get_profile(db: Session, user_id: str) -> PatientProfile:
+    profile = get_profile_row(db, user_id)
+    if profile is None:
+        return PatientProfile(user_id=user_id, target_kcal=1800)
+    return profile
 
 
 def _persist_plan(db: Session, user_id: str, plan: MealPlanOutput) -> MealPlan:
@@ -112,6 +142,22 @@ def _persist_interaction_alerts(db: Session, user: User, plan: MealPlanOutput) -
         notifications.on_alert_created(alert)
 
 
+def persist_generated_plan(db: Session, user_id: str, plan: MealPlanOutput) -> MealPlanOutput:
+    """Persist a generated plan and related interaction alerts (shared by HTTP + chat)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise ValueError(f"User not found: {user_id}")
+
+    if not plan.id:
+        plan.id = str(uuid.uuid4())
+    plan.user_id = user_id
+
+    _persist_plan(db, user_id, plan)
+    _persist_interaction_alerts(db, user, plan)
+    db.commit()
+    return plan
+
+
 def generate_meal_plan(
     db: Session,
     user: User,
@@ -123,9 +169,178 @@ def generate_meal_plan(
 
     profile = get_profile(db, user.id)
     plan = build_plan(profile, notes=notes, priorities=priorities or [], db=db)
-    plan.id = str(uuid.uuid4())
-    plan.user_id = user.id
-    _persist_plan(db, user.id, plan)
-    _persist_interaction_alerts(db, user, plan)
-    db.commit()
-    return plan
+    return persist_generated_plan(db, user.id, plan)
+
+
+def resolve_patient_plan_row(db: Session, user_id: str) -> MealPlan | None:
+    """Resolve plan for patient view: active → upcoming → latest."""
+    from app.services.plan_apply import find_active_plan, find_upcoming_plan
+
+    today = date.today()
+    active = find_active_plan(db, user_id, today)
+    if active is not None:
+        return active
+    upcoming = find_upcoming_plan(db, user_id, today)
+    if upcoming is not None:
+        return upcoming
+    return (
+        db.query(MealPlan)
+        .filter(MealPlan.user_id == user_id)
+        .order_by(MealPlan.created_at.desc())
+        .first()
+    )
+
+
+def parse_meal_slots(message: str) -> list[str]:
+    """Map Vietnamese meal phrases to plan slot keys."""
+    msg = message.lower()
+    slots: list[str] = []
+    if re.search(r"bữa sáng|sáng nay|\bsáng\b", msg):
+        slots.append("breakfast")
+    if re.search(r"bữa trưa|trưa nay|\btrưa\b", msg):
+        slots.append("lunch")
+    if re.search(r"bữa tối|tối nay|\btối\b", msg):
+        slots.append("dinner")
+    if re.search(r"bữa phụ|\bsnack\b|\bphụ\b", msg):
+        slots.append("snack")
+    if slots:
+        return slots
+    return list(DEFAULT_MEAL_SLOTS)
+
+
+def message_requests_plan_creation(message: str) -> bool:
+    """True when user asks to create/generate a new plan (read-only chat redirects)."""
+    msg = message.lower()
+    return bool(
+        re.search(
+            r"lập thực đơn|tạo thực đơn|sinh thực đơn|lên kế hoạch ăn|"
+            r"kế hoạch dinh dưỡng|7 ngày|tạo plan|generate",
+            msg,
+        )
+    )
+
+
+def _day_index_for_plan(row: MealPlan, plan: MealPlanOutput, today: date | None = None) -> int:
+    today = today or date.today()
+    if row.starts_on is not None:
+        idx = (today - row.starts_on).days + 1
+        if plan.days:
+            return max(1, min(idx, len(plan.days)))
+        return max(1, idx)
+    return 1
+
+
+def _day_plan_for_index(plan: MealPlanOutput, day_index: int) -> DayPlan | None:
+    if not plan.days:
+        return None
+    match = next((d for d in plan.days if d.day_index == day_index), None)
+    return match or plan.days[0]
+
+
+def _meal_items(meal: Meal) -> list[FoodItem]:
+    return list(meal.items or [])
+
+
+def _collect_citations(plan: MealPlanOutput, meals: list[MealPreviewMeal]) -> list[str]:
+    citations = list(plan.citations or [])
+    for meal in meals:
+        for item in meal.items:
+            for cite in item.citations or []:
+                if cite not in citations:
+                    citations.append(cite)
+    return citations
+
+
+def build_meal_preview(
+    db: Session,
+    user_id: str,
+    message: str,
+    today: date | None = None,
+) -> MealPreviewOut | None:
+    """Build structured preview from existing patient plan (read-only)."""
+    row = resolve_patient_plan_row(db, user_id)
+    if row is None:
+        return None
+
+    plan = meal_plan_from_row(row)
+    today = today or date.today()
+    day_index = _day_index_for_plan(row, plan, today)
+    day_plan = _day_plan_for_index(plan, day_index)
+    if day_plan is None:
+        return None
+
+    requested_slots = parse_meal_slots(message)
+    preview_meals: list[MealPreviewMeal] = []
+    for slot in requested_slots:
+        meal = next((m for m in day_plan.meals if m.slot == slot), None)
+        if meal is None:
+            preview_meals.append(
+                MealPreviewMeal(
+                    slot=slot,
+                    label=SLOT_LABELS.get(slot, slot),
+                    items=[],
+                )
+            )
+            continue
+        preview_meals.append(
+            MealPreviewMeal(
+                slot=slot,
+                label=SLOT_LABELS.get(slot, slot),
+                items=_meal_items(meal),
+            )
+        )
+
+    preview_date = today.isoformat()
+    if row.starts_on is not None:
+        preview_date = (row.starts_on + timedelta(days=day_index - 1)).isoformat()
+
+    return MealPreviewOut(
+        date=preview_date,
+        day_index=day_index,
+        meal_plan_id=row.id,
+        plan_status=row.status,
+        meals=preview_meals,
+    )
+
+
+def format_meal_preview_message(
+    preview: MealPreviewOut | None,
+    message: str,
+) -> str:
+    """Human-readable summary for chat bubble."""
+    if preview is None:
+        return (
+            "Bạn chưa có thực đơn trong hệ thống. "
+            "Vui lòng liên hệ bác sĩ để được lập thực đơn, hoặc mở mục Thực đơn trên ứng dụng."
+        )
+
+    prefix = ""
+    if message_requests_plan_creation(message):
+        prefix = (
+            "Thực đơn được bác sĩ lập và quản lý — chat không tự tạo thực đơn mới. "
+            "Dưới đây là thực đơn hiện có của bạn:\n\n"
+        )
+
+    status_note = ""
+    if preview.plan_status == "pending_review":
+        status_note = (
+            "⚠️ Thực đơn đang chờ bác sĩ duyệt — thông tin mang tính tham khảo.\n"
+        )
+    elif preview.plan_status == "rejected":
+        status_note = "⚠️ Thực đơn này đã bị từ chối — vui lòng liên hệ bác sĩ.\n"
+
+    meal_names = []
+    for meal in preview.meals:
+        if meal.items:
+            names = ", ".join(item.name for item in meal.items[:3])
+            meal_names.append(f"- {meal.label}: {names}")
+        else:
+            meal_names.append(f"- {meal.label}: (chưa có món)")
+
+    body = (
+        f"{prefix}"
+        f"{status_note}"
+        f"Thực đơn ngày {preview.date} (Ngày {preview.day_index}):\n"
+        + "\n".join(meal_names)
+    )
+    return body.strip()

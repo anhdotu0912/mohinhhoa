@@ -135,6 +135,12 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 { "code": "NO_MEAL_PLAN", "detail": "Bạn chưa có thực đơn nào." }
 ```
 
+### `GET /meal-plans/schedule`
+**Role:** `patient`. Lịch tuần thực đơn của chính mình — cùng schema với `GET /doctor/patients/{patient_id}/meal-plan-schedule` (ADR-012); `patient_id` trong response = `user_id` của patient đang đăng nhập.
+```json
+// Response 200 → MealPlanScheduleOut (xem § GET /doctor/patients/{patient_id}/meal-plan-schedule)
+```
+
 ### `GET /meal-plans/{meal_plan_id}`
 **Role:** bất kỳ user đã đăng nhập (`get_current_user`). Patient chỉ xem plan của chính mình (403 nếu không phải chủ plan); doctor xem được plan của bất kỳ patient nào (không giới hạn ownership).
 ```json
@@ -161,7 +167,7 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 // Error 400 { "code": "PLAN_NOT_APPROVED", "detail": "Chỉ yêu cầu điều chỉnh trên thực đơn đã được duyệt." } — khi plan đang pending_review/rejected/edited
 ```
 
-**Ghi chú đồng bộ persist qua `/chat` (quyết định 2026-08-15):** meal plan sinh qua `POST /chat` (intent `meal_plan`) **phải được persist** vào bảng `meal_plans` giống `POST /meal-plans/generate` (đóng gap as-built đã ghi ở `contracts/agent-io-schema.md` §5.2) — `meal_plan_id` trả về từ `/chat` phải dùng lại được với `GET /meal-plans/{id}`. Đây là thay đổi hành vi **Planned**, chưa implement.
+**Ghi chú `/chat` intent `meal_plan` (read-only):** chat **không** sinh/persist thực đơn mới. Chỉ đọc plan có sẵn trong DB và trả `meal_preview` + `meal_plan_id` của plan đang xem. Sinh plan qua `POST /meal-plans/generate` hoặc `POST /doctor/.../meal-plans/generate`.
 
 ---
 
@@ -469,6 +475,43 @@ On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `
 // Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
 ```
 **Multi-intent `[Planned]`, quyết định 2026-08-15:** `intent_classifier` cần nâng cấp để phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
+
+### `POST /chat/stream`
+**Role:** `patient` **hoặc** `doctor`.
+```json
+// Request
+{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
+```
+**Response 200:** `text/event-stream` (Server-Sent Events)
+
+**Client:** phải dùng `fetch` + đọc `ReadableStream` (không dùng `EventSource` native) vì endpoint yêu cầu header `Authorization: Bearer <token>`.
+
+Các sự kiện SSE emit theo định dạng `data: <JSON>\n\n`:
+
+| `type` | Payload | Mô tả |
+|---|---|---|
+| `status` | `{ "node": "profile_loader \| intent_classifier \| rag_qa \| meal_plan \| …", "message": "Đang tải hồ sơ..." }` | Bước xử lý đang chạy (hiển thị luồng suy nghĩ trên UI) |
+| `intent` | `{ "intent": "rag_qa \| meal_plan \| interaction_check \| refuse \| unknown" }` | Intent đã phân loại |
+| `token` | `{ "content": "..." }` | Một đoạn text câu trả lời (stream token thật cho `rag_qa`; chunk mô phỏng cho intent khác) |
+| `status` | `{ "node": "apply_guardrails", "message": "Đang kiểm tra an toàn & nguồn trích dẫn..." }` | Guardrail hậu kiểm |
+| `correction` | `{ "message": "<câu trả lời an toàn cuối>", "reason": "missing_citations \| unsafe_recommendation" }` | Chỉ emit khi guardrail thay đổi nội dung đã stream — client **thay thế** toàn bộ text đã hiển thị |
+| `done` | `{ "data": AgentRunOutput }` | Kết thúc stream; `data` cùng schema với `POST /chat` |
+| `error` | `{ "message": "..." }` | Lỗi trong generator (response HTTP vẫn 200) |
+
+Ví dụ chuỗi sự kiện:
+```
+data: {"type": "status", "node": "profile_loader", "message": "Đang tải hồ sơ..."}
+data: {"type": "status", "node": "intent_classifier", "message": "Đang phân loại yêu cầu..."}
+data: {"type": "intent", "intent": "rag_qa"}
+data: {"type": "status", "node": "rag_qa", "message": "Đang tìm tài liệu tham khảo..."}
+data: {"type": "token", "content": "Dựa "}
+data: {"type": "token", "content": "trên "}
+data: {"type": "status", "node": "apply_guardrails", "message": "Đang kiểm tra an toàn & nguồn trích dẫn..."}
+data: {"type": "done", "data": { ...AgentRunOutput }}
+```
+
+**As-built:** `POST /chat` (sync JSON) vẫn giữ nguyên để tương thích; FE assistant ưu tiên `/chat/stream`.
+
 
 ---
 

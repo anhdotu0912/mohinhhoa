@@ -20,7 +20,7 @@ except ImportError:
     chromadb = None  # type: ignore
 
 from app.core.config import settings
-from app.rag.embeddings import get_embedding_function
+from app.rag.embeddings import embed_query_texts, get_embedding_function
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def retrieve_foods(
         where_filter = {"category": {"$eq": category_filter}}
 
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=embed_query_texts([query]),
         n_results=top_k,
         where=where_filter,
     )
@@ -132,7 +132,7 @@ def retrieve_guidelines(
         where_filter = {"source": {"$eq": source_filter}}
 
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=embed_query_texts([query]),
         n_results=top_k,
         where=where_filter,
     )

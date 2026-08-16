@@ -53,6 +53,12 @@ def indexed_client(chroma_dir):
 # ============================================================
 
 class TestEmbeddings:
+    def test_prepare_query_and_document_prefixes(self):
+        from app.rag.embeddings import prepare_document_text, prepare_query_text
+
+        assert "task: search result | query:" in prepare_query_text("cơm gạo lứt")
+        assert "title: none | text:" in prepare_document_text("nội dung")
+
     def test_embedding_function_loads(self):
         """Embedding function should load and produce vectors."""
         from app.rag.embeddings import get_embedding_function
@@ -257,7 +263,7 @@ class TestGraphCompilation:
         expected_nodes = [
             "profile_loader", "intent_classifier",
             "rag_qa", "meal_plan", "interaction_check",
-            "food_log", "refuse", "unknown",
+            "food_log", "refuse", "unknown", "apply_guardrails",
         ]
         for node_name in expected_nodes:
             assert node_name in graph.nodes, f"Missing node: {node_name}"
@@ -284,6 +290,29 @@ class TestNodes:
         state = {"user_id": "unknown_user_xyz"}
         result = profile_loader(state)
         assert result["profile"]["target_kcal"] == 1800
+
+    def test_profile_loader_db_profile(self, db_session):
+        """Profile loader should prefer DB profile over demo/default."""
+        from app.agents.nodes.profile_loader import profile_loader
+        from app.models.profile import Profile
+
+        db_session.add(
+            Profile(
+                user_id="db_user_123",
+                disease=["diabetes_t2"],
+                medications=["glipizide"],
+                allergies=["đậu phộng"],
+                target_kcal=1500,
+                restrictions={"carb_per_meal": 35},
+                preferences=["ăn chay"],
+            )
+        )
+        db_session.commit()
+
+        result = profile_loader({"user_id": "db_user_123", "db": db_session})
+        assert result["profile"]["target_kcal"] == 1500
+        assert result["profile"]["medications"] == ["glipizide"]
+        assert "đậu phộng" in result["profile"]["allergies"]
 
     def test_intent_classifier_meal_plan(self):
         """Meal plan keywords should classify correctly."""

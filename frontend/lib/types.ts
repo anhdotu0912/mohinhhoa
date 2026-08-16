@@ -387,15 +387,38 @@ export interface FoodCatalogOut {
   total: number;
 }
 
+export interface MealPreviewMeal {
+  slot: string;
+  label: string;
+  items: FoodItem[];
+}
+
+export interface MealPreviewOut {
+  date: string;
+  day_index: number;
+  meal_plan_id: string;
+  plan_status: string;
+  meals: MealPreviewMeal[];
+}
+
 export interface AgentRunOutput {
   intent: string;
   message: string;
   meal_plan_id?: string | null;
+  meal_preview?: MealPreviewOut | null;
   food_log_id?: string | null;
   alert_ids: string[];
   citations: string[];
   guardrail_triggered: boolean;
 }
+
+export type ChatStreamEvent =
+  | { type: "status"; node: string; message: string }
+  | { type: "intent"; intent: string }
+  | { type: "token"; content: string }
+  | { type: "correction"; message: string; reason?: string }
+  | { type: "done"; data: AgentRunOutput }
+  | { type: "error"; message: string };
 
 export class ApiError extends Error {
   status: number;

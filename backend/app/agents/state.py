@@ -37,6 +37,8 @@ class AgentState(TypedDict, total=False):
 
     # Outputs (populated by respective nodes)
     meal_plan: dict | None
+    meal_preview: dict | None
+    meal_plan_id: str | None
     food_log: dict | None
     interactions: dict | None
 

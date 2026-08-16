@@ -46,36 +46,45 @@ _DEMO_PROFILES: dict[str, dict] = {
 }
 
 
-def profile_loader(state: AgentState) -> AgentState:
-    """Load patient profile from demo data or existing state.
+def _default_profile(user_id: str) -> dict:
+    return {
+        "id": "",
+        "user_id": user_id,
+        "disease": ["diabetes_t2"],
+        "medications": ["metformin"],
+        "allergies": [],
+        "bmi": None,
+        "target_kcal": 1800,
+        "restrictions": {"carb_per_meal": 45, "sodium_daily": 2300},
+        "preferences": [],
+    }
 
-    In production, this would query the database via BE2 API.
-    """
+
+def profile_loader(state: AgentState) -> AgentState:
+    """Load patient profile from DB, demo data, or defaults."""
     user_id = state.get("user_id", "")
 
-    # If profile already in state, keep it
     if state.get("profile"):
         logger.debug("Profile already loaded for user %s", user_id)
         return state
 
-    # Look up demo profile
-    profile = _DEMO_PROFILES.get(user_id)
+    db = state.get("db")
+    if db is not None:
+        from app.services.meal_plan_service import get_profile_row
 
+        profile_obj = get_profile_row(db, user_id)
+        if profile_obj is not None:
+            logger.info("Loaded DB profile for user %s", user_id)
+            return {
+                **state,
+                "profile": profile_obj.model_dump(mode="json"),
+            }
+
+    profile = _DEMO_PROFILES.get(user_id)
     if profile:
         logger.info("Loaded demo profile for user %s", user_id)
     else:
-        # Default minimal profile for diabetes
         logger.warning("No profile found for user %s, using diabetes defaults", user_id)
-        profile = {
-            "id": "",
-            "user_id": user_id,
-            "disease": ["diabetes_t2"],
-            "medications": ["metformin"],
-            "allergies": [],
-            "bmi": None,
-            "target_kcal": 1800,
-            "restrictions": {"carb_per_meal": 45, "sodium_daily": 2300},
-            "preferences": [],
-        }
+        profile = _default_profile(user_id)
 
     return {**state, "profile": profile}

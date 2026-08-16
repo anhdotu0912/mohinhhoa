@@ -7,11 +7,6 @@ import { api } from "@/lib/api";
 import { homePathForRole, useAuthStore } from "@/lib/auth-store";
 import { ApiError } from "@/lib/types";
 
-const DEMO = {
-  doctor: { email: "demo_doctor@example.com", password: "demo1234" },
-  patient: { email: "demo_patient_1@example.com", password: "demo1234" },
-} as const;
-
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
@@ -58,13 +53,6 @@ export default function LoginPage() {
     void completeLogin(email, password);
   };
 
-  const handleDemoLogin = (targetRole: "doctor" | "patient") => {
-    const creds = DEMO[targetRole];
-    setEmail(creds.email);
-    setPassword(creds.password);
-    void completeLogin(creds.email, creds.password);
-  };
-
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-md font-body">
       <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl shadow-md max-w-md w-full">
@@ -90,7 +78,7 @@ export default function LoginPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="demo_patient_1@example.com"
+              placeholder="name@example.com"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -124,30 +112,6 @@ export default function LoginPage() {
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
-
-        <div className="mt-md p-sm bg-surface-container-low rounded-xl border border-outline-variant/40">
-          <p className="text-[11px] text-on-surface-variant font-semibold mb-xs text-center">
-            TRUY CẬP NHANH DEMO
-          </p>
-          <div className="flex gap-xs">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleDemoLogin("doctor")}
-              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer disabled:opacity-60"
-            >
-              Demo Bác sĩ
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleDemoLogin("patient")}
-              className="flex-1 py-1.5 px-xs bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold text-primary hover:border-primary transition-colors text-center cursor-pointer disabled:opacity-60"
-            >
-              Demo Bệnh nhân
-            </button>
-          </div>
-        </div>
 
         <div className="mt-lg pt-md border-t border-outline-variant/40 text-center">
           <p className="font-caption text-caption text-on-surface-variant text-xs">

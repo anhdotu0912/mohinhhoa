@@ -30,8 +30,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     DEEPSEEK_API_KEY: str = ""
 
-    # Embedding
+    # Embedding — provider: gemini (default) | local
+    EMBEDDING_PROVIDER: str = "gemini"
     EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    GEMINI_API_KEY: str = ""
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
+    GEMINI_EMBEDDING_DIMENSION: int = 768
 
     # Database
     DATABASE_URL: str = "sqlite:///./app.db"

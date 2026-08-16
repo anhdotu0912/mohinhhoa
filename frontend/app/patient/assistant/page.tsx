@@ -1,99 +1,235 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { TopBar } from "@/components/shared/TopBar";
+import {
+  ChatThinkingSteps,
+  ChatTypingDots,
+  type ThinkingStep,
+} from "@/components/patient/ChatThinkingSteps";
+import { DishCard, MealSectionHeader } from "@/components/patient/PatientMealPlanUI";
+import { api } from "@/lib/api";
+import { foodItemToDish } from "@/lib/meal-plan-mappers";
+import { ApiError, type AgentRunOutput, type MealPreviewOut } from "@/lib/types";
 
 interface Message {
   id: string;
   sender: "ai" | "user";
   text: string;
-  thoughts?: string[];
-  recommendations?: string[];
-  reference?: string;
+  intent?: string;
+  citations?: string[];
+  guardrailTriggered?: boolean;
+  mealPlanId?: string | null;
+  mealPreview?: MealPreviewOut | null;
+  isStreaming?: boolean;
+  thinkingSteps?: ThinkingStep[];
+  corrected?: boolean;
+  correctionReason?: string;
+}
+
+const INTENT_LABELS: Record<string, string> = {
+  meal_plan: "Xem thực đơn",
+  interaction_check: "Tương tác thuốc–thực phẩm",
+  rag_qa: "Hỏi đáp dinh dưỡng (RAG)",
+  refuse: "Từ chối yêu cầu ngoài phạm vi",
+  food_log: "Ghi nhận bữa ăn (chưa khả dụng)",
+  unknown: "Chưa phân loại được",
+};
+
+const SAMPLE_QUESTIONS = [
+  { text: "Hôm nay ăn gì?", icon: "restaurant" },
+  { text: "Trưa nay ăn gì?", icon: "wb_sunny" },
+  { text: "Tối nay nên ăn gì?", icon: "bedtime" },
+  {
+    text: "Tôi uống metformin có ăn rau muống được không?",
+    icon: "medical_services",
+  },
+  { text: "Thực đơn tuần này của tôi có gì?", icon: "calendar_month" },
+];
+
+const MEAL_SLOT_ICONS: Record<string, string> = {
+  breakfast: "wb_twilight",
+  lunch: "wb_sunny",
+  dinner: "bedtime",
+  snack: "cookie",
+};
+
+function formatCitationLabel(citation: string): string {
+  const base = citation.split("#")[0] || citation;
+  return base.replace(/_/g, " ").replace(/\.md$/i, "");
 }
 
 export default function PatientAssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      sender: "user",
-      text: "Gợi ý giúp tôi một bữa tối nhẹ nhàng, ít muối và không có thịt đỏ nhé.",
-    },
-    {
-      id: "2",
-      sender: "ai",
-      text: "Dựa trên hồ sơ sức khỏe của bạn (cần kiểm soát huyết áp) và yêu cầu bữa tối, tôi gợi ý thực đơn sau:",
-      thoughts: [
-        "Phân tích hồ sơ: Bệnh nhân nam, 55 tuổi, tiền sử tăng huyết áp.",
-        "Truy vấn CSDL: Tìm món ăn < 500mg Na, protein từ thực vật/cá.",
-        "Kiểm tra ràng buộc: Loại trừ thịt đỏ, đảm bảo calo ~400kcal.",
-        "Tổng hợp: Đề xuất 3 món phù hợp.",
-      ],
-      recommendations: [
-        "Cá hồi áp chảo sốt chanh dây: Khoảng 150g cá hồi, áp chảo với chút dầu oliu. Sốt chanh dây chua ngọt tự nhiên, không cần thêm muối.",
-        "Salad cải bó xôi và cà chua bi: Trộn với dầu giấm, cung cấp nhiều kali giúp cân bằng natri.",
-        "Nửa bát cơm gạo lứt: Cung cấp chất xơ hòa tan.",
-      ],
-      reference: "CSDL Thành phần Thực phẩm Việt Nam & Hướng dẫn điều trị Tăng huyết áp",
-    },
-  ]);
-
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputQuery, setInputQuery] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showReferences, setShowReferences] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  const latestAiMessage = useMemo(
+    () => [...messages].reverse().find((msg) => msg.sender === "ai"),
+    [messages]
+  );
+
+  const activeCitations = latestAiMessage?.citations ?? [];
+  const hasConversation = messages.length > 0;
+
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isSending, scrollToBottom]);
 
-  const sampleQuestions = [
-    { text: "Gợi ý thực đơn giảm muối cho hôm nay", icon: "restaurant" },
-    { text: "Món nào phù hợp với người tiểu đường?", icon: "medical_services" },
-    { text: "Giải thích vì sao tôi cần giảm đạm", icon: "science" },
-    { text: "Thực đơn tuần này của tôi có gì?", icon: "calendar_month" },
-  ];
+  const mapAgentResponse = (response: AgentRunOutput): Omit<Message, "id" | "sender"> => ({
+    text: response.message,
+    intent: response.intent,
+    citations: response.citations ?? [],
+    guardrailTriggered: response.guardrail_triggered,
+    mealPlanId: response.meal_plan_id,
+    mealPreview: response.meal_preview ?? null,
+    isStreaming: false,
+  });
 
-  const autocompleteChips = [
-    "Cách làm sốt chanh dây?",
-    "Đổi cá hồi thành ức gà được không?",
-    "Gợi ý đồ uống kèm theo",
-  ];
+  const upsertThinkingStep = (
+    steps: ThinkingStep[],
+    node: string,
+    message: string
+  ): ThinkingStep[] => {
+    const next = steps.map((s) =>
+      s.status === "active" ? { ...s, status: "done" as const } : s
+    );
+    const existingIdx = next.findIndex((s) => s.node === node && s.message === message);
+    if (existingIdx >= 0) {
+      next[existingIdx] = { ...next[existingIdx], status: "active" };
+      return next;
+    }
+    return [...next, { node, message, status: "active" }];
+  };
 
-  const handleSend = (textToSend?: string) => {
-    const query = textToSend || inputQuery;
-    if (!query.trim()) return;
+  const handleSend = async (textToSend?: string) => {
+    const query = (textToSend ?? inputQuery).trim();
+    if (!query || isSending) return;
 
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      sender: "user",
-      text: query.trim(),
-    };
-
-    setMessages((prev) => [...prev, newMsg]);
+    setError(null);
     setInputQuery("");
 
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: "ai",
-          text: `Cảm ơn bạn đã hỏi về "${query}". Hệ thống NutriAI đã ghi nhận yêu cầu và sẽ gợi ý thực đơn đáp ứng đúng phác đồ dinh dưỡng y khoa của bạn.`,
-          thoughts: [
-            "Phân tích yêu cầu bổ sung từ bệnh nhân.",
-            "Tra cứu chỉ số Dinh dưỡng & Khuyến nghị Lâm sàng.",
-          ],
-        },
-      ]);
-    }, 1000);
+    const userMsg: Message = {
+      id: `${Date.now()}-user`,
+      sender: "user",
+      text: query,
+    };
+
+    const aiMsgId = `${Date.now()}-ai`;
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      {
+        id: aiMsgId,
+        sender: "ai",
+        text: "",
+        isStreaming: true,
+        thinkingSteps: [],
+      },
+    ]);
+    setIsSending(true);
+
+    let streamingText = "";
+    let thinkingSteps: ThinkingStep[] = [];
+
+    try {
+      for await (const event of api.chatStream(query)) {
+        if (event.type === "status") {
+          thinkingSteps = upsertThinkingStep(thinkingSteps, event.node, event.message);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? { ...m, thinkingSteps: [...thinkingSteps] }
+                : m
+            )
+          );
+        } else if (event.type === "intent") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId ? { ...m, intent: event.intent } : m
+            )
+          );
+        } else if (event.type === "token") {
+          streamingText += event.content;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    text: streamingText,
+                  }
+                : m
+            )
+          );
+        } else if (event.type === "correction") {
+          streamingText = event.message;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    text: event.message,
+                    corrected: true,
+                    correctionReason: event.reason,
+                  }
+                : m
+            )
+          );
+        } else if (event.type === "done") {
+          const finalized = mapAgentResponse(event.data);
+          const completedSteps = thinkingSteps.map((s) => ({
+            ...s,
+            status: "done" as const,
+          }));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    ...finalized,
+                    text: event.data.message,
+                    thinkingSteps: completedSteps,
+                    corrected: m.corrected,
+                    correctionReason: m.correctionReason,
+                  }
+                : m
+            )
+          );
+          if (event.data.citations?.length) {
+            setShowReferences(true);
+          }
+        } else if (event.type === "error") {
+          setError(event.message);
+          setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
+        }
+      }
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Không thể kết nối trợ lý AI. Vui lòng thử lại.";
+      setError(message);
+      setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setError(null);
+    setInputQuery("");
   };
 
   return (
@@ -102,326 +238,390 @@ export default function PatientAssistantPage() {
         title="Trợ lý AI"
         rightSlot={
           <span className="px-sm py-[2px] rounded-full bg-primary/10 text-primary font-label text-xs border border-primary/20 flex items-center gap-xs">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            Đang hoạt động
+            <span
+              className={`w-2 h-2 rounded-full bg-primary ${
+                isSending ? "animate-pulse" : ""
+              }`}
+            />
+            {isSending ? "Đang trả lời…" : "Đang hoạt động"}
           </span>
         }
       />
-    <div className="flex-1 flex h-[calc(100vh-64px)] overflow-hidden bg-background">
-      {/* Column 1: Lịch sử trò chuyện (Left Panel - 240px) */}
-      {showHistory && (
-        <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-          <div className="p-md flex items-center justify-between border-b border-outline-variant/40">
-            <span className="font-h2 text-h2 text-on-surface font-semibold text-sm">Lịch sử chat</span>
-            <button
-              onClick={() => setShowHistory(false)}
-              className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
-              title="Ẩn lịch sử"
-            >
-              <span className="material-symbols-outlined text-[18px]">first_page</span>
-            </button>
-          </div>
-          <div className="p-md pt-xs">
-            <button
-              onClick={() => setMessages([])}
-              className="w-full bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg py-sm px-md flex items-center justify-center gap-sm hover:bg-surface-container-low transition-colors shadow-xs text-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              Cuộc trò chuyện mới
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-sm pb-md flex flex-col gap-sm">
-            <div className="px-sm py-xs">
-              <span className="font-label text-label text-on-surface-variant uppercase text-[11px] font-semibold tracking-wider">
-                GẦN ĐÂY
+      <div className="flex-1 flex h-[calc(100vh-64px)] overflow-hidden bg-background">
+        {showHistory && (
+          <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
+            <div className="p-md flex items-center justify-between border-b border-outline-variant/40">
+              <span className="font-h2 text-h2 text-on-surface font-semibold text-sm">
+                Phiên chat
               </span>
+              <button
+                type="button"
+                onClick={() => setShowHistory(false)}
+                className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
+                title="Ẩn lịch sử"
+              >
+                <span className="material-symbols-outlined text-[18px]">first_page</span>
+              </button>
             </div>
-            <button className="w-full text-left p-sm rounded-lg bg-surface-container-low border-l-2 border-primary group transition-all">
-              <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
-                Thực đơn giảm muối cho tuần này
-              </p>
-              <p className="font-caption text-caption text-on-surface-variant truncate mt-xs group-hover:text-primary transition-colors text-xs">
-                Hôm nay, 14:30
-              </p>
-            </button>
-            <button className="w-full text-left p-sm rounded-lg hover:bg-surface-container-high transition-colors">
-              <p className="font-body text-on-surface truncate text-sm">Phân tích chỉ số huyết áp ngày 12/05</p>
-              <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
-                Hôm qua, 09:15
-              </p>
-            </button>
-
-            <div className="px-sm py-xs mt-md">
-              <span className="font-label text-label text-on-surface-variant uppercase text-[11px] font-semibold tracking-wider">
-                TRƯỚC ĐÓ
-              </span>
+            <div className="p-md pt-xs">
+              <button
+                type="button"
+                onClick={handleNewConversation}
+                className="w-full bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg py-sm px-md flex items-center justify-center gap-sm hover:bg-surface-container-low transition-colors shadow-xs text-xs"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Cuộc trò chuyện mới
+              </button>
             </div>
-            <button className="w-full text-left p-sm rounded-lg hover:bg-surface-container-high transition-colors">
-              <p className="font-body text-on-surface truncate text-sm">Lượng đạm phù hợp cho bữa tối</p>
-              <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
-                3 ngày trước
-              </p>
-            </button>
-            <button className="w-full text-left p-sm rounded-lg hover:bg-surface-container-high transition-colors">
-              <p className="font-body text-on-surface truncate text-sm">Giải thích kết quả xét nghiệm sinh hóa</p>
-              <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
-                5 ngày trước
-              </p>
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Column 2: Main Chat Thread Container */}
-      <div className="flex-1 bg-background flex flex-col h-full overflow-hidden relative">
-        {/* Toggle Control Bar */}
-        <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
-              showHistory
-                ? "bg-primary/10 text-primary border border-primary/20"
-                : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
-            }`}
-            title={showHistory ? "Ẩn lịch sử trò chuyện" : "Hiện lịch sử trò chuyện"}
-          >
-            <span className="material-symbols-outlined text-[16px]">history</span>
-            <span>{showHistory ? "Ẩn lịch sử" : "Hiện lịch sử"}</span>
-          </button>
-
-          <div className="text-xs text-on-surface-variant font-medium hidden sm:block">
-            Phân tích y khoa & Tư vấn Dinh dưỡng Cá nhân
-          </div>
-
-          <button
-            onClick={() => setShowReferences(!showReferences)}
-            className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
-              showReferences
-                ? "bg-primary/10 text-primary border border-primary/20"
-                : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
-            }`}
-            title={showReferences ? "Ẩn tài liệu tham khảo" : "Hiện tài liệu tham khảo"}
-          >
-            <span className="material-symbols-outlined text-[16px]">library_books</span>
-            <span>{showReferences ? "Ẩn tham khảo" : "Hiện tham khảo"}</span>
-          </button>
-        </div>
-
-        {/* Scrollable Chat Area */}
-        <div className="flex-1 overflow-y-auto p-lg flex flex-col gap-xl scroll-smooth">
-          {/* AI Welcome Header */}
-          <div className="flex flex-col items-center justify-center mt-4 mb-4">
-            <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
-              <span className="material-symbols-outlined text-[32px] text-on-primary-container">smart_toy</span>
-            </div>
-            <h3 className="font-h2 text-h2 text-on-surface mb-sm font-bold text-xl">
-              Xin chào, tôi có thể giúp gì cho bạn?
-            </h3>
-            <p className="font-body text-body text-on-surface-variant text-center max-w-md text-sm">
-              Tôi là Trợ lý AI NutriAI, chuyên gia tư vấn dinh dưỡng cá nhân của bạn.
-            </p>
-
-            {/* Sample Questions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-sm mt-lg w-full max-w-2xl">
-              {sampleQuestions.map((q, idx) => (
+            <div className="flex-1 overflow-y-auto px-sm pb-md flex flex-col gap-sm">
+              {hasConversation ? (
                 <button
-                  key={idx}
-                  onClick={() => handleSend(q.text)}
-                  className="p-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-left hover:border-primary hover:bg-surface-container-low transition-colors shadow-sm flex items-start gap-sm cursor-pointer"
+                  type="button"
+                  className="w-full text-left p-sm rounded-lg bg-surface-container-low border-l-2 border-primary group transition-all"
                 >
-                  <span className="material-symbols-outlined text-primary mt-[2px] text-[18px]">
-                    {q.icon}
-                  </span>
-                  <span className="font-body text-body text-on-surface text-sm">{q.text}</span>
+                  <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
+                    {messages.find((m) => m.sender === "user")?.text ?? "Cuộc trò chuyện hiện tại"}
+                  </p>
+                  <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
+                    Phiên này · {messages.length} tin nhắn
+                  </p>
                 </button>
-              ))}
+              ) : (
+                <p className="px-sm py-md font-caption text-caption text-on-surface-variant text-xs">
+                  Chưa có hội thoại trong phiên này. Hãy gửi câu hỏi đầu tiên.
+                </p>
+              )}
             </div>
           </div>
+        )}
 
-          {/* Conversation Messages */}
-          {messages.map((msg) =>
-            msg.sender === "user" ? (
-              <div key={msg.id} className="flex justify-end w-full">
-                <div className="max-w-[75%] bg-primary text-on-primary rounded-2xl rounded-tr-sm p-md shadow-sm">
-                  <p className="font-body text-body">{msg.text}</p>
-                </div>
-              </div>
-            ) : (
-              <div key={msg.id} className="flex gap-md w-full max-w-[85%]">
-                <div className="w-8 h-8 rounded-full bg-primary-container flex-shrink-0 flex items-center justify-center mt-1 border border-outline-variant/30">
-                  <span className="material-symbols-outlined text-[18px] text-on-primary-container">
+        <div className="flex-1 bg-background flex flex-col h-full overflow-hidden relative">
+          <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
+                showHistory
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
+              }`}
+              title={showHistory ? "Ẩn lịch sử trò chuyện" : "Hiện lịch sử trò chuyện"}
+            >
+              <span className="material-symbols-outlined text-[16px]">history</span>
+              <span>{showHistory ? "Ẩn lịch sử" : "Hiện lịch sử"}</span>
+            </button>
+
+            <div className="text-xs text-on-surface-variant font-medium hidden sm:block">
+              Phân tích y khoa & Tư vấn Dinh dưỡng Cá nhân
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowReferences(!showReferences)}
+              className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
+                showReferences
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
+              }`}
+              title={showReferences ? "Ẩn tài liệu tham khảo" : "Hiện tài liệu tham khảo"}
+            >
+              <span className="material-symbols-outlined text-[16px]">library_books</span>
+              <span>{showReferences ? "Ẩn tham khảo" : "Hiện tham khảo"}</span>
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-lg flex flex-col gap-xl scroll-smooth">
+            {!hasConversation && (
+              <div className="flex flex-col items-center justify-center mt-4 mb-4">
+                <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
+                  <span className="material-symbols-outlined text-[32px] text-on-primary-container">
                     smart_toy
                   </span>
                 </div>
-                <div className="flex flex-col gap-sm w-full">
-                  {/* Agent Thought Process Accordion */}
-                  {msg.thoughts && msg.thoughts.length > 0 && (
-                    <details className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden group">
-                      <summary className="p-sm px-md flex items-center justify-between cursor-pointer hover:bg-surface-container-high transition-colors list-none">
-                        <div className="flex items-center gap-sm">
-                          <span className="material-symbols-outlined text-[16px] text-on-surface-variant group-open:animate-pulse">
-                            psychology
-                          </span>
-                          <span className="font-label text-label text-on-surface-variant font-semibold text-xs">
-                            Luồng tư duy của Agent
-                          </span>
-                        </div>
-                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant group-open:rotate-180 transition-transform">
-                          expand_more
-                        </span>
-                      </summary>
-                      <div className="p-md pt-0 border-t border-outline-variant/50">
-                        <div className="flex flex-col gap-sm relative mt-sm pl-sm border-l-2 border-outline-variant/30">
-                          {msg.thoughts.map((thought, tIdx) => (
-                            <div key={tIdx} className="relative pl-md">
-                              <div className="absolute left-[-21px] top-1 w-2 h-2 rounded-full bg-primary"></div>
-                              <p className="font-mono text-[11px] text-on-surface-variant">{thought}</p>
+                <h3 className="font-h2 text-h2 text-on-surface mb-sm font-bold text-xl">
+                  Xin chào, tôi có thể giúp gì cho bạn?
+                </h3>
+                <p className="font-body text-body text-on-surface-variant text-center max-w-md text-sm">
+                  Tôi là Trợ lý AI NutriAI — hỗ trợ lập thực đơn, kiểm tra tương tác thuốc–thực
+                  phẩm và trả lời câu hỏi dinh dưỡng có nguồn trích dẫn.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-sm mt-lg w-full max-w-2xl">
+                  {SAMPLE_QUESTIONS.map((q) => (
+                    <button
+                      key={q.text}
+                      type="button"
+                      disabled={isSending}
+                      onClick={() => void handleSend(q.text)}
+                      className="p-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-left hover:border-primary hover:bg-surface-container-low transition-colors shadow-sm flex items-start gap-sm cursor-pointer disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-primary mt-[2px] text-[18px]">
+                        {q.icon}
+                      </span>
+                      <span className="font-body text-body text-on-surface text-sm">{q.text}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg) =>
+              msg.sender === "user" ? (
+                <div key={msg.id} className="flex justify-end w-full">
+                  <div className="max-w-[75%] bg-primary text-on-primary rounded-2xl rounded-tr-sm p-md shadow-sm">
+                    <p className="font-body text-body whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+                </div>
+              ) : (
+                <div key={msg.id} className="flex gap-md w-full max-w-[85%]">
+                  <div className="w-8 h-8 rounded-full bg-primary-container flex-shrink-0 flex items-center justify-center mt-1 border border-outline-variant/30">
+                    <span className="material-symbols-outlined text-[18px] text-on-primary-container">
+                      smart_toy
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-sm w-full">
+                    <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl rounded-tl-sm p-md shadow-sm">
+                      {msg.isStreaming && !msg.text && <ChatTypingDots />}
+
+                      {msg.text && (
+                        <p
+                          className={`font-body text-body text-on-surface whitespace-pre-wrap ${
+                            msg.mealPreview && msg.mealPreview.meals.length > 0 ? "mb-sm" : ""
+                          }`}
+                        >
+                          {msg.text}
+                          {msg.isStreaming && (
+                            <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
+                          )}
+                        </p>
+                      )}
+
+                      {msg.corrected && (
+                        <p className="inline-flex items-center gap-xs text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-sm py-xs mt-sm">
+                          <span className="material-symbols-outlined text-[14px]">shield</span>
+                          Đã điều chỉnh để đảm bảo an toàn
+                        </p>
+                      )}
+
+                      {msg.mealPreview && msg.mealPreview.meals.length > 0 && (
+                        <div className="mt-md flex flex-col gap-md border-t border-outline-variant/50 pt-md">
+                          <div className="flex flex-wrap items-center gap-sm">
+                            {msg.mealPreview.plan_status === "pending_review" && (
+                              <span className="inline-flex items-center gap-xs px-sm py-xs bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-medium">
+                                <span className="material-symbols-outlined text-[14px]">pending</span>
+                                Chờ bác sĩ duyệt
+                              </span>
+                            )}
+                            {msg.mealPreview.plan_status === "approved" && (
+                              <span className="inline-flex items-center gap-xs px-sm py-xs bg-green-50 border border-green-200 rounded-lg text-green-800 text-xs font-medium">
+                                <span className="material-symbols-outlined text-[14px]">verified</span>
+                                Đã duyệt
+                              </span>
+                            )}
+                            <Link
+                              href="/patient/meals"
+                              className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary text-xs font-medium"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
+                              Xem đầy đủ
+                            </Link>
+                          </div>
+
+                          {msg.mealPreview.meals.map((meal) => (
+                            <div key={meal.slot} className="flex flex-col gap-sm">
+                              <MealSectionHeader
+                                label={meal.label}
+                                icon={MEAL_SLOT_ICONS[meal.slot] ?? "restaurant"}
+                              />
+                              {meal.items.length === 0 ? (
+                                <p className="text-xs text-on-surface-variant px-1">
+                                  Chưa có món cho bữa này.
+                                </p>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
+                                  {meal.items.map((item, idx) => (
+                                    <DishCard
+                                      key={`${meal.slot}-${item.name}-${idx}`}
+                                      item={foodItemToDish(item)}
+                                      portion={item.portion}
+                                      compact
+                                    />
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    </details>
-                  )}
+                      )}
 
-                  {/* AI Message Bubble */}
-                  <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl rounded-tl-sm p-md shadow-sm">
-                    <p className="font-body text-body text-on-surface mb-sm">{msg.text}</p>
-                    {msg.recommendations && (
-                      <ul className="list-disc pl-md font-body text-body text-on-surface flex flex-col gap-xs mb-sm">
-                        {msg.recommendations.map((rec, rIdx) => (
-                          <li key={rIdx}>
-                            <strong>{rec.split(":")[0]}:</strong>
-                            {rec.split(":")[1]}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {msg.reference && (
-                      <button
-                        onClick={() => setShowReferences(true)}
-                        className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 cursor-pointer"
+                      {msg.intent === "meal_plan" && !msg.mealPreview && (
+                        <Link
+                          href="/patient/meals"
+                          className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 text-xs font-medium"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
+                          Mở mục Thực đơn
+                        </Link>
+                      )}
+
+                      {msg.citations && msg.citations.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowReferences(true)}
+                          className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">description</span>
+                          <span className="font-caption text-caption font-medium text-xs">
+                            {msg.citations.length} nguồn tham khảo
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {(msg.intent ||
+                      msg.guardrailTriggered ||
+                      (msg.thinkingSteps && msg.thinkingSteps.length > 0)) && (
+                      <details
+                        className="bg-surface-container border border-outline-variant rounded-xl overflow-hidden group"
+                        open={msg.isStreaming}
                       >
-                        <span className="material-symbols-outlined text-[14px]">description</span>
-                        <span className="font-caption text-caption font-medium text-xs">
-                          📄 Xem tài liệu tham khảo: {msg.reference}
-                        </span>
-                      </button>
+                        <summary className="p-sm px-md flex items-center justify-between cursor-pointer hover:bg-surface-container-high transition-colors list-none">
+                          <div className="flex items-center gap-sm">
+                            <span className="material-symbols-outlined text-[16px] text-on-surface-variant">
+                              psychology
+                            </span>
+                            <span className="font-label text-label text-on-surface-variant font-semibold text-xs">
+                              Phân loại:{" "}
+                              {msg.intent
+                                ? INTENT_LABELS[msg.intent] ?? msg.intent
+                                : "Đang xử lý…"}
+                              {msg.guardrailTriggered ? " · Guardrail" : ""}
+                            </span>
+                          </div>
+                          <span className="material-symbols-outlined text-[18px] text-on-surface-variant group-open:rotate-180 transition-transform">
+                            expand_more
+                          </span>
+                        </summary>
+                        <div className="p-md pt-0 border-t border-outline-variant/50">
+                          {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                            <div className="mt-sm">
+                              <ChatThinkingSteps steps={msg.thinkingSteps} />
+                            </div>
+                          )}
+                          {msg.intent && (
+                            <p className="font-caption text-caption text-on-surface-variant text-xs mt-sm">
+                              Intent: <code>{msg.intent}</code>
+                              {msg.guardrailTriggered
+                                ? " — hệ thống đã áp dụng guardrail an toàn lâm sàng."
+                                : ""}
+                            </p>
+                          )}
+                        </div>
+                      </details>
                     )}
                   </div>
                 </div>
-              </div>
-            )
-          )}
-          {/* Scroll Anchor */}
-          <div ref={messagesEndRef} />
-        </div>
+              )
+            )}
 
-        {/* Input Area (Fixed Bottom) */}
-        <div className="p-md bg-background border-t border-outline-variant shrink-0 relative">
-          {/* Autocomplete Chips */}
-          <div className="flex gap-sm mb-sm overflow-x-auto absolute top-[-40px] left-0 w-full px-md">
-            {autocompleteChips.map((chip, cIdx) => (
+            {error && (
+              <div className="mx-auto max-w-lg w-full rounded-lg border border-red-200 bg-red-50 px-md py-sm text-sm text-red-800">
+                {error}
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-md bg-background border-t border-outline-variant shrink-0 relative">
+            <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
+              <textarea
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSend();
+                  }
+                }}
+                disabled={isSending}
+                className="flex-1 bg-transparent border-none focus:ring-0 resize-none font-body text-body text-on-surface p-sm min-h-[40px] max-h-[120px] focus:outline-none disabled:opacity-60"
+                placeholder="Nhập câu hỏi của bạn..."
+                rows={1}
+              />
               <button
-                key={cIdx}
-                onClick={() => handleSend(chip)}
-                className="whitespace-nowrap px-sm py-xs bg-surface-container-lowest border border-outline-variant rounded-full font-caption text-caption text-on-surface-variant hover:bg-surface-container-low shadow-sm text-xs cursor-pointer"
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={isSending || !inputQuery.trim()}
+                className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-colors shrink-0 mb-[2px] mr-[2px] cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {chip}
+                <span className="material-symbols-outlined text-[20px]">send</span>
               </button>
-            ))}
-          </div>
-
-          <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
-            <button className="p-sm text-on-surface-variant hover:text-primary transition-colors mb-[2px]">
-              <span className="material-symbols-outlined text-[20px]">attach_file</span>
-            </button>
-            <textarea
-              value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              className="flex-1 bg-transparent border-none focus:ring-0 resize-none font-body text-body text-on-surface p-sm min-h-[40px] max-h-[120px] focus:outline-none"
-              placeholder="Nhập câu hỏi của bạn..."
-              rows={1}
-            />
-            <button
-              onClick={() => handleSend()}
-              className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-colors shrink-0 mb-[2px] mr-[2px] cursor-pointer active:scale-95"
-            >
-              <span className="material-symbols-outlined text-[20px]">send</span>
-            </button>
+            </div>
           </div>
         </div>
+
+        {showReferences && (
+          <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
+            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between">
+              <div className="flex items-center gap-sm">
+                <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
+                <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">
+                  Tài liệu tham khảo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReferences(false)}
+                className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
+                title="Ẩn tham khảo"
+              >
+                <span className="material-symbols-outlined text-[18px]">last_page</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
+              <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs">
+                Nguồn từ câu trả lời AI gần nhất.
+              </p>
+
+              {activeCitations.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-outline-variant p-md text-center">
+                  <span className="material-symbols-outlined text-on-surface-variant text-[28px]">
+                    menu_book
+                  </span>
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-sm">
+                    Chưa có nguồn trích dẫn cho tin nhắn này.
+                  </p>
+                </div>
+              ) : (
+                activeCitations.map((cite, idx) => (
+                  <div
+                    key={`${cite}-${idx}`}
+                    className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm"
+                  >
+                    <div className="flex justify-between items-start mb-sm">
+                      <div className="flex items-center gap-xs text-primary bg-primary/10 px-xs py-[2px] rounded text-[10px] font-bold">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        NGUỒN #{idx + 1}
+                      </div>
+                    </div>
+                    <h4 className="font-body-bold text-body-bold text-on-surface mb-xs flex items-start gap-xs font-semibold text-sm">
+                      <span className="material-symbols-outlined text-[18px] text-primary mt-[2px] shrink-0">
+                        article
+                      </span>
+                      {formatCitationLabel(cite)}
+                    </h4>
+                    <p className="font-caption text-caption text-on-surface-variant text-xs break-all">
+                      {cite}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Column 3: Tài liệu tham khảo Panel (Right Panel - 320px) */}
-      {showReferences && (
-        <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-          <div className="p-md border-b border-outline-variant/50 flex items-center justify-between">
-            <div className="flex items-center gap-sm">
-              <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
-              <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">Tài liệu tham khảo</h3>
-            </div>
-            <button
-              onClick={() => setShowReferences(false)}
-              className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
-              title="Ẩn tham khảo"
-            >
-              <span className="material-symbols-outlined text-[18px]">last_page</span>
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
-            <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs">
-              Các nguồn dữ liệu được sử dụng để tạo ra câu trả lời bên cạnh.
-            </p>
-
-            {/* Source Card 1 */}
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-              <div className="flex justify-between items-start mb-sm">
-                <div className="flex items-center gap-xs text-primary bg-primary/10 px-xs py-[2px] rounded text-[10px] font-bold">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  ĐỘ LIÊN QUAN: CAO
-                </div>
-                <span className="material-symbols-outlined text-on-surface-variant text-[18px]">open_in_new</span>
-              </div>
-              <h4 className="font-body-bold text-body-bold text-on-surface mb-xs flex items-start gap-xs font-semibold text-sm">
-                <span className="material-symbols-outlined text-[18px] text-primary mt-[2px] shrink-0">
-                  article
-                </span>
-                CSDL Thành phần Thực phẩm Việt Nam
-              </h4>
-              <p className="font-caption text-caption text-on-surface-variant line-clamp-3 text-xs">
-                Viện Dinh dưỡng Quốc gia. Bảng thành phần thực phẩm Việt Nam (2007). Hàm lượng Natri trong 100g cá hồi tươi, các loại rau củ...
-              </p>
-            </div>
-
-            {/* Source Card 2 */}
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-              <div className="flex justify-between items-start mb-sm">
-                <div className="flex items-center gap-xs text-on-surface-variant bg-surface-container-high px-xs py-[2px] rounded text-[10px] font-bold">
-                  <span className="material-symbols-outlined text-[14px]">info</span>
-                  ĐỘ LIÊN QUAN: TRUNG BÌNH
-                </div>
-              </div>
-              <h4 className="font-body-bold text-body-bold text-on-surface mb-xs flex items-start gap-xs font-semibold text-sm">
-                <span className="material-symbols-outlined text-[18px] text-secondary mt-[2px] shrink-0">
-                  book
-                </span>
-                Hướng dẫn điều trị Tăng huyết áp
-              </h4>
-              <p className="font-caption text-caption text-on-surface-variant line-clamp-3 text-xs">
-                Bộ Y tế (2022). Hướng dẫn chẩn đoán và điều trị tăng huyết áp. Khuyến nghị chế độ ăn DASH, giảm muối &lt; 5g/ngày...
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
     </>
   );
 }

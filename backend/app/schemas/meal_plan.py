@@ -150,11 +150,28 @@ class AgentRunInput(BaseModel):
     force_intent: str | None = None
 
 
+class MealPreviewMeal(BaseModel):
+    """Single meal slot in chat meal preview."""
+    slot: str
+    label: str
+    items: list[FoodItem] = Field(default_factory=list)
+
+
+class MealPreviewOut(BaseModel):
+    """Structured meal preview for chat UI — read-only from existing plan."""
+    date: str
+    day_index: int
+    meal_plan_id: str
+    plan_status: str
+    meals: list[MealPreviewMeal] = Field(default_factory=list)
+
+
 class AgentRunOutput(BaseModel):
     """Output of run_agent facade."""
     intent: str = "unknown"
     message: str = ""
     meal_plan_id: str | None = None
+    meal_preview: MealPreviewOut | None = None
     food_log_id: str | None = None
     alert_ids: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)

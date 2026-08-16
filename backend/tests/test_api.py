@@ -514,15 +514,49 @@ def test_update_patient_metrics(client):
 
 def test_chat_thin_wrapper(client):
     headers = _login(client, PATIENT)
+
+    gen = client.post("/api/v1/meal-plans/generate", headers=headers)
+    assert gen.status_code == 200, gen.text
+    existing_plan_id = gen.json()["id"]
+
+    from app.models.meal_plan import MealPlan
+    from app.db.session import get_db
+    from app.main import app
+
+    def _count_plans():
+        override = app.dependency_overrides.get(get_db)
+        db = next(override())
+        try:
+            return db.query(MealPlan).filter(MealPlan.user_id == "demo_patient_1").count()
+        finally:
+            db.close()
+
+    count_before = _count_plans()
+
     response = client.post(
         "/api/v1/chat",
         headers=headers,
-        json={"message": "Tạo thực đơn cho tôi"},
+        json={"message": "Hôm nay ăn gì?"},
     )
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["intent"] == "meal_plan"
     assert data["message"]
+    assert data["meal_preview"] is not None
+    assert len(data["meal_preview"]["meals"]) >= 1
+    assert data["meal_plan_id"] == existing_plan_id
+    assert _count_plans() == count_before
+
+    create_resp = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"message": "Tạo thực đơn cho tôi"},
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    create_data = create_resp.json()
+    assert create_data["intent"] == "meal_plan"
+    assert _count_plans() == count_before
+    assert "bác sĩ" in create_data["message"].lower()
 
 
 def test_chat_empty_message_rejected(client):
