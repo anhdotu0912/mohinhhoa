@@ -26,6 +26,7 @@ from app.schemas.doctor import (
     DiagnosisItem,
     DoctorPatientSummary,
     DoctorPatientUpdate,
+    DoctorConstraintsUpdate,
     FoodCatalogItem,
     FoodCatalogMacros,
     FoodCatalogOut,
@@ -125,6 +126,9 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
     bmi = profile.bmi if profile else None
     target_kcal = profile.target_kcal if profile and profile.target_kcal else 1800
     preferences = list(profile.preferences or []) if profile else []
+    restrictions = dict(profile.restrictions or {}) if profile else {}
+    salt_daily_g = restrictions.get("salt_daily_g")
+    sugar_daily_g = restrictions.get("sugar_daily_g")
 
     latest_plan = (
         db.query(MealPlan)
@@ -202,6 +206,8 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         allergies=allergies,
         bmi=bmi,
         target_kcal=target_kcal,
+        salt_daily_g=salt_daily_g,
+        sugar_daily_g=sugar_daily_g,
         preferences=preferences,
         status=status,  # type: ignore[arg-type]
         status_key=status_key,  # type: ignore[arg-type]
@@ -413,6 +419,38 @@ def update_patient_profile(
     ):
         if field in provided:
             setattr(profile, field, getattr(payload, field))
+    db.commit()
+    return _patient_summary(db, patient)
+
+
+@router.put("/patients/{patient_id}/constraints", response_model=DoctorPatientSummary)
+def update_patient_constraints(
+    patient_id: str,
+    payload: DoctorConstraintsUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorPatientSummary:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+
+    profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
+    if profile is None:
+        profile = Profile(user_id=patient.id)
+        db.add(profile)
+
+    provided = payload.model_fields_set
+    if "target_kcal" in provided and payload.target_kcal is not None:
+        profile.target_kcal = payload.target_kcal
+
+    restrictions = dict(profile.restrictions or {})
+    if "salt_daily_g" in provided:
+        restrictions["salt_daily_g"] = payload.salt_daily_g
+    if "sugar_daily_g" in provided:
+        restrictions["sugar_daily_g"] = payload.sugar_daily_g
+    profile.restrictions = restrictions
+
     db.commit()
     return _patient_summary(db, patient)
 

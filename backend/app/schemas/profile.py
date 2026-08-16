@@ -7,6 +7,8 @@ class Restrictions(BaseModel):
     """Dietary restrictions per-meal/daily limits."""
     carb_per_meal: float | None = Field(None, description="Max carb grams per meal")
     sodium_daily: float | None = Field(None, description="Max sodium mg per day")
+    salt_daily_g: float | None = Field(None, description="Max salt grams per day (doctor-set)")
+    sugar_daily_g: float | None = Field(None, description="Max free sugar grams per day (doctor-set)")
 
 
 class PatientProfile(BaseModel):

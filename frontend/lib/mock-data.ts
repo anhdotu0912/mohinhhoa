@@ -28,6 +28,9 @@ export interface Patient {
   planPending?: number;
   planTotal?: number;
   alertCount?: number;
+  targetKcal?: number;
+  saltDailyG?: number;
+  sugarDailyG?: number;
 }
 
 export function statusColorFor(
@@ -68,6 +71,9 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     planPending: p.plan_pending ?? 0,
     planTotal: p.plan_total ?? 0,
     alertCount: p.alert_count,
+    targetKcal: p.target_kcal,
+    saltDailyG: p.salt_daily_g ?? undefined,
+    sugarDailyG: p.sugar_daily_g ?? undefined,
   };
 }
 
@@ -91,6 +97,9 @@ export const MOCK_PATIENTS: Patient[] = [
     height: 171,
     bloodSugar: "7.8 mmol/L",
     bloodPressure: "135/85 mmHg",
+    targetKcal: 1600,
+    saltDailyG: 4.5,
+    sugarDailyG: 20,
   },
   {
     id: "BN-10294",
@@ -111,6 +120,9 @@ export const MOCK_PATIENTS: Patient[] = [
     height: 162,
     bloodSugar: "5.6 mmol/L",
     bloodPressure: "120/80 mmHg",
+    targetKcal: 1700,
+    saltDailyG: 3.0,
+    sugarDailyG: 15,
   },
   {
     id: "BN-10295",
@@ -131,5 +143,8 @@ export const MOCK_PATIENTS: Patient[] = [
     height: 170,
     bloodSugar: "6.2 mmol/L",
     bloodPressure: "145/95 mmHg",
+    targetKcal: 1800,
+    saltDailyG: 5.0,
+    sugarDailyG: 25,
   },
 ];

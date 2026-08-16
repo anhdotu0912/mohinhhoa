@@ -72,32 +72,34 @@
 
 ---
 
-## 3. Clinical Constraints `[Planned]`
+## 3. Clinical Constraints
 
-Chưa tồn tại as-built — patient tự set `restrictions`/`target_kcal` qua `POST /profile`, doctor **chưa** có cách set hộ (`PUT /doctor/patients/{id}/profile` hiện không nhận 2 field này). Thiết kế đề xuất, xem `specs/04-clinical-constraints.md`.
+Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Doctor set qua endpoint riêng bên dưới (as-built 2026-08-16). `PUT /doctor/patients/{id}/profile` **không** nhận `target_kcal`/`restrictions`.
 
-**Quyết định 2026-08-15 (đã chốt, thay cho `[CẦN XÁC NHẬN]` trước đây):**
-- **Mở rộng schema `Restrictions`** thêm `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` để khớp UI `frontend/app/doctor/patients/constraints/page.tsx` — giữ nguyên song song `carb_per_meal`/`sodium_daily` cũ, không xoá.
-- **HITL cho ràng buộc lâm sàng:** patient tự sửa qua `POST /profile` → có hiệu lực ngay nhưng gắn `constraints_status="pending_doctor_review"`; doctor sửa qua endpoint này → có hiệu lực ngay và giữ `constraints_status="confirmed"` (doctor là người xác nhận trực tiếp, không cần duyệt lại).
+**Quyết định 2026-08-16 (as-built):**
+- **Ràng buộc doctor UI:** `target_kcal`, `salt_daily_g`, `sugar_daily_g` — khớp trang `frontend/app/doctor/patients/constraints/page.tsx`.
+- **Schema `Restrictions`:** giữ song song `carb_per_meal`/`sodium_daily` (patient) + `salt_daily_g`/`sugar_daily_g` (doctor). Meal planner dùng `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị.
+- **`protein_daily_g`:** bỏ khỏi scope ràng buộc (Won't Have MVP này).
 
-### `PUT /doctor/patients/{patient_id}/constraints` `[Planned]`
+**Deferred `[Planned]`:**
+- **HITL `constraints_status`:** patient tự sửa → `pending_doctor_review`; doctor approve qua endpoint riêng — chưa implement trong MVP này.
+- **`POST /doctor/patients/{id}/constraints/approve`:** deferred cùng HITL.
+
+### `PUT /doctor/patients/{patient_id}/constraints` (as-built)
 **Role:** `doctor`. Partial update — chỉ field gửi lên mới bị ghi đè.
 ```json
-// Request
+// Request (flat — không bọc trong restrictions)
 {
   "target_kcal": 1700,
-  "restrictions": {
-    "carb_per_meal": 40,
-    "sodium_daily": 1400,
-    "salt_daily_g": 5,
-    "sugar_daily_g": 20,
-    "protein_daily_g": 65
-  }
+  "salt_daily_g": 4.5,
+  "sugar_daily_g": 20
 }
-// Response 200 → PatientProfile (target_kcal + restrictions đã cập nhật, constraints_status="confirmed")
+// Response 200 → DoctorPatientSummary (target_kcal + salt_daily_g + sugar_daily_g đã cập nhật)
+// Error 404 PATIENT_NOT_FOUND — bệnh nhân không tồn tại
+// Error 422 — target_kcal/salt/sugar ngoài range validation
 ```
 
-### `POST /doctor/patients/{patient_id}/constraints/approve` `[Planned]`
+### `POST /doctor/patients/{patient_id}/constraints/approve` `[Planned]` (deferred)
 **Role:** `doctor`. Xác nhận thay đổi ràng buộc mà **patient tự sửa** trước đó (không đổi giá trị, chỉ chuyển `constraints_status` từ `"pending_doctor_review"` → `"confirmed"`).
 ```json
 // Request: rỗng (không cần body)
@@ -482,7 +484,7 @@ Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeh
 - Version hiện tại: **1.1**.
 - **Changelog 1.0 → 1.1 (2026-08-15) — tổng hợp quyết định team sau vòng review đầu:**
   1. Thêm `POST /auth/forgot-password`, `POST /auth/reset-password` `[Planned]` + rate-limit `POST /auth/login` `[Planned]`.
-  2. `PUT /doctor/patients/{id}/constraints` mở rộng field (`salt_daily_g`/`sugar_daily_g`/`protein_daily_g`); thêm `POST /doctor/patients/{id}/constraints/approve` `[Planned]`; `POST /profile` set `constraints_status` khi patient tự sửa.
+  2. `PUT /doctor/patients/{id}/constraints` as-built (`target_kcal`, `salt_daily_g`, `sugar_daily_g`); `POST /doctor/patients/{id}/constraints/approve` + `constraints_status` HITL vẫn `[Planned]`/deferred.
   3. Thêm `POST /meal-plans/{id}/request-adjustment` `[Planned]`; ghi nhận quyết định persist meal plan sinh qua `/chat`.
   4. `InteractionCheckOutput` thêm `unmatched_pairs[]` `[Planned]`.
   5. `POST /doctor/meal-plans/{id}/review` thêm optimistic lock + `409 PLAN_ALREADY_REVIEWED` `[Planned]`.

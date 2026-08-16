@@ -10,6 +10,7 @@ class Macros(BaseModel):
     protein_g: float = 0
     fat_g: float = 0
     sodium_mg: float = 0
+    sugar_g: float = 0
 
 
 # --- MealPlan schemas (contract §1.2) ---
@@ -38,6 +39,7 @@ class DayTotals(BaseModel):
     protein_g: float = 0
     fat_g: float = 0
     sodium_mg: float = 0
+    sugar_g: float = 0
 
 
 class DayPlan(BaseModel):

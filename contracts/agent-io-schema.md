@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.1 (2026-08-15 — bổ sung quyết định team sau vòng review đầu: mở rộng `Restrictions`, `constraints_status`, `FoodLogEntry.slot` 3-giá-trị, `unmatched_pairs` trong `InteractionCheckOutput`, `secondary_intents` Planned trong `AgentRunOutput`. Xem changelog ở §7 Versioning.)
+**Version:** 1.2 (2026-08-16 — as-built `salt_daily_g`/`sugar_daily_g` trên `Restrictions`; thêm `Macros.sugar_g`/`DayTotals.sugar_g`; bỏ `protein_daily_g` khỏi scope ràng buộc doctor; quy đổi muối→natri `salt_daily_g*400=sodium_mg` trong meal planner. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -46,8 +46,7 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
     "carb_per_meal": 45,
     "sodium_daily": 1500,
     "salt_daily_g": 5,
-    "sugar_daily_g": 25,
-    "protein_daily_g": 60
+    "sugar_daily_g": 25
   },
   "preferences": ["thích ăn cơm", "không ăn thịt bò"],
   "treatment_goals": ["Kiểm soát đường huyết ổn định (HbA1c < 7%)."],
@@ -60,7 +59,8 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
 - `allergies` = **hard filter** (loại tuyệt đối khỏi thực đơn, không có ngoại lệ) — dùng trong `meal_planner_agent._is_allergic`.
 - `preferences` = **soft filter** — as-built hiện chỉ match đúng 1 pattern hard-code (`"không ăn thịt bò"`). **[Planned, quyết định 2026-08-15]** mở rộng thêm danh sách pattern phổ biến khác (ví dụ `"ăn chay"`, `"không ăn hải sản"`, `"không ăn heo/lợn"`, `"không ăn gà"`) — danh sách cụ thể do BE1 chốt khi implement, xem `specs/02` §3 rule 4 và `tasks/be1-ai-core.md`.
 - `restrictions.carb_per_meal`/`restrictions.sodium_daily` optional, `null` = không áp giới hạn đó — **as-built**.
-- **`restrictions.salt_daily_g`/`sugar_daily_g`/`protein_daily_g` — `[Planned]`, quyết định 2026-08-15:** mở rộng schema `Restrictions` để khớp UI doctor `constraints` đã thiết kế sẵn (`frontend/app/doctor/patients/constraints/page.tsx`). Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ (không xoá field cũ), tất cả optional, `null` = không áp giới hạn. Chưa có trong Pydantic schema thật — cần BE2 bổ sung.
+- **`restrictions.salt_daily_g`/`sugar_daily_g` — as-built (2026-08-16):** doctor set qua `PUT /doctor/patients/{id}/constraints`; optional, `null` = không áp giới hạn. Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ (patient set qua `POST /profile`). Meal planner quy đổi `salt_daily_g` → natri hiệu lực: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị (hằng số 400 mg natri/g muối).
+- **`protein_daily_g` — Won't Have (2026-08-16):** bỏ khỏi scope ràng buộc doctor; `protein_g` vẫn có trong `Macros`/`DayTotals` như thông tin dinh dưỡng, không phải ngưỡng ràng buộc.
 - **`constraints_status` — `[Planned]`, quyết định 2026-08-15:** enum `"confirmed" | "pending_doctor_review"`. Default `"confirmed"`. Chuyển sang `"pending_doctor_review"` khi **patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile`; reset lại `"confirmed"` khi **doctor xác nhận** (qua `POST /doctor/patients/{id}/constraints/approve` hoặc khi doctor tự sửa trực tiếp qua `PUT /doctor/patients/{id}/constraints`). Giá trị mới của patient **vẫn được áp dụng ngay** cho lần generate plan kế tiếp trong lúc chờ duyệt (không block demo flow) — `constraints_status` chỉ là cờ hiển thị cho doctor biết cần xem lại, không phải cờ chặn sử dụng. Xem thiết kế đầy đủ ở `specs/04-clinical-constraints.md`.
 
 ---
@@ -89,17 +89,17 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Luôn **7 ngày** (`days_count=7` m
               "name": "Cháo yến mạch",
               "portion": "1 bát (~250ml)",
               "kcal": 220,
-              "macros": { "carb_g": 38, "protein_g": 8, "fat_g": 4, "sodium_mg": 40 },
+              "macros": { "carb_g": 38, "protein_g": 8, "fat_g": 4, "sodium_mg": 40, "sugar_g": 2 },
               "food_id": "f_yen_mach",
               "citations": ["food_catalog_demo#f_yen_mach", "byt_vn_notes.md"],
               "alternatives": [
-                { "name": "Bánh mì nguyên cám", "portion": "2 lát", "kcal": 180, "macros": {"carb_g": 34, "protein_g": 7, "fat_g": 2, "sodium_mg": 220}, "food_id": "f_banh_mi_cam", "citations": ["food_catalog_demo#f_banh_mi_cam"], "alternatives": [] }
+                { "name": "Bánh mì nguyên cám", "portion": "2 lát", "kcal": 180, "macros": {"carb_g": 34, "protein_g": 7, "fat_g": 2, "sodium_mg": 220, "sugar_g": 2}, "food_id": "f_banh_mi_cam", "citations": ["food_catalog_demo#f_banh_mi_cam"], "alternatives": [] }
               ]
             }
           ]
         }
       ],
-      "totals": { "kcal": 1780, "carb_g": 200, "protein_g": 80, "fat_g": 55, "sodium_mg": 1400 },
+      "totals": { "kcal": 1780, "carb_g": 200, "protein_g": 80, "fat_g": 55, "sodium_mg": 1400, "sugar_g": 22 },
       "warnings": []
     }
   ],
@@ -265,7 +265,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.1**.
+- Version hiện tại của contract này: **1.2**.
+- **Changelog 1.1 → 1.2 (2026-08-16):** `Restrictions.salt_daily_g`/`sugar_daily_g` chuyển từ `[Planned]` → as-built; thêm `Macros.sugar_g`/`DayTotals.sugar_g`; bỏ `protein_daily_g` khỏi scope ràng buộc; ghi chú quy đổi muối→natri trong meal planner.
 - **Changelog 1.0 → 1.1 (2026-08-15):** thêm `PatientProfile.restrictions.{salt_daily_g,sugar_daily_g,protein_daily_g}` `[Planned]`, `PatientProfile.constraints_status` `[Planned]`, `FoodLogEntry.slot` đổi sang 3-giá-trị `morning|noon|evening` `[Planned]` (thay đề xuất 4-slot ban đầu), `InteractionCheckOutput.unmatched_pairs[]` `[Planned]`, `AgentRunOutput.secondary_intents[]` `[Planned]`. Toàn bộ đều là field mới optional với default an toàn (`null`/`[]`/`"confirmed"`) — không breaking change với code hiện tại, minor bump.
 - Mọi thay đổi field/enum/shape phải: (1) bump version ở đầu file, (2) note ngày + lý do đổi ngay dưới tiêu đề version, (3) cập nhật `contracts/api-v1.md` nếu ảnh hưởng tới response HTTP, (4) cập nhật spec liên quan trong `specs/`.
 - **Luật cứng:** sửa contract trước, code sau (`CLAUDE.md` Mục 6, Mục 12). Code không được implement field/enum chưa có trong contract này.

@@ -35,6 +35,8 @@ from app.services.nutrition_calculator import (
 
 logger = logging.getLogger(__name__)
 
+_SALT_TO_SODIUM_MG = 400.0
+
 _APP_DIR = Path(__file__).resolve().parent.parent
 _CATALOG_PATH = _APP_DIR / "kb" / "food_catalog_demo.json"
 
@@ -124,6 +126,7 @@ def _recipe_to_item(recipe_row, food_groups: dict[str, str]) -> dict:
             "protein_g": float(nutrition.get("protein_g") or 0),
             "fat_g": float(nutrition.get("fat_g") or 0),
             "sodium_mg": float(nutrition.get("sodium_mg") or 0),
+            "sugar_g": float(nutrition.get("sugar_g") or 0),
         },
         "category": category,
         "tags": [],
@@ -149,6 +152,7 @@ def _food_composition_to_item(row) -> dict | None:
             "protein_g": float(nutrition.get("protein_g") or 0),
             "fat_g": float(nutrition.get("fat_g") or 0),
             "sodium_mg": float(nutrition.get("sodium_mg") or 0),
+            "sugar_g": float(nutrition.get("sugar_g") or 0),
         },
         "category": category,
         "tags": [],
@@ -296,6 +300,7 @@ def _dict_to_food_item(
             protein_g=float(macros_dict.get("protein_g", 0)),
             fat_g=float(macros_dict.get("fat_g", 0)),
             sodium_mg=float(macros_dict.get("sodium_mg", 0)),
+            sugar_g=float(macros_dict.get("sugar_g", 0)),
         ),
         food_id=food.get("id"),
         citations=[item_citation] + ([default_citation] if default_citation else []),
@@ -458,15 +463,51 @@ def _pick_rotated(pool: list[dict], index: int, ranked: list[dict]) -> dict | No
     return ranked[(index % top_n)]
 
 
-def _restriction_limits(profile: PatientProfile) -> tuple[float | None, float | None]:
-    restrictions = profile.restrictions
+def _restriction_value(restrictions: Restrictions | dict | None, key: str) -> float | None:
     if restrictions is None:
-        return None, None
-    if hasattr(restrictions, "carb_per_meal"):
-        return restrictions.carb_per_meal, restrictions.sodium_daily
+        return None
+    if hasattr(restrictions, key):
+        return getattr(restrictions, key)
     if isinstance(restrictions, dict):
-        return restrictions.get("carb_per_meal"), restrictions.get("sodium_daily")
-    return None, None
+        return restrictions.get(key)
+    return None
+
+
+def _restriction_limits(
+    profile: PatientProfile,
+) -> tuple[float | None, float | None, float | None]:
+    restrictions = profile.restrictions
+    carb_limit = _restriction_value(restrictions, "carb_per_meal")
+    sodium_daily = _restriction_value(restrictions, "sodium_daily")
+    salt_daily_g = _restriction_value(restrictions, "salt_daily_g")
+    sugar_limit = _restriction_value(restrictions, "sugar_daily_g")
+
+    sodium_from_salt = (
+        float(salt_daily_g) * _SALT_TO_SODIUM_MG if salt_daily_g is not None else None
+    )
+    sodium_candidates = [v for v in (sodium_daily, sodium_from_salt) if v is not None]
+    effective_sodium = min(sodium_candidates) if sodium_candidates else None
+
+    return carb_limit, effective_sodium, sugar_limit
+
+
+def _effective_restrictions(profile: PatientProfile) -> Restrictions | None:
+    carb_limit, effective_sodium, sugar_limit = _restriction_limits(profile)
+    restrictions = profile.restrictions
+    salt_daily_g = _restriction_value(restrictions, "salt_daily_g")
+    if (
+        carb_limit is None
+        and effective_sodium is None
+        and sugar_limit is None
+        and salt_daily_g is None
+    ):
+        return restrictions if restrictions else None
+    return Restrictions(
+        carb_per_meal=carb_limit,
+        sodium_daily=effective_sodium,
+        salt_daily_g=salt_daily_g,
+        sugar_daily_g=sugar_limit,
+    )
 
 
 def _carb_factor(food: dict, carb_budget: float | None) -> float:
@@ -498,6 +539,7 @@ def _scale_food_item(item: FoodItem, factor: float) -> FoodItem:
                 protein_g=round(item.macros.protein_g * factor, 1),
                 fat_g=round(item.macros.fat_g * factor, 1),
                 sodium_mg=round(item.macros.sodium_mg * factor, 1),
+                sugar_g=round(item.macros.sugar_g * factor, 1),
             ),
             "alternatives": item.alternatives,
         }
@@ -821,7 +863,7 @@ def _try_llm_plan(
     if not llm_configured():
         return None
 
-    carb_limit, sodium_limit = _restriction_limits(profile)
+    carb_limit, sodium_limit, sugar_limit = _restriction_limits(profile)
     compact = [
         {
             "id": f.get("id"),
@@ -833,6 +875,7 @@ def _try_llm_plan(
             "protein_g": _macro(f, "protein_g"),
             "fat_g": _macro(f, "fat_g"),
             "sodium_mg": _macro(f, "sodium_mg"),
+            "sugar_g": _macro(f, "sugar_g"),
         }
         for f in catalog.foods
         if not _is_allergic(f, profile.allergies or [])
@@ -863,6 +906,7 @@ QUY TẮC CỨNG:
 - Tổng kcal/ngày trong khoảng ±10% của {target_kcal} kcal.
 - Carb mỗi bữa ≤ {carb_limit if carb_limit is not None else "không giới hạn"} g (ưu tiên tinh bột carb thấp / ít phần).
 - Natri cả ngày ≤ {sodium_limit if sodium_limit is not None else "không giới hạn"} mg.
+- Đường tự do cả ngày ≤ {sugar_limit if sugar_limit is not None else "không giới hạn"} g.
 - Tôn trọng dị ứng, thuốc.
 - KHÔNG khuyến nghị đổi thuốc/liều.
 
@@ -960,7 +1004,7 @@ def _rule_based_days(
 ) -> list[DayPlan]:
     pools = _pools_from_safe(profile, catalog)
     target_kcal = float(profile.target_kcal or 1800)
-    carb_limit, sodium_daily = _restriction_limits(profile)
+    carb_limit, sodium_daily, _sugar_daily = _restriction_limits(profile)
 
     days: list[DayPlan] = []
     for day_idx in range(1, days_count + 1):
@@ -997,11 +1041,16 @@ def _hard_breaches(
     target_kcal: float,
     carb_limit: float | None,
     sodium_daily: float | None,
+    sugar_daily: float | None,
 ) -> list[str]:
-    """Return only hard clinical breaches (ignore near-limit soft sodium warnings)."""
+    """Return only hard clinical breaches (ignore near-limit soft warnings)."""
     restrictions = None
-    if carb_limit is not None or sodium_daily is not None:
-        restrictions = Restrictions(carb_per_meal=carb_limit, sodium_daily=sodium_daily)
+    if carb_limit is not None or sodium_daily is not None or sugar_daily is not None:
+        restrictions = Restrictions(
+            carb_per_meal=carb_limit,
+            sodium_daily=sodium_daily,
+            sugar_daily_g=sugar_daily,
+        )
     warnings = validate_nutrition(
         day,
         target_kcal=target_kcal,
@@ -1051,6 +1100,27 @@ def _repair_day_sodium(day: DayPlan, sodium_daily: float, catalog: _Catalog) -> 
     totals = calculate_day_totals(day)
     if totals.sodium_mg > sodium_daily and totals.sodium_mg > 0:
         global_factor = max(_SCALE_MIN, sodium_daily / totals.sodium_mg)
+        for meal in day.meals:
+            meal.items = [_scale_food_item(i, global_factor) for i in meal.items]
+
+
+def _repair_day_sugar(day: DayPlan, sugar_daily: float, catalog: _Catalog) -> None:
+    totals = calculate_day_totals(day)
+    if totals.sugar_g <= sugar_daily or totals.sugar_g <= 0:
+        return
+    factor = max(_SCALE_MIN, sugar_daily / totals.sugar_g)
+    for meal in day.meals:
+        new_items: list[FoodItem] = []
+        for item in meal.items:
+            cat = _category_of_item(item, catalog)
+            if cat in ("trai_cay", "trung_sua") or item.macros.sugar_g >= 5:
+                new_items.append(_scale_food_item(item, factor))
+            else:
+                new_items.append(item)
+        meal.items = new_items
+    totals = calculate_day_totals(day)
+    if totals.sugar_g > sugar_daily and totals.sugar_g > 0:
+        global_factor = max(_SCALE_MIN, sugar_daily / totals.sugar_g)
         for meal in day.meals:
             meal.items = [_scale_food_item(i, global_factor) for i in meal.items]
 
@@ -1147,15 +1217,17 @@ def _enforce_clinical_constraints(
     catalog: _Catalog,
     max_passes: int = 4,
 ) -> None:
-    """Repair days in-place so kcal/carb/sodium hard limits are met when feasible."""
+    """Repair days in-place so kcal/carb/sodium/sugar hard limits are met when feasible."""
     target_kcal = float(profile.target_kcal or 1800)
-    carb_limit, sodium_daily = _restriction_limits(profile)
+    carb_limit, sodium_daily, sugar_daily = _restriction_limits(profile)
     pools = _pools_from_safe(profile, catalog)
 
     for day in days:
         for _ in range(max_passes):
             day.totals = calculate_day_totals(day)
-            breaches = _hard_breaches(day, target_kcal, carb_limit, sodium_daily)
+            breaches = _hard_breaches(
+                day, target_kcal, carb_limit, sodium_daily, sugar_daily
+            )
             if not breaches:
                 break
 
@@ -1168,6 +1240,11 @@ def _enforce_clinical_constraints(
                 day.totals = calculate_day_totals(day)
                 if day.totals.sodium_mg > sodium_daily:
                     _repair_day_sodium(day, sodium_daily, catalog)
+
+            if sugar_daily is not None:
+                day.totals = calculate_day_totals(day)
+                if day.totals.sugar_g > sugar_daily:
+                    _repair_day_sugar(day, sugar_daily, catalog)
 
             day.totals = calculate_day_totals(day)
             if day.totals.kcal < target_kcal * 0.9 or day.totals.kcal > target_kcal * 1.1:
@@ -1247,7 +1324,7 @@ def generate_meal_plan(
         day.warnings = validate_nutrition(
             day,
             target_kcal=target_kcal,
-            restrictions=profile_obj.restrictions,
+            restrictions=_effective_restrictions(profile_obj),
         )
 
     return MealPlanOutput(

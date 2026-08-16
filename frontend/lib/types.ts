@@ -19,6 +19,8 @@ export interface RegisterResponse {
 export interface Restrictions {
   carb_per_meal?: number | null;
   sodium_daily?: number | null;
+  salt_daily_g?: number | null;
+  sugar_daily_g?: number | null;
 }
 
 export interface PatientProfile {
@@ -66,6 +68,7 @@ export interface Macros {
   protein_g: number;
   fat_g: number;
   sodium_mg: number;
+  sugar_g?: number;
 }
 
 export interface FoodItem {
@@ -222,6 +225,8 @@ export interface DoctorPatientSummary {
   blood_glucose?: string | null;
   treatment_goals?: string[];
   target_kcal: number;
+  salt_daily_g?: number | null;
+  sugar_daily_g?: number | null;
   preferences: string[];
   status: DoctorPatientStatus;
   status_key: DoctorPatientStatusKey;
@@ -295,6 +300,12 @@ export interface DoctorPatientUpdate {
   treatment_goals?: string[];
 }
 
+export interface DoctorConstraintsUpdate {
+  target_kcal?: number;
+  salt_daily_g?: number | null;
+  sugar_daily_g?: number | null;
+}
+
 export interface CatalogItem {
   id: string;
   name: string;
@@ -316,6 +327,7 @@ export interface FoodCatalogMacros {
   protein_g: number;
   fat_g: number;
   sodium_mg: number;
+  sugar_g?: number;
 }
 
 export interface FoodCatalogItem {
