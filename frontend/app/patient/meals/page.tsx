@@ -657,8 +657,11 @@ export default function PatientMealsPage() {
                         <button
                           key={day.dayIndex}
                           type="button"
-                          onClick={() => openDetail(day.dayIndex, setSelectedDayIndex, setViewMode)}
-                          className={`px-2.5 py-3 text-left transition-colors cursor-pointer border-b-2 border-r border-slate-200 last:border-r-0 ${day.isToday
+                          onClick={() => { setHighlightDayIndex(null); openDetail(day.dayIndex, setSelectedDayIndex, setViewMode); }}
+                          className={`px-2.5 py-3 text-left transition-colors cursor-pointer border-b-2 border-r border-slate-200 last:border-r-0 ${
+                              day.dayIndex === highlightDayIndex
+                              ? "bg-blue-50 border-x-2 border-x-blue-500 border-t-2 border-t-blue-500 shadow-[inset_0_-2px_0_0_theme(colors.blue.400)]"
+                              : day.isToday
                               ? "bg-teal-100 border-x-2 border-x-teal-500 border-b-teal-300 shadow-[inset_0_-2px_0_0_theme(colors.teal.400)]"
                               : "bg-slate-50 hover:bg-slate-100/90 border-slate-200"
                             }`}
@@ -739,10 +742,14 @@ export default function PatientMealsPage() {
                                 }}
                                 className={`relative p-2.5 min-h-[100px] text-left transition-colors cursor-pointer border-r border-slate-200 ${dayIdx === planDays.length - 1 ? "border-r-0" : ""
                                   } ${rowIdx > 0 ? "border-t-[3px] border-t-slate-300" : "border-t border-t-slate-200"
-                                  } ${day.isToday
+                                  } ${day.dayIndex === highlightDayIndex
+                                    ? "bg-blue-50/50 border-x-2 border-x-blue-500 hover:bg-blue-100/50"
+                                    : day.isToday
                                     ? "bg-teal-50/90 border-x-2 border-x-teal-500 hover:bg-teal-100/80"
                                     : "bg-white hover:bg-slate-50/80"
-                                  } ${isLastRow && day.isToday ? "border-b-2 border-b-teal-400" : ""}`}
+                                  } ${isLastRow && day.dayIndex === highlightDayIndex 
+                                    ? "border-b-2 border-b-blue-500" 
+                                    : isLastRow && day.isToday ? "border-b-2 border-b-teal-400" : ""}`}
                                 title="Xem chi tiết bữa ăn"
                               >
                                 {canLog && (
