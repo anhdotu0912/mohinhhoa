@@ -9,7 +9,7 @@ export default function PatientNotificationsPage() {
       <div className="max-w-[800px] mx-auto w-full">
         <div className="flex flex-col gap-4">
           {/* Unread Notification 1 (Warning) */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-subtle flex p-card-padding relative overflow-hidden">
+          <div className="bg-[#2f8f7a]/[0.06] border border-[#2f8f7a]/30 rounded-lg shadow-subtle flex p-card-padding relative overflow-hidden mb-4">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2F8F7A]"></div>
             <div className="flex items-start gap-4 w-full pl-2">
               <div className="flex-shrink-0 mt-1">
@@ -22,7 +22,7 @@ export default function PatientNotificationsPage() {
               </div>
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-body-bold text-on-background font-semibold">
+                  <h3 className="font-body-bold text-on-surface font-semibold">
                     Vượt ngưỡng muối hôm nay
                   </h3>
                   <span className="font-caption text-caption text-on-surface-variant whitespace-nowrap ml-4">
@@ -44,7 +44,7 @@ export default function PatientNotificationsPage() {
           </div>
 
           {/* Read Notification (Success) */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-subtle flex p-card-padding">
+          <div className="bg-[#2f8f7a]/[0.06] border border-[#2f8f7a]/30 rounded-lg shadow-subtle flex p-card-padding mb-4">
             <div className="flex items-start gap-4 w-full">
               <div className="flex-shrink-0 mt-1">
                 <span
@@ -56,7 +56,7 @@ export default function PatientNotificationsPage() {
               </div>
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-body-bold text-on-background font-semibold">
+                  <h3 className="font-body-bold text-on-surface font-semibold">
                     Hoàn thành mục tiêu tuần
                   </h3>
                   <span className="font-caption text-caption text-on-surface-variant whitespace-nowrap ml-4">
@@ -71,7 +71,7 @@ export default function PatientNotificationsPage() {
           </div>
 
           {/* Unread Notification 2 (Alert) */}
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-subtle flex p-card-padding relative overflow-hidden">
+          <div className="bg-[#2f8f7a]/[0.06] border border-[#2f8f7a]/30 rounded-lg shadow-subtle flex p-card-padding relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2F8F7A]"></div>
             <div className="flex items-start gap-4 w-full pl-2">
               <div className="flex-shrink-0 mt-1">
@@ -84,7 +84,7 @@ export default function PatientNotificationsPage() {
               </div>
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-body-bold text-on-background font-semibold">
+                  <h3 className="font-body-bold text-on-surface font-semibold">
                     Nhắc nhở uống thuốc
                   </h3>
                   <span className="font-caption text-caption text-on-surface-variant whitespace-nowrap ml-4">

@@ -54,13 +54,13 @@ function NavLinks({
             }`}
           >
             <span
-              className={`material-symbols-outlined text-[22px] ${
+              className={`material-symbols-outlined text-[26px] ${
                 isActive ? "text-primary" : ""
               }`}
             >
               {item.icon}
             </span>
-            <span className="text-sm">{item.label}</span>
+            <span className="text-body font-body">{item.label}</span>
           </Link>
         );
       })}
@@ -108,8 +108,8 @@ function SidebarFooter({
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
       <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
-        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
-          <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-[10px] font-semibold">
+        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
+          <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
             {initials(resolvedName)}
           </div>
           {avatarSrc ? (
@@ -124,10 +124,10 @@ function SidebarFooter({
           ) : null}
         </div>
         <div className="overflow-hidden">
-          <p className="font-body-bold text-body-bold text-on-surface truncate text-xs font-semibold">
+          <p className="font-body-bold text-body-bold text-on-surface truncate font-semibold">
             {resolvedName}
           </p>
-          <p className="font-caption text-caption text-on-surface-variant truncate text-[11px]">
+          <p className="font-caption text-caption text-on-surface-variant truncate">
             {meta.roleLabel}
           </p>
         </div>
@@ -136,9 +136,9 @@ function SidebarFooter({
       <Link
         href="/"
         onClick={onNavigate}
-        className="w-full flex items-center justify-center gap-sm bg-surface-container-low text-error border border-outline-variant hover:bg-error-container hover:text-on-error-container font-label text-label py-sm px-md rounded-lg transition-colors shadow-xs text-xs font-semibold cursor-pointer active:scale-95"
+        className="w-full flex items-center justify-center gap-sm bg-surface-container-low text-error border border-outline-variant hover:bg-error-container hover:text-on-error-container font-label text-label py-sm px-md rounded-lg transition-colors shadow-xs font-semibold cursor-pointer active:scale-95"
       >
-        <span className="material-symbols-outlined text-[18px]">logout</span>
+        <span className="material-symbols-outlined text-[22px]">logout</span>
         <span>Đăng xuất</span>
       </Link>
     </div>

@@ -177,7 +177,7 @@ export default function PatientMessagesPage() {
                 <div
                   className={`p-md rounded-lg shadow-sm relative ${
                     msg.sender === "patient"
-                      ? "bg-primary text-on-primary font-body text-body rounded-br-none"
+                      ? "bg-primary text-white font-body text-body rounded-br-none"
                       : "bg-surface-container-high text-on-surface font-body text-body rounded-bl-none border border-outline-variant"
                   }`}
                 >
