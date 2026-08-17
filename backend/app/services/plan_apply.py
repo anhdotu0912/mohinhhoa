@@ -21,6 +21,33 @@ def _ranges_overlap(a_start: date, a_end: date, b_start: date, b_end: date) -> b
     return a_start <= b_end and b_start <= a_end
 
 
+def _overlap_days(a_start: date, a_end: date, b_start: date, b_end: date) -> int:
+    lo = max(a_start, b_start)
+    hi = min(a_end, b_end)
+    if hi < lo:
+        return 0
+    return (hi - lo).days + 1
+
+
+def _clear_or_trim_overlap(other: MealPlan, start_date: date, ends_on: date) -> None:
+    """Free a week window: unapply a mostly-overlapping plan, else trim the edge."""
+    if other.starts_on is None or other.ends_on is None:
+        return
+    overlap = _overlap_days(start_date, ends_on, other.starts_on, other.ends_on)
+    other_len = (other.ends_on - other.starts_on).days + 1
+    if overlap >= 4 or overlap >= max(1, other_len - 1):
+        other.starts_on = None
+        other.ends_on = None
+        return
+    if other.starts_on < start_date:
+        other.ends_on = start_date - timedelta(days=1)
+    else:
+        other.starts_on = ends_on + timedelta(days=1)
+    if other.starts_on is None or other.ends_on is None or other.ends_on < other.starts_on:
+        other.starts_on = None
+        other.ends_on = None
+
+
 def _stamp_day_dates(row: MealPlan, starts_on: date) -> None:
     days = list(row.days or [])
     for day in days:
@@ -227,20 +254,10 @@ def apply_meal_plan(
         active.ends_on = start_date - timedelta(days=1)
         overlaps = [p for p in overlaps if p.id != active.id]
 
-    if overlaps and not replace_active:
-        raise APIError(
-            409,
-            "PLAN_DATE_OVERLAP",
-            "Khoảng ngày trùng với thực đơn khác.",
-        )
-
-    if replace_active and overlaps:
-        for other in overlaps:
-            if other.starts_on and other.starts_on >= start_date:
-                other.starts_on = None
-                other.ends_on = None
-            elif other.ends_on and other.ends_on >= start_date:
-                other.ends_on = start_date - timedelta(days=1)
+    # Ghost / misaligned weeks (grid slides with today) must not 409 an empty
+    # slot the doctor just chose. Only the active-today plan is protected above.
+    for other in overlaps:
+        _clear_or_trim_overlap(other, start_date, ends_on)
 
     plan_row.starts_on = start_date
     plan_row.ends_on = ends_on

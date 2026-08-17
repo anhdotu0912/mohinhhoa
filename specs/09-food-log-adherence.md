@@ -1,7 +1,7 @@
 # Spec: Ghi nhận Ăn uống Thực tế & Tuân thủ (Food Log)
 
 ## Status
-Planned (Won't Have cho MVP hiện tại) — theo đúng `CLAUDE.md`/`AGENTS.md`: "**Không** implement Food Log trong MVP. Route/stub có thể tồn tại trong code nhưng **không** hiện trong nav demo". Tài liệu này mô tả **thiết kế đề xuất** để tránh scope-creep lộn xộn nếu/khi feature được nâng ưu tiên — không mô tả hành vi đã hoạt động.
+Done (core) — implement theo phạm vi tối thiểu ADR-009 (2026-08-17).
 
 ## 1. Mục tiêu (Why)
 Meal plan chỉ là "kế hoạch" — hệ thống cần biết bệnh nhân **thực tế** đã ăn gì để (a) tính tuân thủ cho bác sĩ theo dõi, (b) phát hiện tương tác nguy hiểm nếu bệnh nhân ăn món ngoài kế hoạch trùng với thuốc đang dùng.
@@ -26,9 +26,9 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 6. Dữ liệu log tổng hợp làm input cho `specs/10-doctor-compliance-view.md` (thông qua tín hiệu `Notification(type="adherence_checkin")`, không trực tiếp qua `FoodLogEntry` — xem ADR-008: nguồn tuân thủ chính hiện tại là notification checkin, không phải food log thô).
 
 ## 5. Edge cases
-- Hiện tại **hoàn toàn chưa có API** — intent `food_log` trong `/chat` map tới `food_log_node`, node này luôn trả cứng: *"Tính năng ghi nhận bữa ăn chưa khả dụng trong phiên bản này."*, không đọc/viết gì. Mọi mô tả "luồng chính" ở §4 là thiết kế, không phải hành vi thật — **không demo tính năng này** cho tới khi được nâng ưu tiên và implement.
-- `routes_food_log.py`/`models/food_log.py` tồn tại dạng file nhưng nội dung chỉ là `"""Placeholder"""`, **không mount** trong `main.py` — route thực tế trả `404 Not Found` (route không tồn tại) nếu ai đó thử gọi.
-- Route `/patient/meals/log` (FE) vẫn tồn tại trong code nhưng **ẩn khỏi nav** (`frontend/lib/nav-config.ts`) đúng luật MVP — không xoá route để giữ chỗ neo UI khi implement sau.
+- Intent `food_log` trong `/chat` map tới `food_log_node` — đọc log gần nhất từ DB và tóm tắt tuân thủ (fallback message cũ khi không có DB context).
+- `POST /food-log` với `type="custom"` và `note` rỗng → `422` validation error.
+- `GET /food-log?date=YYYY-MM-DD` lọc theo ngày `logged_at` (timezone server).
 
 ## 6. Ngoài phạm vi (Out of scope)
 - Nhận diện ảnh món ăn (Could Have riêng, khác hẳn phạm vi Food Log text).
@@ -42,8 +42,8 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 ## 8. API liên quan
 | Method | Path | Role |
 |---|---|---|
-| POST | `/food-log` | patient **[Planned]** |
-| GET | `/food-log` | patient **[Planned]** |
+| POST | `/food-log` | patient |
+| GET | `/food-log` | patient |
 
 ## 9. Liên quan
 - `adrs/009-food-log-scope-strategy.md` — quyết định phạm vi gốc.

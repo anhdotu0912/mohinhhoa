@@ -10,9 +10,13 @@ import {
   type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
   type FoodCatalogOut,
+  type FoodLogCreate,
+  type FoodLogEntry,
   type GoalsOut,
   type GenerateMealPlanRequest,
   type MealPlanOutput,
+  type MetricsHistoryPoint,
+  type MetricsLogCreate,
   type NotificationOut,
   type PatientMetrics,
   type PatientProfile,
@@ -138,6 +142,36 @@ export const api = {
       body: payload,
       token,
     });
+  },
+
+  createFoodLog(payload: FoodLogCreate): Promise<FoodLogEntry> {
+    return request("/api/v1/food-log", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  listFoodLogs(params?: { date?: string; meal_plan_id?: string }): Promise<FoodLogEntry[]> {
+    const search = new URLSearchParams();
+    if (params?.date) search.set("date", params.date);
+    if (params?.meal_plan_id) search.set("meal_plan_id", params.meal_plan_id);
+    const q = search.toString() ? `?${search}` : "";
+    return request(`/api/v1/food-log${q}`);
+  },
+
+  recordMetrics(payload: MetricsLogCreate): Promise<MetricsHistoryPoint> {
+    return request("/api/v1/metrics", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  getMetricsHistory(days = 90): Promise<MetricsHistoryPoint[]> {
+    return request(`/api/v1/metrics/history?days=${days}`);
+  },
+
+  deleteMetrics(id: string): Promise<void> {
+    return request(`/api/v1/metrics/${id}`, { method: "DELETE" });
   },
 
   generateMealPlan(payload?: GenerateMealPlanRequest): Promise<MealPlanOutput> {

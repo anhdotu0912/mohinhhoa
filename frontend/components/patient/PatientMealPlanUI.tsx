@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import type { MealDishItem } from "@/lib/plans-store";
 
-type NutrientKind = "kcal" | "fat" | "salt";
+type NutrientKind = "kcal" | "salt" | "sugar";
 
 const NUTRIENT_META: Record<
   NutrientKind,
@@ -15,17 +15,17 @@ const NUTRIENT_META: Record<
     unit: "kcal",
     iconClass: "text-amber-600",
   },
-  fat: {
-    icon: "opacity",
-    label: "Béo",
-    unit: "g",
-    iconClass: "text-yellow-700",
-  },
   salt: {
     icon: "grain",
     label: "Muối",
     unit: "g",
     iconClass: "text-sky-700",
+  },
+  sugar: {
+    icon: "cake",
+    label: "Đường",
+    unit: "g",
+    iconClass: "text-rose-600",
   },
 };
 
@@ -71,8 +71,31 @@ export function NutrientChipsRow({
   return (
     <div className={`flex flex-wrap ${compact ? "gap-1" : "gap-1.5"}`}>
       <NutrientChip kind="kcal" value={food.calories || 0} compact={compact} />
-      <NutrientChip kind="fat" value={food.fat ?? 0} compact={compact} />
       <NutrientChip kind="salt" value={food.salt} compact={compact} />
+      <NutrientChip kind="sugar" value={food.sugar ?? 0} compact={compact} />
+    </div>
+  );
+}
+
+function DishNutrientsPanel({
+  food,
+  compact = false,
+  expanded,
+}: {
+  food: MealDishItem;
+  compact?: boolean;
+  expanded: boolean;
+}) {
+  return (
+    <div
+      className={`transition-all duration-200 ${
+        expanded
+          ? "opacity-100 max-h-24 mt-1.5"
+          : "opacity-0 max-h-0 overflow-hidden mt-0 group-hover/dish:opacity-100 group-hover/dish:max-h-24 group-hover/dish:mt-1.5"
+      }`}
+      aria-hidden={!expanded}
+    >
+      <NutrientChipsRow food={food} compact={compact} />
     </div>
   );
 }
@@ -319,18 +342,23 @@ export function DayTabButton({
 export function MealSectionHeader({
   label,
   icon,
+  action,
 }: {
   label: string;
   icon: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
-      <span className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
-        <span className="material-symbols-outlined text-teal-700 text-[18px]" aria-hidden>
-          {icon}
+    <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
+          <span className="material-symbols-outlined text-teal-700 text-[18px]" aria-hidden>
+            {icon}
+          </span>
         </span>
-      </span>
-      <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">{label}</h4>
+        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">{label}</h4>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -358,19 +386,42 @@ function AlternativesSwapControl({ alternatives }: { alternatives: MealDishItem[
       {open && (
         <ul className="mt-2 space-y-2 pl-1 border-l-2 border-teal-100">
           {alternatives.map((alt, i) => (
-            <li
-              key={`${alt.foodId || alt.name}-${i}`}
-              className="pl-3 py-2 bg-slate-50/80 border border-slate-200 rounded-lg"
-            >
-              <p className="text-xs font-semibold text-slate-800">{alt.name}</p>
-              <div className="mt-1.5">
-                <NutrientChipsRow food={alt} compact />
-              </div>
-            </li>
+            <AlternativeItem key={`${alt.foodId || alt.name}-${i}`} alt={alt} />
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+function AlternativeItem({ alt }: { alt: MealDishItem }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <li
+      className="pl-3 py-2 bg-slate-50/80 border border-slate-200 rounded-lg group/alt cursor-pointer"
+      onClick={() => setExpanded((v) => !v)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
+      }}
+      aria-expanded={expanded}
+    >
+      <p className="text-xs font-semibold text-slate-800">{alt.name}</p>
+      <div
+        className={`transition-all duration-200 ${
+          expanded
+            ? "opacity-100 max-h-24 mt-1.5"
+            : "opacity-0 max-h-0 overflow-hidden mt-0 group-hover/alt:opacity-100 group-hover/alt:max-h-24 group-hover/alt:mt-1.5"
+        }`}
+      >
+        <NutrientChipsRow food={alt} compact />
+      </div>
+    </li>
   );
 }
 
@@ -384,30 +435,58 @@ export function DishCard({
   compact?: boolean;
 }) {
   const alts = item.alternatives ?? [];
+  const [expanded, setExpanded] = useState(false);
 
   if (compact) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-xs">
+      <div
+        className="bg-white border border-slate-200 rounded-lg p-2 shadow-xs group/dish cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded((v) => !v);
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }
+        }}
+        aria-expanded={expanded}
+        aria-label={`${item.name}${expanded ? " — đang hiện dinh dưỡng" : " — bấm hoặc hover để xem dinh dưỡng"}`}
+      >
         <p className="text-xs font-semibold text-slate-900 leading-snug">{item.name}</p>
-        <div className="mt-1.5">
-          <NutrientChipsRow food={item} compact />
-        </div>
+        <DishNutrientsPanel food={item} compact expanded={expanded} />
       </div>
     );
   }
 
   return (
-    <article className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm">
+    <article
+      className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm group/dish cursor-pointer"
+      onClick={() => setExpanded((v) => !v)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
+      }}
+      aria-expanded={expanded}
+    >
       <p className="text-sm sm:text-base font-semibold text-slate-900 leading-snug">{item.name}</p>
       {portion && (
         <p className="text-xs text-slate-600 mt-1">
           Khẩu phần: <span className="font-medium">{portion}</span>
         </p>
       )}
-      <div className="mt-2.5">
-        <NutrientChipsRow food={item} />
+      <DishNutrientsPanel food={item} expanded={expanded} />
+      <div onClick={(e) => e.stopPropagation()}>
+        <AlternativesSwapControl alternatives={alts} />
       </div>
-      <AlternativesSwapControl alternatives={alts} />
     </article>
   );
 }

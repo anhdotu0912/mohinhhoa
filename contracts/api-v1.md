@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.1 (2026-08-15 — bổ sung quyết định team sau vòng review đầu, xem changelog ở mục Versioning cuối file)
+**Version:** 1.3 (2026-08-17 — thêm DELETE /metrics/{id}. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -274,6 +274,7 @@ GET /notifications?status=pending&type=meal_reminder
   "today": "2026-08-16",
   "active_plan_id": "plan_uuid",
   "active_plan": { /* MealPlanOutput or null */ },
+  "unassigned_plans": [ /* pending_review / approved / edited chưa gán starts_on */ ],
   "slots": [
     {
       "slot_key": "current",
@@ -294,6 +295,8 @@ GET /notifications?status=pending&type=meal_reminder
   ]
 }
 ```
+- `unassigned_plans`: thực đơn chưa gán tuần (`pending_review` | `approved` | `edited`, `starts_on` null). Không nhét vào slot `current` — cột tuần chỉ hiện plan đã apply đúng cửa sổ ngày.
+- Plan đã apply mà `ends_on` < hôm nay xuất hiện với `occupancy="past"` (dùng cho điều hướng tuần trước).
 
 ### `GET /doctor/patients/{patient_id}`
 **Role:** `doctor`. Response 200 → `DoctorPatientSummary`. Error 404 `PATIENT_NOT_FOUND`.
@@ -515,28 +518,57 @@ data: {"type": "done", "data": { ...AgentRunOutput }}
 
 ---
 
-## 12. Food Log `[Planned]`
+## 12. Food Log
 
-Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeholder, không mount trong `main.py`). Thiết kế đề xuất theo `adrs/009-food-log-scope-strategy.md`, xem `specs/09-food-log-adherence.md`.
+Theo `adrs/009-food-log-scope-strategy.md`, `specs/09-food-log-adherence.md`.
 
-### `POST /food-log` `[Planned]`
+### `POST /food-log`
 **Role:** `patient`.
 ```json
 // Request
 { "meal_plan_id": "plan_uuid", "day_index": 3, "slot": "noon", "type": "custom", "note": "Ăn phở bò ngoài quán" }
 // Response 200 → FoodLogEntry (xem contracts/agent-io-schema.md §3)
+// Error 422 — custom thiếu note
 ```
-**Quyết định 2026-08-15:** `slot` dùng đúng 3-giá-trị theo UI (`"morning" | "noon" | "evening"`), **không** dùng 4-slot của meal plan — xem `contracts/agent-io-schema.md` §3 và `adrs/009-food-log-scope-strategy.md`.
+`slot` ∈ `"morning" | "noon" | "evening"`. Custom log khớp KB tương tác → tạo `Alert` + `alert_ids[]`.
 
-### `GET /food-log` `[Planned]`
-**Role:** `patient`. Query optional `date`/`meal_plan_id`.
+### `GET /food-log`
+**Role:** `patient`. Query optional `date` (YYYY-MM-DD), `meal_plan_id`.
 ```json
 // Response 200 → list[FoodLogEntry]
 ```
 
 ---
 
-## 13. Health
+## 13. Patient Metrics History
+
+Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracking.md`.
+
+### `POST /metrics`
+**Role:** `patient`. Ghi entry mới + cập nhật snapshot `profiles`.
+```json
+// Request (ít nhất 1 trong weight/blood_pressure/blood_glucose)
+{ "weight": 71.5, "blood_pressure": "128/78 mmHg", "blood_glucose": "130 mg/dL", "note": "" }
+// Response 200 → BodyMetricsEntry (contracts/agent-io-schema.md §3.5)
+// Error 400 METRICS_EMPTY — không có field nào
+```
+
+### `GET /metrics/history`
+**Role:** `patient`. Query optional `days` (default 90, max 365).
+```json
+// Response 200 → list[BodyMetricsEntry] (recorded_at asc)
+```
+
+### `DELETE /metrics/{id}`
+**Role:** `patient`. Xóa một bản ghi chỉ số thuộc user hiện tại.
+```json
+// Response 204 — no body
+// Error 404 METRICS_NOT_FOUND — id không tồn tại hoặc không thuộc user
+```
+
+---
+
+## 14. Health
 
 ### `GET /health`
 **Role:** không cần auth. **Không** có prefix `/api/v1` (root-level).
@@ -570,17 +602,19 @@ Chưa tồn tại as-built (`routes_food_log.py`/`models/food_log.py` là placeh
 | Meal slot (`Meal.slot`, `Swap.slot`) | `breakfast` \| `lunch` \| `dinner` \| `snack` | `schemas/meal_plan.py` — **khác** `FoodLogEntry.slot` (xem dòng dưới) |
 | Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` | `agents/nodes/intent_classifier.py::VALID_INTENTS` |
 | `AgentRunOutput.secondary_intents[]` `[Planned]` | cùng enum intent phía trên, dạng mảng | Quyết định 2026-08-15, đáp ứng multi-intent |
-| `FoodLogEntry.type` `[Planned]` | `as_planned` \| `custom` | Đề xuất, theo `frontend/app/patient/meals/log/page.tsx` |
-| `FoodLogEntry.status` `[Planned]` | `logged` \| `adjusted` | Đề xuất, `adrs/009-food-log-scope-strategy.md` |
-| `FoodLogEntry.slot` `[Planned]` | `morning` \| `noon` \| `evening` | Quyết định 2026-08-15, khớp UI 3-slot (khác 4-slot meal plan) |
+| `FoodLogEntry.type` | `as_planned` \| `custom` | `schemas/food_log.py` |
+| `FoodLogEntry.status` | `logged` \| `adjusted` | `adrs/009-food-log-scope-strategy.md` |
+| `FoodLogEntry.slot` | `morning` \| `noon` \| `evening` | ADR-009, khớp UI 3-slot |
+| `BodyMetricsEntry.recorded_by` | `patient` \| `doctor` | `models/body_metrics.py` |
 | `PatientProfile.constraints_status` `[Planned]` | `confirmed` \| `pending_doctor_review` | Quyết định 2026-08-15, `specs/04-clinical-constraints.md` |
 
 ---
 
 ## Versioning
 
-- Version hiện tại: **1.1**.
-- **Changelog 1.0 → 1.1 (2026-08-15) — tổng hợp quyết định team sau vòng review đầu:**
+- Version hiện tại: **1.3**.
+- **Changelog 1.2 → 1.3 (2026-08-17):** thêm `DELETE /metrics/{id}` (patient xóa bản ghi chỉ số của mình); response 204, lỗi 404 `METRICS_NOT_FOUND`.
+- **Changelog 1.1 → 1.2 (2026-08-17):** Food Log §12 as-built; thêm Patient Metrics History §13 (`POST /metrics`, `GET /metrics/history`); Health chuyển §14. `GET .../meal-plan-schedule`: `unassigned_plans` gồm cả `pending_review`; slot `past` cho plan đã hết tuần.
   1. Thêm `POST /auth/forgot-password`, `POST /auth/reset-password` `[Planned]` + rate-limit `POST /auth/login` `[Planned]`.
   2. `PUT /doctor/patients/{id}/constraints` as-built (`target_kcal`, `salt_daily_g`, `sugar_daily_g`); `POST /doctor/patients/{id}/constraints/approve` + `constraints_status` HITL vẫn `[Planned]`/deferred.
   3. Thêm `POST /meal-plans/{id}/request-adjustment` `[Planned]`; ghi nhận quyết định persist meal plan sinh qua `/chat`.

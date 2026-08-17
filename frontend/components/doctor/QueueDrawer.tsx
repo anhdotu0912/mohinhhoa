@@ -5,7 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueueStore } from "@/lib/queue-store";
-import { saveSlotIntent } from "@/lib/plan-slot-intent";
+import { saveSlotIntent, buildReviewHref } from "@/lib/plan-slot-intent";
 import { assetUrl } from "@/lib/api";
 
 function initials(name: string): string {
@@ -54,17 +54,16 @@ export function QueueDrawer() {
   if (!isDrawerOpen) return null;
 
   const handleNavigateReview = (patientId?: string, planId?: string) => {
-    if (patientId && planId) {
-      const job = jobs.find(
-        (j) => j.patientId === patientId && j.planIds?.includes(planId)
-      );
-      if (job?.slotIntent) {
-        saveSlotIntent(job.slotIntent);
-      }
+    const job =
+      patientId && planId
+        ? jobs.find((j) => j.patientId === patientId && j.planIds?.includes(planId))
+        : jobs.find((j) => j.patientId === patientId && j.slotIntent);
+    if (job?.slotIntent) {
+      saveSlotIntent(job.slotIntent);
     }
     closeDrawer();
     if (patientId && planId) {
-      router.push(`/doctor/reviews/${patientId}/${planId}`);
+      router.push(buildReviewHref(patientId, planId, job?.slotIntent));
     } else if (patientId) {
       router.push(`/doctor/reviews/${patientId}`);
     } else {

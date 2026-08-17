@@ -34,7 +34,7 @@ const INTENT_LABELS: Record<string, string> = {
   interaction_check: "Tương tác thuốc–thực phẩm",
   rag_qa: "Hỏi đáp dinh dưỡng (RAG)",
   refuse: "Từ chối yêu cầu ngoài phạm vi",
-  food_log: "Ghi nhận bữa ăn (chưa khả dụng)",
+  food_log: "Ghi nhận bữa ăn",
   unknown: "Chưa phân loại được",
 };
 

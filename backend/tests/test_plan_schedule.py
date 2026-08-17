@@ -252,3 +252,47 @@ def test_apply_trailing_empty_then_next_empty(client):
     )
     assert second.status_code == 200, second.text
     assert second.json()["starts_on"] == later_start.isoformat()
+
+
+def test_schedule_previews_first_pending_plan(client):
+    """First generated plan (not yet applied) is listed as unassigned, not stuffed into tuần này."""
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    patient_headers = _login(client, "demo_patient_2@example.com")
+    plan = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
+    assert plan.status_code == 200, plan.text
+    plan_id = plan.json()["id"]
+
+    schedule = client.get(
+        "/api/v1/doctor/patients/demo_patient_2/meal-plan-schedule",
+        headers=doctor_headers,
+    ).json()
+    current = next(s for s in schedule["slots"] if s["slot_key"] == "current")
+    assert current["occupancy"] == "empty"
+    assert current["plan"] is None
+    ids = [p["id"] for p in schedule.get("unassigned_plans", [])]
+    assert plan_id in ids
+
+
+def test_schedule_includes_past_applied_plan(client, db_session):
+    """Applied plans that already ended must still appear on the history timeline."""
+    from app.models.meal_plan import MealPlan
+
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    plan_id = _generate_and_approve(
+        client, "demo_patient_2@example.com", doctor_headers
+    )
+    assert _apply(client, doctor_headers, plan_id, slot_key="current").status_code == 200
+
+    db_session.expire_all()
+    row = db_session.get(MealPlan, plan_id)
+    assert row is not None
+    row.starts_on = date.today() - timedelta(days=14)
+    row.ends_on = date.today() - timedelta(days=8)
+    db_session.commit()
+
+    schedule = client.get(
+        "/api/v1/doctor/patients/demo_patient_2/meal-plan-schedule",
+        headers=doctor_headers,
+    ).json()
+    past = [s for s in schedule["slots"] if s["occupancy"] == "past"]
+    assert any(s["plan"] and s["plan"]["id"] == plan_id for s in past)

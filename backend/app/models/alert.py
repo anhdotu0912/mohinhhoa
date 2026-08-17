@@ -23,4 +23,5 @@ class Alert(Base):
     recommendation: Mapped[str] = mapped_column(Text)
     sources: Mapped[list] = mapped_column(JSON, default=list)
     meal_plan_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    food_log_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

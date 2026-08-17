@@ -34,9 +34,9 @@ Toàn bộ `frontend/**`.
 ### P3 — Auth: quên mật khẩu (khi BE2 hoàn thành, → `specs/01`, quyết định 2026-08-15)
 - [ ] Thêm màn "Quên mật khẩu" gọi `POST /auth/forgot-password` + `POST /auth/reset-password` — cần trước khi mở khảo sát người dùng thật.
 
-### Won't (vòng này) — Food Log
-- [ ] Giữ route `/patient/meals/log` tồn tại nhưng **ẩn khỏi nav** (`frontend/lib/nav-config.ts`) — không được tự ý hiện lại nav item này.
-- [ ] Không gọi bất kỳ API `/food-log` nào (chưa mount ở backend) — giữ local state mock hiện tại nếu route còn được truy cập trực tiếp qua URL. UI hiện tại đã dùng đúng 3-slot (sáng/trưa/tối) khớp quyết định 2026-08-15 — **không cần đổi** khi BE2 implement thật.
+### Done — Food Log (→ `specs/09-food-log-adherence.md`, ADR-009)
+- [x] Hiện nav item "Ghi nhận bữa ăn" trỏ `/patient/meals/log`.
+- [x] Nối `POST/GET /food-log` qua `lib/api.ts`; giữ UI 3-slot hiện có.
 
 ## Definition of Done
 - [ ] Không có request nào gọi field/endpoint không có trong `contracts/api-v1.md`.

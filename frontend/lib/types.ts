@@ -321,6 +321,48 @@ export interface PatientMetrics {
   updated_at: string;
 }
 
+export interface FoodLogEntry {
+  id: string;
+  user_id: string;
+  meal_plan_id?: string | null;
+  day_index?: number | null;
+  slot: "morning" | "noon" | "evening";
+  type: "as_planned" | "custom";
+  note?: string;
+  status: string;
+  alert_ids: string[];
+  logged_at: string;
+}
+
+export interface FoodLogCreate {
+  meal_plan_id?: string | null;
+  day_index?: number | null;
+  slot: "morning" | "noon" | "evening";
+  type: "as_planned" | "custom";
+  note?: string;
+}
+
+export interface MetricsHistoryPoint {
+  id: string;
+  user_id: string;
+  weight?: number | null;
+  height?: number | null;
+  bmi?: number | null;
+  blood_pressure?: string | null;
+  blood_glucose?: string | null;
+  note?: string;
+  recorded_by: "patient" | "doctor";
+  recorded_at: string;
+}
+
+export interface MetricsLogCreate {
+  weight?: number | null;
+  height?: number | null;
+  blood_pressure?: string | null;
+  blood_glucose?: string | null;
+  note?: string;
+}
+
 export interface GoalsOut {
   goals: string[];
 }
