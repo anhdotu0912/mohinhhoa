@@ -369,6 +369,21 @@ def _migrate_add_meal_plan_dates(db: Session) -> None:
         logger.info("Unapplied %d overlapping meal plans (one plan per week)", n)
 
 
+def _migrate_add_alert_food_log_id(db: Session) -> None:
+    """Add alerts.food_log_id to existing SQLite DBs (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    try:
+        columns = [c["name"] for c in inspect(engine).get_columns("alerts")]
+    except Exception:
+        return
+    if "food_log_id" in columns:
+        return
+    db.execute(text("ALTER TABLE alerts ADD COLUMN food_log_id VARCHAR(36)"))
+    db.commit()
+    logger.info("Added alerts.food_log_id column")
+
+
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     Base.metadata.create_all(bind=engine)
@@ -378,6 +393,7 @@ def init_db() -> None:
         _migrate_add_body_metrics(db)
         _migrate_add_profile_detail(db)
         _migrate_widen_alert_severity(db)
+        _migrate_add_alert_food_log_id(db)
         _migrate_add_meal_plan_dates(db)
         seed_demo_accounts(db)
         seed_catalog(db)

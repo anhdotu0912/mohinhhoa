@@ -16,12 +16,18 @@ import {
   MedicalApprovalBadge,
 } from "@/components/patient/PatientMealPlanUI";
 import {
+  FoodLogModal,
+  type FoodLogModalContext,
+  type FoodLogSlot,
+} from "@/components/patient/FoodLogModal";
+import {
   computeMealPlanValidity,
   formatDateFull,
   formatDateIso,
   formatDateShort,
   parseFlexibleDate,
 } from "@/lib/plan-expiry";
+import { pickDefaultSlot, visibleScheduleSlots, displaySlotTitle } from "@/lib/plan-schedule-helpers";
 import {
   ApiError,
   type DayPlan,
@@ -31,15 +37,6 @@ import {
   type MealPlanScheduleSlot,
   type PatientProfile,
 } from "@/lib/types";
-
-function pickDefaultSlot(schedule: MealPlanScheduleOut): MealPlanScheduleSlot | null {
-  return (
-    schedule.slots.find((s) => s.occupancy === "active") ??
-    schedule.slots.find((s) => s.plan) ??
-    schedule.slots[0] ??
-    null
-  );
-}
 
 type ViewMode = "grid" | "detail";
 type MealSlot = "breakfast" | "lunch" | "dinner" | "snack";
@@ -88,6 +85,30 @@ function resolveDayDate(plan: MealPlanOutput, dayIndex: number): Date | null {
     if (start) return shiftDays(start, dayIndex - 1);
   }
   return null;
+}
+
+/** Column calendar date for the week being viewed (schedule slot window). */
+function columnDateForDay(
+  dayIndex: number,
+  weekStart: Date,
+  plan: MealPlanOutput,
+  preferSlotWindow: boolean
+): Date {
+  if (preferSlotWindow) {
+    return shiftDays(weekStart, dayIndex - 1);
+  }
+  return resolveDayDate(plan, dayIndex) ?? shiftDays(weekStart, dayIndex - 1);
+}
+
+function dayIndexForToday(
+  days: { day_index: number }[],
+  weekStart: Date,
+  today: Date = new Date()
+): number | undefined {
+  const todayIso = formatDateIso(today);
+  return days.find((d) => {
+    return formatDateIso(shiftDays(weekStart, d.day_index - 1)) === todayIso;
+  })?.day_index;
 }
 
 function statusMeta(status: string): { label: string; className: string; medical: boolean } {
@@ -161,6 +182,15 @@ function openDetail(dayIndex: number, setSelectedDayIndex: (n: number) => void, 
   setViewMode("detail");
 }
 
+const MEAL_SLOT_TO_FOOD_LOG: Record<
+  Exclude<MealSlot, "snack">,
+  FoodLogSlot
+> = {
+  breakfast: "morning",
+  lunch: "noon",
+  dinner: "evening",
+};
+
 export default function PatientMealsPage() {
   const router = useRouter();
   const { token, role } = useAuthStore();
@@ -175,6 +205,8 @@ export default function PatientMealsPage() {
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -205,16 +237,23 @@ export default function PatientMealsPage() {
         return;
       }
 
-      const defaultSlot = pickDefaultSlot(scheduleRes);
+      const defaultSlot =
+        visibleScheduleSlots(scheduleRes)[1] ?? pickDefaultSlot(scheduleRes);
       setSelectedStartsOn(defaultSlot?.starts_on ?? null);
 
       const initialPlan = defaultSlot?.plan ?? latestPlan;
       if (initialPlan) {
-        const todayIso = formatDateIso(new Date());
-        const todayDayIndex = initialPlan.days.find((d) => {
-          const date = resolveDayDate(initialPlan, d.day_index);
-          return date ? formatDateIso(date) === todayIso : false;
-        })?.day_index;
+        const slotStart =
+          parseFlexibleDate(defaultSlot?.starts_on) ??
+          parseFlexibleDate(initialPlan.starts_on);
+        const todayDayIndex = slotStart
+          ? dayIndexForToday(initialPlan.days, slotStart)
+          : initialPlan.days.find((d) => {
+              const date = resolveDayDate(initialPlan, d.day_index);
+              return date
+                ? formatDateIso(date) === formatDateIso(new Date())
+                : false;
+            })?.day_index;
         setSelectedDayIndex(todayDayIndex ?? 1);
       }
     } catch (err) {
@@ -244,13 +283,19 @@ export default function PatientMealsPage() {
     void loadData();
   }, [hydrated, token, role, loadData]);
 
+  const displaySlots = useMemo(
+    () => (schedule ? visibleScheduleSlots(schedule) : []),
+    [schedule]
+  );
+
   const selectedSlot = useMemo(() => {
-    if (!schedule?.slots.length) return null;
+    if (!displaySlots.length) return null;
     return (
-      schedule.slots.find((slot) => slot.starts_on === selectedStartsOn) ??
-      pickDefaultSlot(schedule)
+      displaySlots.find((slot) => slot.starts_on === selectedStartsOn) ??
+      displaySlots[1] ??
+      pickDefaultSlot(schedule!)
     );
-  }, [schedule, selectedStartsOn]);
+  }, [displaySlots, selectedStartsOn, schedule]);
 
   const plan = useMemo((): MealPlanOutput | null => {
     if (selectedSlot?.plan) return selectedSlot.plan;
@@ -286,13 +331,20 @@ export default function PatientMealsPage() {
 
   const planDays = useMemo(() => {
     if (!plan) return [];
+    // Prefer the schedule slot window so "Hôm nay" tracks the week navigator,
+    // even when plan.starts_on / day.date still stamp an older apply window
+    // (e.g. unassigned plan previewed on empty current week).
+    const preferSlotWindow = selectedSlot != null;
+    const todayIso = formatDateIso(new Date());
     return plan.days.map((raw) => {
       const ui = uiDays.find((d) => d.dayIndex === raw.day_index)!;
-      const dateFromPlan = resolveDayDate(plan, raw.day_index);
-      const date =
-        dateFromPlan ?? shiftDays(weekStart, raw.day_index - 1);
+      const date = columnDateForDay(
+        raw.day_index,
+        weekStart,
+        plan,
+        preferSlotWindow
+      );
       const isoDate = formatDateIso(date);
-      const todayIso = formatDateIso(new Date());
       return {
         dayIndex: raw.day_index,
         ui,
@@ -306,36 +358,61 @@ export default function PatientMealsPage() {
         weekdayShort: WEEKDAY_SHORT[date.getDay()],
       };
     });
-  }, [plan, uiDays, selectedSlot?.starts_on, weekStart]);
+  }, [plan, uiDays, selectedSlot, weekStart]);
 
   const selectedDay = planDays.find((d) => d.dayIndex === selectedDayIndex) ?? planDays[0];
 
-  const slotIndex = schedule
-    ? schedule.slots.findIndex((slot) => slot.starts_on === selectedSlot?.starts_on)
+  const slotIndex = selectedSlot
+    ? displaySlots.findIndex((slot) => slot.starts_on === selectedSlot.starts_on)
     : -1;
   const canPrevWeek = slotIndex > 0;
-  const canNextWeek =
-    schedule != null && slotIndex >= 0 && slotIndex < schedule.slots.length - 1;
+  const canNextWeek = displaySlots.length > 0 && slotIndex >= 0 && slotIndex < displaySlots.length - 1;
+  const weekSlotLabel = slotIndex >= 0 ? displaySlotTitle(slotIndex) : null;
+
+  const openFoodLog = useCallback(
+    (
+      day: { dayIndex: number; label: string; isFuture: boolean },
+      mealSlot: Exclude<MealSlot, "snack">,
+      mealLabel: string
+    ) => {
+      if (!plan || day.isFuture) return;
+      setLogContext({
+        slot: MEAL_SLOT_TO_FOOD_LOG[mealSlot],
+        slotLabel: mealLabel,
+        dayLabel: day.label,
+        mealPlanId: plan.id,
+        dayIndex: day.dayIndex,
+      });
+    },
+    [plan]
+  );
+
+  const handleFoodLogSaved = useCallback(() => {
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 4000);
+  }, []);
 
   const handlePrevWeek = () => {
-    if (!schedule || !selectedSlot || !canPrevWeek) return;
-    setSelectedStartsOn(schedule.slots[slotIndex - 1].starts_on);
+    if (!selectedSlot || !canPrevWeek || slotIndex <= 0) return;
+    setSelectedStartsOn(displaySlots[slotIndex - 1].starts_on);
     setSelectedDayIndex(1);
   };
 
   const handleNextWeek = () => {
-    if (!schedule || !selectedSlot || !canNextWeek) return;
-    setSelectedStartsOn(schedule.slots[slotIndex + 1].starts_on);
+    if (!selectedSlot || !canNextWeek || slotIndex < 0) return;
+    setSelectedStartsOn(displaySlots[slotIndex + 1].starts_on);
     setSelectedDayIndex(1);
   };
 
   const handleResetCurrentWeek = () => {
-    if (!schedule) return;
-    const active = pickDefaultSlot(schedule);
-    if (active) {
-      setSelectedStartsOn(active.starts_on);
-      setSelectedDayIndex(1);
-    }
+    const currentWeek = displaySlots[1];
+    if (!currentWeek) return;
+    setSelectedStartsOn(currentWeek.starts_on);
+    const start = parseFlexibleDate(currentWeek.starts_on);
+    const planForSlot = currentWeek.plan ?? fallbackPlan;
+    const todayIdx =
+      start && planForSlot ? dayIndexForToday(planForSlot.days, start) : undefined;
+    setSelectedDayIndex(todayIdx ?? 1);
   };
 
   const showTodayButton = planDays.some((d) => d.isToday);
@@ -396,6 +473,23 @@ export default function PatientMealsPage() {
                 className="px-3 py-1.5 text-xs font-semibold bg-white border border-red-200 rounded-lg text-red-700 hover:bg-red-50"
               >
                 Thử lại
+              </button>
+            </div>
+          )}
+
+          {saveSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center gap-2 text-sm text-emerald-800 font-semibold">
+                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                Đã lưu ghi nhận bữa ăn thành công!
+              </div>
+              <button
+                type="button"
+                onClick={() => setSaveSuccess(false)}
+                className="text-emerald-700 hover:opacity-75"
+                aria-label="Đóng"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
           )}
@@ -507,7 +601,10 @@ export default function PatientMealsPage() {
 
                     <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-800">
                       <span className="material-symbols-outlined text-emerald-600 text-[15px]">calendar_month</span>
-                      <span>Tuần: {weekRangeLabel}</span>
+                      <span>
+                        {weekSlotLabel ? `${weekSlotLabel}: ` : "Tuần: "}
+                        {weekRangeLabel}
+                      </span>
                     </div>
 
                     <button
@@ -626,13 +723,21 @@ export default function PatientMealsPage() {
                           {planDays.map((day, dayIdx) => {
                             const items = day.ui[row.slot] as MealDishItem[];
                             const isLastRow = rowIdx === MEAL_ROWS.length - 1;
+                            const canLog = weekInPlan && !day.isFuture;
 
                             return (
-                              <button
+                              <div
                                 key={`${day.dayIndex}-${row.slot}`}
-                                type="button"
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => openDetail(day.dayIndex, setSelectedDayIndex, setViewMode)}
-                                className={`p-2.5 min-h-[100px] text-left transition-colors cursor-pointer border-r border-slate-200 ${dayIdx === planDays.length - 1 ? "border-r-0" : ""
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    openDetail(day.dayIndex, setSelectedDayIndex, setViewMode);
+                                  }
+                                }}
+                                className={`relative p-2.5 min-h-[100px] text-left transition-colors cursor-pointer border-r border-slate-200 ${dayIdx === planDays.length - 1 ? "border-r-0" : ""
                                   } ${rowIdx > 0 ? "border-t-[3px] border-t-slate-300" : "border-t border-t-slate-200"
                                   } ${day.isToday
                                     ? "bg-teal-50/90 border-x-2 border-x-teal-500 hover:bg-teal-100/80"
@@ -640,8 +745,22 @@ export default function PatientMealsPage() {
                                   } ${isLastRow && day.isToday ? "border-b-2 border-b-teal-400" : ""}`}
                                 title="Xem chi tiết bữa ăn"
                               >
+                                {canLog && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openFoodLog(day, row.slot, row.label);
+                                    }}
+                                    className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md text-emerald-700 bg-emerald-50/90 border border-emerald-200/70 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                    title="Ghi nhận bữa ăn"
+                                    aria-label={`Ghi nhận bữa ăn ${row.label} ${day.shortDate}`}
+                                  >
+                                    <span className="material-symbols-outlined text-[16px] block">edit_note</span>
+                                  </button>
+                                )}
                                 {items.length > 0 ? (
-                                  <ul className="space-y-2">
+                                  <ul className="space-y-2 pr-6">
                                     {items.map((food, fIdx) => (
                                       <li key={fIdx}>
                                         <DishCard item={food} compact />
@@ -651,7 +770,7 @@ export default function PatientMealsPage() {
                                 ) : (
                                   <span className="text-slate-300 text-xs">—</span>
                                 )}
-                              </button>
+                              </div>
                             );
                           })}
                         </React.Fragment>
@@ -736,7 +855,30 @@ export default function PatientMealsPage() {
 
                         return (
                           <section key={meal.slot}>
-                            <MealSectionHeader label={meal.label} icon={meal.icon} />
+                            <MealSectionHeader
+                              label={meal.label}
+                              icon={meal.icon}
+                              action={
+                                meal.slot !== "snack" &&
+                                !selectedDay.isFuture &&
+                                weekInPlan ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openFoodLog(
+                                        selectedDay,
+                                        meal.slot as Exclude<MealSlot, "snack">,
+                                        meal.label
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                                    Ghi nhận
+                                  </button>
+                                ) : undefined
+                              }
+                            />
                             {items.length === 0 ? (
                               <p className="text-sm text-slate-400 pl-10">Chưa có món trong buổi này</p>
                             ) : (
@@ -776,6 +918,13 @@ export default function PatientMealsPage() {
           )}
         </div>
       </main>
+
+      <FoodLogModal
+        open={logContext != null}
+        context={logContext}
+        onClose={() => setLogContext(null)}
+        onSaved={handleFoodLogSaved}
+      />
     </>
   );
 }

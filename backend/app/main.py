@@ -14,8 +14,10 @@ from app.api.v1 import (
     routes_auth,
     routes_chat,
     routes_doctor,
+    routes_food_log,
     routes_interactions,
     routes_meal_plan,
+    routes_metrics,
     routes_notifications,
     routes_profile,
 )
@@ -55,6 +57,8 @@ for router in (
     routes_interactions.router,
     routes_alerts.router,
     routes_notifications.router,
+    routes_food_log.router,
+    routes_metrics.router,
     routes_doctor.router,
 ):
     app.include_router(router, prefix="/api/v1")

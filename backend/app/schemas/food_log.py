@@ -1,26 +1,37 @@
-"""Food log schemas."""
+"""Food log schemas — contract §3, ADR-009."""
+
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class FoodLogCreate(BaseModel):
-    profile_id: int
-    text: str = Field(min_length=1)
-    meal_type: str = "other"
-    logged_at: datetime | None = None
+    meal_plan_id: str | None = None
+    day_index: int | None = None
+    slot: Literal["morning", "noon", "evening"]
+    type: Literal["as_planned", "custom"]
+    note: str = ""
+
+    @model_validator(mode="after")
+    def note_required_for_custom(self) -> FoodLogCreate:
+        if self.type == "custom" and not self.note.strip():
+            raise ValueError("note bắt buộc khi type=custom")
+        return self
 
 
 class FoodLogOut(BaseModel):
-    id: int
-    profile_id: int
-    meal_type: str
-    raw_text: str
-    items: list[dict[str, Any]]
-    totals: dict[str, Any]
-    alerts: list[dict[str, Any]] = Field(default_factory=list)
-    logged_at: datetime | None = None
+    id: str
+    user_id: str
+    meal_plan_id: str | None = None
+    day_index: int | None = None
+    slot: str
+    type: str
+    note: str = ""
+    status: str = "logged"
+    alert_ids: list[str] = Field(default_factory=list)
+    logged_at: datetime
 
     model_config = {"from_attributes": True}

@@ -138,6 +138,52 @@ def test_replace_active_plan(client):
     assert row["active_plan_id"] == plan_a
 
 
+def test_apply_next_week_displaces_misaligned_plan(client):
+    """Plan applied as tuần sau yesterday is 1 day off today's sliding grid.
+
+    Schedule must still show it on tuần sau, and applying a new plan to the
+    canonical next week must succeed instead of 409 PLAN_DATE_OVERLAP.
+    """
+    from app.models.meal_plan import MealPlan
+    from tests.conftest import TestingSessionLocal
+
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    plan_old = _generate_and_approve(client, "demo_patient_3@example.com", doctor_headers)
+    today = date.today()
+    misaligned_start = today + timedelta(days=6)
+    with TestingSessionLocal() as db:
+        row = db.get(MealPlan, plan_old)
+        assert row is not None
+        row.starts_on = misaligned_start
+        row.ends_on = misaligned_start + timedelta(days=6)
+        db.commit()
+
+    schedule = client.get(
+        "/api/v1/doctor/patients/demo_patient_3/meal-plan-schedule",
+        headers=doctor_headers,
+    ).json()
+    next_slot = next(s for s in schedule["slots"] if s["slot_key"] == "next")
+    assert next_slot["plan"]["id"] == plan_old
+    assert next_slot["occupancy"] == "upcoming"
+
+    plan_new = _generate_and_approve(client, "demo_patient_3@example.com", doctor_headers)
+    canonical_next = today + timedelta(days=7)
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_new}/apply",
+        headers=doctor_headers,
+        json={
+            "start_date": canonical_next.isoformat(),
+            "replace_active": False,
+            "slot_key": "next",
+        },
+    )
+    assert response.status_code == 200, response.text
+    old_row = client.get(f"/api/v1/meal-plans/{plan_old}", headers=doctor_headers).json()
+    assert old_row["starts_on"] is None
+    new_row = client.get(f"/api/v1/meal-plans/{plan_new}", headers=doctor_headers).json()
+    assert new_row["starts_on"] == canonical_next.isoformat()
+
+
 def test_plan_usage_for_row_windows():
     from app.services.plan_expiry import plan_usage_for_row
 

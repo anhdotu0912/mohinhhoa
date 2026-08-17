@@ -50,8 +50,8 @@
 - [ ] Bổ sung dữ liệu thật cho `data/food_db_vn.json` (hiện phần lớn placeholder) hoặc xác nhận không cần vì meal planner dùng `food_catalog_demo.json` riêng.
 - [ ] Tạo `data/guidelines/*.md` (hiện thư mục không tồn tại) — nội dung guideline dinh dưỡng Việt Nam thật để index vào ChromaDB, phục vụ intent `rag_qa`.
 
-### Could/Won't — Food Log (→ `specs/09-food-log-adherence.md`)
-- [ ] Giữ nguyên `food_log_node` là stub — **không** implement logic thật trong vòng này trừ khi MoSCoW đổi. Khi implement, dùng đúng slot 3-giá-trị đã chốt (`morning|noon|evening`), không phải 4-slot meal plan.
+### Done — Food Log (→ `specs/09-food-log-adherence.md`)
+- [x] `food_log_node` đọc log gần nhất từ DB và tóm tắt tuân thủ.
 
 ## Definition of Done
 - [ ] Test liên quan pass (`pytest tests/agents`, `tests/rag`, `tests/guardrails` nếu có).

@@ -382,6 +382,11 @@ def update_patient_metrics(
     profile.height = payload.height
     height_m = payload.height / 100.0
     profile.bmi = round(payload.weight / (height_m * height_m), 1)
+    db.flush()
+
+    from app.services.metrics_service import record_doctor_metrics
+
+    record_doctor_metrics(db, patient.id, profile.weight, profile.height, profile.bmi)
     db.commit()
     db.refresh(profile)
 

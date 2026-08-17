@@ -5,11 +5,15 @@ import { useEffect, useId, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   formatDateFull,
-  formatDateShort,
   parseFlexibleDate,
 } from "@/lib/plan-expiry";
-import { firstEmptyScheduleSlot } from "@/lib/plan-schedule-helpers";
-import { buildGenerateHref } from "@/lib/plan-slot-intent";
+import { displaySlotTitle, firstEmptyScheduleSlot, slotAllowsAdd, slotTitle, visibleScheduleSlots } from "@/lib/plan-schedule-helpers";
+import {
+  buildGenerateHref,
+  buildReviewHref,
+  intentFromSlot,
+  saveSlotIntent,
+} from "@/lib/plan-slot-intent";
 import {
   ApiError,
   type MealPlanOutput,
@@ -19,15 +23,15 @@ import {
   type ScheduleSlotKey,
 } from "@/lib/types";
 
-function slotTitle(slot: MealPlanScheduleSlot, index: number): string {
-  if (slot.slot_key === "current") return "Tuần này";
-  if (slot.slot_key === "next") return "Tuần sau";
-  if (slot.occupancy === "empty" && index >= 2) return "Tuần trống tiếp theo";
-  if (slot.occupancy === "upcoming") return "Tuần đã xếp";
-  return "Tuần trước";
-}
-
-function occupancyLabel(occupancy: ScheduleOccupancy): string {
+function occupancyLabel(
+  occupancy: ScheduleOccupancy,
+  plan?: MealPlanOutput | null
+): string {
+  if (plan?.status === "pending_review") return "Chờ duyệt";
+  if (occupancy === "empty" && plan) {
+    if (plan.status === "approved" || plan.status === "edited") return "Đã duyệt";
+    return "Chưa xếp lịch";
+  }
   switch (occupancy) {
     case "active":
       return "ĐANG ÁP DỤNG";
@@ -44,7 +48,7 @@ function slotRangeLabel(slot: MealPlanScheduleSlot): string {
   const start = parseFlexibleDate(slot.starts_on);
   const end = parseFlexibleDate(slot.ends_on);
   if (!start || !end) return `${slot.starts_on} – ${slot.ends_on}`;
-  return `${formatDateShort(start)} – ${formatDateFull(end)}`;
+  return `${formatDateFull(start)} – ${formatDateFull(end)}`;
 }
 
 function planTitle(plan: MealPlanOutput): string {
@@ -54,7 +58,9 @@ function planTitle(plan: MealPlanOutput): string {
 function planStatusLabel(status: string): string {
   if (status === "edited") return "Đã chỉnh sửa";
   if (status === "approved") return "Đã duyệt";
-  return "Đã duyệt";
+  if (status === "pending_review") return "Chờ duyệt";
+  if (status === "rejected") return "Từ chối";
+  return status;
 }
 
 function avgDailyKcal(plan: MealPlanOutput): number | null {
@@ -80,6 +86,7 @@ interface MealPlanScheduleTableProps {
   schedule: MealPlanScheduleOut;
   selectedStartsOn?: string | null;
   onSelectSlot?: (slot: MealPlanScheduleSlot) => void;
+  onPreviewPlan?: (plan: MealPlanOutput) => void;
   onRefresh?: (applied?: {
     planId: string;
     startsOn: string;
@@ -91,9 +98,9 @@ export function MealPlanScheduleTable({
   schedule,
   selectedStartsOn,
   onSelectSlot,
+  onPreviewPlan,
   onRefresh,
 }: MealPlanScheduleTableProps) {
-  const displaySlots = schedule.slots.slice(0, 4);
   const dialogTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,9 +150,16 @@ export function MealPlanScheduleTable({
   ) =>
     buildGenerateHref(patientId, {
       action,
-      slotKey: slot.slot_key,
+      slotKey: slot.slot_key === "current" || slot.slot_key === "next" ? slot.slot_key : "empty",
       startsOn: slot.starts_on,
     });
+
+  const persistSlotIntent = (
+    slot: MealPlanScheduleSlot,
+    action: "add" | "replace"
+  ) => {
+    saveSlotIntent(intentFromSlot(patientId, slot, action));
+  };
 
   const closePicker = () => {
     if (assigningId) return;
@@ -172,8 +186,8 @@ export function MealPlanScheduleTable({
       setPicker(null);
       showToast(
         mode === "replace"
-          ? `Đã thay thế thực đơn ${slotTitle(slot, index)} (${slotRangeLabel(slot)}).`
-          : `Đã gán ${planTitle(plan)} vào ${slotTitle(slot, index)} (${slotRangeLabel(slot)}).`
+          ? `Đã thay thế thực đơn ${slotTitle(slot)} (${slotRangeLabel(slot)}).`
+          : `Đã gán ${planTitle(plan)} vào ${slotTitle(slot)} (${slotRangeLabel(slot)}).`
       );
     } catch (err) {
       setAssignError(
@@ -184,7 +198,23 @@ export function MealPlanScheduleTable({
     }
   };
 
-  const unassignedPlans = schedule.unassigned_plans;
+  const displaySlots = visibleScheduleSlots(schedule);
+  const shownPlanIds = new Set(
+    displaySlots.map((slot) => slot.plan?.id).filter((id): id is string => Boolean(id))
+  );
+  const unassignedPlans = schedule.unassigned_plans.filter(
+    (plan) => !shownPlanIds.has(plan.id)
+  );
+  const currentSlot =
+    displaySlots.find((slot) => slot.slot_key === "current") ??
+    schedule.slots.find((slot) => slot.slot_key === "current") ??
+    null;
+  const previewUnassigned = (plan: MealPlanOutput) => {
+    onPreviewPlan?.(plan);
+    if (currentSlot) onSelectSlot?.(currentSlot);
+  };
+  const isAssignable = (plan: MealPlanOutput) =>
+    plan.status === "approved" || plan.status === "edited";
   const replacePlans = (() => {
     const occupyingId = picker?.slot.plan?.id;
     const fromOtherSlots = displaySlots
@@ -261,7 +291,7 @@ export function MealPlanScheduleTable({
                   } ${columnClass(slot)}`}
                   onClick={() => onSelectSlot?.(slot)}
                 >
-                  <div>{slotTitle(slot, index)}</div>
+                  <div>{displaySlotTitle(index)}</div>
                   <div className="font-normal text-on-surface-variant mt-0.5">
                     {slotRangeLabel(slot)}
                   </div>
@@ -275,16 +305,13 @@ export function MealPlanScheduleTable({
               {displaySlots.map((slot, index) => (
                 <td
                   key={`plan-${slot.starts_on}-${index}`}
-                  className={`p-sm ${columnClass(slot)}`}
+                  className={`p-sm cursor-pointer ${columnClass(slot)}`}
+                  onClick={() => onSelectSlot?.(slot)}
                 >
                   {slot.plan ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectSlot?.(slot)}
-                      className="font-semibold text-on-surface text-left hover:text-primary cursor-pointer"
-                    >
+                    <span className="font-semibold text-on-surface text-left hover:text-primary">
                       {planTitle(slot.plan)}
-                    </button>
+                    </span>
                   ) : (
                     <span className="text-on-surface-variant italic">(trống)</span>
                   )}
@@ -296,18 +323,25 @@ export function MealPlanScheduleTable({
               {displaySlots.map((slot, index) => (
                 <td
                   key={`status-${slot.starts_on}-${index}`}
-                  className={`p-sm ${columnClass(slot)}`}
+                  className={`p-sm cursor-pointer ${columnClass(slot)}`}
+                  onClick={() => onSelectSlot?.(slot)}
                 >
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                      slot.occupancy === "active"
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                        : slot.occupancy === "upcoming"
-                          ? "bg-sky-50 text-sky-800 border-sky-200"
-                          : "bg-surface-container-high text-on-surface-variant border-outline-variant"
+                      slot.plan?.status === "pending_review"
+                        ? "bg-amber-50 text-amber-900 border-amber-200"
+                        : slot.occupancy === "active"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : slot.occupancy === "upcoming"
+                            ? "bg-sky-50 text-sky-800 border-sky-200"
+                            : slot.occupancy === "past"
+                              ? "bg-surface-container-high text-on-surface-variant border-outline-variant"
+                              : slot.plan
+                                ? "bg-amber-50 text-amber-900 border-amber-200"
+                                : "bg-surface-container-high text-on-surface-variant border-outline-variant"
                     }`}
                   >
-                    {occupancyLabel(slot.occupancy)}
+                    {occupancyLabel(slot.occupancy, slot.plan)}
                   </span>
                 </td>
               ))}
@@ -320,15 +354,6 @@ export function MealPlanScheduleTable({
                   className={`p-sm ${columnClass(slot)}`}
                 >
                   <div className="flex flex-wrap gap-xs">
-                    {slot.actions.includes("view") && slot.plan && (
-                      <button
-                        type="button"
-                        onClick={() => onSelectSlot?.(slot)}
-                        className="px-sm py-1 rounded-lg border border-outline-variant text-on-surface hover:border-primary transition-colors cursor-pointer"
-                      >
-                        Xem nội dung
-                      </button>
-                    )}
                     {slot.actions.includes("replace") && (
                       <button
                         type="button"
@@ -341,17 +366,14 @@ export function MealPlanScheduleTable({
                         Thay thế
                       </button>
                     )}
-                    {slot.actions.includes("add") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAssignError(null);
-                          setPicker({ slot, index, mode: "add" });
-                        }}
-                        className="px-sm py-1 rounded-lg bg-primary text-on-primary font-semibold hover:bg-primary-container transition-colors cursor-pointer"
+                    {slotAllowsAdd(slot, schedule.today) && !slot.plan && (
+                      <Link
+                        href={buildGenerateLink(slot, "add")}
+                        onClick={() => persistSlotIntent(slot, "add")}
+                        className="px-sm py-1 rounded-lg bg-primary text-on-primary font-semibold hover:bg-primary-container transition-colors"
                       >
                         Thêm thực đơn
-                      </button>
+                      </Link>
                     )}
                   </div>
                 </td>
@@ -360,6 +382,75 @@ export function MealPlanScheduleTable({
           </tbody>
         </table>
       </div>
+
+      {unassignedPlans.length > 0 && (
+        <div className="mt-md pt-md border-t border-outline-variant">
+          <p className="text-xs font-semibold text-on-surface mb-sm flex items-center gap-xs">
+            <span className="material-symbols-outlined text-[16px] text-amber-700">
+              pending_actions
+            </span>
+            Thực đơn chưa xếp tuần ({unassignedPlans.length})
+          </p>
+          <ul className="space-y-sm">
+            {unassignedPlans.map((plan) => (
+              <li
+                key={plan.id}
+                className="flex flex-wrap items-center justify-between gap-sm rounded-xl border border-outline-variant bg-surface-container-low/40 px-md py-sm"
+              >
+                <button
+                  type="button"
+                  className="min-w-0 text-left cursor-pointer"
+                  onClick={() => previewUnassigned(plan)}
+                >
+                  <p className="text-sm font-semibold text-on-surface">
+                    {planTitle(plan)}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant">
+                    {planStatusLabel(String(plan.status))}
+                    {formatCreatedAt(plan.created_at)
+                      ? ` · tạo ${formatCreatedAt(plan.created_at)}`
+                      : ""}
+                  </p>
+                </button>
+                <div className="flex flex-wrap items-center gap-xs">
+                  {plan.status === "pending_review" ? (
+                    <Link
+                      href={buildReviewHref(
+                        patientId,
+                        plan.id,
+                        currentSlot
+                          ? intentFromSlot(patientId, currentSlot, "add")
+                          : null
+                      )}
+                      onClick={() => {
+                        if (currentSlot) persistSlotIntent(currentSlot, "add");
+                      }}
+                      className="px-sm py-1 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:bg-amber-700"
+                    >
+                      Duyệt
+                    </Link>
+                  ) : currentSlot ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignError(null);
+                        setPicker({
+                          slot: currentSlot,
+                          index: displaySlots.indexOf(currentSlot),
+                          mode: "add",
+                        });
+                      }}
+                      className="px-sm py-1 rounded-lg bg-primary text-on-primary text-[11px] font-semibold hover:bg-primary-container cursor-pointer"
+                    >
+                      Gán vào tuần này
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {picker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -382,7 +473,7 @@ export function MealPlanScheduleTable({
                   className="text-sm font-bold text-on-surface"
                 >
                   {picker.mode === "replace" ? "Thay thế thực đơn" : "Gán thực đơn vào"}{" "}
-                  {slotTitle(picker.slot, picker.index)}
+                  {slotTitle(picker.slot)}
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   {slotRangeLabel(picker.slot)}
@@ -428,6 +519,12 @@ export function MealPlanScheduleTable({
                       picker.slot,
                       picker.mode === "replace" ? "replace" : "add"
                     )}
+                    onClick={() =>
+                      persistSlotIntent(
+                        picker.slot,
+                        picker.mode === "replace" ? "replace" : "add"
+                      )
+                    }
                     className="inline-flex items-center gap-xs mt-md px-md py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">
@@ -461,31 +558,45 @@ export function MealPlanScheduleTable({
                             </p>
                             {alreadyScheduled ? (
                               <p className="text-[11px] text-amber-800 mt-1">
-                                Đang xếp ở {slotTitle(alreadyScheduled, displaySlots.indexOf(alreadyScheduled))}
+                                Đang xếp ở {slotTitle(alreadyScheduled)}
                               </p>
                             ) : null}
                           </div>
-                          <button
-                            type="button"
-                            disabled={Boolean(assigningId)}
-                            onClick={() =>
-                              void assignPlanToSlot(
-                                plan,
-                                picker.slot,
-                                picker.index,
-                                picker.mode
-                              )
-                            }
-                            className="shrink-0 px-sm py-1.5 rounded-lg bg-primary text-on-primary text-[11px] font-semibold hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {busy
-                              ? picker.mode === "replace"
-                                ? "Đang thay…"
-                                : "Đang gán…"
-                              : picker.mode === "replace"
-                                ? "Chọn thay thế"
-                                : "Gán vào tuần này"}
-                          </button>
+                          {isAssignable(plan) ? (
+                            <button
+                              type="button"
+                              disabled={Boolean(assigningId)}
+                              onClick={() =>
+                                void assignPlanToSlot(
+                                  plan,
+                                  picker.slot,
+                                  picker.index,
+                                  picker.mode
+                                )
+                              }
+                              className="shrink-0 px-sm py-1.5 rounded-lg bg-primary text-on-primary text-[11px] font-semibold hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {busy
+                                ? picker.mode === "replace"
+                                  ? "Đang thay…"
+                                  : "Đang gán…"
+                                : picker.mode === "replace"
+                                  ? "Chọn thay thế"
+                                  : "Gán vào tuần này"}
+                            </button>
+                          ) : (
+                            <Link
+                              href={buildReviewHref(
+                                patientId,
+                                plan.id,
+                                intentFromSlot(patientId, picker.slot, picker.mode)
+                              )}
+                              onClick={() => persistSlotIntent(picker.slot, picker.mode)}
+                              className="shrink-0 px-sm py-1.5 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:bg-amber-700"
+                            >
+                              Duyệt trước
+                            </Link>
+                          )}
                         </div>
                       </li>
                     );
@@ -501,6 +612,12 @@ export function MealPlanScheduleTable({
                     picker.slot,
                     picker.mode === "replace" ? "replace" : "add"
                   )}
+                  onClick={() =>
+                    persistSlotIntent(
+                      picker.slot,
+                      picker.mode === "replace" ? "replace" : "add"
+                    )
+                  }
                   className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline"
                 >
                   <span className="material-symbols-outlined text-[16px]">

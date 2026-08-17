@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { MealPlanScheduleTable, buildHistoryGenerateHref } from "@/components/doctor/MealPlanScheduleTable";
@@ -21,6 +21,8 @@ import {
   type PlanUsageStatus,
   type PlanValidityRange,
 } from "@/lib/plan-expiry";
+import { pickDefaultSlot, visibleScheduleSlots } from "@/lib/plan-schedule-helpers";
+import { buildReviewHref, intentFromSlot, saveSlotIntent } from "@/lib/plan-slot-intent";
 import type { DayMealPlan, MealPlanItem } from "@/lib/plans-store";
 import { asRouteId } from "@/lib/route-params";
 import {
@@ -43,15 +45,6 @@ function occupancyToUsage(occupancy: ScheduleOccupancy): PlanUsageStatus {
   if (occupancy === "upcoming") return "upcoming";
   if (occupancy === "past") return "finished";
   return "none";
-}
-
-function pickDefaultSlot(schedule: MealPlanScheduleOut): MealPlanScheduleSlot | null {
-  return (
-    schedule.slots.find((s) => s.occupancy === "active") ??
-    schedule.slots.find((s) => s.plan) ??
-    schedule.slots[0] ??
-    null
-  );
 }
 
 function getDayMealByIndex(
@@ -97,7 +90,9 @@ function shiftDays(base: Date, days: number): Date {
 export default function DoctorPatientHistoryPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const patientId = asRouteId(params?.patientId);
+  const weekParam = searchParams.get("week");
 
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
@@ -110,6 +105,7 @@ export default function DoctorPatientHistoryPage() {
   const [schedule, setSchedule] = useState<MealPlanScheduleOut | null>(null);
   const [compliance, setCompliance] = useState<PatientComplianceOut | null>(null);
   const [selectedStartsOn, setSelectedStartsOn] = useState<string | null>(null);
+  const [previewPlanId, setPreviewPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     setHydrated(true);
@@ -138,8 +134,9 @@ export default function DoctorPatientHistoryPage() {
       if (opts?.selectStartsOn) {
         setSelectedStartsOn(opts.selectStartsOn);
       } else if (!opts?.silent) {
-        const fallback = pickDefaultSlot(scheduleData);
-        setSelectedStartsOn(fallback?.starts_on ?? null);
+        setSelectedStartsOn(
+          weekParam ?? pickDefaultSlot(scheduleData)?.starts_on ?? null
+        );
       }
     } catch (err) {
       setLoadError(
@@ -155,7 +152,7 @@ export default function DoctorPatientHistoryPage() {
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  }, [token, role, patientId]);
+  }, [token, role, patientId, weekParam]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -166,33 +163,34 @@ export default function DoctorPatientHistoryPage() {
     void load();
   }, [hydrated, token, role, router, load]);
 
+  const displaySlots = useMemo(
+    () => (schedule ? visibleScheduleSlots(schedule) : []),
+    [schedule]
+  );
+
   const selectedSlot = useMemo(() => {
-    if (!schedule?.slots.length) return null;
+    if (!displaySlots.length) return null;
     return (
-      schedule.slots.find((slot) => slot.starts_on === selectedStartsOn) ??
-      pickDefaultSlot(schedule)
+      displaySlots.find((slot) => slot.starts_on === selectedStartsOn) ??
+      displaySlots.find((slot) => slot.slot_key === "current") ??
+      displaySlots[1] ??
+      displaySlots[0]
     );
-  }, [schedule, selectedStartsOn]);
+  }, [displaySlots, selectedStartsOn]);
 
   const selectedEntry = useMemo((): HistoryPlanEntry | null => {
-    if (!selectedSlot?.plan || !patient || !summary) return null;
-    const validity =
-      computeMealPlanValidity(selectedSlot.plan) ??
-      (() => {
-        const start = parseFlexibleDate(selectedSlot.starts_on);
-        const end = parseFlexibleDate(selectedSlot.ends_on);
-        if (!start || !end) return null;
-        return {
-          start,
-          end,
-          daysLeft: 0,
-          bucket: "ok" as const,
-          startDateLabel: formatDateFull(start),
-          endDateLabel: formatDateFull(end),
-        };
-      })();
+    if (!selectedSlot || !patient || !summary) return null;
+    const rawPlan =
+      selectedSlot.plan ??
+      (selectedSlot.slot_key === "current"
+        ? (schedule?.unassigned_plans.find((p) => p.id === previewPlanId) ??
+          schedule?.unassigned_plans[0] ??
+          null)
+        : null);
+    if (!rawPlan) return null;
+    const validity = computeMealPlanValidity(rawPlan);
     return {
-      plan: mealPlanToUiItem(selectedSlot.plan, {
+      plan: mealPlanToUiItem(rawPlan, {
         patientName: patient.name,
         patientCode: patient.id,
         condition: patient.condition,
@@ -200,7 +198,7 @@ export default function DoctorPatientHistoryPage() {
       validity,
       usage: occupancyToUsage(selectedSlot.occupancy),
     };
-  }, [selectedSlot, patient, summary]);
+  }, [selectedSlot, patient, summary, schedule, previewPlanId]);
 
   const adherenceByDate = useMemo(() => {
     const map = new Map<string, number | null>();
@@ -233,7 +231,7 @@ export default function DoctorPatientHistoryPage() {
   const weekEnd = useMemo(() => shiftDays(weekStart, 6), [weekStart]);
 
   const weekRangeLabel = `${formatDateShort(weekStart)} – ${formatDateFull(weekEnd)}`;
-  const weekInPlan = Boolean(selectedSlot?.plan && selectedEntry);
+  const weekInPlan = Boolean(selectedEntry);
 
   const weeklyStats = useMemo(() => {
     if (!selectedEntry || !weekInPlan) {
@@ -286,31 +284,30 @@ export default function DoctorPatientHistoryPage() {
   ]);
 
   const handlePrevWeek = () => {
-    if (!schedule || !selectedSlot) return;
-    const idx = schedule.slots.findIndex(
+    if (!selectedSlot) return;
+    const idx = displaySlots.findIndex(
       (slot) => slot.starts_on === selectedSlot.starts_on
     );
-    if (idx > 0) setSelectedStartsOn(schedule.slots[idx - 1].starts_on);
+    if (idx > 0) setSelectedStartsOn(displaySlots[idx - 1].starts_on);
   };
 
   const handleNextWeek = () => {
-    if (!schedule || !selectedSlot) return;
-    const idx = schedule.slots.findIndex(
+    if (!selectedSlot) return;
+    const idx = displaySlots.findIndex(
       (slot) => slot.starts_on === selectedSlot.starts_on
     );
-    if (idx >= 0 && idx < schedule.slots.length - 1) {
-      setSelectedStartsOn(schedule.slots[idx + 1].starts_on);
+    if (idx >= 0 && idx < displaySlots.length - 1) {
+      setSelectedStartsOn(displaySlots[idx + 1].starts_on);
     }
   };
 
   const handleResetCurrentWeek = () => {
-    const active = schedule ? pickDefaultSlot(schedule) : null;
-    if (active) setSelectedStartsOn(active.starts_on);
+    const current = displaySlots.find((slot) => slot.slot_key === "current");
+    if (current) setSelectedStartsOn(current.starts_on);
   };
 
   const handleSelectSlot = (slot: MealPlanScheduleSlot) => {
     setSelectedStartsOn(slot.starts_on);
-    if (!slot.plan) return;
     requestAnimationFrame(() => {
       document.getElementById("meal-week-grid")?.scrollIntoView({
         behavior: "smooth",
@@ -413,11 +410,19 @@ export default function DoctorPatientHistoryPage() {
                   {patient.id}
                 </span>
                 {selectedEntry && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-caption text-xs font-semibold bg-primary-container/20 text-primary border border-primary-container/30">
-                    {planCardUsageLabel(
-                      selectedEntry.usage,
-                      selectedEntry.validity != null
-                    )}
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-caption text-xs font-semibold border ${
+                      selectedEntry.plan.status === "pending"
+                        ? "bg-amber-50 text-amber-900 border-amber-200"
+                        : "bg-primary-container/20 text-primary border-primary-container/30"
+                    }`}
+                  >
+                    {selectedEntry.plan.status === "pending"
+                      ? "Chờ duyệt"
+                      : planCardUsageLabel(
+                          selectedEntry.usage,
+                          selectedEntry.validity != null
+                        )}
                   </span>
                 )}
               </div>
@@ -427,6 +432,22 @@ export default function DoctorPatientHistoryPage() {
             </div>
           </div>
           <div className="flex items-center gap-sm flex-wrap">
+            {selectedEntry?.plan.status === "pending" && patientId && selectedSlot && (
+              <Link
+                href={buildReviewHref(
+                  patientId,
+                  selectedEntry.plan.id,
+                  intentFromSlot(patientId, selectedSlot, "add")
+                )}
+                onClick={() =>
+                  saveSlotIntent(intentFromSlot(patientId, selectedSlot, "add"))
+                }
+                className="bg-amber-600 hover:bg-amber-700 text-white font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-2xs transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">assignment_turned_in</span>
+                Duyệt thực đơn
+              </Link>
+            )}
             <Link
               href={buildHistoryGenerateHref(patientId!, schedule)}
               className="bg-primary hover:bg-primary-container text-on-primary font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-2xs transition-all cursor-pointer"
@@ -443,6 +464,7 @@ export default function DoctorPatientHistoryPage() {
             schedule={schedule}
             selectedStartsOn={selectedSlot?.starts_on ?? selectedStartsOn}
             onSelectSlot={handleSelectSlot}
+            onPreviewPlan={(plan) => setPreviewPlanId(plan.id)}
             onRefresh={(applied) =>
               load({ silent: true, selectStartsOn: applied?.startsOn })
             }
@@ -548,7 +570,9 @@ export default function DoctorPatientHistoryPage() {
               <div className="text-xs text-on-surface-variant">
                 {selectedEntry?.validity
                   ? `Kế hoạch: ${selectedEntry.validity.startDateLabel} – ${selectedEntry.validity.endDateLabel}`
-                  : "Chưa có thực đơn cho tuần đang xem"}
+                  : selectedEntry
+                    ? "Thực đơn chưa gán vào tuần này"
+                    : "Chưa có thực đơn cho tuần đang xem"}
               </div>
             </div>
 

@@ -21,6 +21,7 @@ SlotOccupancy = Literal["empty", "active", "upcoming", "past"]
 SlotAction = Literal["add", "replace", "view"]
 
 DEFAULT_DURATION = 7
+UNASSIGNED_STATUSES = frozenset({"pending_review", "approved", "edited"})
 
 
 def _duration_for_row(row: MealPlan | None) -> int:
@@ -54,6 +55,36 @@ def _plan_at_start(plans: list[MealPlan], start: date) -> MealPlan | None:
     return None
 
 
+def _best_overlapping_plan(
+    plans: list[MealPlan],
+    start: date,
+    end: date,
+    *,
+    exclude_id: str | None = None,
+) -> MealPlan | None:
+    """Pick the applied plan covering most of a week window.
+
+    Slots are anchored to today, so a plan applied yesterday as "tuần sau"
+    can sit one day off the new grid and disappear from the table.
+    """
+    hits: list[tuple[int, MealPlan]] = []
+    for row in plans:
+        if row.id == exclude_id or row.starts_on is None or row.ends_on is None:
+            continue
+        lo = max(row.starts_on, start)
+        hi = min(row.ends_on, end)
+        if hi < lo:
+            continue
+        hits.append(((hi - lo).days + 1, row))
+    if not hits:
+        return None
+    hits.sort(key=lambda item: (-item[0], item[1].starts_on or start))
+    overlap, row = hits[0]
+    if overlap < 4:
+        return None
+    return row
+
+
 def _furthest_end(plans: list[MealPlan], today: date) -> date | None:
     future = [p for p in plans if p.ends_on >= today]
     if not future:
@@ -64,10 +95,16 @@ def _furthest_end(plans: list[MealPlan], today: date) -> date | None:
 def _slot_actions(
     occupancy: SlotOccupancy,
     slot_key: SlotKey,
+    *,
+    has_plan: bool = False,
 ) -> list[SlotAction]:
     if occupancy == "empty":
-        return ["add"]
-    actions: list[SlotAction] = ["view"]
+        actions: list[SlotAction] = []
+        if has_plan:
+            actions.append("view")
+        actions.append("add")
+        return actions
+    actions = ["view"]
     if slot_key in ("current", "next"):
         actions.append("replace")
     return actions
@@ -89,7 +126,7 @@ def build_schedule_slot(
         "ends_on": ends_on.isoformat(),
         "occupancy": occupancy,
         "plan": plan_out.model_dump() if plan_out else None,
-        "actions": _slot_actions(occupancy, slot_key),
+        "actions": _slot_actions(occupancy, slot_key, has_plan=plan_row is not None),
     }
 
 
@@ -132,12 +169,20 @@ def build_meal_plan_schedule(
     next_start = anchor_end + timedelta(days=1)
     next_end = _window_end(next_start, duration)
     next_plan = _plan_at_start(applied, next_start)
+    if next_plan is None:
+        next_plan = _best_overlapping_plan(
+            applied,
+            next_start,
+            next_end,
+            exclude_id=active.id if active else None,
+        )
     if next_plan and next_plan.id != (active.id if active else None):
+        exact = next_plan.starts_on == next_start
         slots.append(
             build_schedule_slot(
                 "next",
-                next_plan.starts_on,
-                next_plan.ends_on,
+                next_plan.starts_on if exact else next_start,
+                next_plan.ends_on if exact else next_end,
                 "upcoming",
                 next_plan,
             )
@@ -182,6 +227,21 @@ def build_meal_plan_schedule(
             build_schedule_slot("empty", empty_start, empty_end, "empty", None)
         )
 
+    # Applied plans whose window already ended were skipped above (starts
+    # before current/next). Keep them for week navigation / history timeline.
+    past_rows = [
+        row
+        for row in applied
+        if row.starts_on not in used_starts
+        and row.ends_on is not None
+        and row.ends_on < today
+    ]
+    past_slots = [
+        build_schedule_slot("empty", row.starts_on, row.ends_on, "past", row)
+        for row in past_rows
+    ]
+    slots = past_slots + slots
+
     active_plan_id = active.id if active else None
     active_plan = meal_plan_from_row(active) if active else None
 
@@ -189,7 +249,7 @@ def build_meal_plan_schedule(
         db.query(MealPlan)
         .filter(
             MealPlan.user_id == user_id,
-            MealPlan.status.in_(APPLY_ELIGIBLE_STATUSES),
+            MealPlan.status.in_(UNASSIGNED_STATUSES),
             MealPlan.starts_on.is_(None),
             MealPlan.ends_on.is_(None),
         )
@@ -278,6 +338,8 @@ def allowed_starts_for_slot(
     for slot in schedule["slots"]:
         start = date.fromisoformat(slot["starts_on"])
         if slot["slot_key"] == slot_key:
+            if slot_key == "empty" and slot["occupancy"] != "empty":
+                continue
             allowed.add(start)
             if (
                 slot_key == "current"

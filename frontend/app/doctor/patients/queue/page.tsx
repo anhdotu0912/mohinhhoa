@@ -10,6 +10,7 @@ import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import type { DoctorPatientSummary } from "@/lib/types";
 import { shortCondition } from "@/lib/format";
+import { buildReviewHref, saveSlotIntent } from "@/lib/plan-slot-intent";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -365,9 +366,19 @@ export default function QueuePage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              router.push(`/doctor/reviews/${job.patientId}`)
-                            }
+                            onClick={() => {
+                              if (job.slotIntent) saveSlotIntent(job.slotIntent);
+                              const planId = job.planIds?.[0];
+                              router.push(
+                                planId
+                                  ? buildReviewHref(
+                                      job.patientId,
+                                      planId,
+                                      job.slotIntent
+                                    )
+                                  : `/doctor/reviews/${job.patientId}`
+                              );
+                            }}
                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg transition-all text-xs cursor-pointer active:scale-95 shadow-xs"
                           >
                             So sánh &amp; Duyệt

@@ -17,10 +17,9 @@ import {
   parseFlexibleDate,
 } from "@/lib/plan-expiry";
 import {
+  parseSlotIntentParams,
   saveSlotIntent,
   type MealPlanSlotIntent,
-  type SlotIntentAction,
-  type SlotIntentKey,
 } from "@/lib/plan-slot-intent";
 
 const PRIORITY_OPTIONS = [
@@ -99,19 +98,8 @@ export default function DoctorGenerateMealPlanPage() {
   );
 
   const slotIntent = useMemo((): MealPlanSlotIntent | null => {
-    const intent = searchParams.get("intent");
-    const slot = searchParams.get("slot");
-    const startsOn = searchParams.get("starts_on");
-    if (!patientId || !intent || !slot || !startsOn) return null;
-    if (intent !== "add" && intent !== "replace") return null;
-    if (slot !== "current" && slot !== "next" && slot !== "empty") return null;
-    return {
-      patientId,
-      action: intent as SlotIntentAction,
-      slotKey: slot as SlotIntentKey,
-      startsOn,
-      replaceActive: intent === "replace",
-    };
+    if (!patientId) return null;
+    return parseSlotIntentParams(patientId, searchParams);
   }, [patientId, searchParams]);
 
   const slotIntentLabel = useMemo(() => {
@@ -126,7 +114,17 @@ export default function DoctorGenerateMealPlanPage() {
     if (slotIntent.action === "replace") {
       return `Sẽ thay thế thực đơn tuần ${slotIntent.slotKey === "current" ? "này" : "sau"} (${range})`;
     }
+    if (slotIntent.slotKey === "next") {
+      return `Sẽ gán vào tuần sau (${range})`;
+    }
+    if (slotIntent.slotKey === "current") {
+      return `Sẽ gán vào tuần hiện tại (${range})`;
+    }
     return `Sẽ gán vào tuần trống (${range})`;
+  }, [slotIntent]);
+
+  useEffect(() => {
+    if (slotIntent) saveSlotIntent(slotIntent);
   }, [slotIntent]);
 
   useEffect(() => {
@@ -201,6 +199,7 @@ export default function DoctorGenerateMealPlanPage() {
 
     // Đã có job đang chờ/xử lý → mở bảng hàng đợi
     if (activeJob) {
+      if (slotIntent) saveSlotIntent(slotIntent);
       openDrawer();
       router.push("/doctor/patients/queue");
       return;
@@ -214,9 +213,7 @@ export default function DoctorGenerateMealPlanPage() {
     ];
 
     setEnqueueing(true);
-    if (slotIntent) {
-      saveSlotIntent(slotIntent);
-    }
+    if (slotIntent) saveSlotIntent(slotIntent);
     useQueueStore.getState().addJobs([
       {
         id: patientId,

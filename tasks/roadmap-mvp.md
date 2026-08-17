@@ -16,10 +16,10 @@
 | 6 | `specs/06-meal-plan-review.md` | Approve/reject/edit đã hoạt động; **[Planned, đã quyết định]** thêm optimistic lock (409 khi plan không còn `pending_review`) | Must | BE2 | Done (core) / Planned (lock) |
 | 7 | `specs/07-patient-meal-plan-view.md` | Xem chi tiết/swaps đã hoạt động; **[Planned, đã quyết định]** `POST /meal-plans/{id}/request-adjustment` (cần bác sĩ duyệt lại); đi chợ/gợi ý khu vực Could Have | Must (xem) / Should (request-adjustment) / Could (đi chợ) | BE2 (API) + FE (hiển thị) | Partial |
 | 8 | `specs/08-drug-food-interaction-check.md` | Gap KB đầy đủ vs rút gọn: **chấp nhận cho vòng này** (hạ khỏi P0); **[Planned, đã quyết định]** thêm `unmatched_pairs[]`; wire agent thật cho `DEMO_MOCK=false` (hiện trả 501) vẫn cần cho gap-closure | Must | BE1 | Partial |
-| 9 | `specs/09-food-log-adherence.md` | Giữ Won't Have — slot vocabulary đã chốt (3-slot theo UI, `morning/noon/evening`) để tránh thiết kế lại nếu nâng ưu tiên sau này; không code trong vòng này | Won't (vòng này) | BE1 (node stub) + BE2 (schema/model placeholder) | Planned/Deferred |
+| 9 | `specs/09-food-log-adherence.md` | Food Log structured manual entry (3-slot ADR-009), mount API + nối FE | Should | BE2 (API) + FE | Done (core) |
 | 10 | `specs/10-doctor-compliance-view.md` | **[Planned]** `GET /doctor/patients/{id}/compliance` (on-the-fly, ngưỡng thấp = config `COMPLIANCE_LOW_THRESHOLD_PCT`) + `POST .../remind` (type mới `manual_reminder`, đã chốt) | Should | BE2 | Planned |
 | 11 | `specs/11-compliance-notification-delivery.md` | Event-driven materialize-ahead đã hoạt động; **[Planned, đã quyết định]** sửa `/notifications/demo/simulate` cho idempotent; thêm type `manual_reminder` | Must | BE2 | Done (core) / Planned (2 mục trên) |
-| 12 | `specs/12-patient-metrics-tracking.md` | Ghi nhận/xem snapshot đã hoạt động; **[Planned, đã quyết định]** validate `weight`+`height` đủ cặp; "lời khuyên khi chỉ số đổi" cần intent Agent mới; "xu hướng dài hạn" hoãn theo ADR-010 | Should (lời khuyên) / Won't (xu hướng, vòng này) | BE2 (metrics) + BE1 (intent mới) | Partial |
+| 12 | `specs/12-patient-metrics-tracking.md` | Snapshot Done; time-series patient self-tracking Done (ADR-013); validate `weight`+`height` Planned; AI advice Planned | Should | BE2 | Done (core tracking) / Planned (validation, AI) |
 | 13 | `specs/13-ai-chat-assistant.md` | **P0 gap:** implement guardrails thật; `profile_loader` đọc DB thật khi `DEMO_MOCK=false`; **[Planned, đã quyết định]** multi-intent qua `secondary_intents[]` | Must | BE1 | Partial |
 
 ## Backlog kiến trúc mới (không gắn 1 spec cụ thể, ảnh hưởng nhiều spec)
@@ -41,7 +41,7 @@
 8. **P2 — Mở rộng pattern `preferences`** (spec 02), **`unmatched_pairs[]`** (spec 08), **validate `weight`+`height` đủ cặp** (spec 03/12), **idempotent `/notifications/demo/simulate`** (spec 11), **multi-intent `secondary_intents[]`** (spec 13).
 9. **P2 — Rate-limit login + quên mật khẩu** (spec 01) — cần trước khi mở khảo sát người dùng thật, không cần cho demo nội bộ.
 10. **P3 — Kiến trúc mới (A1, A2):** migrate embedding sang Gemini API, thêm dual-provider LLM fallback — cải thiện chất lượng nhưng không chặn demo North Star hiện tại, làm sau khi các P0-P1-P2 ở trên ổn định.
-11. **Won't Have (giữ nguyên, không code):** Food Log (spec 09, slot vocabulary đã chốt sẵn), xu hướng chỉ số dài hạn (spec 12 phần trend), danh sách đi chợ/gợi ý khu vực bán (spec 07).
+11. **Done (2026-08-17):** Food Log (spec 09), Patient Metrics time-series (spec 12, ADR-013).
 
 ## Liên quan
 - `tasks/be1-ai-core.md`, `tasks/be2-platform.md`, `tasks/fe-frontend.md` — checklist chi tiết theo owner.

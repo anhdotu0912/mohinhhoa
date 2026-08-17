@@ -1,7 +1,7 @@
 # ADR-009: Phạm vi thật của Food Log
 
 ## Status
-Deferred (cho vòng demo hiện tại) — kiến trúc/schema Accepted để BE1/BE2 không tự sáng tạo khác nhau khi implement sau này.
+Accepted — đã implement (2026-08-17). Kiến trúc/schema giữ nguyên theo quyết định gốc.
 
 ## Context
 `CLAUDE.md` liệt kê **Food Log (text/search/NLP)** là **Won't Have** trong MVP hiện tại; `AGENTS.md` nhắc lại "Không implement Food Log trong MVP (nav đã ẩn)". Tuy vậy:

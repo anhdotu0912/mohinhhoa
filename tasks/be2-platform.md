@@ -40,9 +40,12 @@
 - [ ] `POST /interactions/check`: thêm `unmatched_pairs[]` cho cặp không tìm thấy dữ liệu KB (`specs/08`).
 - [ ] `POST /notifications/demo/simulate`: sửa lại cho idempotent — chỉ tạo mới nếu chưa có bản ghi mẫu cùng loại đang `pending`/`sent` (`specs/11`).
 
-### Won't (vòng này) — Food Log (→ `specs/09-food-log-adherence.md`, ADR-009)
-- [ ] Giữ nguyên `routes_food_log.py`/`models/food_log.py` là placeholder, **không mount** vào `main.py`.
-- [ ] Nếu implement sau: dùng `slot` 3-giá-trị đã chốt (`morning|noon|evening`, khác 4-slot meal plan); nhớ sửa `FoodLogCreate.profile_id` sang `str` (UUID) trước khi dùng, không giữ `int` như hiện tại.
+### Done — Food Log (→ `specs/09-food-log-adherence.md`, ADR-009)
+- [x] Implement `routes_food_log.py`, `models/food_log.py`, mount trong `main.py`.
+- [x] Alert linkage qua `food_log_id`; slot 3-giá-trị `morning|noon|evening`.
+
+### Done — Patient Metrics History (→ `specs/12`, ADR-013)
+- [x] Bảng `body_metrics_history`, `POST/GET /metrics`, doctor metrics ghi thêm history.
 
 ## Definition of Done
 - [ ] Test liên quan pass (`pytest tests/api`, `tests/services`).

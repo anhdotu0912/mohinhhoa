@@ -150,11 +150,49 @@ def interaction_check_node(state: AgentState) -> AgentState:
 
 
 def food_log_node(state: AgentState) -> AgentState:
-    """Stub for FoodLog — out of MVP scope."""
+    """Summarize recent food logs for the patient."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Tính năng ghi nhận bữa ăn chưa khả dụng trong phiên bản này.",
+            "food_log": None,
+        }
+
+    from app.models.food_log import FoodLog
+
+    logs = (
+        db.query(FoodLog)
+        .filter(FoodLog.user_id == user_id)
+        .order_by(FoodLog.logged_at.desc())
+        .limit(3)
+        .all()
+    )
+    if not logs:
+        return {
+            **state,
+            "answer": (
+                "Bạn chưa có ghi nhận bữa ăn nào. "
+                "Hãy mở mục «Ghi nhận bữa ăn» trên ứng dụng để ghi lại các bữa trong ngày."
+            ),
+            "food_log": None,
+        }
+
+    slot_labels = {"morning": "Bữa sáng", "noon": "Bữa trưa", "evening": "Bữa tối"}
+    lines = ["Ghi nhận bữa ăn gần đây của bạn:"]
+    for log in reversed(logs):
+        label = slot_labels.get(log.slot, log.slot)
+        if log.type == "as_planned":
+            lines.append(f"• {label}: Đã ăn theo kế hoạch")
+        else:
+            lines.append(f"• {label}: Ăn khác — {log.note}")
+
     return {
         **state,
-        "answer": "Tính năng ghi nhận bữa ăn chưa khả dụng trong phiên bản này.",
-        "food_log": None,
+        "answer": "\n".join(lines),
+        "food_log": {"recent_count": len(logs)},
     }
 
 

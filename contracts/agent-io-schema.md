@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.2 (2026-08-16 — as-built `salt_daily_g`/`sugar_daily_g` trên `Restrictions`; thêm `Macros.sugar_g`/`DayTotals.sugar_g`; bỏ `protein_daily_g` khỏi scope ràng buộc doctor; quy đổi muối→natri `salt_daily_g*400=sodium_mg` trong meal planner. Xem changelog ở §7 Versioning.)
+**Version:** 1.3 (2026-08-17 — FoodLogEntry as-built; Alert.food_log_id; thêm BodyMetricsEntry §3.5. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -122,9 +122,9 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Luôn **7 ngày** (`days_count=7` m
 
 ---
 
-## 3. `FoodLogEntry` (Planned — theo ADR-009)
+## 3. `FoodLogEntry` (as-built — ADR-009)
 
-**Status: Planned.** Chưa có bảng DB thật (`models/food_log.py` là placeholder), chưa mount route. Schema dưới đây là **thiết kế đề xuất**, dựa trên `schemas/food_log.py` hiện có (đã sửa `profile_id` sang `str` theo đúng convention UUID toàn hệ thống — xem ghi chú Negative của ADR-009) + UI đã thiết kế ở `frontend/app/patient/meals/log/page.tsx`.
+Nguồn: `backend/app/models/food_log.py`, `backend/app/schemas/food_log.py`.
 
 ```json
 {
@@ -144,7 +144,7 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Luôn **7 ngày** (`days_count=7` m
 - `type`: `"as_planned" | "custom"` — khớp 2 nút bấm đã có trên UI ("Đã ăn theo kế hoạch" / "Ăn khác").
 - `note`: bắt buộc khi `type="custom"`, rỗng khi `type="as_planned"`.
 - `status`: `"logged" | "adjusted"` — không có `pending/rejected` (không cần workflow duyệt, xem ADR-009).
-- `slot`: **[Planned, quyết định 2026-08-15]** dùng đúng **3-slot theo UI**: `"morning" | "noon" | "evening"` (sáng/trưa/tối) — **KHÁC** với 4-slot của meal plan (`breakfast/lunch/dinner/snack`), có chủ đích, không mở rộng thêm slot thứ 4. Ánh xạ gần đúng khi đối chiếu tuân thủ: `morning≈breakfast`, `noon≈lunch`, `evening≈dinner`; **không có** slot tương ứng cho `snack` — tuân thủ bữa phụ không được food log ghi nhận (Out of scope có chủ đích, xem ADR-009).
+- `slot`: dùng đúng **3-slot theo UI**: `"morning" | "noon" | "evening"` — **KHÁC** 4-slot meal plan.
 - `alert_ids[]`: liên kết tới `Alert` được tạo nếu `custom` log trùng khớp 1 cặp tương tác nguy hiểm trong KB.
 
 ---
@@ -164,11 +164,37 @@ Nguồn HTTP: `backend/app/schemas/alert.py` (`AlertOut`, đây là schema thậ
   "recommendation": "Hạn chế và giữ ổn định lượng rau giàu Vitamin K; trao đổi với bác sĩ trước khi thay đổi chế độ ăn.",
   "sources": ["drug_food_interactions#warfarin_rau_muong"],
   "meal_plan_id": "plan_uuid",
+  "food_log_id": "log_uuid",
   "created_at": "2026-08-15T09:00:05+07:00"
 }
 ```
 
-**Ghi chú quan trọng (as-built, khác với `Alert` Pydantic phụ định nghĩa trong `schemas/meal_plan.py`):** model DB **không có** cột `food_log_id` (dù `schemas/meal_plan.py::Alert` — một class trùng tên, không dùng ở HTTP layer — có field này). `AlertOut` (schema HTTP thật) không có `food_log_id`. Khi `specs/09-food-log-adherence.md` (Planned) cần liên kết Alert → FoodLog, phải thêm cột `meal_plan_id`-style mới (`food_log_id`) vào model DB thật, không giả định nó đã tồn tại.
+**Ghi chú:** model DB và `AlertOut` có cột/field `food_log_id` (nullable) khi Alert được tạo từ custom food log.
+
+---
+
+## 3.5 `BodyMetricsEntry` (as-built — ADR-013)
+
+Nguồn: `backend/app/models/body_metrics.py`, `backend/app/schemas/body_metrics.py`.
+
+```json
+{
+  "id": "metrics_uuid",
+  "user_id": "user_uuid",
+  "weight": 72,
+  "height": 170,
+  "bmi": 24.9,
+  "blood_pressure": "130/80 mmHg",
+  "blood_glucose": "135 mg/dL",
+  "note": "",
+  "recorded_by": "patient",
+  "recorded_at": "2026-08-17T08:00:00+07:00"
+}
+```
+
+- `recorded_by`: `"patient" | "doctor"`.
+- Ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có khi ghi qua `POST /metrics`.
+- Snapshot `profiles` vẫn cập nhật song song mỗi lần ghi entry mới.
 
 ---
 
@@ -278,8 +304,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.2**.
-- **Changelog 1.1 → 1.2 (2026-08-16):** `Restrictions.salt_daily_g`/`sugar_daily_g` chuyển từ `[Planned]` → as-built; thêm `Macros.sugar_g`/`DayTotals.sugar_g`; bỏ `protein_daily_g` khỏi scope ràng buộc; ghi chú quy đổi muối→natri trong meal planner.
+- Version hiện tại của contract này: **1.3**.
+- **Changelog 1.2 → 1.3 (2026-08-17):** `FoodLogEntry` chuyển Planned → as-built; `Alert` thêm `food_log_id`; thêm `BodyMetricsEntry` §3.5 (ADR-013).
 - **Changelog 1.0 → 1.1 (2026-08-15):** thêm `PatientProfile.restrictions.{salt_daily_g,sugar_daily_g,protein_daily_g}` `[Planned]`, `PatientProfile.constraints_status` `[Planned]`, `FoodLogEntry.slot` đổi sang 3-giá-trị `morning|noon|evening` `[Planned]` (thay đề xuất 4-slot ban đầu), `InteractionCheckOutput.unmatched_pairs[]` `[Planned]`, `AgentRunOutput.secondary_intents[]` `[Planned]`. Toàn bộ đều là field mới optional với default an toàn (`null`/`[]`/`"confirmed"`) — không breaking change với code hiện tại, minor bump.
 - Mọi thay đổi field/enum/shape phải: (1) bump version ở đầu file, (2) note ngày + lý do đổi ngay dưới tiêu đề version, (3) cập nhật `contracts/api-v1.md` nếu ảnh hưởng tới response HTTP, (4) cập nhật spec liên quan trong `specs/`.
 - **Luật cứng:** sửa contract trước, code sau (`CLAUDE.md` Mục 6, Mục 12). Code không được implement field/enum chưa có trong contract này.

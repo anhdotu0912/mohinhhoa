@@ -17,6 +17,7 @@ class AlertOut(BaseModel):
     recommendation: str
     sources: list[str]
     meal_plan_id: str | None = None
+    food_log_id: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

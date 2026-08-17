@@ -1,7 +1,7 @@
 # ADR-010: Có làm Time-series Chỉ số Cơ thể hay giữ Snapshot?
 
 ## Status
-Accepted (giữ Snapshot, hoãn Time-series)
+Superseded by ADR-013 (2026-08-17) — patient self-tracking time-series đã implement; snapshot trên `profiles` vẫn giữ.
 
 ## Context
 Chỉ số cơ thể (weight/height/bmi) hiện lưu **snapshot mới nhất duy nhất** trên `profiles.weight/height/bmi` (`backend/app/models/profile.py`) — mỗi lần patient tự cập nhật (`POST /profile`) hoặc doctor cập nhật (`PUT /doctor/patients/{id}/metrics`) đều **ghi đè** giá trị cũ, không có bảng lịch sử nhiều bản ghi theo thời gian. `bmi_category` (`Thiếu cân/Bình thường/Thừa cân nhẹ/Béo phì`, ngưỡng 18.5/23/25 — chuẩn BMI châu Á, không phải WHO 25/30) được tính lại mỗi lần từ snapshot, không lưu lịch sử category.

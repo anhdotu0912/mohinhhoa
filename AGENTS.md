@@ -10,4 +10,4 @@ Hướng dẫn ngắn cho AI coding agent trên repo **P-014**.
 6. Backlog: [`tasks/roadmap-mvp.md`](tasks/roadmap-mvp.md).
 7. Hạn chế thay đổi frontend đã được thiết kế.
 
-**Không** implement Food Log trong MVP (nav đã ẩn). Ưu tiên demo North Star mượt hơn thêm feature.
+Food Log (ADR-009) và Patient Metrics time-series (ADR-013) đã implement — xem `specs/09`, `specs/12`, contracts §12 + §14.

@@ -23,15 +23,17 @@
 
 | Must Have (MVP) | Should Have | Could Have | Won't Have (MVP này) |
 |---|---|---|---|
-| Hồ sơ bệnh nhân | Adaptive feedback | Food recognition ảnh | **Food Log** (text/search/NLP) |
+| Hồ sơ bệnh nhân | Adaptive feedback | Food recognition ảnh | NLP parse tự do thành định lượng dinh dưỡng |
 | Meal plan 7 ngày (RAG) | Memory preferences | Danh sách đi chợ | Billing/payment |
 | Drug-food interaction + Alert | Expert review nâng cao | Export PDF | Multi-language |
 | **Compliance Notification** (in-app) | Cảnh báo ngưỡng dinh dưỡng | Push notification (FCM/APNs) | Social features |
 | Nutrition calculator | Chat Q&A sâu hơn | Wearable sync | |
 | Guardrails + nguồn trích dẫn | **Doctor Compliance View** (`specs/10`, Done core) | | |
-| Dietitian review UI (approve/edit/reject) | **Clinical Constraints HITL** (`specs/04`, Planned) | | |
+| Dietitian review UI (approve/edit/reject) | **Food Log** (structured manual entry, ADR-009) | | |
+| | **Clinical Constraints HITL** (`specs/04`, Planned) | | |
+| | **Patient Metrics History** (time-series, ADR-013) | | |
 
-> **Thay đổi scope so với bản cũ:** bỏ Food Log khỏi MVP; đưa Compliance Notification vào Must Have; Drug-food interaction nâng lên Must Have vì nằm trên North Star demo.
+> **Thay đổi scope (2026-08-17):** Food Log (phạm vi tối thiểu ADR-009) và Patient Metrics time-series (ADR-013) đã được nâng lên Should Have và implement. Compliance Notification và Drug-food interaction vẫn Must Have.
 
 ---
 
@@ -91,7 +93,8 @@ P-014/
 │   ├── 007-compliance-notification-strategy.md
 │   ├── 008-compliance-summary-aggregation-strategy.md
 │   ├── 009-food-log-scope-strategy.md
-│   └── 010-patient-metrics-history-strategy.md
+│   ├── 010-patient-metrics-history-strategy.md
+│   └── 013-patient-metrics-time-series.md
 ├── contracts/
 │   ├── agent-io-schema.md          # Agent facade + core schemas (versioned)
 │   └── api-v1.md                   # FE ↔ BE HTTP
@@ -107,7 +110,7 @@ P-014/
 │   ├── core/                       # config.py, security.py
 │   ├── api/v1/                     # auth, profile, meal_plan, chat, interactions,
 │   │                               # alerts, notifications, doctor
-│   │                               # (routes_food_log.py tồn tại, không mount — xem §7)
+│   │                               # food_log, metrics
 │   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
 │   ├── rag/                        # indexer, retriever, embeddings (Chroma)
 │   ├── guardrails/                 # rules.py đã code (chưa wired graph); source_check.py placeholder
@@ -156,7 +159,8 @@ Backlog hiện tại: `/tasks/roadmap-mvp.md`. Ownership rút gọn: `/tasks/be1
 - Guardrails: AI **không** được tự ý khuyến nghị đổi thuốc/liều lượng — luôn redirect bác sĩ.
 - Mọi Agent mới phải khớp schema đã định nghĩa trong `contracts/agent-io-schema.md`.
 - Danh sách câu AI phải từ chối & redirect bác sĩ → định nghĩa trong `backend/app/guardrails/rules.py`.
-- **Không** implement Food Log trong MVP này. Route/stub có thể tồn tại trong code nhưng **không** hiện trong nav demo; không mount food-log API trong `main.py` trừ khi team đổi MoSCoW + cập nhật CLAUDE/specs.
+- Food Log implement theo phạm vi tối thiểu ADR-009: nhập tay có cấu trúc (3 slot `morning|noon|evening`, `as_planned|custom`), **không** làm NLP parse tự do hay nhận diện ảnh món ăn.
+- Patient Metrics time-series theo ADR-013: bảng `body_metrics_history` cho bệnh nhân/bác sĩ ghi nhận theo thời gian; snapshot trên `profiles` vẫn giữ làm giá trị mới nhất.
 
 ---
 
