@@ -5,8 +5,10 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.agents.interaction_checker_agent import check_interactions
+from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.food_log import FoodLog
+from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.schemas.food_log import FoodLogCreate
 from app.services.notification import NotificationService
@@ -57,6 +59,15 @@ def create_food_log(
 ) -> FoodLog:
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
     medications = (profile.medications if profile else None) or []
+
+    if payload.meal_plan_id:
+        plan = db.get(MealPlan, payload.meal_plan_id)
+        if plan is None or plan.user_id != user_id:
+            raise APIError(
+                403,
+                "FORBIDDEN",
+                "meal_plan_id không thuộc về bạn.",
+            )
 
     row = FoodLog(
         user_id=user_id,

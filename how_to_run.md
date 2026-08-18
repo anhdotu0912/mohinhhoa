@@ -43,6 +43,12 @@ Backend được xây dựng bằng Python và FastAPI.
    File `.env` của project **ghi đè** biến môi trường Windows cùng tên. Thiếu key → gen thực đơn vẫn chạy (xoay vòng catalog, không gọi LLM).
    OpenAI: `LLM_PROVIDER=openai`, `LLM_MODEL=gpt-4o-mini`, `OPENAI_API_KEY=sk-...`
 
+   Embedding Gemini: nhiều key cách nhau bởi dấu phẩy — xoay khi hết quota / 429:
+
+   ```bash
+   GEMINI_API_KEY=key-1,key-2,key-3
+   ```
+
 5. **Khởi chạy server FastAPI:**
    ```bash
    uvicorn app.main:app --reload

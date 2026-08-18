@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -56,13 +57,33 @@ function weeklyAdherence(logs: FoodLogEntry[]): number {
 }
 
 export default function PatientDashboardPage() {
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
   const displayName = useAuthStore((s) => s.displayName);
+  const [hydrated, setHydrated] = useState(false);
   const [alerts, setAlerts] = useState<AlertOut[]>([]);
   const [plan, setPlan] = useState<MealPlanOutput | null>(null);
   const [foodLogs, setFoodLogs] = useState<FoodLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    if (role === "doctor") {
+      router.replace("/doctor");
+    }
+  }, [hydrated, token, role, router]);
+
+  useEffect(() => {
+    if (!hydrated || !token || role === "doctor") return;
     let cancelled = false;
     void (async () => {
       setLoading(true);
@@ -99,7 +120,7 @@ export default function PatientDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hydrated, token, role]);
 
   const greeting = displayName?.trim() ? `Chào, ${displayName}` : "Chào bạn";
   const topAlert = alerts[0];

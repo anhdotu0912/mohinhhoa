@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
   NAV_BY_ROLE,
@@ -75,11 +75,13 @@ function SidebarFooter({
   role: AppRole;
   onNavigate?: () => void;
 }) {
+  const router = useRouter();
   const meta = ROLE_META[role];
   const token = useAuthStore((s) => s.token);
   const email = useAuthStore((s) => s.email);
   const displayName = useAuthStore((s) => s.displayName);
   const avatar = useAuthStore((s) => s.avatar);
+  const logout = useAuthStore((s) => s.logout);
   const setUserProfile = useAuthStore((s) => s.setUserProfile);
 
   useEffect(() => {
@@ -104,6 +106,12 @@ function SidebarFooter({
 
   const resolvedName = displayName || email || meta.displayName;
   const avatarSrc = avatar ? assetUrl(avatar) : "";
+
+  const handleLogout = () => {
+    logout();
+    onNavigate?.();
+    router.push("/login");
+  };
 
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
@@ -133,14 +141,14 @@ function SidebarFooter({
         </div>
       </div>
 
-      <Link
-        href="/"
-        onClick={onNavigate}
+      <button
+        type="button"
+        onClick={handleLogout}
         className="w-full flex items-center justify-center gap-sm bg-surface-container-low text-error border border-outline-variant hover:bg-error-container hover:text-on-error-container font-label text-label py-sm px-md rounded-lg transition-colors shadow-xs font-semibold cursor-pointer active:scale-95"
       >
         <span className="material-symbols-outlined text-[22px]">logout</span>
         <span>Đăng xuất</span>
-      </Link>
+      </button>
     </div>
   );
 }

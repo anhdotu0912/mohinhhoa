@@ -23,6 +23,7 @@ from app.api.v1 import (
 )
 from app.core.config import settings
 from app.core.errors import register_error_handlers
+from app.core.startup_checks import validate_security_settings
 from app.db.init_db import init_db
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
@@ -31,6 +32,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_security_settings()
     init_db()
     yield
 

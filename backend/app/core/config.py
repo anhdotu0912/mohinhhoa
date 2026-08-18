@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Embedding — provider: gemini (default) | local
     EMBEDDING_PROVIDER: str = "gemini"
     EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    # Comma-separated pool, e.g. key-1,key-2,key-3
     GEMINI_API_KEY: str = ""
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_EMBEDDING_DIMENSION: int = 768

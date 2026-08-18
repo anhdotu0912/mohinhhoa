@@ -45,7 +45,7 @@ def _stub_outbound_email(monkeypatch):
     """Do not hit real SMTP in tests; treat mail as configured + delivered."""
     monkeypatch.setattr("app.services.email.is_configured", lambda: True)
     monkeypatch.setattr(
-        "app.services.email.send_temporary_password", lambda *args, **kwargs: None
+        "app.services.email.send_password_reset_link", lambda *args, **kwargs: None
     )
 
 

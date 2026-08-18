@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MetricsProgressChart } from "@/components/patient/MetricsProgressChart";
 import { TopBar } from "@/components/shared/TopBar";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import { ApiError, type FoodLogEntry, type MetricsHistoryPoint } from "@/lib/types";
 
 function formatDayKey(iso: string): string {
@@ -21,6 +23,10 @@ function formatTableDate(iso: string): string {
 }
 
 export default function PatientHistoryPage() {
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
   const [history, setHistory] = useState<MetricsHistoryPoint[]>([]);
   const [foodLogs, setFoodLogs] = useState<FoodLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +56,24 @@ export default function PatientHistoryPage() {
   }, []);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    if (role === "doctor") {
+      router.replace("/doctor");
+    }
+  }, [hydrated, token, role, router]);
+
+  useEffect(() => {
+    if (!hydrated || !token || role === "doctor") return;
     void loadData();
-  }, [loadData]);
+  }, [hydrated, token, role, loadData]);
 
   const recentTableRows = useMemo(
     () =>
