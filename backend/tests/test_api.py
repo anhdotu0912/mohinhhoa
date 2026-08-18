@@ -31,13 +31,13 @@ def test_register_login_flow(client):
         json={
             "email": "New.User@Example.com",
             "password": "secret123",
-            "role": "patient",
             "full_name": "Nguyễn Văn Test",
         },
     )
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["email"] == "new.user@example.com"
+    assert body["role"] == "patient"
     assert body["full_name"] == "Nguyễn Văn Test"
 
     response = client.post(
@@ -60,6 +60,26 @@ def test_register_login_flow(client):
     )
     assert response.status_code == 409
     assert response.json()["code"] == "EMAIL_EXISTS"
+
+
+def test_register_doctor_role_ignored(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "wannabe.doctor@example.com",
+            "password": "secret123",
+            "role": "doctor",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["role"] == "patient"
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "wannabe.doctor@example.com", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    assert login.json()["role"] == "patient"
 
 
 def test_login_wrong_password(client):

@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import {
   ChatThinkingSteps,
@@ -12,6 +13,7 @@ import {
 import { DishCard, MealSectionHeader } from "@/components/patient/PatientMealPlanUI";
 import { api } from "@/lib/api";
 import { foodItemToDish } from "@/lib/meal-plan-mappers";
+import { useAuthStore } from "@/lib/auth-store";
 import { ApiError, type AgentRunOutput, type MealPreviewOut } from "@/lib/types";
 
 interface Message {
@@ -62,6 +64,10 @@ function formatCitationLabel(citation: string): string {
 }
 
 export default function PatientAssistantPage() {
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputQuery, setInputQuery] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -82,6 +88,21 @@ export default function PatientAssistantPage() {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    if (role === "doctor") {
+      router.replace("/doctor");
+    }
+  }, [hydrated, token, role, router]);
 
   useEffect(() => {
     scrollToBottom();

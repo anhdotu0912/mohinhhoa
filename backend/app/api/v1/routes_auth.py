@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import APIError
 from app.core.security import create_access_token, get_current_user, hash_password, verify_password
 from app.db.session import get_db
@@ -29,31 +30,33 @@ from app.services.login_rate_limit import check_rate_limit, clear_attempts, reco
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_RESET_MESSAGE = "Nếu email tồn tại, mật khẩu mới đã được gửi tới email của bạn."
-_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-
-
-def _new_password(length: int = 10) -> str:
-    return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
+_RESET_MESSAGE = "Nếu email tồn tại, liên kết đặt lại mật khẩu đã được gửi tới email của bạn."
+_PASSWORD_RESET_EXPIRE_HOURS = 1
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 def register(
     payload: RegisterRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> RegisterResponse:
+    client_ip = request.client.host if request.client else "unknown"
     email = payload.email.strip().lower()
+    check_rate_limit("register", email, client_ip)
+
     if db.query(User).filter(User.email == email).first() is not None:
+        record_failed_attempt("register", email, client_ip)
         raise APIError(409, "EMAIL_EXISTS", "Email đã được đăng ký.")
     user = User(
         email=email,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
+        role="patient",
         full_name=(payload.full_name or "").strip() or None,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    clear_attempts("register", email, client_ip)
     return RegisterResponse(
         id=user.id,
         email=user.email,
@@ -70,14 +73,14 @@ def login(
 ) -> TokenResponse:
     client_ip = request.client.host if request.client else "unknown"
     email = payload.email.strip().lower()
-    check_rate_limit(email, client_ip)
+    check_rate_limit("login", email, client_ip)
 
     user = db.query(User).filter(User.email == email).first()
     if user is None or not verify_password(payload.password, user.hashed_password):
-        record_failed_attempt(email, client_ip)
+        record_failed_attempt("login", email, client_ip)
         raise APIError(401, "INVALID_CREDENTIALS", "Email hoặc mật khẩu không đúng.")
 
-    clear_attempts(email, client_ip)
+    clear_attempts("login", email, client_ip)
     return TokenResponse(
         access_token=create_access_token(user.id, user.role),
         role=user.role,
@@ -88,6 +91,7 @@ def login(
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(
     payload: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ForgotPasswordResponse:
     if not email_service.is_configured():
@@ -97,14 +101,31 @@ def forgot_password(
             "Chưa cấu hình gửi email (SMTP). Liên hệ quản trị viên.",
         )
 
+    client_ip = request.client.host if request.client else "unknown"
     email = payload.email.strip().lower()
+    check_rate_limit("forgot_password", email, client_ip)
+
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         return ForgotPasswordResponse(message=_RESET_MESSAGE)
 
-    new_password = _new_password()
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=_PASSWORD_RESET_EXPIRE_HOURS)
+    db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=hash_password(raw_token),
+            expires_at=expires_at,
+        )
+    )
+    db.commit()
+
+    reset_url = (
+        settings.FRONTEND_URL.rstrip("/") + f"/reset-password?token={raw_token}"
+    )
     try:
-        email_service.send_temporary_password(user.email, new_password)
+        email_service.send_password_reset_link(user.email, reset_url)
     except email_service.EmailNotConfiguredError:
         raise APIError(
             503,
@@ -125,9 +146,7 @@ def forgot_password(
             "Không gửi được email. Vui lòng thử lại sau.",
         )
 
-    user.hashed_password = hash_password(new_password)
-    db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
-    db.commit()
+    clear_attempts("forgot_password", email, client_ip)
     return ForgotPasswordResponse(message=_RESET_MESSAGE)
 
 
@@ -136,7 +155,7 @@ def reset_password(
     payload: ResetPasswordRequest,
     db: Session = Depends(get_db),
 ) -> ResetPasswordResponse:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     tokens = (
         db.query(PasswordResetToken)
         .filter(PasswordResetToken.expires_at >= now)

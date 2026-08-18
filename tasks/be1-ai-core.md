@@ -46,6 +46,7 @@
 ### P3 — Migrate embedding sang Gemini Embedding API (→ `adrs/003-embedding-model-choice.md`, quyết định 2026-08-15)
 - [x] Thêm config `EMBEDDING_PROVIDER`/`GEMINI_API_KEY`/`GEMINI_EMBEDDING_MODEL="gemini-embedding-2"` vào `backend/app/core/config.py`.
 - [x] Viết custom `EmbeddingFunction` gọi Gemini API trong `backend/app/rag/embeddings.py`, giữ `SentenceTransformerEmbeddingFunction` local làm fallback offline khi Gemini API lỗi/thiếu key.
+- [x] Rotation pool API key Gemini (`GEMINI_API_KEY=key-1,key-2,…`) trước khi fallback MiniLM — `app/rag/gemini_keys.py`.
 - [ ] Re-index toàn bộ ChromaDB collection sau khi đổi embedding (`app/rag/indexer.py::build_index()`), đo lại SLA RAG — chạy lại khi deploy môi trường mới hoặc sau thay đổi corpus.
 
 ### P3 — LLM dual-provider fallback (→ `adrs/004-llm-provider-and-fallback-strategy.md`, quyết định 2026-08-15)

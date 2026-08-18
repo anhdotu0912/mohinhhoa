@@ -44,7 +44,7 @@
 **AI/ML Layer**
 - LLM: GPT-4o-mini mặc định (`LLM_MODEL` + `OPENAI_API_KEY` trong env); as-built single-provider qua `LLM_PROVIDER` — ADR-004 đã quyết định dual-provider fallback OpenAI↔DeepSeek nhưng **Planned, chưa code**
 - Orchestration: LangGraph (Python) — facade `run_agent`
-- Embedding: **Gemini `gemini-embedding-2`** (default, `EMBEDDING_PROVIDER=gemini`) — fallback local `paraphrase-multilingual-MiniLM-L12-v2` khi thiếu key/lỗi API (ADR-003)
+- Embedding: **Gemini `gemini-embedding-2`** (default, `EMBEDDING_PROVIDER=gemini`) — `GEMINI_API_KEY=key1,key2,…` xoay khi 401/403/429/503; fallback local `paraphrase-multilingual-MiniLM-L12-v2` khi hết key hoặc lỗi API (ADR-003)
 - Vector DB: **ChromaDB** persist (`CHROMA_PERSIST_DIR` / `chroma_db/`) — ADR-001 (Accepted, giữ Chroma cho prototype)
 - RAG: dense retrieval (+ BM25 hybrid trong retriever)
 - Demo flag: `DEMO_MOCK=true` (mặc định) — **chỉ** chi phối `POST /interactions/check` (trả 501 khi `false`); meal plan generate luôn chạy qua `meal_planner_agent`, không rẽ nhánh theo cờ này (`specs/05-meal-plan-generation.md`)

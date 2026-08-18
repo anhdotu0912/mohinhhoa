@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
+from app.core.image_validation import detect_image_type
 from app.core.security import require_roles
 from app.core.config import settings
 from app.db.session import get_db
@@ -628,17 +629,15 @@ async def upload_patient_avatar(
     content_type = (file.content_type or "").lower()
     if not content_type.startswith("image/"):
         raise APIError(415, "INVALID_IMAGE", "File phải là ảnh (png/jpg/webp/gif).")
-    ext = {
-        "image/png": ".png",
-        "image/jpeg": ".jpg",
-        "image/jpg": ".jpg",
-        "image/webp": ".webp",
-        "image/gif": ".gif",
-    }.get(content_type, ".img")
 
     content = await file.read()
     if len(content) > 2 * 1024 * 1024:
         raise APIError(413, "IMAGE_TOO_LARGE", "Ảnh tối đa 2MB.")
+
+    detected = detect_image_type(content)
+    if detected is None:
+        raise APIError(415, "INVALID_IMAGE", "File phải là ảnh (png/jpg/webp/gif).")
+    _, ext = detected
 
     avatars_dir = STATIC_AVATARS_DIR
     avatars_dir.mkdir(parents=True, exist_ok=True)

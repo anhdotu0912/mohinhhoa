@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 PATIENT = "demo_patient_1@example.com"
 DOCTOR = "demo_doctor@example.com"
 
@@ -24,14 +26,14 @@ def test_forgot_password_always_200(client):
     assert "message" in response.json()
 
 
-def test_forgot_password_emails_new_password(client, monkeypatch):
+def test_forgot_password_sends_reset_link(client, monkeypatch):
     captured: dict[str, str] = {}
 
-    def fake_send(to_email: str, new_password: str) -> None:
+    def fake_send(to_email: str, reset_url: str) -> None:
         captured["to"] = to_email
-        captured["password"] = new_password
+        captured["reset_url"] = reset_url
 
-    monkeypatch.setattr("app.services.email.send_temporary_password", fake_send)
+    monkeypatch.setattr("app.services.email.send_password_reset_link", fake_send)
 
     response = client.post(
         "/api/v1/auth/forgot-password",
@@ -39,17 +41,24 @@ def test_forgot_password_emails_new_password(client, monkeypatch):
     )
     assert response.status_code == 200
     assert captured["to"] == PATIENT
-    assert len(captured["password"]) >= 6
+    assert "/reset-password?token=" in captured["reset_url"]
 
+    token = parse_qs(urlparse(captured["reset_url"]).query)["token"][0]
     old = client.post(
         "/api/v1/auth/login",
         json={"email": PATIENT, "password": "demo1234"},
     )
-    assert old.status_code == 401
+    assert old.status_code == 200
+
+    reset = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": token, "new_password": "newpass123"},
+    )
+    assert reset.status_code == 200
 
     new = client.post(
         "/api/v1/auth/login",
-        json={"email": PATIENT, "password": captured["password"]},
+        json={"email": PATIENT, "password": "newpass123"},
     )
     assert new.status_code == 200
 

@@ -35,7 +35,7 @@ def chat(
         raise
     except Exception as exc:  # noqa: BLE001
         logger.exception("Agent failed for user %s", user.id)
-        raise APIError(503, "AGENT_ERROR", f"Lỗi xử lý agent: {exc}") from exc
+        raise APIError(503, "AGENT_ERROR", "Lỗi xử lý agent. Vui lòng thử lại sau.") from exc
 
 
 @router.post("/stream")

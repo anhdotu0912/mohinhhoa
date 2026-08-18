@@ -1,4 +1,4 @@
-"""Outbound email via SMTP (temporary password after forgot-password)."""
+"""Outbound email via SMTP (password reset links)."""
 
 from __future__ import annotations
 
@@ -51,30 +51,24 @@ def _smtp_password() -> str:
     return cleaned
 
 
-def send_temporary_password(to_email: str, new_password: str) -> None:
+def send_password_reset_link(to_email: str, reset_url: str) -> None:
     if not is_configured():
         raise EmailNotConfiguredError("SMTP is not configured")
 
     from_addr = _smtp_username()
-    login_url = settings.FRONTEND_URL.rstrip("/") + "/login"
-    subject = "Mật khẩu mới — AI Trợ lý Dinh dưỡng"
+    subject = "Đặt lại mật khẩu — AI Trợ lý Dinh dưỡng"
     text = (
         "Bạn vừa yêu cầu đặt lại mật khẩu trên AI Trợ lý Dinh dưỡng.\n\n"
-        f"Mật khẩu mới: {new_password}\n\n"
-        f"Đăng nhập tại: {login_url}\n\n"
-        "Nếu bạn không yêu cầu, hãy đăng nhập và liên hệ bác sĩ phụ trách.\n"
+        f"Mở liên kết sau để chọn mật khẩu mới (hết hạn sau 1 giờ):\n{reset_url}\n\n"
+        "Nếu bạn không yêu cầu, hãy bỏ qua email này.\n"
     )
     html = f"""\
 <html>
   <body style="font-family: sans-serif; color: #1a1a1a; line-height: 1.5;">
     <p>Bạn vừa yêu cầu đặt lại mật khẩu trên <strong>AI Trợ lý Dinh dưỡng</strong>.</p>
-    <p>Mật khẩu mới:</p>
-    <p style="font-size: 20px; font-family: ui-monospace, monospace; letter-spacing: 0.04em;">
-      <strong>{new_password}</strong>
-    </p>
-    <p><a href="{login_url}">Đăng nhập</a></p>
+    <p><a href="{reset_url}">Đặt lại mật khẩu</a></p>
     <p style="color: #666; font-size: 13px;">
-      Nếu bạn không yêu cầu, hãy đăng nhập và liên hệ bác sĩ phụ trách.
+      Liên kết hết hạn sau 1 giờ. Nếu bạn không yêu cầu, hãy bỏ qua email này.
     </p>
   </body>
 </html>
