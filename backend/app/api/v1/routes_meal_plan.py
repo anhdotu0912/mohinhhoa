@@ -13,7 +13,7 @@ from app.db.session import get_db
 from app.models.meal_plan import MealPlan
 from app.models.user import User
 from app.schemas.doctor import MealPlanScheduleOut
-from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput
+from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput, RequestAdjustmentRequest
 from app.services import plan_expiry
 from app.services.meal_plan_service import (
     generate_meal_plan,
@@ -85,4 +85,30 @@ def get_plan(
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
     if user.role == "patient" and row.user_id != user.id:
         raise APIError(403, "FORBIDDEN", "Bạn không có quyền xem thực đơn này.")
+    return meal_plan_from_row(row)
+
+
+@router.post("/{meal_plan_id}/request-adjustment", response_model=MealPlanOutput)
+def request_plan_adjustment(
+    meal_plan_id: str,
+    payload: RequestAdjustmentRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("patient")),
+) -> MealPlanOutput:
+    row = db.get(MealPlan, meal_plan_id)
+    if row is None:
+        raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+    if row.user_id != user.id:
+        raise APIError(403, "FORBIDDEN", "Bạn không có quyền yêu cầu điều chỉnh thực đơn này.")
+    if row.status != "approved":
+        raise APIError(
+            400,
+            "PLAN_NOT_APPROVED",
+            "Chỉ yêu cầu điều chỉnh trên thực đơn đã được duyệt.",
+        )
+
+    row.status = "pending_review"
+    row.adjustment_note = payload.adjustment_note.strip()
+    db.commit()
+    db.refresh(row)
     return meal_plan_from_row(row)

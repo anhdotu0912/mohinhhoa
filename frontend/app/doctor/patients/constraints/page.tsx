@@ -135,6 +135,7 @@ export default function PatientConstraintsPage() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [approveBusy, setApproveBusy] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -214,6 +215,29 @@ export default function PatientConstraintsPage() {
         setDetailLoading(false);
       });
   }, []);
+
+  const handleApproveConstraints = async (patientId: string) => {
+    if (approveBusy) return;
+    setApproveBusy(true);
+    try {
+      await api.approveDoctorConstraints(patientId);
+      showToast("Đã xác nhận ràng buộc lâm sàng.");
+      await loadPatients();
+      const detail = await api.getDoctorPatient(patientId);
+      setViewingDetail(detail);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patientId ? { ...p, constraintsStatus: "confirmed" } : p
+        )
+      );
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : "Không xác nhận được ràng buộc."
+      );
+    } finally {
+      setApproveBusy(false);
+    }
+  };
 
   const handleCloseDetail = () => {
     setViewingPatient(null);
@@ -464,6 +488,11 @@ export default function PatientConstraintsPage() {
                               <p className="font-body-bold text-on-surface font-semibold text-sm whitespace-nowrap">
                                 {patient.name}
                               </p>
+                              {patient.constraintsStatus === "pending_doctor_review" && (
+                                <span className="inline-flex mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                  Chờ bác sĩ xác nhận
+                                </span>
+                              )}
                               <p className="text-xs text-on-surface-variant">
                                 {patient.age ? `${patient.age} tuổi` : "—"}{" "}
                                 {patient.gender ? `• ${patient.gender}` : ""}
@@ -832,12 +861,25 @@ export default function PatientConstraintsPage() {
                       )}
                     </div>
                   </div>
-                  <button
+                  <div className="flex items-center gap-sm shrink-0">
+                    {(detail?.constraints_status ?? viewingPatient.constraintsStatus) ===
+                      "pending_doctor_review" && (
+                      <button
+                        type="button"
+                        disabled={approveBusy}
+                        onClick={() => void handleApproveConstraints(viewingPatient.id)}
+                        className="px-md py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-60"
+                      >
+                        {approveBusy ? "Đang xác nhận…" : "Xác nhận"}
+                      </button>
+                    )}
+                    <button
                     onClick={handleCloseDetail}
                     className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[20px]">close</span>
                   </button>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-md pr-xs py-xs">

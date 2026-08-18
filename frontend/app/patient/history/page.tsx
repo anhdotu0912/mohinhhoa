@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MetricsProgressChart } from "@/components/patient/MetricsProgressChart";
 import { TopBar } from "@/components/shared/TopBar";
 import { api } from "@/lib/api";
 import { ApiError, type FoodLogEntry, type MetricsHistoryPoint } from "@/lib/types";
@@ -17,84 +18,6 @@ function formatTableDate(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function parseLeadingNumber(value?: string | null): number | null {
-  if (!value) return null;
-  const match = value.match(/[\d.]+/);
-  if (!match) return null;
-  const n = parseFloat(match[0]);
-  return Number.isFinite(n) ? n : null;
-}
-
-type ChartSeries = {
-  id: string;
-  label: string;
-  color: string;
-  dashed?: boolean;
-  path: string;
-  points: { x: number; y: number; hasValue: boolean }[];
-};
-
-function normalizeSeries(values: (number | null)[]): (number | null)[] {
-  const nums = values.filter((v): v is number => v != null);
-  if (nums.length === 0) return values.map(() => null);
-  const min = Math.min(...nums);
-  const max = Math.max(...nums);
-  const range = max - min || 1;
-  return values.map((v) => (v == null ? null : ((v - min) / range) * 100));
-}
-
-function buildMultiMetricChart(history: MetricsHistoryPoint[]) {
-  const slice = history.slice(-7);
-  if (slice.length === 0) return null;
-
-  const n = slice.length;
-  const xForIndex = (i: number) => (n === 1 ? 50 : (i / (n - 1)) * 100);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const xLabels = slice.map((p, i) => {
-    const d = new Date(p.recorded_at);
-    d.setHours(0, 0, 0, 0);
-    const isToday = d.getTime() === today.getTime() && i === n - 1;
-    return {
-      label: isToday
-        ? "Hôm nay"
-        : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
-      isToday,
-    };
-  });
-
-  const makeSeries = (
-    id: string,
-    label: string,
-    color: string,
-    extract: (p: MetricsHistoryPoint) => number | null,
-    dashed?: boolean
-  ): ChartSeries | null => {
-    const raw = slice.map(extract);
-    if (raw.every((v) => v == null)) return null;
-    const normalized = normalizeSeries(raw);
-    const points = normalized.map((y, i) => ({
-      x: xForIndex(i),
-      y: y == null ? 50 : 100 - y,
-      hasValue: y != null,
-    }));
-    const pathPoints = points.filter((p) => p.hasValue);
-    const path = pathPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" ");
-    return { id, label, color, dashed, path, points };
-  };
-
-  const series = [
-    makeSeries("weight", "Cân nặng (kg)", "#2F8F7A", (p) => p.weight ?? null),
-    makeSeries("bp", "Huyết áp (mmHg)", "#4A90D9", (p) => parseLeadingNumber(p.blood_pressure), true),
-    makeSeries("glucose", "Đường huyết (mmol/L)", "#8B7355", (p) => parseLeadingNumber(p.blood_glucose)),
-  ].filter((s): s is ChartSeries => s != null);
-
-  if (series.length === 0) return null;
-  return { series, xLabels };
 }
 
 export default function PatientHistoryPage() {
@@ -129,8 +52,6 @@ export default function PatientHistoryPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
-
-  const chart = useMemo(() => buildMultiMetricChart(history), [history]);
 
   const recentTableRows = useMemo(
     () =>
@@ -376,86 +297,7 @@ export default function PatientHistoryPage() {
             </div>
           </section>
 
-          {/* Multi-metric progress chart */}
-          <section className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-subtle p-card-padding">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-6 pb-4 border-b border-outline-variant">
-              <div>
-                <h2 className="font-h2 text-h2 text-on-surface font-semibold text-lg">
-                  Biểu đồ tiến triển
-                </h2>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                  {chart?.series.map((s) => (
-                    <div key={s.id} className="flex items-center gap-1.5">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: s.color }}
-                      />
-                      <span className="text-xs text-on-surface-variant">{s.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <span className="text-xs text-on-surface-variant shrink-0">7 ngày qua</span>
-            </div>
-
-            {loading ? (
-              <p className="text-sm text-on-surface-variant">Đang tải...</p>
-            ) : chart ? (
-              <div className="relative w-full h-[280px]">
-                <div className="relative h-[240px]">
-                  <div className="absolute w-full border-b border-outline-variant/30 top-0" />
-                  <div className="absolute w-full border-b border-outline-variant/30 top-[25%]" />
-                  <div className="absolute w-full border-b border-outline-variant/30 top-[50%]" />
-                  <div className="absolute w-full border-b border-outline-variant/30 top-[75%]" />
-                  <div className="absolute w-full border-b border-outline-variant/30 bottom-0" />
-                  <svg
-                    className="absolute inset-0 w-full h-full"
-                    preserveAspectRatio="none"
-                    viewBox="0 0 100 100"
-                  >
-                    {chart.series.map((s) => (
-                      <g key={s.id}>
-                        <path
-                          d={s.path}
-                          fill="none"
-                          stroke={s.color}
-                          strokeWidth="1.5"
-                          strokeDasharray={s.dashed ? "4 3" : undefined}
-                          vectorEffect="non-scaling-stroke"
-                        />
-                        {s.points
-                          .filter((p) => p.hasValue)
-                          .map((p, i) => (
-                            <circle
-                              key={i}
-                              cx={p.x}
-                              cy={p.y}
-                              fill={s.color}
-                              r="2"
-                              vectorEffect="non-scaling-stroke"
-                            />
-                          ))}
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 text-xs h-[32px] pt-2">
-                  {chart.xLabels.map((item, i) => (
-                    <span
-                      key={i}
-                      className={item.isToday ? "text-[#2F8F7A] font-semibold" : "text-on-surface-variant"}
-                    >
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-on-surface-variant">
-                Chưa có dữ liệu biểu đồ. Bấm «Ghi nhận chỉ số mới» để bắt đầu theo dõi.
-              </p>
-            )}
-          </section>
+          <MetricsProgressChart history={history} loading={loading} />
 
           {/* Past Meals Section */}
           <section>

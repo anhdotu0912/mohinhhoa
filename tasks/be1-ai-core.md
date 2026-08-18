@@ -11,12 +11,12 @@
 ## Sub-tasks (checkbox)
 
 ### P0 — Guardrails thật (→ `specs/13-ai-chat-assistant.md`)
-- [ ] Implement `backend/app/guardrails/rules.py` — danh sách câu AI phải từ chối & redirect bác sĩ (theo `CLAUDE.md` Mục 7), tích hợp vào `refuse_node`.
-- [ ] Implement `backend/app/guardrails/source_check.py` — kiểm tra `citations[]` không rỗng trước khi trả kết quả `rag_qa_node`; nếu thiếu nguồn → redact/từ chối phần đó thay vì bịa số liệu.
-- [ ] Set `guardrail_triggered=true` trong `AgentRunOutput` đúng khi guardrail thực sự can thiệp (hiện tại field này tồn tại nhưng logic set giá trị cần audit lại cùng lúc implement 2 file trên).
+- [x] Implement `backend/app/guardrails/rules.py` — `enforce_output_safety` + `get_refuse_message` wired vào `refuse_node` và `apply_guardrails`.
+- [x] Implement `backend/app/guardrails/source_check.py` — `enforce_citation_guardrail` wired vào `apply_guardrails` (redact `rag_qa` thiếu citations).
+- [ ] Set `guardrail_triggered=true` trong `AgentRunOutput` đúng khi guardrail thực sự can thiệp (audit lại logic set giá trị).
 
 ### P0 — `profile_loader` đọc DB thật (→ `specs/13-ai-chat-assistant.md`)
-- [ ] Sửa `agents/nodes/profile_loader.py` để đọc `PatientProfile` thật từ DB theo `user_id`, chỉ fallback `_DEMO_PROFILES`/default khi không tìm thấy hồ sơ nào (thay vì luôn ưu tiên demo hard-code).
+- [x] Sửa `agents/nodes/profile_loader.py` để đọc `PatientProfile` thật từ DB theo `user_id`, chỉ fallback `_DEMO_PROFILES`/default khi không tìm thấy hồ sơ nào.
 
 ### P0 — Ổn định `DEMO_MOCK=false` cho interaction check (→ `specs/08-drug-food-interaction-check.md`)
 - [ ] Wire `interaction_checker_agent` (KB đầy đủ 28 cặp) vào `POST /interactions/check` khi `DEMO_MOCK=false` (hiện trả `501`).
@@ -34,13 +34,19 @@
 ### P2 — Multi-intent qua `secondary_intents[]` (→ `specs/13-ai-chat-assistant.md`, quyết định 2026-08-15)
 - [ ] Nâng cấp `intent_classifier` để phát hiện ý định phụ trong câu hỏi ghép, trả qua `secondary_intents[]` (`AgentRunOutput`) — không xử lý song song đầy đủ, chỉ gợi ý người dùng hỏi lại riêng.
 
+### P2 — Guardrails bổ sung (→ `specs/13`, ADR-006)
+- [ ] Wire `validate_interaction_output` và `sanitize_recommendation` từ `rules.py` vào runtime flow (`interaction_checker_agent` hoặc `apply_guardrails`).
+
+### P2 — Hybrid RAG retrieval (→ `specs/13-ai-chat-assistant.md`)
+- [ ] Chuyển `rag_qa_node` (`nodes/rag_tool.py`) sang dùng `retrieve_hybrid()` (BM25+dense RRF) thay vì dense-only — `retrieve_hybrid()` đã implement trong `retriever.py`.
+
 ### Should — Intent mới cho "lời khuyên khi chỉ số đổi" (→ `specs/12-patient-metrics-tracking.md`)
 - [ ] Thiết kế + thêm intent mới (nếu team quyết định làm) vào `VALID_INTENTS` — nhớ cập nhật `contracts/agent-io-schema.md` §5 **trước** khi code (handoff rule).
 
 ### P3 — Migrate embedding sang Gemini Embedding API (→ `adrs/003-embedding-model-choice.md`, quyết định 2026-08-15)
-- [ ] Thêm config `EMBEDDING_PROVIDER`/`GEMINI_API_KEY`/`GEMINI_EMBEDDING_MODEL="gemini-embedding-2"` vào `backend/app/core/config.py`.
-- [ ] Viết custom `EmbeddingFunction` gọi Gemini API trong `backend/app/rag/embeddings.py`, giữ `SentenceTransformerEmbeddingFunction` local làm fallback offline khi Gemini API lỗi/thiếu key.
-- [ ] Re-index toàn bộ ChromaDB collection sau khi đổi embedding (`app/rag/indexer.py::build_index()`), đo lại SLA RAG.
+- [x] Thêm config `EMBEDDING_PROVIDER`/`GEMINI_API_KEY`/`GEMINI_EMBEDDING_MODEL="gemini-embedding-2"` vào `backend/app/core/config.py`.
+- [x] Viết custom `EmbeddingFunction` gọi Gemini API trong `backend/app/rag/embeddings.py`, giữ `SentenceTransformerEmbeddingFunction` local làm fallback offline khi Gemini API lỗi/thiếu key.
+- [ ] Re-index toàn bộ ChromaDB collection sau khi đổi embedding (`app/rag/indexer.py::build_index()`), đo lại SLA RAG — chạy lại khi deploy môi trường mới hoặc sau thay đổi corpus.
 
 ### P3 — LLM dual-provider fallback (→ `adrs/004-llm-provider-and-fallback-strategy.md`, quyết định 2026-08-15)
 - [ ] Thêm tầng fallback provider-to-provider trong `backend/app/core/llm.py`: nếu provider chính (`LLM_PROVIDER`) lỗi và provider phụ có key hợp lệ, tự động thử provider phụ trước khi rơi về rule-based. Khuyến nghị dùng LangChain `with_fallbacks()` thay vì tự viết retry logic.

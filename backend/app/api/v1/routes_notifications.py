@@ -56,7 +56,18 @@ def simulate_demo_notifications(
             "Endpoint demo không khả dụng ở production.",
         )
     today = date.today()
-    samples = [
+    existing_types = {
+        row.type
+        for row in db.query(Notification)
+        .filter(
+            Notification.user_id == user.id,
+            Notification.type.in_(["meal_reminder", "adherence_checkin", "plan_approved"]),
+            Notification.status.in_(["pending", "sent"]),
+        )
+        .all()
+    }
+    samples = []
+    candidates = [
         Notification(
             user_id=user.id,
             type="meal_reminder",
@@ -85,6 +96,17 @@ def simulate_demo_notifications(
             related_ids={},
         ),
     ]
+    for sample in candidates:
+        if sample.type not in existing_types:
+            samples.append(sample)
+    if not samples:
+        return (
+            db.query(Notification)
+            .filter(Notification.user_id == user.id)
+            .order_by(Notification.created_at.desc())
+            .limit(3)
+            .all()
+        )
     db.add_all(samples)
     db.commit()
     for sample in samples:
@@ -98,7 +120,12 @@ def mark_read(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> Notification:
-    return NotificationService(db).mark(_get_own_notification(db, user, notification_id), "read")
+    row = NotificationService(db).mark(
+        _get_own_notification(db, user, notification_id), "read"
+    )
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @router.post("/{notification_id}/dismiss", response_model=NotificationOut)
@@ -107,7 +134,12 @@ def mark_dismiss(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> Notification:
-    return NotificationService(db).mark(_get_own_notification(db, user, notification_id), "dismiss")
+    row = NotificationService(db).mark(
+        _get_own_notification(db, user, notification_id), "dismiss"
+    )
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @router.post("/{notification_id}/done", response_model=NotificationOut)
@@ -117,8 +149,11 @@ def mark_done(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> Notification:
-    return NotificationService(db).mark(
+    row = NotificationService(db).mark(
         _get_own_notification(db, user, notification_id),
         "done",
         adherence=payload.adherence,
     )
+    db.commit()
+    db.refresh(row)
+    return row

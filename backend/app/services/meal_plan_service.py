@@ -53,6 +53,7 @@ def _profile_from_row(row: Profile) -> PatientProfile:
         restrictions=row.restrictions or {},
         preferences=row.preferences or [],
         treatment_goals=row.treatment_goals or [],
+        constraints_status=getattr(row, "constraints_status", None) or "confirmed",
     )
 
 
@@ -101,6 +102,7 @@ def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
         swaps=row.swaps or [],
         citations=row.citations or [],
         status=row.status,
+        adjustment_note=row.adjustment_note,
         starts_on=row.starts_on.isoformat() if row.starts_on else None,
         ends_on=row.ends_on.isoformat() if row.ends_on else None,
         created_at=row.created_at.isoformat() if row.created_at else None,

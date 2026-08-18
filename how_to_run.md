@@ -97,3 +97,20 @@ Mật khẩu: demo1234
 Bệnh nhân 1: demo_patient_1@example.com / demo1234 (Nguyễn Văn A)
 Bệnh nhân 2: demo_patient_2@example.com / demo1234 (Trần Thị B)
 Bệnh nhân 3: demo_patient_3@example.com / demo1234 (Lê Văn C)
+
+### Quên mật khẩu (gửi mật khẩu mới qua email)
+
+Luồng: `/forgot-password` → BE tạo mật khẩu tạm → gửi SMTP → mật khẩu cũ hết hiệu lực → đăng nhập bằng mật khẩu trong email.
+
+Thêm vào `.env` (root repo hoặc `backend/.env`) — **chỉ 2 dòng**:
+
+```bash
+SMTP_USERNAME=ban@gmail.com
+SMTP_PASSWORD="xxxx xxxx xxxx xxxx"
+```
+
+**Gmail:** bật xác minh 2 bước, tạo [App Password](https://myaccount.google.com/apppasswords) 16 ký tự (không dùng mật khẩu Gmail thường). Bọc trong dấu ngoặc kép; code tự bỏ khoảng trắng. Email trường (`@vnu.edu.vn`) thường bị admin chặn SMTP — nếu vẫn `EMAIL_AUTH_FAILED`, dùng Gmail cá nhân. Sửa `.env` xong phải **restart uvicorn** (reload không theo dõi file `.env`).
+
+Nếu chưa cấu hình SMTP, API trả `503 EMAIL_NOT_CONFIGURED`. Kiểm tra cả hộp thư rác.
+
+Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`.

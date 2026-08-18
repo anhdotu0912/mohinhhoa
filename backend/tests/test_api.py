@@ -192,9 +192,14 @@ def test_interactions_check_persists_alerts(client):
         json={"medications": ["metformin"], "foods": ["rượu", "cơm gạo lứt"]},
     )
     assert response.status_code == 200, response.text
-    interactions = response.json()["interactions"]
+    body = response.json()
+    interactions = body["interactions"]
     assert len(interactions) == 1
     assert interactions[0]["severity"] == "Nguy hiểm"
+    assert any(
+        p["drug"] == "metformin" and p["food"] == "cơm gạo lứt"
+        for p in body.get("unmatched_pairs", [])
+    )
 
     response = client.get("/api/v1/alerts", headers=headers)
     assert any(a["drug"] == "metformin" and a["food"] == "rượu" for a in response.json())

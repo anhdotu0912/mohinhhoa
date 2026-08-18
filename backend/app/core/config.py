@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     # App
     APP_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # SMTP — chỉ cần USERNAME + PASSWORD (App Password). Host/port/TLS mặc định Gmail.
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
 
     # Demo mode: return contract-shaped mock data for agent features that
     # are not implemented yet (meal plan, interaction check). Disable in prod.

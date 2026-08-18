@@ -42,10 +42,11 @@ from app.schemas.doctor import (
     ReviewResponse,
 )
 from app.schemas.meal_plan import ApplyMealPlanRequest, GenerateMealPlanRequest, MealPlanOutput
+from app.schemas.profile import PatientProfile
 from app.schemas.notification import NotificationOut
 from app.services import plan_expiry
 from app.services.compliance import ComplianceService
-from app.services.meal_plan_service import generate_meal_plan, meal_plan_from_row
+from app.services.meal_plan_service import generate_meal_plan, get_profile, meal_plan_from_row
 from app.services.notification import NotificationService
 from app.services.plan_apply import (
     apply_meal_plan,
@@ -247,6 +248,7 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         salt_daily_g=salt_daily_g,
         sugar_daily_g=sugar_daily_g,
         preferences=preferences,
+        constraints_status=getattr(profile, "constraints_status", None) or "confirmed",
         status=status,  # type: ignore[arg-type]
         status_key=status_key,  # type: ignore[arg-type]
         latest_plan_id=latest_plan.id if latest_plan else None,
@@ -378,6 +380,13 @@ def update_patient_metrics(
         profile = Profile(user_id=patient.id)
         db.add(profile)
 
+    if payload.weight is None or payload.height is None:
+        raise APIError(
+            400,
+            "METRICS_INCOMPLETE",
+            "Cần gửi đủ weight và height cùng lúc.",
+        )
+
     profile.weight = payload.weight
     profile.height = payload.height
     height_m = payload.height / 100.0
@@ -501,9 +510,37 @@ def update_patient_constraints(
     if "sugar_daily_g" in provided:
         restrictions["sugar_daily_g"] = payload.sugar_daily_g
     profile.restrictions = restrictions
+    profile.constraints_status = "confirmed"
 
     db.commit()
     return _patient_summary(db, patient)
+
+
+@router.post("/patients/{patient_id}/constraints/approve", response_model=PatientProfile)
+def approve_patient_constraints(
+    patient_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> PatientProfile:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+
+    profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
+    if profile is None:
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy hồ sơ bệnh nhân.")
+
+    if getattr(profile, "constraints_status", "confirmed") != "pending_doctor_review":
+        raise APIError(
+            400,
+            "NOTHING_TO_APPROVE",
+            "Không có thay đổi nào đang chờ duyệt.",
+        )
+
+    profile.constraints_status = "confirmed"
+    db.commit()
+    return get_profile(db, patient.id)
 
 
 @router.get("/catalog", response_model=CatalogOut)
@@ -693,6 +730,14 @@ def review_meal_plan(
     row = db.get(MealPlan, meal_plan_id)
     if row is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+
+    if row.status != "pending_review":
+        raise APIError(
+            409,
+            "PLAN_ALREADY_REVIEWED",
+            f"Thực đơn này đã được xử lý (status hiện tại: {row.status}). "
+            "Tải lại danh sách để xem trạng thái mới nhất.",
+        )
 
     plan = meal_plan_from_row(row)
     now = datetime.now(UTC)

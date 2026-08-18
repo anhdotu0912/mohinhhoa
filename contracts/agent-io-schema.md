@@ -296,7 +296,7 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 **Lưu ý as-built quan trọng — 2 KB khác nhau dùng cùng shape:**
 1. **KB đầy đủ** (`backend/data/drug_food_interactions.json`, 28 cặp, severity: 11 Nguy hiểm / 16 Cần chú ý / 1 An toàn) qua `agents/interaction_checker_agent.py` — có alias tiếng Anh/không dấu + so khớp accent-insensitive (`unidecode`). Dùng **nội bộ** trong `meal_planner_agent` để quyết định swap món khi sinh plan.
-2. **KB rút gọn demo** (`services/meal_plan_demo.py::INTERACTION_KB`, chỉ 2 cặp: `warfarin+rau muống`, `warfarin+bông cải xanh`) — so khớp substring đơn giản, không unidecode, không alias. Dùng cho **`POST /interactions/check`** (khi `DEMO_MOCK=true`) **và** để tạo `Alert` sau khi sinh plan (`meal_plan_service._persist_interaction_alerts`).
+2. **KB rút gọn demo** (`services/meal_plan_demo.py::INTERACTION_KB`, chỉ 2 cặp: `warfarin+rau muống`, `warfarin+bông cải xanh`) — so khớp substring đơn giản, không unidecode, không alias. Dùng **chỉ** để tạo `Alert` sau khi sinh plan (`meal_plan_service._persist_interaction_alerts`). **`POST /interactions/check`** luôn dùng KB đầy đủ qua `interaction_checker_agent` (as-built 2026-08-18).
 
 → Nghĩa là: món ăn trong thực đơn được swap an toàn dựa trên KB đầy đủ (28 cặp), nhưng `Alert` hiển thị cho bác sĩ/patient sau khi plan được tạo chỉ phản ánh KB rút gọn (2 cặp). **Quyết định team (2026-08-15): chấp nhận gap này cho vòng demo hiện tại**, không ưu tiên đóng ngay — 2 cặp demo đủ minh hoạ flow guardrail cho North Star. Xem `specs/08-drug-food-interaction-check.md` §5 và `tasks/roadmap-mvp.md` (đã hạ mức ưu tiên khỏi P0).
 

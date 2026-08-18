@@ -64,6 +64,7 @@ export default function DoctorDashboardPage() {
   const [timeframe, setTimeframe] = useState<"this_week" | "last_week">("this_week");
   const [hoveredDay, setHoveredDay] = useState<DayCompliance | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [complianceChart, setComplianceChart] = useState<DayCompliance[]>([]);
 
   useEffect(() => {
     setHydrated(true);
@@ -87,6 +88,38 @@ export default function DoctorDashboardPage() {
       });
       setPlans(items);
       setPatientSummaries(patientRows);
+      const samplePatients = patientRows.slice(0, 5);
+      if (samplePatients.length > 0) {
+        const complianceRows = await Promise.all(
+          samplePatients.map((p) => api.getPatientCompliance(p.id, 7).catch(() => null))
+        );
+        const valid = complianceRows.filter(Boolean);
+        if (valid.length > 0) {
+          const maxLen = Math.max(...valid.map((r) => r!.daily_series.length));
+          const aggregated: DayCompliance[] = [];
+          for (let i = 0; i < maxLen; i += 1) {
+            const points = valid
+              .map((r) => r!.daily_series[i])
+              .filter((p) => p && p.adherence_pct != null);
+            const rate =
+              points.length > 0
+                ? Math.round(
+                    points.reduce((sum, p) => sum + (p!.adherence_pct ?? 0), 0) / points.length
+                  )
+                : 0;
+            const dateLabel = points[0]?.date?.slice(5).replace("-", "/") ?? "";
+            aggregated.push({
+              day: `T${i + 2 > 7 ? "CN" : i + 2}`,
+              date: dateLabel,
+              rate,
+              meals: "—",
+              calories: `${rate}%`,
+              salt: `${rate}%`,
+            });
+          }
+          setComplianceChart(aggregated.slice(-7));
+        }
+      }
     } catch {
       setPlans([]);
       setPatientSummaries([]);
@@ -135,7 +168,12 @@ export default function DoctorDashboardPage() {
       setDemoBusy(false);
     }
   };
-  const chartData = timeframe === "this_week" ? THIS_WEEK_DATA : LAST_WEEK_DATA;
+  const chartData =
+    complianceChart.length > 0
+      ? complianceChart
+      : timeframe === "this_week"
+        ? THIS_WEEK_DATA
+        : LAST_WEEK_DATA;
   const avgCompliance = Math.round(
     chartData.reduce((acc, curr) => acc + curr.rate, 0) / chartData.length
   );
@@ -192,7 +230,7 @@ export default function DoctorDashboardPage() {
                 Tổng bệnh nhân
               </p>
               <p className="font-h1 text-h1 text-on-surface group-hover:text-primary transition-colors">
-                {MOCK_PATIENTS.length}
+                {patientSummaries.length}
               </p>
             </div>
           </Link>

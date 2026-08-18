@@ -20,12 +20,12 @@ Hệ thống phục vụ **2 vai trò chính (Actors)**: **Bệnh nhân (Patient
 | **F-04** | Kiểm tra Tương tác Thuốc - Thực phẩm | Bệnh nhân / AI Agent | Cơ bản | 🟢 Đã có | Cho phép bệnh nhân tra cứu chủ động một hoặc nhiều món ăn xem có kỵ với thuốc mình đang dùng hay không. |
 | **F-05** | Duyệt & Phê duyệt Thực đơn (HITL) | Bác sĩ / Chuyên gia | Cơ bản / HITL | 🟢 Đã có | Chuyên gia xem danh sách thực đơn do AI khởi tạo, phê duyệt (Approve) hoặc chỉnh sửa (Edit) trước khi áp dụng chính thức cho bệnh nhân. |
 | **F-06** | Hộp thoại Chat Trợ lý AI (RAG QA) | Bệnh nhân / AI Agent | Cơ bản | 🟢 Đã có | Hỏi đáp về kiến thức dinh dưỡng y khoa grounded trên guideline y tế (ADA, Bộ Y tế). Chặn chỉ định y khoa/kê đơn. |
-| **F-07** | Ghi Nhật ký Ăn uống (Food Log) | Bệnh nhân | Cơ bản | 🔴 **Cần code** | Bệnh nhân chụp ảnh/nhập món ăn thực tế đã ăn trong ngày để hệ thống tích lũy dữ liệu dinh dưỡng thực tế. |
+| **F-07** | Ghi Nhật ký Ăn uống (Food Log) | Bệnh nhân | Cơ bản | 🟢 **Đã có (core)** | Nhập tay có cấu trúc 3 slot (`morning\|noon\|evening`), type `as_planned\|custom` + ghi chú — modal trên `/patient/meals`, API `POST/GET /food-log` (ADR-009). Không chụp ảnh/NLP. |
 | **F-08** | Cảnh báo Vượt ngưỡng Muối / Đường theo Bệnh lý | AI Agent | Nâng cao | 🟡 **Cần nâng cấp** | Cảnh báo đỏ khi tổng lượng Natri vượt ngưỡng cho bệnh nhân Tim mạch/Thận ($<2000\text{mg/ngày}$) hoặc lượng Đường vượt ngưỡng cho Tiểu đường. |
 | **F-09** | Tạo Danh sách Đi chợ (Shopping List) | Bệnh nhân | Nâng cao | 🔴 **Cần code** | Gom tổng hợp toàn bộ nguyên liệu của thực đơn 7 ngày đã duyệt thành danh sách phân loại (Rau, Thịt, Gia vị...) để đi chợ. |
-| **F-10** | Phân tích Xu hướng Dinh dưỡng (Nutrition Analytics) | Bệnh nhân / Bác sĩ | Nâng cao | 🔴 **Cần code** | Biểu đồ theo dõi xu hướng nạp Kcal, Muối, Đường thực tế so với mục tiêu bác sĩ đề ra theo tuần/tháng. |
+| **F-10** | Phân tích Xu hướng Dinh dưỡng (Nutrition Analytics) | Bệnh nhân / Bác sĩ | Nâng cao | 🟡 **Partial** | Time-series chỉ số cơ thể Done (`/patient/history`, ADR-013). Phân tích nâng cao so target dinh dưỡng/tuần-tháng và AI advice khi chỉ số đổi — Planned. |
 | **F-11** | Memory Sở thích & Nguyên liệu Tủ lạnh | AI Agent | Nâng cao | 🔴 **Cần code** | Ghi nhớ món ăn yêu thích/ghét và tận dụng nguyên liệu đang có sẵn trong tủ lạnh (pantry) khi lập thực đơn. |
-| **F-12** | Guardrail Kiểm tra Nguồn (Source Check) | AI Agent Guardrail | Nâng cao | 🔴 **Cần code** | Tự động kiểm tra chéo số liệu Calo/Đường/Muối trong phản hồi AI xem có đúng 100% với CSDL thực phẩm hay không. |
+| **F-12** | Guardrail Kiểm tra Nguồn (Source Check) | AI Agent Guardrail | Nâng cao | 🟡 **Partial** | `enforce_citation_guardrail` wired — redact RAG thiếu citation; `enforce_output_safety` chặn khuyến nghị đổi thuốc. Cross-check số liệu dinh dưỡng tự động toàn phần (`validate_interaction_output`, `sanitize_recommendation`) — chưa wired runtime. |
 
 ---
 
@@ -65,17 +65,21 @@ Hệ thống phục vụ **2 vai trò chính (Actors)**: **Bệnh nhân (Patient
 
 ---
 
-### 📌 Kịch bản 3: Ghi Nhật Ký Ăn Uống & Cảnh Báo Vượt Ngưỡng (Food Log & Alert)
-* **Actor**: Bệnh nhân C (Bệnh Thận mãn tính, giới hạn Natri $<1500\text{mg/ngày}$).
-* **Luồng từng bước**:
-  1. Sau bữa trưa, Bệnh nhân C mở mục Nhật ký ăn uống (`/patient/meals/log`) chọn món *"Bún nước lèo"* và *"Chả giò"*.
-  2. API tính toán tổng lượng Natri trong 2 món ăn này là $1800\text{mg}$.
-  3. Hệ thống so sánh với ngưỡng bệnh lý Thận ($1500\text{mg}$) $\rightarrow$ Phát hiện **Vượt ngưỡng Natri khẩn cấp (+300mg)**.
-  4. Hệ thống hiển thị cảnh báo đỏ trên màn hình bệnh nhân: *"⚠️ Cảnh báo: Bữa ăn trưa chứa lượng Natri vượt ngưỡng cho phép đối với bệnh Thận. Khuyên dùng thêm nhiều nước và giảm mặn bữa tối."* Đồng thời gửi thông báo tới Bác sĩ theo dõi.
+### 📌 Kịch bản 3: Ghi Nhật ký Ăn uống & Cảnh báo Tương tác (Food Log — as-built ADR-009)
+* **Actor**: Bệnh nhân C (đang dùng thuốc có tương tác thực phẩm).
+* **Luồng từng bước (as-built):**
+  1. Sau bữa trưa, Bệnh nhân C mở `/patient/meals` → bấm "Ghi nhận" trên hàng bữa trưa → modal chọn **"Ăn khác"** + ghi chú tự do (VD: "bún nước lèo").
+  2. `POST /api/v1/food-log` persist log với `slot=noon`, `type=custom`.
+  3. BE quét ghi chú với KB tương tác thuốc–thực phẩm → nếu khớp cặp nguy hiểm → tạo `Alert` + link `food_log_id`.
+  4. Bệnh nhân xem tóm tắt trên `/patient/history`; cảnh báo vượt ngưỡng Natri tự động theo dinh dưỡng thực tế — **chưa implement** (ngoài phạm vi ADR-009).
+
+> **Lưu ý:** Kịch bản gốc (2026-08-13) mô tả NLP/ảnh và cảnh báo Natri tự động — chưa khớp as-built. Sơ đồ UML đính kèm (ảnh 2026-08-13) có thể chưa phản ánh Food Log Done và Metrics time-series (2026-08-17).
 
 ---
 
-## 📐 3. Các Sơ Đồ UML & Luồng Hoạt Động (UML Diagrams)
+## 📐 3. Các Sơ đồ UML & Luồng Hoạt Động (UML Diagrams)
+
+> **Lưu ý cập nhật (2026-08-17):** Các ảnh diagram bên dưới được export **2026-08-13**, trước khi Food Log (ADR-009), Patient Metrics time-series (ADR-013) và Doctor Compliance View (spec 10) được implement. Dùng làm tham chiếu kiến trúc tổng quan; chi tiết as-built xem `docs/MO_TA_HE_THONG.md`, `docs/architecture_diagram.md`, `specs/`.
 
 ### 3.1. Sơ đồ Use Case Tổng quan (UML Use Case Diagram)
 

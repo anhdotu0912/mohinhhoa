@@ -84,3 +84,14 @@ class TestInteractionChecker:
         assert len(output.interactions) > 0
         assert any(i.drug == "metformin" for i in output.interactions)
         assert any(i.severity.startswith("Nguy hiểm") for i in output.interactions)
+
+    def test_unmatched_pairs_for_unknown_food(self):
+        """Pairs without KB data appear in unmatched_pairs."""
+        input_data = InteractionCheckInput(
+            medications=["metformin"],
+            foods=["rượu", "cơm gạo lứt"],
+        )
+        output = interaction_checker_agent(input_data)
+        assert len(output.interactions) >= 1
+        assert any(p.drug == "metformin" and p.food == "cơm gạo lứt" for p in output.unmatched_pairs)
+        assert not any(p.food == "rượu" for p in output.unmatched_pairs)

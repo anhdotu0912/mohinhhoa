@@ -4,35 +4,54 @@
 
 ```mermaid
 graph TB
-    User([User: Bệnh nhân/Bác sĩ]) --> UI[Frontend<br/>Next.js App Router]
-    UI -->|REST API| API[FastAPI Backend]
-    API --> Agent[LangGraph Agent]
-    Agent --> LLM[LLM Service<br/>GPT-4o / Gemini]
-    Agent --> Tools[Agent Tools]
-    Tools --> DB[(Database)]
-    Agent --> VS[Vector Store<br/>ChromaDB]
+    User([User: Bệnh nhân/Bác sĩ]) --> UI[Frontend<br/>Next.js 16 App Router]
+    UI -->|REST /api/v1| API[FastAPI Backend]
+    API --> Agent[LangGraph Agent<br/>run_agent / chat stream]
+    Agent --> LLM[LLM Service<br/>OpenAI GPT-4o-mini default<br/>or DeepSeek via LLM_PROVIDER]
+    Agent --> RAG[RAG Retriever<br/>ChromaDB dense + BM25 hybrid]
+    RAG --> Embed[Gemini gemini-embedding-2<br/>fallback local MiniLM]
+    Agent --> DB[(SQLite default<br/>Postgres-ready)]
+    API --> Services[Platform Services<br/>meal_plan, notification, compliance, metrics, food_log]
+    Services --> DB
+    RAG --> VS[(ChromaDB persist<br/>CHROMA_PERSIST_DIR)]
 ```
 
-## Agent Flow
+## LangGraph Agent Flow (as-built)
 
 ```mermaid
 graph LR
-    START((Start)) --> Input[Parse Input]
-    Input --> Analyze[Analyze Query]
-    Analyze --> Decide{Need Tool?}
-    Decide -->|Yes| CallTool[Call Tool]
-    CallTool --> Analyze
-    Decide -->|No| Generate[Generate Response]
-    Generate --> END((End))
+    START((Start)) --> ProfileLoader[profile_loader<br/>DB profile first]
+    ProfileLoader --> IntentClassifier[intent_classifier<br/>LLM + keyword fallback]
+    IntentClassifier --> Route{intent}
+    Route -->|meal_plan| MealPlan[meal_plan<br/>read-only preview]
+    Route -->|interaction_check| Interaction[interaction_check<br/>InteractionCheckerAgent]
+    Route -->|food_log| FoodLog[food_log<br/>summarize recent logs]
+    Route -->|rag_qa| RAGQA[rag_qa<br/>dense retrieval]
+    Route -->|refuse| Refuse[refuse]
+    Route -->|unknown| Unknown[unknown]
+    MealPlan --> Guardrails[apply_guardrails<br/>citation + output safety]
+    Interaction --> Guardrails
+    FoodLog --> Guardrails
+    RAGQA --> Guardrails
+    Refuse --> Guardrails
+    Unknown --> Guardrails
+    Guardrails --> END((End))
 ```
+
+**Ghi chú as-built:**
+- `meal_plan` node **không** persist plan mới — chỉ preview plan đã có; generation qua `POST /meal-plans/generate`.
+- `rag_qa` dùng dense retrieval; `retrieve_hybrid()` (BM25+RRF) đã có trong retriever nhưng chưa wired vào chat node.
+- `POST /interactions/check` vẫn trả **501** khi `DEMO_MOCK=false`; agent thật chạy qua chat graph.
 
 ## Component Details
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Frontend | React/Next.js | User interface |
-| Backend | FastAPI | API server |
-| Agent | LangGraph | AI agent orchestration |
-| LLM | OpenAI/Gemini | Language model |
-| Database | PostgreSQL/SQLite | Data persistence |
-| Vector Store | ChromaDB | RAG / embeddings |
+| Frontend | Next.js 16 (App Router) + Tailwind + Zustand | Patient/doctor UI shells |
+| Backend | FastAPI | REST API `/api/v1`, JWT auth |
+| Agent | LangGraph StateGraph | Chat orchestration facade `run_agent` |
+| LLM | OpenAI (`gpt-4o-mini` default) or DeepSeek | Intent classification, RAG answer, meal planner |
+| Embedding | Gemini `gemini-embedding-2` + local MiniLM fallback | Chroma vector indexing/query |
+| Database | SQLite (`DATABASE_URL` default) / Postgres-ready | Users, profiles, meal_plans, alerts, notifications, food_logs, body_metrics_history |
+| Vector Store | ChromaDB (`./chroma_db`) | RAG over food items + guidelines |
+| Guardrails | `rules.py` + `source_check.py` | Citation enforcement, output safety, refuse messages |

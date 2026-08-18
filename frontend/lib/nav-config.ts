@@ -48,7 +48,6 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
       icon: "notifications",
     },
     { id: "history", label: "Chỉ số sức khỏe", href: "/patient/history", icon: "monitor_heart" },
-    { id: "messages", label: "Trao đổi", href: "/patient/messages", icon: "chat" },
   ],
 };
 
