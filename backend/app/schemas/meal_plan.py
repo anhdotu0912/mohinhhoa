@@ -78,6 +78,11 @@ class ApplyMealPlanRequest(BaseModel):
     slot_key: Literal["current", "next", "empty"] | None = None
 
 
+class RequestAdjustmentRequest(BaseModel):
+    """Patient request to adjust an approved meal plan."""
+    adjustment_note: str = Field(min_length=1)
+
+
 class MealPlanOutput(BaseModel):
     """Full multi-day meal plan output — contract §1.2."""
     id: str = ""
@@ -90,6 +95,7 @@ class MealPlanOutput(BaseModel):
     swaps: list[Swap] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     status: str = "pending_review"
+    adjustment_note: str | None = None
     starts_on: str | None = None
     ends_on: str | None = None
     created_at: str | None = None
@@ -136,9 +142,16 @@ class InteractionItem(BaseModel):
     ai_warning: str | None = None
 
 
+class UnmatchedPair(BaseModel):
+    """Drug×food pair with no KB data — contract §6."""
+    drug: str
+    food: str
+
+
 class InteractionCheckOutput(BaseModel):
     """Output of InteractionCheckerAgent — contract §3."""
     interactions: list[InteractionItem] = Field(default_factory=list)
+    unmatched_pairs: list[UnmatchedPair] = Field(default_factory=list)
 
 
 # --- Agent Graph I/O (contract §2) ---

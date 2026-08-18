@@ -246,10 +246,33 @@ def _is_allergic(food: dict, allergies: list[str]) -> bool:
 
 def _blocked_by_preference(food: dict, preferences: list[str]) -> bool:
     name = food.get("name", "").lower()
+    food_id = food.get("id", "").lower()
+    category = str(food.get("category") or "").lower()
+
     for pref in preferences or []:
         pref_l = pref.lower()
         if "không ăn thịt bò" in pref_l or "khong an thit bo" in pref_l:
-            if "bò" in name or "bo nac" in food.get("id", ""):
+            if "bò" in name or "bo nac" in food_id:
+                return True
+        if "ăn chay" in pref_l or pref_l.strip() == "chay":
+            if category in {"thit", "hai_san", "trung_sua"} or any(
+                token in name
+                for token in ("thịt", "gà", "heo", "lợn", "bò", "cá", "tôm", "cua", "trứng", "sữa")
+            ):
+                return True
+        if "không ăn hải sản" in pref_l or "khong an hai san" in pref_l:
+            if category == "hai_san" or any(
+                token in name for token in ("tôm", "cua", "cá", "mực", "nghêu", "hải sản")
+            ):
+                return True
+        if any(
+            phrase in pref_l
+            for phrase in ("không ăn heo", "không ăn lợn", "khong an heo", "khong an lon")
+        ):
+            if any(token in name for token in ("heo", "lợn", "ba rọi", "sườn heo")):
+                return True
+        if "không ăn gà" in pref_l or "khong an ga" in pref_l:
+            if "gà" in name or "ga" in food_id:
                 return True
     return False
 

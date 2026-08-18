@@ -26,6 +26,7 @@ from app.schemas.meal_plan import (
     InteractionCheckInput,
     InteractionCheckOutput,
     InteractionItem,
+    UnmatchedPair,
 )
 
 logger = logging.getLogger(__name__)
@@ -403,6 +404,53 @@ def check_interactions(
     return results
 
 
+def _pair_matches_kb(
+    med: str,
+    food: str,
+    kb: list[dict],
+    db: Session | None = None,
+) -> bool:
+    """Return True if drug×food pair has a legacy KB entry."""
+    if not med or not food or not kb:
+        return False
+
+    product = resolve_medication(med, db=db)
+    resolved_name = product.get("activeIngredientText", med) if product else med
+
+    for entry in kb:
+        drug_name = entry.get("drug", "")
+        drug_aliases = entry.get("drug_aliases", [])
+        food_name = entry.get("food", "")
+        food_aliases = entry.get("food_aliases", [])
+
+        drug_matched = (
+            _match_term(med, drug_name, drug_aliases)
+            or _match_term(resolved_name, drug_name, drug_aliases)
+        )
+        if drug_matched and _match_term(food, food_name, food_aliases):
+            return True
+    return False
+
+
+def compute_unmatched_pairs(
+    medications: list[str],
+    foods: list[str],
+    db: Session | None = None,
+) -> list[UnmatchedPair]:
+    """List drug×food input pairs with no KB match."""
+    kb = load_interaction_kb()
+    unmatched: list[UnmatchedPair] = []
+    for med in medications:
+        if not med:
+            continue
+        for food in foods:
+            if not food:
+                continue
+            if not _pair_matches_kb(med, food, kb, db=db):
+                unmatched.append(UnmatchedPair(drug=med, food=food))
+    return unmatched
+
+
 def interaction_checker_agent(
     input_data: InteractionCheckInput,
     db: Session | None = None,
@@ -420,5 +468,10 @@ def interaction_checker_agent(
         foods=input_data.foods,
         db=db,
     )
-    return InteractionCheckOutput(interactions=items)
+    unmatched = compute_unmatched_pairs(
+        medications=input_data.medications,
+        foods=input_data.foods,
+        db=db,
+    )
+    return InteractionCheckOutput(interactions=items, unmatched_pairs=unmatched)
 

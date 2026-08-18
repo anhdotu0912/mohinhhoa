@@ -37,3 +37,10 @@ Input để tính tuân thủ đã tồn tại rải rác:
 **Alternatives đã cân nhắc**
 - Bảng tổng hợp riêng ngay từ đầu: bị loại cho vòng demo này vì thêm độ phức tạp (cần đồng bộ 2 nguồn dữ liệu, cần migration, cần xử lý trường hợp lệch dữ liệu) không tương xứng với quy mô demo (1 doctor, vài patient mẫu).
 - Cache kết quả aggregation (Redis/in-memory TTL): chưa cần thiết ở quy mô hiện tại; có thể thêm sau nếu on-the-fly chậm, không cần đổi kiến trúc lưu trữ.
+
+## As-built (2026-08-17)
+
+- `GET /api/v1/doctor/patients/{patient_id}/compliance?days=14` — on-the-fly aggregate từ `Notification(type="adherence_checkin")` + `Alert` (`routes_doctor.py`, `services/compliance.py`).
+- `POST /api/v1/doctor/patients/{patient_id}/compliance/remind` — tạo `Notification(type="manual_reminder")`.
+- `COMPLIANCE_LOW_THRESHOLD_PCT` trong `config.py` (default `50`).
+- FE `/doctor/patients/compliance` nối API thật (`getPatientCompliance`, `remindPatientCompliance`). Dashboard `/doctor` vẫn dùng mock chart cho compliance summary.

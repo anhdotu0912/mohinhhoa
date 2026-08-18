@@ -24,6 +24,7 @@ class MealPlan(Base):
     swaps: Mapped[list] = mapped_column(JSON, default=list)
     citations: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(20), default="pending_review")
+    adjustment_note: Mapped[str | None] = mapped_column(String, nullable=True)
     trust_badge: Mapped[str | None] = mapped_column(String(50), nullable=True)
     reviewer_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     review_notes: Mapped[str | None] = mapped_column(String, nullable=True)

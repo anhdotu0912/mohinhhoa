@@ -17,6 +17,8 @@ os.environ["DEMO_MOCK"] = "true"
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["EMBEDDING_PROVIDER"] = "local"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ["SMTP_USERNAME"] = ""
+os.environ["SMTP_PASSWORD"] = ""
 
 import pytest  # noqa: E402
 import app.models  # noqa: E402,F401 — register nutrition catalog tables
@@ -36,6 +38,15 @@ TEST_ENGINE = create_engine(
 TestingSessionLocal = sessionmaker(bind=TEST_ENGINE, autocommit=False, autoflush=False)
 
 Base.metadata.create_all(bind=TEST_ENGINE)
+
+
+@pytest.fixture(autouse=True)
+def _stub_outbound_email(monkeypatch):
+    """Do not hit real SMTP in tests; treat mail as configured + delivered."""
+    monkeypatch.setattr("app.services.email.is_configured", lambda: True)
+    monkeypatch.setattr(
+        "app.services.email.send_temporary_password", lambda *args, **kwargs: None
+    )
 
 
 @pytest.fixture()

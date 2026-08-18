@@ -207,17 +207,16 @@ Backlog hiện tại: `/tasks/roadmap-mvp.md`. Ownership rút gọn: `/tasks/be1
 
 Roadmap 14 ngày gốc đã **superseded**. Backlog đóng gap as-built → North Star:
 
-→ **[`/tasks/roadmap-mvp.md`](/tasks/roadmap-mvp.md)** (bảng ánh xạ spec→task→MoSCoW→owner, cập nhật 2026-08-15).
+→ **[`/tasks/roadmap-mvp.md`](/tasks/roadmap-mvp.md)** (bảng ánh xạ spec→task→MoSCoW→owner, cập nhật 2026-08-18).
 
 Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 
 | Ưu tiên | Việc | Owner |
 |---|---|---|
-| **P0** | Guardrails thật (`rules.py` + `source_check.py` wired vào graph) + `profile_loader` đọc DB thật khi chat | BE1 |
 | **P0** | `DEMO_MOCK=false` cho interaction check — wire agent thật vào `POST /interactions/check` (hết 501) | BE1 + BE2 |
-| **P1** | Clinical Constraints HITL — `PUT/POST .../constraints[/approve]` (`specs/04`) | BE2 |
+| **P1** | Clinical Constraints HITL approve — `constraints_status` + `POST .../constraints/approve` (`PUT .../constraints` đã Done) | BE2 |
 | **P1** | Optimistic lock review (409) + persist meal plan qua `/chat` (`specs/06`, `specs/05`) | BE2 + BE1 |
-| **P2/P3** | Mở rộng `preferences`, `unmatched_pairs[]`, migrate embedding/LLM provider (Should, không chặn demo) | BE1 |
+| **P2/P3** | Guardrails bổ sung (`validate_interaction_output`/`sanitize_recommendation`), hybrid RAG chat, mở rộng `preferences`, `unmatched_pairs[]`, LLM dual-provider fallback | BE1 |
 
 **Đã Done (core), không chặn North Star:** Doctor Compliance View (`specs/10` — `GET/POST .../compliance*`, FE nối API thật).
 
@@ -233,7 +232,7 @@ Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 | Chroma đủ cho prototype / không migrate Qdrant | Thấp | Giữ Chroma (ADR-001 Accepted) |
 | Compliance không có cron thật | Trung bình | Event-driven materialize + `demo/simulate` seed mẫu |
 | API cost LLM vượt budget | Thấp | Cache, model nhỏ, mock mặc định |
-| Scope creep (Food Log quay lại) | Trung bình | Giữ Won't Have; ẩn nav |
+| Scope creep (Food Log quay lại) | Thấp | Food Log đã Done (ADR-009); giữ phạm vi structured manual, không mở NLP/ảnh |
 
 ---
 

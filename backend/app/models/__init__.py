@@ -7,6 +7,7 @@ from app.models.food_log import FoodLog
 from app.models.meal_plan import MealPlan
 from app.models.notification import Notification
 from app.models.nutrition_catalog import DrugProduct, DrugRule, FoodComposition, Recipe
+from app.models.password_reset import PasswordResetToken
 from app.models.profile import Profile
 from app.models.user import User
 
@@ -22,6 +23,7 @@ __all__ = [
     "MealPlan",
     "Medicine",
     "Notification",
+    "PasswordResetToken",
     "Profile",
     "Recipe",
     "User",

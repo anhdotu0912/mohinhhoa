@@ -18,8 +18,16 @@ Cần một quyết định rõ để BE1 (agent side) và BE2 (API/DB side) kh�
 1. **Phạm vi khi implement (không phải bây giờ):** nhập tay có cấu trúc (structured manual entry) theo đúng UI đã có sẵn — chọn "đúng kế hoạch" hoặc "khác + ghi chú tự do", theo từng slot bữa ăn trong ngày. **Không** làm nhận diện ảnh món ăn (Could Have riêng, `CLAUDE.md`), **không** làm NLP parse tự do thành danh sách món ăn có định lượng dinh dưỡng (quá phức tạp cho quy mô này).
 2. **Slot vocabulary — ĐÃ QUYẾT ĐỊNH (2026-08-15):** giữ đúng theo UI hiện có — **3 slot cố định** `"morning" | "noon" | "evening"` (sáng/trưa/tối), **không** mở rộng thêm slot thứ 4 để khớp 4-slot của meal plan (`breakfast/lunch/dinner/snack`). Hệ quả chấp nhận được: food log **không** ghi nhận riêng cho "bữa phụ/snack" — coi đây là giới hạn có chủ đích (Out of scope), không phải gap cần vá. Khi đối chiếu tuân thủ theo `specs/10-doctor-compliance-view.md`, chỉ đối chiếu được 3 bữa chính, ánh xạ gần đúng `morning≈breakfast`, `noon≈lunch`, `evening≈dinner`.
 3. **`FoodLogEntry.status`:** không cần workflow duyệt (approve/reject) như meal plan — chỉ cần 2 trạng thái: `logged` (đã ghi nhận) và `adjusted` (bệnh nhân sửa lại sau khi đã log). Không cần trạng thái `pending`/`rejected` vì đây là ghi nhận thực tế, không phải đề xuất cần duyệt.
-4. **Liên kết Alert:** khi log món ăn "khác" (custom) trùng khớp với 1 cặp tương tác thuốc–thực phẩm trong KB (`data/drug_food_interactions.json`), hệ thống nên tạo `Alert` mới (dùng lại service dùng chung ở `specs/08-drug-food-interaction-check.md`) — thiết kế đề xuất, chưa implement.
-5. **Mức ưu tiên:** **Should Have**, không bắt buộc cho North Star demo (đăng nhập bác sĩ → generate → duyệt → bệnh nhân xem → chat hỏi lại — không cần Food Log để hoàn thành luồng này).
+4. **Liên kết Alert:** khi log món ăn "khác" (custom) trùng khớp với 1 cặp tương tác thuốc–thực phẩm trong KB (`data/drug_food_interactions.json`), hệ thống tạo `Alert` mới (dùng lại service dùng chung ở `specs/08-drug-food-interaction-check.md`) — **đã implement** (`food_log_service.py`, `Alert.food_log_id`).
+5. **Mức ưu tiên:** **Should Have**, đã implement core (2026-08-17); không bắt buộc cho North Star demo.
+
+## As-built (2026-08-17)
+
+- API: `POST/GET /api/v1/food-log` mounted trong `main.py`; model `FoodLog`, service `food_log_service.py`.
+- Schema khớp `contracts/agent-io-schema.md` §3: `slot` = `morning|noon|evening`, `type` = `as_planned|custom`, `status` = `logged|adjusted`.
+- FE: modal `FoodLogModal` trên `/patient/meals` (không phải route riêng `/patient/meals/log`); tóm tắt trên `/patient/history`.
+- Chat `food_log_node`: chỉ tóm tắt 3 log gần nhất từ DB — không tạo log mới qua chat.
+- Alert linkage: custom log + ghi chú khớp KB → tạo Alert với `food_log_id`.
 
 ## Consequences
 **Positive**

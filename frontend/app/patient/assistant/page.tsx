@@ -206,9 +206,6 @@ export default function PatientAssistantPage() {
                 : m
             )
           );
-          if (event.data.citations?.length) {
-            setShowReferences(true);
-          }
         } else if (event.type === "error") {
           setError(event.message);
           setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
@@ -230,7 +227,37 @@ export default function PatientAssistantPage() {
     setMessages([]);
     setError(null);
     setInputQuery("");
+    setShowReferences(false);
   };
+
+  const isCompactViewport = () =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+
+  const toggleHistory = () => {
+    setShowHistory((open) => {
+      const next = !open;
+      if (next && isCompactViewport()) setShowReferences(false);
+      return next;
+    });
+  };
+
+  const toggleReferences = () => {
+    setShowReferences((open) => {
+      const next = !open;
+      if (next && isCompactViewport()) setShowHistory(false);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const compact = window.matchMedia("(max-width: 1023px)").matches;
+    if (!compact || (!showHistory && !showReferences)) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showHistory, showReferences]);
 
   return (
     <>
@@ -247,10 +274,22 @@ export default function PatientAssistantPage() {
           </span>
         }
       />
-      <div className="flex-1 flex h-[calc(100vh-64px)] overflow-hidden bg-background">
+      {(showHistory || showReferences) && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-on-surface/35 lg:hidden"
+          onClick={() => {
+            setShowHistory(false);
+            setShowReferences(false);
+          }}
+          aria-label="Đóng panel"
+        />
+      )}
+
+      <div className="relative flex-1 flex items-start w-full bg-background">
         {showHistory && (
-          <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-            <div className="p-md flex items-center justify-between border-b border-outline-variant/40">
+          <aside className="flex flex-col bg-surface-container-lowest border-r border-outline-variant max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-dvh max-lg:w-[min(280px,88vw)] max-lg:shadow-xl lg:sticky lg:top-16 lg:z-20 lg:h-[calc(100vh-4rem)] lg:w-[240px] lg:shrink-0 lg:self-start">
+            <div className="p-md flex items-center justify-between border-b border-outline-variant/40 shrink-0">
               <span className="font-h2 text-h2 text-on-surface font-semibold text-sm">
                 Phiên chat
               </span>
@@ -263,7 +302,7 @@ export default function PatientAssistantPage() {
                 <span className="material-symbols-outlined text-[18px]">first_page</span>
               </button>
             </div>
-            <div className="p-md pt-xs">
+            <div className="p-md pt-xs shrink-0">
               <button
                 type="button"
                 onClick={handleNewConversation}
@@ -274,11 +313,11 @@ export default function PatientAssistantPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-sm pb-md flex flex-col gap-sm">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-sm pb-md flex flex-col gap-sm">
               {hasConversation ? (
                 <button
                   type="button"
-                  className="w-full text-left p-sm rounded-lg bg-surface-container-low border-l-2 border-primary group transition-all"
+                  className="w-full text-left p-sm rounded-lg bg-primary/10 ring-1 ring-primary/20 group transition-all"
                 >
                   <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
                     {messages.find((m) => m.sender === "user")?.text ?? "Cuộc trò chuyện hiện tại"}
@@ -293,14 +332,15 @@ export default function PatientAssistantPage() {
                 </p>
               )}
             </div>
-          </div>
+          </aside>
         )}
 
-        <div className="flex-1 bg-background flex flex-col h-full overflow-hidden relative">
-          <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
+        <div className="flex-1 min-w-0 bg-background flex flex-col min-h-[calc(100vh-4rem)] relative">
+          <div className="sticky top-16 z-30 bg-surface-container-lowest/92 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center shadow-[0_1px_0_rgba(18,28,42,0.04)]">
             <button
               type="button"
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={toggleHistory}
+              aria-expanded={showHistory}
               className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
                 showHistory
                   ? "bg-primary/10 text-primary border border-primary/20"
@@ -318,7 +358,8 @@ export default function PatientAssistantPage() {
 
             <button
               type="button"
-              onClick={() => setShowReferences(!showReferences)}
+              onClick={toggleReferences}
+              aria-expanded={showReferences}
               className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
                 showReferences
                   ? "bg-primary/10 text-primary border border-primary/20"
@@ -328,10 +369,15 @@ export default function PatientAssistantPage() {
             >
               <span className="material-symbols-outlined text-[16px]">library_books</span>
               <span>{showReferences ? "Ẩn tham khảo" : "Hiện tham khảo"}</span>
+              {!showReferences && activeCitations.length > 0 ? (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center">
+                  {activeCitations.length}
+                </span>
+              ) : null}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-lg flex flex-col gap-xl scroll-smooth">
+          <div className={`flex-1 p-lg flex flex-col gap-xl ${hasConversation ? "" : "justify-center"}`}>
             {!hasConversation && (
               <div className="flex flex-col items-center justify-center mt-4 mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
@@ -468,7 +514,10 @@ export default function PatientAssistantPage() {
                       {msg.citations && msg.citations.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setShowReferences(true)}
+                          onClick={() => {
+                            if (isCompactViewport()) setShowHistory(false);
+                            setShowReferences(true);
+                          }}
                           className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[14px]">description</span>
@@ -534,7 +583,7 @@ export default function PatientAssistantPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-md bg-background border-t border-outline-variant shrink-0 relative">
+          <div className="sticky bottom-0 z-30 p-md bg-background/95 backdrop-blur-md border-t border-outline-variant shadow-[0_-8px_24px_rgba(18,28,42,0.05)]">
             <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
               <textarea
                 value={inputQuery}
@@ -563,8 +612,8 @@ export default function PatientAssistantPage() {
         </div>
 
         {showReferences && (
-          <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between">
+          <aside className="flex flex-col bg-surface-container-lowest border-l border-outline-variant max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-50 max-lg:h-dvh max-lg:w-[min(320px,88vw)] max-lg:shadow-xl lg:sticky lg:top-16 lg:z-20 lg:h-[calc(100vh-4rem)] lg:w-[320px] lg:shrink-0 lg:self-start">
+            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-sm">
                 <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
                 <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">
@@ -580,7 +629,7 @@ export default function PatientAssistantPage() {
                 <span className="material-symbols-outlined text-[18px]">last_page</span>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-md flex flex-col gap-md bg-surface/50">
               <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs">
                 Nguồn từ câu trả lời AI gần nhất.
               </p>
@@ -619,7 +668,7 @@ export default function PatientAssistantPage() {
                 ))
               )}
             </div>
-          </div>
+          </aside>
         )}
       </div>
     </>

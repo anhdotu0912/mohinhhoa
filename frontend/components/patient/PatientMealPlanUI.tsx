@@ -91,7 +91,7 @@ function DishNutrientsPanel({
       className={`transition-all duration-200 ${
         expanded
           ? "opacity-100 max-h-24 mt-1.5"
-          : "opacity-0 max-h-0 overflow-hidden mt-0 group-hover/dish:opacity-100 group-hover/dish:max-h-24 group-hover/dish:mt-1.5"
+          : "opacity-0 max-h-0 overflow-hidden mt-0"
       }`}
       aria-hidden={!expanded}
     >
@@ -339,6 +339,38 @@ export function DayTabButton({
   );
 }
 
+export function LoggedMealBadge({
+  type,
+  compact = false,
+}: {
+  type: "as_planned" | "custom";
+  compact?: boolean;
+}) {
+  const isCustom = type === "custom";
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 rounded-full font-bold border shadow-2xs ${
+        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]"
+      } ${
+        isCustom
+          ? "bg-amber-100 text-amber-900 border-amber-300"
+          : "bg-emerald-100 text-emerald-900 border-emerald-300"
+      }`}
+      title={isCustom ? "Đã ghi nhận: ăn khác kế hoạch" : "Đã ghi nhận: ăn đúng kế hoạch"}
+    >
+      <span
+        className={`material-symbols-outlined ${compact ? "text-[12px]" : "text-[14px]"} ${
+          isCustom ? "text-amber-700" : "text-emerald-700"
+        }`}
+        aria-hidden
+      >
+        {isCustom ? "edit_note" : "check_circle"}
+      </span>
+      {isCustom ? "Ăn khác" : "Ăn đúng"}
+    </span>
+  );
+}
+
 export function MealSectionHeader({
   label,
   icon,
@@ -399,7 +431,7 @@ function AlternativeItem({ alt }: { alt: MealDishItem }) {
 
   return (
     <li
-      className="pl-3 py-2 bg-slate-50/80 border border-slate-200 rounded-lg group/alt cursor-pointer"
+      className="pl-3 py-2 bg-slate-50/80 border border-slate-200 rounded-lg cursor-pointer"
       onClick={() => setExpanded((v) => !v)}
       role="button"
       tabIndex={0}
@@ -416,7 +448,7 @@ function AlternativeItem({ alt }: { alt: MealDishItem }) {
         className={`transition-all duration-200 ${
           expanded
             ? "opacity-100 max-h-24 mt-1.5"
-            : "opacity-0 max-h-0 overflow-hidden mt-0 group-hover/alt:opacity-100 group-hover/alt:max-h-24 group-hover/alt:mt-1.5"
+            : "opacity-0 max-h-0 overflow-hidden mt-0"
         }`}
       >
         <NutrientChipsRow food={alt} compact />
@@ -440,7 +472,7 @@ export function DishCard({
   if (compact) {
     return (
       <div
-        className="bg-white border border-slate-200 rounded-lg p-2 shadow-xs group/dish cursor-pointer"
+        className="bg-white border border-slate-200 rounded-lg p-2 shadow-xs cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           setExpanded((v) => !v);
@@ -455,7 +487,7 @@ export function DishCard({
           }
         }}
         aria-expanded={expanded}
-        aria-label={`${item.name}${expanded ? " — đang hiện dinh dưỡng" : " — bấm hoặc hover để xem dinh dưỡng"}`}
+        aria-label={`${item.name}${expanded ? " — đang hiện dinh dưỡng" : " — bấm để xem dinh dưỡng"}`}
       >
         <p className="text-xs font-semibold text-slate-900 leading-snug">{item.name}</p>
         <DishNutrientsPanel food={item} compact expanded={expanded} />
@@ -465,7 +497,7 @@ export function DishCard({
 
   return (
     <article
-      className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm group/dish cursor-pointer"
+      className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm cursor-pointer"
       onClick={() => setExpanded((v) => !v)}
       role="button"
       tabIndex={0}

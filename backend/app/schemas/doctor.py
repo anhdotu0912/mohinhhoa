@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.meal_plan import MealPlanOutput
+from app.schemas.profile import PatientProfile
 
 
 class ReviewRequest(BaseModel):
@@ -38,7 +39,6 @@ class DoctorPatientSummary(BaseModel):
     bmi: float | None = None
     weight: float | None = None
     height: float | None = None
-    age: int | None = None
     phone: str | None = None
     address: str | None = None
     blood_pressure: str | None = None
@@ -48,6 +48,7 @@ class DoctorPatientSummary(BaseModel):
     salt_daily_g: float | None = None
     sugar_daily_g: float | None = None
     preferences: list[str] = Field(default_factory=list)
+    constraints_status: str = "confirmed"
     status: Literal["Cần chú ý", "Ổn định", "Cảnh báo", "Chờ duyệt"] = "Ổn định"
     status_key: Literal["attention", "stable", "warning", "pending"] = "stable"
     latest_plan_id: str | None = None
@@ -70,8 +71,8 @@ class DoctorPatientSummary(BaseModel):
 class MetricsUpdateRequest(BaseModel):
     """Cập nhật chỉ số cơ thể — contract §5."""
 
-    weight: float = Field(gt=0, description="Cân nặng (kg), phải > 0")
-    height: float = Field(gt=0, description="Chiều cao (cm), phải > 0")
+    weight: float | None = Field(default=None, gt=0, description="Cân nặng (kg), phải > 0")
+    height: float | None = Field(default=None, gt=0, description="Chiều cao (cm), phải > 0")
 
 
 class PatientMetricsOut(BaseModel):
@@ -190,7 +191,7 @@ class ComplianceDayPoint(BaseModel):
 
 
 class ComplianceEvent(BaseModel):
-    type: Literal["alert"] = "alert"
+    type: Literal["alert", "food_log", "checkin", "reminder"] = "alert"
     severity: str
     title: str
     at: str

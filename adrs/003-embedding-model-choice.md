@@ -35,5 +35,5 @@ Team quyết định đổi sang **Gemini Embedding**, cụ thể model **`gemin
 - `multilingual-e5-base` (đề xuất gốc trong brief cũ): không được chọn, không có ưu thế rõ so với Gemini API cho multilingual tiếng Việt và vẫn yêu cầu chạy local.
 
 ## Ghi chú migration (cho BE1)
-- Đây là **Planned/Accepted-chưa-code** — task cụ thể: thêm `EMBEDDING_PROVIDER`/`GEMINI_API_KEY`/`GEMINI_EMBEDDING_MODEL` vào config, viết Gemini `EmbeddingFunction` wrapper, migrate `indexer.py`, re-index, đo lại SLA RAG. Theo dõi ở `tasks/be1-ai-core.md`.
-- Bump version `contracts/agent-io-schema.md` không cần thiết cho thay đổi này (không đổi shape input/output Agent, chỉ đổi cách tính vector nội bộ) — nhưng cần note trong `CLAUDE.md`/README khi migration hoàn tất.
+- **Đã triển khai** — config + Gemini `EmbeddingFunction` + local fallback có trong `config.py` và `embeddings.py`. Chạy `python -m app.rag.indexer` (re-index) khi deploy môi trường mới hoặc sau thay đổi corpus/embedding model.
+- Bump version `contracts/agent-io-schema.md` không cần thiết cho thay đổi này (không đổi shape input/output Agent).

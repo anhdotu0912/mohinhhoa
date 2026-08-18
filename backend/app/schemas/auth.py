@@ -39,3 +39,20 @@ class UserMeResponse(BaseModel):
     role: str
     full_name: str | None = None
     avatar: str | None = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=8)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

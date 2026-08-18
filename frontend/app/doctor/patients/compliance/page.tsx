@@ -39,6 +39,7 @@ interface PatientComplianceSummary {
 
 const PAGE_SIZE = 10;
 const COMPLIANCE_DAYS = 14;
+const EVENT_LOG_PREVIEW = 3;
 const DEFAULT_REMIND_MESSAGE =
   "Bác sĩ nhắc bạn ghi nhận tuân thủ thực đơn hôm nay nhé.";
 
@@ -57,15 +58,49 @@ function formatEventTime(iso: string): string {
   }
 }
 
+function complianceEventDescription(ev: PatientComplianceOut["events"][number]): string {
+  switch (ev.type) {
+    case "alert":
+      return `Mức độ cảnh báo: ${ev.severity}`;
+    case "food_log":
+      return ev.severity === "Tuân thủ"
+        ? "Bệnh nhân ghi nhận ăn đúng thực đơn"
+        : "Bệnh nhân ghi nhận ăn khác kế hoạch";
+    case "checkin":
+      return `Phản hồi check-in: ${ev.severity}`;
+    case "reminder":
+      return "Bác sĩ gửi nhắc nhở tuân thủ qua thông báo in-app";
+    default:
+      return ev.severity;
+  }
+}
+
+function complianceEventLogType(
+  ev: PatientComplianceOut["events"][number]
+): ComplianceLog["type"] {
+  if (ev.type === "alert") {
+    return ev.severity === "Nguy hiểm" || ev.severity === "Cần chú ý"
+      ? "warning"
+      : "info";
+  }
+  if (ev.type === "food_log") {
+    return ev.severity === "Tuân thủ" ? "success" : "warning";
+  }
+  if (ev.type === "checkin") {
+    if (ev.severity === "Tuân thủ") return "success";
+    if (ev.severity === "Một phần") return "info";
+    return "warning";
+  }
+  if (ev.type === "reminder") return "info";
+  return "info";
+}
+
 function complianceToSummary(data: PatientComplianceOut): PatientComplianceSummary {
   const logs: ComplianceLog[] = data.events.map((ev) => ({
     title: ev.title,
     time: formatEventTime(ev.at),
-    description: `Mức độ cảnh báo: ${ev.severity}`,
-    type:
-      ev.severity === "Nguy hiểm" || ev.severity === "Cần chú ý"
-        ? "warning"
-        : "info",
+    description: complianceEventDescription(ev),
+    type: complianceEventLogType(ev),
   }));
 
   const lastEvent = data.events[0];
@@ -188,6 +223,7 @@ export default function PatientCompliancePage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [showAllEventLogs, setShowAllEventLogs] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -284,6 +320,7 @@ export default function PatientCompliancePage() {
     setViewingPatient(patient);
     setRemindMessage(DEFAULT_REMIND_MESSAGE);
     setRemindFeedback(null);
+    setShowAllEventLogs(false);
   };
 
   const handleSendRemind = async () => {
@@ -292,9 +329,17 @@ export default function PatientCompliancePage() {
     setRemindFeedback(null);
     try {
       await api.remindPatientCompliance(viewingPatient.id, remindMessage.trim());
+      const data = await api.getPatientCompliance(
+        viewingPatient.id,
+        COMPLIANCE_DAYS
+      );
+      setComplianceByPatient((prev) => ({
+        ...prev,
+        [viewingPatient.id]: complianceToSummary(data),
+      }));
       setRemindFeedback({
         type: "success",
-        text: "Đã gửi nhắc nhở tuân thủ tới bệnh nhân.",
+        text: "Đã gửi nhắc nhở. Bệnh nhân sẽ thấy trong mục Thông báo.",
       });
     } catch (err) {
       setRemindFeedback({
@@ -430,7 +475,7 @@ export default function PatientCompliancePage() {
         ) : (
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[980px]">
+              <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-outline-variant">
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
@@ -444,9 +489,6 @@ export default function PatientCompliancePage() {
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center">
                       Mức độ tuân thủ (14 ngày)
-                    </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center">
-                      Check-in tuân thủ
                     </th>
                     <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
                       Sự kiện / Cảnh báo gần nhất
@@ -558,32 +600,6 @@ export default function PatientCompliancePage() {
                           )}
                         </td>
 
-                        <td className="p-md text-center whitespace-nowrap text-xs">
-                          {stats.totalMeals > 0 ? (
-                            <>
-                              <span className="font-semibold text-on-surface">
-                                {stats.asPlannedMeals}
-                              </span>
-                              <span className="text-on-surface-variant">
-                                {" "}
-                                / {stats.totalMeals} check-in
-                              </span>
-                              <p className="text-[11px] text-on-surface-variant mt-0.5">
-                                (
-                                {Math.round(
-                                  (stats.asPlannedMeals / stats.totalMeals) *
-                                    100
-                                )}
-                                % đúng kế hoạch)
-                              </p>
-                            </>
-                          ) : (
-                            <span className="text-on-surface-variant">
-                              Chưa có dữ liệu
-                            </span>
-                          )}
-                        </td>
-
                         <td className="p-md text-on-surface-variant">
                           <div className="flex items-start gap-1 max-w-[240px]">
                             <span
@@ -611,30 +627,17 @@ export default function PatientCompliancePage() {
                         </td>
 
                         <td className="p-md text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-xs">
-                            <Link
-                              href={`/doctor/patients/${encodeURIComponent(patient.id)}`}
-                              title="Xem chi tiết hồ sơ bệnh nhân"
-                              className="inline-flex items-center gap-1.5 px-md py-1.5 bg-surface-container-lowest border border-outline-variant text-on-surface hover:border-primary hover:text-primary font-body-bold text-xs rounded-lg hover:bg-surface-container-low transition-all cursor-pointer active:scale-95 shadow-xs"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                visibility
-                              </span>
-                              <span>Xem chi tiết</span>
-                            </Link>
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenModal(patient)}
-                              title="Xem biểu đồ tuân thủ & nhật ký sự kiện"
-                              className="inline-flex items-center gap-1.5 px-md py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs font-semibold"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                insights
-                              </span>
-                              <span>Biểu đồ &amp; Nhật ký</span>
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenModal(patient)}
+                            title="Xem biểu đồ tuân thủ & nhật ký sự kiện"
+                            className="inline-flex items-center gap-1.5 px-md py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs font-semibold"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              insights
+                            </span>
+                            <span>Biểu đồ &amp; Nhật ký</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -958,11 +961,15 @@ export default function PatientCompliancePage() {
                 </h4>
                 {viewingStats.logs.length === 0 ? (
                   <p className="text-xs text-on-surface-variant">
-                    Chưa có cảnh báo tương tác trong 14 ngày qua.
+                    Chưa có sự kiện tuân thủ trong 14 ngày qua (ghi nhận bữa
+                    ăn, check-in, nhắc nhở hoặc cảnh báo tương tác).
                   </p>
                 ) : (
                   <div className="space-y-xs">
-                    {viewingStats.logs.map((log, idx) => (
+                    {(showAllEventLogs
+                      ? viewingStats.logs
+                      : viewingStats.logs.slice(0, EVENT_LOG_PREVIEW)
+                    ).map((log, idx) => (
                       <div
                         key={idx}
                         className="p-sm bg-surface-container-low/40 border border-outline-variant/60 rounded-lg flex items-start gap-sm text-xs"
@@ -997,6 +1004,17 @@ export default function PatientCompliancePage() {
                         </div>
                       </div>
                     ))}
+                    {viewingStats.logs.length > EVENT_LOG_PREVIEW && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllEventLogs((prev) => !prev)}
+                        className="mt-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        {showAllEventLogs
+                          ? "Thu gọn"
+                          : `Xem thêm (${viewingStats.logs.length - EVENT_LOG_PREVIEW})`}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -492,6 +492,9 @@ export default function PlanReviewDetailPage() {
       }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
+      if (err instanceof ApiError && err.code === "PLAN_ALREADY_REVIEWED") {
+        router.refresh();
+      }
     } finally {
       setSaving(false);
     }

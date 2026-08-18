@@ -1,5 +1,7 @@
 """Pydantic schemas for Patient Profile — matches contract §1.1."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -31,6 +33,7 @@ class PatientProfile(BaseModel):
     restrictions: Restrictions = Field(default_factory=Restrictions)
     preferences: list[str] = Field(default_factory=list, description="e.g. thích ăn cơm, không ăn thịt bò")
     treatment_goals: list[str] = Field(default_factory=list)
+    constraints_status: Literal["confirmed", "pending_doctor_review"] = "confirmed"
 
     model_config = {"from_attributes": True}
 
