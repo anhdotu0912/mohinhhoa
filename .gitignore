@@ -28,10 +28,11 @@ env/
 .DS_Store
 Thumbs.db
 
-# Data (never commit large data)
-data/
+# Runtime DB / vector index (corpus JSON in backend/data and data/clean is tracked)
 *.db
 *.sqlite3
+backend/chroma_db/
+backend/app.db
 
 # Logs
 logs/

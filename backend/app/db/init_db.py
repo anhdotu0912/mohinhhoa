@@ -416,6 +416,8 @@ def _migrate_add_meal_plan_adjustment_note(db: Session) -> None:
 
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
+    from app.db.seed_nutrition_catalog import default_data_dir, seed_nutrition_catalog
+
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         _migrate_add_full_name(db)
@@ -430,3 +432,5 @@ def init_db() -> None:
         _migrate_add_meal_plan_dates(db)
         seed_demo_accounts(db)
         seed_catalog(db)
+        if engine.dialect.name == "postgresql" and default_data_dir().exists():
+            seed_nutrition_catalog(db, default_data_dir())

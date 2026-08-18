@@ -1,0 +1,282 @@
+[
+  {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin", "warfari"],
+    "food": "rau muống",
+    "food_aliases": ["rau muong", "water spinach"],
+    "mechanism": "Rau muống giàu Vitamin K, đối kháng tác dụng chống đông của warfarin.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Hạn chế và giữ ổn định lượng rau giàu Vitamin K; trao đổi với bác sĩ trước khi thay đổi chế độ ăn.",
+    "sources": ["drug_food_interactions#warfarin_rau_muong"]
+  },
+  {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin"],
+    "food": "bông cải xanh",
+    "food_aliases": ["bong cai xanh", "broccoli"],
+    "mechanism": "Bông cải xanh giàu Vitamin K, có thể làm giảm hiệu quả warfarin.",
+    "severity": "Cần chú ý",
+    "recommendation": "Duy trì lượng ăn ổn định và theo dõi chỉ số INR theo chỉ định bác sĩ.",
+    "sources": ["drug_food_interactions#warfarin_broccoli"]
+  },
+  {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin"],
+    "food": "rau ngót",
+    "food_aliases": ["rau ngot"],
+    "mechanism": "Rau ngót chứa Vitamin K, có thể ảnh hưởng đáp ứng chống đông.",
+    "severity": "Cần chú ý",
+    "recommendation": "Ăn đều đặn lượng ổn định; không tự ý tăng/giảm đột ngột.",
+    "sources": ["drug_food_interactions#warfarin_rau_ngot"]
+  },
+  {
+    "drug": "metformin",
+    "drug_aliases": ["glucophage"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia", "beer", "wine"],
+    "mechanism": "Rượu/bia tăng nguy cơ nhiễm toan lactic khi dùng metformin.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Hạn chế rượu bia; tham vấn bác sĩ về mức an toàn với bạn.",
+    "sources": ["drug_food_interactions#metformin_alcohol"]
+  },
+  {
+    "drug": "amlodipine",
+    "drug_aliases": ["norvasc"],
+    "food": "bưởi",
+    "food_aliases": ["buoi", "grapefruit", "nước bưởi"],
+    "mechanism": "Bưởi ức chế CYP3A4, làm tăng nồng độ amlodipine trong máu.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh bưởi và nước ép bưởi khi đang dùng amlodipine; hỏi bác sĩ nếu đã uống.",
+    "sources": ["drug_food_interactions#amlodipine_grapefruit"]
+  },
+  {
+    "drug": "allopurinol",
+    "drug_aliases": ["zyloprim"],
+    "food": "bia",
+    "food_aliases": ["beer", "rượu bia", "alcohol"],
+    "mechanism": "Bia giàu purine, làm tăng acid uric và giảm hiệu quả kiểm soát gout.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Hạn chế bia và thực phẩm giàu purine; duy trì uống đủ nước theo hướng dẫn bác sĩ.",
+    "sources": ["drug_food_interactions#allopurinol_beer"]
+  },
+  {
+    "drug": "allopurinol",
+    "drug_aliases": [],
+    "food": "nội tạng",
+    "food_aliases": ["gan", "tim", "bầu dục", "offal"],
+    "mechanism": "Nội tạng rất giàu purine, dễ kích hoạt đợt gout.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh nội tạng; ưu tiên protein ít purine và hỏi chuyên gia dinh dưỡng.",
+    "sources": ["drug_food_interactions#allopurinol_offal"]
+  },
+  {
+    "drug": "atorvastatin",
+    "drug_aliases": ["lipitor"],
+    "food": "bưởi",
+    "food_aliases": ["buoi", "grapefruit"],
+    "mechanism": "Bưởi ức chế chuyển hóa statin qua CYP3A4, tăng nguy cơ độc cơ.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh bưởi khi dùng atorvastatin; báo bác sĩ nếu có đau cơ bất thường.",
+    "sources": ["drug_food_interactions#atorvastatin_grapefruit"]
+  },
+  {
+    "drug": "simvastatin",
+    "drug_aliases": ["zocor"],
+    "food": "bưởi",
+    "food_aliases": ["buoi", "grapefruit"],
+    "mechanism": "Bưởi làm tăng nồng độ simvastatin, tăng nguy cơ myopathy.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Không uống nước bưởi khi dùng simvastatin; trao đổi với bác sĩ.",
+    "sources": ["drug_food_interactions#simvastatin_grapefruit"]
+  },
+  {
+    "drug": "levothyroxine",
+    "drug_aliases": ["synthroid", "thyroxin"],
+    "food": "đậu nành",
+    "food_aliases": ["dau nanh", "soy", "sữa đậu nành"],
+    "mechanism": "Đậu nành có thể giảm hấp thu levothyroxine nếu dùng cùng lúc.",
+    "severity": "Cần chú ý",
+    "recommendation": "Uống thuốc cách xa bữa có đậu nành theo hướng dẫn bác sĩ.",
+    "sources": ["drug_food_interactions#levothyroxine_soy"]
+  },
+  {
+    "drug": "levothyroxine",
+    "drug_aliases": ["synthroid"],
+    "food": "cà phê",
+    "food_aliases": ["ca phe", "coffee"],
+    "mechanism": "Cà phê có thể giảm hấp thu levothyroxine nếu uống gần giờ uống thuốc.",
+    "severity": "Cần chú ý",
+    "recommendation": "Uống thuốc lúc đói, chờ đủ thời gian trước khi uống cà phê theo chỉ định.",
+    "sources": ["drug_food_interactions#levothyroxine_coffee"]
+  },
+  {
+    "drug": "digoxin",
+    "drug_aliases": ["lanoxin"],
+    "food": "cam thảo",
+    "food_aliases": ["cam thao", "licorice"],
+    "mechanism": "Cam thảo có thể gây hạ kali và tăng độc tính digoxin.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh cam thảo; theo dõi triệu chứng theo hướng dẫn bác sĩ.",
+    "sources": ["drug_food_interactions#digoxin_licorice"]
+  },
+  {
+    "drug": "monoamine oxidase inhibitor",
+    "drug_aliases": ["maoi", "phenelzine", "tranylcypromine"],
+    "food": "phô mai lên men",
+    "food_aliases": ["pho mai len men", "aged cheese", "tyramine"],
+    "mechanism": "Thực phẩm giàu tyramine kết hợp MAOI có thể gây tăng huyết áp đột ngột.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh thực phẩm giàu tyramine; hỏi bác sĩ trước khi thay đổi chế độ ăn.",
+    "sources": ["drug_food_interactions#maoi_tyramine"]
+  },
+  {
+    "drug": "spironolactone",
+    "drug_aliases": ["aldactone"],
+    "food": "chuối",
+    "food_aliases": ["chuoi", "banana"],
+    "mechanism": "Chuối giàu kali; kết hợp thuốc giữ kali có thể gây tăng kali máu.",
+    "severity": "Cần chú ý",
+    "recommendation": "Không tự ý tăng lượng thực phẩm giàu kali; theo dõi xét nghiệm theo bác sĩ.",
+    "sources": ["drug_food_interactions#spironolactone_banana"]
+  },
+  {
+    "drug": "spironolactone",
+    "drug_aliases": ["aldactone"],
+    "food": "nước cam",
+    "food_aliases": ["nuoc cam", "orange juice"],
+    "mechanism": "Nước cam cung cấp kali, có thể cộng hưởng với thuốc giữ kali.",
+    "severity": "Cần chú ý",
+    "recommendation": "Giữ lượng ổn định; hỏi bác sĩ nếu cần hạn chế kali.",
+    "sources": ["drug_food_interactions#spironolactone_orange"]
+  },
+  {
+    "drug": "tetracycline",
+    "drug_aliases": ["doxycycline"],
+    "food": "sữa",
+    "food_aliases": ["sua", "milk", "sữa tươi", "yogurt"],
+    "mechanism": "Canxi trong sữa làm giảm hấp thu kháng sinh nhóm tetracycline.",
+    "severity": "Cần chú ý",
+    "recommendation": "Uống thuốc cách xa sản phẩm sữa theo hướng dẫn trên toa.",
+    "sources": ["drug_food_interactions#tetracycline_milk"]
+  },
+  {
+    "drug": "ciprofloxacin",
+    "drug_aliases": ["cipro"],
+    "food": "sữa",
+    "food_aliases": ["sua", "milk", "dairy"],
+    "mechanism": "Sữa và thực phẩm giàu canxi giảm hấp thu ciprofloxacin.",
+    "severity": "Cần chú ý",
+    "recommendation": "Tránh sữa gần giờ uống thuốc; hỏi dược sĩ về khoảng cách an toàn.",
+    "sources": ["drug_food_interactions#ciprofloxacin_milk"]
+  },
+  {
+    "drug": "lithium",
+    "drug_aliases": [],
+    "food": "muối",
+    "food_aliases": ["salt", "natri", "sodium"],
+    "mechanism": "Thay đổi lượng muối đột ngột ảnh hưởng thải trừ lithium.",
+    "severity": "Cần chú ý",
+    "recommendation": "Giữ chế độ muối ổn định; không tự ý ăn kiêng muối cực đoan.",
+    "sources": ["drug_food_interactions#lithium_salt"]
+  },
+  {
+    "drug": "isoniazid",
+    "drug_aliases": ["inh"],
+    "food": "cá thu",
+    "food_aliases": ["ca thu", "tuna", "histamine fish"],
+    "mechanism": "Một số cá có histamine cao có thể gây phản ứng khi dùng isoniazid.",
+    "severity": "Cần chú ý",
+    "recommendation": "Hạn chế cá bảo quản lâu; báo bác sĩ nếu có phản ứng bất thường.",
+    "sources": ["drug_food_interactions#isoniazid_fish"]
+  },
+  {
+    "drug": "methotrexate",
+    "drug_aliases": ["mtx"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia"],
+    "mechanism": "Rượu tăng nguy cơ độc gan khi dùng methotrexate.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Hạn chế rượu; theo dõi chức năng gan theo chỉ định bác sĩ.",
+    "sources": ["drug_food_interactions#methotrexate_alcohol"]
+  },
+  {
+    "drug": "acarbose",
+    "drug_aliases": [],
+    "food": "đường tinh luyện",
+    "food_aliases": ["duong", "sucrose", "kẹo"],
+    "mechanism": "Đường tinh luyện làm tăng dao động đường huyết, giảm hiệu quả kiểm soát.",
+    "severity": "Cần chú ý",
+    "recommendation": "Ưu tiên carbohydrate phức hợp theo thực đơn đã được chuyên gia duyệt.",
+    "sources": ["drug_food_interactions#acarbose_sugar"]
+  },
+  {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin"],
+    "food": "trà xanh",
+    "food_aliases": ["tra xanh", "green tea"],
+    "mechanism": "Trà xanh chứa Vitamin K, có thể ảnh hưởng đáp ứng chống đông nếu uống nhiều.",
+    "severity": "Cần chú ý",
+    "recommendation": "Giữ lượng trà xanh ổn định hàng ngày; theo dõi với bác sĩ.",
+    "sources": ["drug_food_interactions#warfarin_green_tea"]
+  },
+  {
+    "drug": "clopidogrel",
+    "drug_aliases": ["plavix"],
+    "food": "bưởi",
+    "food_aliases": ["buoi", "grapefruit"],
+    "mechanism": "Bưởi có thể ảnh hưởng enzyme chuyển hóa một số thuốc kháng kết tập tiểu cầu.",
+    "severity": "Cần chú ý",
+    "recommendation": "Thận trọng với bưởi; hỏi bác sĩ trước khi dùng thường xuyên.",
+    "sources": ["drug_food_interactions#clopidogrel_grapefruit"]
+  },
+  {
+    "drug": "furosemide",
+    "drug_aliases": ["lasix"],
+    "food": "cam thảo",
+    "food_aliases": ["cam thao", "licorice"],
+    "mechanism": "Cam thảo và lợi tiểu có thể cùng làm mất kali.",
+    "severity": "Cần chú ý",
+    "recommendation": "Tránh cam thảo; theo dõi kali máu theo hướng dẫn bác sĩ.",
+    "sources": ["drug_food_interactions#furosemide_licorice"]
+  },
+  {
+    "drug": "glipizide",
+    "drug_aliases": ["sulfonylurea"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia"],
+    "mechanism": "Rượu có thể gây hạ đường huyết kéo dài khi dùng sulfonylurea.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Hạn chế rượu; mang theo nguồn đường nhanh theo hướng dẫn bác sĩ nếu có nguy cơ hạ đường huyết.",
+    "sources": ["drug_food_interactions#glipizide_alcohol"]
+  },
+  {
+    "drug": "metformin",
+    "drug_aliases": [],
+    "food": "nước ép trái cây ngọt",
+    "food_aliases": ["nuoc ep", "fruit juice", "nước ngọt"],
+    "mechanism": "Đồ uống nhiều đường làm tăng tải carbohydrate, khó kiểm soát đường huyết.",
+    "severity": "An toàn",
+    "recommendation": "Ưu tiên nước lọc; hạn chế nước ép ngọt theo mục tiêu kcal của thực đơn.",
+    "sources": ["drug_food_interactions#metformin_juice"]
+  },
+  {
+    "drug": "ibuprofen",
+    "drug_aliases": ["nsaid"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol"],
+    "mechanism": "Rượu kết hợp NSAID tăng nguy cơ kích ứng/loét đường tiêu hóa.",
+    "severity": "Cần chú ý",
+    "recommendation": "Hạn chế rượu khi dùng thuốc giảm đau; hỏi bác sĩ nếu đau dạ dày.",
+    "sources": ["drug_food_interactions#ibuprofen_alcohol"]
+  },
+  {
+    "drug": "potassium chloride",
+    "drug_aliases": ["kcl"],
+    "food": "chuối",
+    "food_aliases": ["chuoi", "banana"],
+    "mechanism": "Bổ sung kali + thực phẩm giàu kali có thể gây tăng kali máu.",
+    "severity": "Cần chú ý",
+    "recommendation": "Không tự ý ăn thêm nhiều thực phẩm giàu kali khi đang bổ sung kali.",
+    "sources": ["drug_food_interactions#kcl_banana"]
+  }
+]
