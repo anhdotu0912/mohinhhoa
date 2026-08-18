@@ -342,6 +342,7 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         "db": db,
         "profile": {},
         "intent": "unknown",
+        "secondary_intents": [],
         "rag_context": [],
         "meal_plan": None,
         "meal_preview": None,
@@ -360,6 +361,7 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         logger.error("Agent graph execution failed: %s", e, exc_info=True)
         return AgentRunOutput(
             intent="unknown",
+            secondary_intents=[],
             message=f"Đã xảy ra lỗi trong quá trình xử lý: {str(e)}",
             guardrail_triggered=False,
         )
@@ -377,6 +379,7 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
 
     return AgentRunOutput(
         intent=final_state.get("intent", "unknown"),
+        secondary_intents=final_state.get("secondary_intents", []),
         message=final_state.get("answer", ""),
         meal_plan_id=meal_plan_id,
         meal_preview=meal_preview,

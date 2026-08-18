@@ -206,6 +206,7 @@ export default function PatientMealsPage() {
   const [empty, setEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
+  const [highlightDayIndex, setHighlightDayIndex] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const loadData = useCallback(async () => {

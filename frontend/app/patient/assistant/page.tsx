@@ -9,6 +9,11 @@ import {
   ChatTypingDots,
   type ThinkingStep,
 } from "@/components/patient/ChatThinkingSteps";
+import {
+  FoodLogModal,
+  type FoodLogModalContext,
+  type FoodLogSlot,
+} from "@/components/patient/FoodLogModal";
 import { DishCard, MealSectionHeader } from "@/components/patient/PatientMealPlanUI";
 import { api } from "@/lib/api";
 import { foodItemToDish } from "@/lib/meal-plan-mappers";
@@ -19,6 +24,7 @@ interface Message {
   sender: "ai" | "user";
   text: string;
   intent?: string;
+  secondaryIntents?: string[];
   citations?: string[];
   guardrailTriggered?: boolean;
   mealPlanId?: string | null;
@@ -68,8 +74,51 @@ export default function PatientAssistantPage() {
   const [showReferences, setShowReferences] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
+  const [isFetchingLogPlan, setIsFetchingLogPlan] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenFoodLog = async (msgMealPlanId?: string | null) => {
+    setIsFetchingLogPlan(true);
+    let planId = msgMealPlanId ?? "";
+    if (!planId) {
+      try {
+        const activePlan = await api.getMyMealPlan();
+        if (activePlan?.id) {
+          planId = activePlan.id;
+        }
+      } catch {
+        /* fallback if no active meal plan found */
+      }
+    }
+
+    const hour = new Date().getHours();
+    let slot: FoodLogSlot = "morning";
+    let slotLabel = "Bữa sáng";
+    if (hour >= 11 && hour < 16) {
+      slot = "noon";
+      slotLabel = "Bữa trưa";
+    } else if (hour >= 16) {
+      slot = "evening";
+      slotLabel = "Bữa tối";
+    }
+
+    setLogContext({
+      slot,
+      slotLabel,
+      dayLabel: "Hôm nay",
+      mealPlanId: planId || "demo_plan",
+      dayIndex: 1,
+    });
+    setIsFetchingLogPlan(false);
+  };
+
+  const handleFoodLogSaved = () => {
+    setToastMessage("Đã ghi nhận bữa ăn thành công!");
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   const latestAiMessage = useMemo(
     () => [...messages].reverse().find((msg) => msg.sender === "ai"),
@@ -90,6 +139,7 @@ export default function PatientAssistantPage() {
   const mapAgentResponse = (response: AgentRunOutput): Omit<Message, "id" | "sender"> => ({
     text: response.message,
     intent: response.intent,
+    secondaryIntents: response.secondary_intents ?? [],
     citations: response.citations ?? [],
     guardrailTriggered: response.guardrail_triggered,
     mealPlanId: response.meal_plan_id,
@@ -157,7 +207,13 @@ export default function PatientAssistantPage() {
         } else if (event.type === "intent") {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === aiMsgId ? { ...m, intent: event.intent } : m
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    intent: event.intent,
+                    secondaryIntents: event.secondary_intents ?? [],
+                  }
+                : m
             )
           );
         } else if (event.type === "token") {
@@ -465,6 +521,71 @@ export default function PatientAssistantPage() {
                         </Link>
                       )}
 
+                      {msg.intent === "food_log" && (
+                        <div className="mt-md p-md bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-sm">
+                          <div className="flex items-center gap-xs text-emerald-900">
+                            <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+                              restaurant
+                            </span>
+                            <span className="font-body-bold text-xs font-semibold">
+                              Bạn muốn ghi nhận bữa ăn?
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-sm">
+                            <button
+                              type="button"
+                              disabled={isFetchingLogPlan}
+                              onClick={() => void handleOpenFoodLog(msg.mealPlanId)}
+                              className="inline-flex items-center gap-xs px-md py-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                edit_note
+                              </span>
+                              {isFetchingLogPlan ? "Đang tải..." : "Ghi nhận ngay"}
+                            </button>
+                            <Link
+                              href="/patient/meals"
+                              className="inline-flex items-center gap-xs px-sm py-xs bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100/50 transition-colors rounded-lg text-xs font-medium"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">
+                                restaurant_menu
+                              </span>
+                              Xem thực đơn
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.intent === "interaction_check" && (
+                        <div className="mt-md p-md bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-sm text-rose-900 shadow-xs">
+                          <div className="flex items-start gap-sm">
+                            <span
+                              className="material-symbols-outlined text-rose-600 text-[22px] shrink-0 mt-[1px]"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              warning
+                            </span>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-xs text-rose-950 flex items-center gap-xs">
+                                Cảnh báo tương tác thuốc – thực phẩm
+                              </span>
+                              <span className="text-[11px] text-rose-800 font-normal leading-tight mt-[2px]">
+                                Cần theo dõi hoặc tham khảo ý kiến bác sĩ khi dùng đồng thời.
+                              </span>
+                            </div>
+                          </div>
+                          <Link
+                            href="/patient/notifications"
+                            className="inline-flex items-center justify-center gap-xs px-md py-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg transition-colors shrink-0 shadow-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              notifications_active
+                            </span>
+                            Xem danh sách cảnh báo
+                          </Link>
+                        </div>
+                      )}
+
                       {msg.citations && msg.citations.length > 0 && (
                         <button
                           type="button"
@@ -480,6 +601,7 @@ export default function PatientAssistantPage() {
                     </div>
 
                     {(msg.intent ||
+                      (msg.secondaryIntents && msg.secondaryIntents.length > 0) ||
                       msg.guardrailTriggered ||
                       (msg.thinkingSteps && msg.thinkingSteps.length > 0)) && (
                       <details
@@ -487,7 +609,7 @@ export default function PatientAssistantPage() {
                         open={msg.isStreaming}
                       >
                         <summary className="p-sm px-md flex items-center justify-between cursor-pointer hover:bg-surface-container-high transition-colors list-none">
-                          <div className="flex items-center gap-sm">
+                          <div className="flex items-center gap-sm flex-wrap">
                             <span className="material-symbols-outlined text-[16px] text-on-surface-variant">
                               psychology
                             </span>
@@ -498,6 +620,14 @@ export default function PatientAssistantPage() {
                                 : "Đang xử lý…"}
                               {msg.guardrailTriggered ? " · Guardrail" : ""}
                             </span>
+                            {msg.secondaryIntents && msg.secondaryIntents.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100/90 text-amber-900 border border-amber-300/70 shadow-2xs">
+                                <span className="material-symbols-outlined text-[12px] text-amber-700">
+                                  call_split
+                                </span>
+                                +{msg.secondaryIntents.length} ý định phụ
+                              </span>
+                            )}
                           </div>
                           <span className="material-symbols-outlined text-[18px] text-on-surface-variant group-open:rotate-180 transition-transform">
                             expand_more
@@ -509,13 +639,54 @@ export default function PatientAssistantPage() {
                               <ChatThinkingSteps steps={msg.thinkingSteps} />
                             </div>
                           )}
+
                           {msg.intent && (
-                            <p className="font-caption text-caption text-on-surface-variant text-xs mt-sm">
-                              Intent: <code>{msg.intent}</code>
-                              {msg.guardrailTriggered
-                                ? " — hệ thống đã áp dụng guardrail an toàn lâm sàng."
-                                : ""}
-                            </p>
+                            <div className="mt-sm flex flex-wrap items-center gap-xs text-xs">
+                              <span className="text-on-surface-variant font-medium shrink-0">
+                                Ý định chính:
+                              </span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                                <span className="material-symbols-outlined text-[14px]">stars</span>
+                                {INTENT_LABELS[msg.intent] ?? msg.intent}
+                                <code className="text-[10px] opacity-75 font-mono">({msg.intent})</code>
+                              </span>
+                              {msg.guardrailTriggered && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-rose-100 text-rose-800 border border-rose-200">
+                                  Guardrail an toàn
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {msg.secondaryIntents && msg.secondaryIntents.length > 0 && (
+                            <div className="mt-sm p-sm bg-amber-50/70 rounded-xl border border-amber-200/80 flex flex-col gap-xs">
+                              <div className="flex items-center gap-1.5 text-xs text-amber-950 font-semibold">
+                                <span className="material-symbols-outlined text-[16px] text-amber-700">
+                                  call_split
+                                </span>
+                                <span>Phát hiện ý định phụ (Câu hỏi kép):</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-xs mt-0.5">
+                                {msg.secondaryIntents.map((secIntent) => (
+                                  <span
+                                    key={secIntent}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white text-amber-950 border border-amber-300 shadow-2xs"
+                                  >
+                                    <span className="material-symbols-outlined text-[14px] text-amber-600">
+                                      label
+                                    </span>
+                                    {INTENT_LABELS[secIntent] ?? secIntent}
+                                    <code className="text-[10px] text-amber-800 font-mono">
+                                      ({secIntent})
+                                    </code>
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[11px] text-amber-900/80 italic mt-0.5 leading-snug">
+                                💡 Ý định phụ đã được ghi nhận. Bạn có thể gửi câu hỏi riêng cho ý định
+                                phụ để nhận câu trả lời chi tiết hơn.
+                              </p>
+                            </div>
                           )}
                         </div>
                       </details>
@@ -526,8 +697,17 @@ export default function PatientAssistantPage() {
             )}
 
             {error && (
-              <div className="mx-auto max-w-lg w-full rounded-lg border border-red-200 bg-red-50 px-md py-sm text-sm text-red-800">
-                {error}
+              <div className="mx-auto max-w-lg w-full rounded-xl border border-red-200 bg-red-50 p-md text-sm text-red-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-sm shadow-xs">
+                <span>{error}</span>
+                {error.includes("Authorization") || error.includes("đăng nhập") ? (
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-xs px-md py-xs bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">login</span>
+                    Đăng nhập ngay
+                  </Link>
+                ) : null}
               </div>
             )}
 
@@ -621,6 +801,19 @@ export default function PatientAssistantPage() {
             </div>
           </div>
         )}
+        {toastMessage && (
+          <div className="fixed bottom-20 right-6 z-50 bg-emerald-700 text-white px-md py-sm rounded-xl shadow-lg flex items-center gap-sm animate-fadeIn text-xs font-medium">
+            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+            {toastMessage}
+          </div>
+        )}
+
+        <FoodLogModal
+          open={logContext !== null}
+          context={logContext}
+          onClose={() => setLogContext(null)}
+          onSaved={handleFoodLogSaved}
+        />
       </div>
     </>
   );

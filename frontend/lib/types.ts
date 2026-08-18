@@ -445,6 +445,7 @@ export interface MealPreviewOut {
 
 export interface AgentRunOutput {
   intent: string;
+  secondary_intents?: string[];
   message: string;
   meal_plan_id?: string | null;
   meal_preview?: MealPreviewOut | null;
@@ -456,7 +457,7 @@ export interface AgentRunOutput {
 
 export type ChatStreamEvent =
   | { type: "status"; node: string; message: string }
-  | { type: "intent"; intent: string }
+  | { type: "intent"; intent: string; secondary_intents?: string[] }
   | { type: "token"; content: string }
   | { type: "correction"; message: string; reason?: string }
   | { type: "done"; data: AgentRunOutput }

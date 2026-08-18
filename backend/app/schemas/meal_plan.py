@@ -169,6 +169,7 @@ class MealPreviewOut(BaseModel):
 class AgentRunOutput(BaseModel):
     """Output of run_agent facade."""
     intent: str = "unknown"
+    secondary_intents: list[str] = Field(default_factory=list)
     message: str = ""
     meal_plan_id: str | None = None
     meal_preview: MealPreviewOut | None = None

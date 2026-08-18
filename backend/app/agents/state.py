@@ -31,6 +31,7 @@ class AgentState(TypedDict, total=False):
 
     # Classification
     intent: str  # meal_plan | interaction_check | food_log | rag_qa | refuse | unknown
+    secondary_intents: list[str]  # multi-intent secondary detected intents
 
     # RAG
     rag_context: list[RAGContext]

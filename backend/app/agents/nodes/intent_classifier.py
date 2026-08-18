@@ -48,14 +48,28 @@ _INTENT_PATTERNS = {
 
 def _classify_by_keywords(message: str) -> str:
     """Fallback: classify intent using keyword patterns."""
+    primary, _ = _detect_intents_by_keywords(message)
+    return primary
+
+
+def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
+    """Detect primary and secondary intents using keyword patterns."""
     message_lower = message.lower()
+    matched: list[str] = []
 
     for intent, patterns in _INTENT_PATTERNS.items():
         for pattern in patterns:
             if re.search(pattern, message_lower):
-                return intent
+                if intent not in matched:
+                    matched.append(intent)
+                break
 
-    return "rag_qa"  # Default to RAG Q&A for general questions
+    if not matched:
+        return "rag_qa", []
+
+    primary = matched[0]
+    secondary = [i for i in matched[1:] if i in VALID_INTENTS and i != primary and i != "refuse"]
+    return primary, secondary
 
 
 def _classify_by_llm(message: str) -> str:
@@ -98,19 +112,30 @@ def intent_classifier(state: AgentState) -> AgentState:
 
     If `force_intent` is set in state, use that directly.
     Otherwise, try LLM classification with keyword fallback.
+    Extracts secondary_intents for multi-intent questions.
     """
     # Honor force_intent if provided
     force_intent = state.get("force_intent")
     if force_intent and force_intent in VALID_INTENTS:
         logger.info("Using forced intent: %s", force_intent)
-        return {**state, "intent": force_intent}
+        return {**state, "intent": force_intent, "secondary_intents": []}
 
     message = state.get("message", "")
     if not message:
-        return {**state, "intent": "unknown"}
+        return {**state, "intent": "unknown", "secondary_intents": []}
 
-    # Try LLM first, with keyword fallback
+    kw_primary, kw_secondary = _detect_intents_by_keywords(message)
     intent = _classify_by_llm(message)
-    logger.info("Classified intent: %s (message: %s)", intent, message[:50])
+    if intent not in VALID_INTENTS:
+        intent = kw_primary
 
-    return {**state, "intent": intent}
+    secondary_intents = [s for s in kw_secondary if s != intent]
+
+    logger.info(
+        "Classified intent: %s, secondary: %s (message: %s)",
+        intent,
+        secondary_intents,
+        message[:50],
+    )
+
+    return {**state, "intent": intent, "secondary_intents": secondary_intents}
