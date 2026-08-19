@@ -67,6 +67,29 @@ function formatCitationLabel(citation: string): string {
   return base.replace(/_/g, " ").replace(/\.md$/i, "");
 }
 
+function computeMealPreviewTotals(preview: MealPreviewOut) {
+  let calories = 0;
+  let protein = 0;
+  let carbs = 0;
+  let lipid = 0;
+
+  for (const m of preview.meals) {
+    for (const item of m.items) {
+      if (item.kcal) calories += item.kcal;
+      if (item.macros?.protein_g) protein += item.macros.protein_g;
+      if (item.macros?.carb_g) carbs += item.macros.carb_g;
+      if (item.macros?.fat_g) lipid += item.macros.fat_g;
+    }
+  }
+
+  return {
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    lipid: Math.round(lipid * 10) / 10,
+  };
+}
+
 export default function PatientAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputQuery, setInputQuery] = useState("");
@@ -74,9 +97,17 @@ export default function PatientAssistantPage() {
   const [showReferences, setShowReferences] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastQuery, setLastQuery] = useState<string>("");
   const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
   const [isFetchingLogPlan, setIsFetchingLogPlan] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [appliedPlans, setAppliedPlans] = useState<Record<string, boolean>>({});
+
+  const handleApplyMealPlan = useCallback((planId: string) => {
+    setAppliedPlans((prev) => ({ ...prev, [planId]: true }));
+    setToastMessage("Đã lưu & áp dụng thực đơn vào trang Thực đơn chính!");
+    setTimeout(() => setToastMessage(null), 4000);
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -169,6 +200,7 @@ export default function PatientAssistantPage() {
 
     setError(null);
     setInputQuery("");
+    setLastQuery(query);
 
     const userMsg: Message = {
       id: `${Date.now()}-user`,
@@ -293,13 +325,16 @@ export default function PatientAssistantPage() {
       <TopBar
         title="Trợ lý AI"
         rightSlot={
-          <span className="px-sm py-[2px] rounded-full bg-primary/10 text-primary font-label text-xs border border-primary/20 flex items-center gap-xs">
+          <span className="px-sm py-[2px] rounded-full bg-primary/10 text-primary font-label text-xs border border-primary/20 flex items-center gap-xs shadow-2xs">
             <span
               className={`w-2 h-2 rounded-full bg-primary ${
-                isSending ? "animate-pulse" : ""
+                isSending ? "animate-radar-pulse" : ""
               }`}
             />
-            {isSending ? "Đang trả lời…" : "Đang hoạt động"}
+            {isSending
+              ? latestAiMessage?.thinkingSteps?.find((s) => s.status === "active")?.message ??
+                "Đang trả lời…"
+              : "Đang hoạt động"}
           </span>
         }
       />
@@ -448,7 +483,7 @@ export default function PatientAssistantPage() {
                         >
                           {msg.text}
                           {msg.isStreaming && (
-                            <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
+                            <span className="inline-block w-2 h-4 bg-primary/80 ml-1 animate-caret-blink rounded-xs align-middle shadow-2xs" />
                           )}
                         </p>
                       )}
@@ -460,64 +495,119 @@ export default function PatientAssistantPage() {
                         </p>
                       )}
 
-                      {msg.mealPreview && msg.mealPreview.meals.length > 0 && (
-                        <div className="mt-md flex flex-col gap-md border-t border-outline-variant/50 pt-md">
-                          <div className="flex flex-wrap items-center gap-sm">
-                            {msg.mealPreview.plan_status === "pending_review" && (
-                              <span className="inline-flex items-center gap-xs px-sm py-xs bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-medium">
-                                <span className="material-symbols-outlined text-[14px]">pending</span>
-                                Chờ bác sĩ duyệt
-                              </span>
-                            )}
-                            {msg.mealPreview.plan_status === "approved" && (
-                              <span className="inline-flex items-center gap-xs px-sm py-xs bg-green-50 border border-green-200 rounded-lg text-green-800 text-xs font-medium">
-                                <span className="material-symbols-outlined text-[14px]">verified</span>
-                                Đã duyệt
-                              </span>
-                            )}
-                            <Link
-                              href="/patient/meals"
-                              className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary text-xs font-medium"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
-                              Xem đầy đủ
-                            </Link>
-                          </div>
-
-                          {msg.mealPreview.meals.map((meal) => (
-                            <div key={meal.slot} className="flex flex-col gap-sm">
-                              <MealSectionHeader
-                                label={meal.label}
-                                icon={MEAL_SLOT_ICONS[meal.slot] ?? "restaurant"}
-                              />
-                              {meal.items.length === 0 ? (
-                                <p className="text-xs text-on-surface-variant px-1">
-                                  Chưa có món cho bữa này.
-                                </p>
-                              ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
-                                  {meal.items.map((item, idx) => (
-                                    <DishCard
-                                      key={`${meal.slot}-${item.name}-${idx}`}
-                                      item={foodItemToDish(item)}
-                                      portion={item.portion}
-                                      compact
-                                    />
-                                  ))}
+                      {msg.mealPreview && msg.mealPreview.meals.length > 0 && (() => {
+                        const totals = computeMealPreviewTotals(msg.mealPreview);
+                        const isApplied = Boolean(appliedPlans[msg.mealPreview.meal_plan_id]);
+                        return (
+                          <div className="mt-md flex flex-col gap-md border-t border-outline-variant/50 pt-md">
+                            {/* Card Header: Nutrition Totals & Badges */}
+                            <div className="bg-surface-container-low border border-outline-variant/70 rounded-xl p-md flex flex-col gap-sm">
+                              <div className="flex flex-wrap items-center justify-between gap-sm">
+                                <div className="flex items-center gap-xs text-xs font-semibold text-on-surface">
+                                  <span className="material-symbols-outlined text-primary text-[18px]">
+                                    auto_awesome
+                                  </span>
+                                  <span>Thực đơn gợi ý từ Trợ lý AI</span>
                                 </div>
-                              )}
+                                <div className="flex flex-wrap items-center gap-xs">
+                                  {msg.mealPreview.plan_status === "pending_review" && (
+                                    <span className="inline-flex items-center gap-xs px-sm py-[2px] bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-medium">
+                                      <span className="material-symbols-outlined text-[13px]">pending</span>
+                                      Chờ bác sĩ duyệt
+                                    </span>
+                                  )}
+                                  {msg.mealPreview.plan_status === "approved" && (
+                                    <span className="inline-flex items-center gap-xs px-sm py-[2px] bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] font-medium">
+                                      <span className="material-symbols-outlined text-[13px]">verified</span>
+                                      Đã duyệt
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Nutrition Summary Bar */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-xs pt-xs border-t border-outline-variant/40 text-xs">
+                                <div className="flex items-center gap-xs text-on-surface-variant bg-surface-container-lowest p-xs rounded-lg border border-outline-variant/40">
+                                  <span className="material-symbols-outlined text-amber-600 text-[16px]">local_fire_department</span>
+                                  <span>{totals.calories > 0 ? `${totals.calories} kcal` : "Dinh dưỡng chuẩn"}</span>
+                                </div>
+                                <div className="flex items-center gap-xs text-on-surface-variant bg-surface-container-lowest p-xs rounded-lg border border-outline-variant/40">
+                                  <span className="material-symbols-outlined text-rose-500 text-[16px]">egg_alt</span>
+                                  <span>{totals.protein > 0 ? `${totals.protein}g đạm` : "Cân bằng đạm"}</span>
+                                </div>
+                                <div className="flex items-center gap-xs text-on-surface-variant bg-surface-container-lowest p-xs rounded-lg border border-outline-variant/40">
+                                  <span className="material-symbols-outlined text-amber-700 text-[16px]">grain</span>
+                                  <span>{totals.carbs > 0 ? `${totals.carbs}g bột đường` : "Tốt cho đường huyết"}</span>
+                                </div>
+                                <div className="flex items-center gap-xs text-on-surface-variant bg-surface-container-lowest p-xs rounded-lg border border-outline-variant/40">
+                                  <span className="material-symbols-outlined text-emerald-600 text-[16px]">opacity</span>
+                                  <span>{totals.lipid > 0 ? `${totals.lipid}g chất béo` : "Chất béo lành mạnh"}</span>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-wrap items-center gap-sm pt-xs">
+                                <button
+                                  type="button"
+                                  disabled={isApplied}
+                                  onClick={() => handleApplyMealPlan(msg.mealPreview!.meal_plan_id)}
+                                  className={`inline-flex items-center gap-xs px-md py-xs rounded-lg transition-all text-xs font-semibold shadow-2xs cursor-pointer ${
+                                    isApplied
+                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                      : "bg-primary hover:bg-primary/90 text-on-primary"
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    {isApplied ? "check_circle" : "bookmark_add"}
+                                  </span>
+                                  {isApplied ? "Đã lưu & áp dụng" : "Lưu / Áp dụng thực đơn này"}
+                                </button>
+                                <Link
+                                  href={`/patient/meals?plan_id=${msg.mealPreview.meal_plan_id}`}
+                                  className="inline-flex items-center gap-xs px-md py-xs bg-surface-container-lowest border border-outline-variant hover:border-primary rounded-lg transition-colors text-on-surface-variant hover:text-primary text-xs font-medium"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">restaurant_menu</span>
+                                  Xem chi tiết tại Thực đơn
+                                </Link>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
+
+                            {/* Meal Dishes list */}
+                            {msg.mealPreview.meals.map((meal) => (
+                              <div key={meal.slot} className="flex flex-col gap-sm">
+                                <MealSectionHeader
+                                  label={meal.label}
+                                  icon={MEAL_SLOT_ICONS[meal.slot] ?? "restaurant"}
+                                />
+                                {meal.items.length === 0 ? (
+                                  <p className="text-xs text-on-surface-variant px-1">
+                                    Chưa có món cho bữa này.
+                                  </p>
+                                ) : (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
+                                    {meal.items.map((item, idx) => (
+                                      <DishCard
+                                        key={`${meal.slot}-${item.name}-${idx}`}
+                                        item={foodItemToDish(item)}
+                                        portion={item.portion}
+                                        compact
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       {msg.intent === "meal_plan" && !msg.mealPreview && (
                         <Link
                           href="/patient/meals"
-                          className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 text-xs font-medium"
+                          className="inline-flex items-center gap-xs px-md py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 text-xs font-medium"
                         >
-                          <span className="material-symbols-outlined text-[14px]">restaurant_menu</span>
-                          Mở mục Thực đơn
+                          <span className="material-symbols-outlined text-[16px]">restaurant_menu</span>
+                          Mở mục Thực đơn chính
                         </Link>
                       )}
 
@@ -697,17 +787,35 @@ export default function PatientAssistantPage() {
             )}
 
             {error && (
-              <div className="mx-auto max-w-lg w-full rounded-xl border border-red-200 bg-red-50 p-md text-sm text-red-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-sm shadow-xs">
-                <span>{error}</span>
-                {error.includes("Authorization") || error.includes("đăng nhập") ? (
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center gap-xs px-md py-xs bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">login</span>
-                    Đăng nhập ngay
-                  </Link>
-                ) : null}
+              <div className="mx-auto max-w-lg w-full rounded-xl border border-red-200 bg-red-50 p-md text-sm text-red-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-md shadow-xs animate-fadeIn">
+                <div className="flex items-center gap-xs">
+                  <span className="material-symbols-outlined text-red-600 text-[20px] shrink-0">
+                    error
+                  </span>
+                  <span>{error}</span>
+                </div>
+                <div className="flex items-center gap-xs shrink-0 flex-wrap">
+                  {lastQuery && (
+                    <button
+                      type="button"
+                      onClick={() => void handleSend(lastQuery)}
+                      disabled={isSending}
+                      className="inline-flex items-center gap-xs px-md py-xs bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60 shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">refresh</span>
+                      Thử lại
+                    </button>
+                  )}
+                  {error.includes("Authorization") || error.includes("đăng nhập") ? (
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center gap-xs px-md py-xs bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">login</span>
+                      Đăng nhập ngay
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             )}
 

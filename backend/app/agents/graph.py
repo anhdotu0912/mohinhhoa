@@ -13,7 +13,11 @@ from typing import Literal
 
 from langgraph.graph import END, StateGraph
 
-from app.agents.interaction_checker_agent import interaction_checker_agent, load_interaction_kb
+from app.agents.interaction_checker_agent import (
+    extract_foods_from_message,
+    interaction_checker_agent,
+    load_interaction_kb,
+)
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import rag_qa_node
@@ -29,28 +33,37 @@ from app.schemas.profile import PatientProfile
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_INTERACTION_FOODS = [
-    "rau muống",
-    "bưởi",
-    "rượu",
-    "bia",
-    "chuối",
-    "sữa tươi",
-    "cơm trắng",
-]
 
+def _generate_safe_food_answer(message: str, medications: list[str], foods: list[str]) -> str:
+    """Generate an informative, friendly response when no dangerous interaction is found for queried foods."""
+    meds_str = ", ".join(m.capitalize() for m in medications)
+    food_names_str = ", ".join(foods)
 
-def _extract_foods_from_message(message: str) -> list[str]:
-    """Match foods mentioned in the user message against the interaction KB."""
-    message_lower = message.lower()
-    kb = load_interaction_kb()
-    foods_in_kb = sorted(
-        {entry["food"] for entry in kb if entry.get("food")},
-        key=len,
-        reverse=True,
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.3)
+        if llm is not None:
+            prompt = (
+                f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường.\n"
+                f"Thuốc bệnh nhân đang dùng: {meds_str}.\n"
+                f"Câu hỏi của bệnh nhân: \"{message}\"\n"
+                f"Kết quả tra cứu y khoa: KHÔNG có tương tác nguy hiểm hoặc chống chỉ định nào giữa {meds_str} và {food_names_str}.\n\n"
+                f"Hãy trả lời bệnh nhân bằng tiếng Việt ngắn gọn, dễ hiểu (2-4 câu):\n"
+                f"1. Trực tiếp xác nhận {food_names_str} AN TOÀN / CÓ THỂ ăn/dùng được khi đang uống {meds_str}.\n"
+                f"2. Đưa ra 1-2 lời khuyên dinh dưỡng hữu ích phù hợp cho người bệnh đái tháo đường (ví dụ: lượng dùng, cách chế biến, hàm lượng chất xơ/chỉ số đường huyết).\n"
+                f"Trả lời trực tiếp, lịch sự, không tạo tiêu đề thừa."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                return response.content.strip()
+    except Exception as e:
+        logger.warning("LLM safe food answer generation failed: %s", e)
+
+    return (
+        f"Không ghi nhận tương tác nguy hiểm giữa các thuốc bạn đang dùng ({meds_str}) và {food_names_str}.\n\n"
+        f"Khuyến nghị: Bạn có thể ăn/dùng {food_names_str} bình thường với lượng vừa phải trong chế độ ăn cân bằng đối với người đái tháo đường."
     )
-    matched = [food for food in foods_in_kb if food.lower() in message_lower]
-    return matched or list(_DEFAULT_INTERACTION_FOODS)
 
 
 def meal_plan_node(state: AgentState) -> AgentState:
@@ -108,7 +121,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
     medications = profile.medications or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
 
     message = state.get("message", "")
-    foods = _extract_foods_from_message(message)
+    foods, is_specific_query = extract_foods_from_message(message)
 
     check_input = InteractionCheckInput(
         medications=medications,
@@ -121,7 +134,11 @@ def interaction_check_node(state: AgentState) -> AgentState:
         interactions = result.interactions
 
         if interactions:
-            lines = [f"Phát hiện {len(interactions)} tương tác thuốc-thực phẩm:"]
+            if is_specific_query:
+                lines = [f"Phát hiện {len(interactions)} tương tác thuốc-thực phẩm cho yêu cầu của bạn:"]
+            else:
+                lines = ["Các tương tác thuốc-thực phẩm cần lưu ý đối với thuốc bạn đang dùng:"]
+
             for item in interactions:
                 lines.append(
                     f"• {item.drug.capitalize()} + {item.food}: [{item.severity}] {item.mechanism}\n"
@@ -129,7 +146,11 @@ def interaction_check_node(state: AgentState) -> AgentState:
                 )
             answer_text = "\n".join(lines)
         else:
-            answer_text = "Không tìm thấy tương tác nguy hiểm giữa các thuốc và thực phẩm kiểm tra."
+            if is_specific_query and foods:
+                answer_text = _generate_safe_food_answer(message, medications, foods)
+            else:
+                meds_str = ", ".join(m.capitalize() for m in medications)
+                answer_text = f"Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra."
 
         all_sources = list({src for item in interactions for src in item.sources})
 

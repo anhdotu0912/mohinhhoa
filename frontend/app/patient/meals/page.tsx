@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -191,8 +191,10 @@ const MEAL_SLOT_TO_FOOD_LOG: Record<
   dinner: "evening",
 };
 
-export default function PatientMealsPage() {
+function PatientMealsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const planIdParam = searchParams.get("plan_id");
   const { token, role } = useAuthStore();
 
   const [hydrated, setHydrated] = useState(false);
@@ -201,6 +203,7 @@ export default function PatientMealsPage() {
   const [schedule, setSchedule] = useState<MealPlanScheduleOut | null>(null);
   const [selectedStartsOn, setSelectedStartsOn] = useState<string | null>(null);
   const [fallbackPlan, setFallbackPlan] = useState<MealPlanOutput | null>(null);
+  const [urlPlan, setUrlPlan] = useState<MealPlanOutput | null>(null);
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
@@ -221,6 +224,16 @@ export default function PatientMealsPage() {
       setSchedule(scheduleRes);
       setProfile(profileRes);
 
+      let targetPlan: MealPlanOutput | null = null;
+      if (planIdParam) {
+        try {
+          targetPlan = await api.getMealPlan(planIdParam);
+          setUrlPlan(targetPlan);
+        } catch {
+          /* fallback if plan_id not found */
+        }
+      }
+
       let latestPlan: MealPlanOutput | null = null;
       try {
         latestPlan = await api.getMyMealPlan();
@@ -229,11 +242,11 @@ export default function PatientMealsPage() {
           throw err;
         }
       }
-      setFallbackPlan(latestPlan);
+      setFallbackPlan(targetPlan ?? latestPlan);
 
       const hasScheduledPlan = scheduleRes.slots.some((s) => s.plan != null);
       const hasUnassigned = (scheduleRes.unassigned_plans?.length ?? 0) > 0;
-      if (!latestPlan && !hasScheduledPlan && !hasUnassigned) {
+      if (!targetPlan && !latestPlan && !hasScheduledPlan && !hasUnassigned) {
         setEmpty(true);
         return;
       }
@@ -242,7 +255,7 @@ export default function PatientMealsPage() {
         visibleScheduleSlots(scheduleRes)[1] ?? pickDefaultSlot(scheduleRes);
       setSelectedStartsOn(defaultSlot?.starts_on ?? null);
 
-      const initialPlan = defaultSlot?.plan ?? latestPlan;
+      const initialPlan = targetPlan ?? defaultSlot?.plan ?? latestPlan;
       if (initialPlan) {
         const slotStart =
           parseFlexibleDate(defaultSlot?.starts_on) ??
@@ -262,7 +275,7 @@ export default function PatientMealsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [planIdParam]);
 
   useEffect(() => {
     setHydrated(true);
@@ -299,10 +312,11 @@ export default function PatientMealsPage() {
   }, [displaySlots, selectedStartsOn, schedule]);
 
   const plan = useMemo((): MealPlanOutput | null => {
+    if (urlPlan) return urlPlan;
     if (selectedSlot?.plan) return selectedSlot.plan;
     if (fallbackPlan && selectedSlot?.slot_key === "current") return fallbackPlan;
-    return null;
-  }, [selectedSlot, fallbackPlan]);
+    return fallbackPlan;
+  }, [urlPlan, selectedSlot, fallbackPlan]);
 
   const uiDays = useMemo(() => (plan ? plan.days.map(dayPlanToUi) : []), [plan]);
   const validity = useMemo(() => (plan ? computeMealPlanValidity(plan) : null), [plan]);
@@ -492,6 +506,41 @@ export default function PatientMealsPage() {
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
+            </div>
+          )}
+
+          {urlPlan && (
+            <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <span className="material-symbols-outlined text-[22px]">smart_toy</span>
+                </div>
+                <div>
+                  <p className="font-semibold text-xs text-emerald-950 flex items-center gap-1.5">
+                    <span>Đang hiển thị Thực đơn gợi ý từ Trợ lý AI</span>
+                    {urlPlan.status === "approved" ? (
+                      <span className="px-2 py-0.5 bg-emerald-200/70 text-emerald-900 rounded-md text-[10px] font-bold">Đã duyệt</span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-md text-[10px] font-bold">Chờ bác sĩ duyệt</span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-emerald-800 mt-0.5">
+                    Thực đơn này được tạo riêng từ phiên tư vấn Chatbot theo thể trạng và nhu cầu của bạn.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUrlPlan(null);
+                    router.replace("/patient/meals");
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-emerald-300 rounded-lg text-emerald-900 hover:bg-emerald-100/50 transition-colors shadow-2xs shrink-0 cursor-pointer"
+                >
+                  Về thực đơn mặc định
+                </button>
+              </div>
             </div>
           )}
 
@@ -934,5 +983,22 @@ export default function PatientMealsPage() {
         onSaved={handleFoodLogSaved}
       />
     </>
+  );
+}
+
+export default function PatientMealsPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <TopBar title="Thực đơn bệnh nhân" />
+          <main className="flex-1 w-full p-6 flex justify-center items-center bg-slate-50/50 min-h-[calc(100vh-64px)]">
+            <p className="text-sm text-slate-500">Đang tải thực đơn…</p>
+          </main>
+        </>
+      }
+    >
+      <PatientMealsContent />
+    </Suspense>
   );
 }

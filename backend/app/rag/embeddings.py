@@ -146,6 +146,9 @@ class GeminiEmbeddingFunction:
             )
             return self._local_fallback(input)
 
+    def name(self) -> str:
+        return f"gemini_embedding_{self._input_kind}"
+
 
 class LocalEmbeddingFunction:
     """Thin wrapper so Chroma always gets a callable object."""
@@ -155,6 +158,9 @@ class LocalEmbeddingFunction:
 
     def __call__(self, input: list[str]) -> list[list[float]]:
         return self._inner(input)
+
+    def name(self) -> str:
+        return "local_minilm"
 
 
 @lru_cache(maxsize=1)

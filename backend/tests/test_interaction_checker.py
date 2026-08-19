@@ -13,8 +13,10 @@ import pytest
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.agents.graph import interaction_check_node
 from app.agents.interaction_checker_agent import (
     check_interactions,
+    extract_foods_from_message,
     interaction_checker_agent,
     load_interaction_kb,
 )
@@ -84,3 +86,27 @@ class TestInteractionChecker:
         assert len(output.interactions) > 0
         assert any(i.drug == "metformin" for i in output.interactions)
         assert any(i.severity.startswith("Nguy hiểm") for i in output.interactions)
+
+    def test_extract_foods_specific_unmatched_food(self):
+        """Should extract 'rau muống' specifically without dumping default foods."""
+        message = "Tôi uống metformin có ăn rau muống được không?"
+        foods, is_specific = extract_foods_from_message(message)
+        assert is_specific is True
+        assert "rau muống" in foods
+        assert "bưởi" not in foods
+        assert "rượu" not in foods
+
+    def test_interaction_check_node_safe_food_response(self):
+        """interaction_check_node should confirm safety for 'rau muống' and not inject grapefruit/alcohol."""
+        state = {
+            "message": "Tôi uống metformin có ăn rau muống được không?",
+            "profile": {"medications": ["metformin"]},
+        }
+        res_state = interaction_check_node(state)
+        answer = res_state.get("answer", "").lower()
+
+        assert "rau muống" in answer
+        assert "bưởi" not in answer
+        assert "rượu" not in answer
+        assert "bia" not in answer
+
