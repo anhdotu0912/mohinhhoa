@@ -65,10 +65,6 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_USE_TLS: bool = True
 
-    # Demo mode: return contract-shaped mock data for agent features that
-    # are not implemented yet (meal plan, interaction check). Disable in prod.
-    DEMO_MOCK: bool = True
-
     # Generation defaults
     DEFAULT_VARIANTS_PER_JOB: int = 3
     DEFAULT_PLAN_DAYS: int = 7

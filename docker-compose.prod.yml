@@ -23,8 +23,11 @@ services:
     environment:
       APP_ENV: production
       DATABASE_URL: postgresql://p014:${POSTGRES_PASSWORD}@postgres:5432/p014
+      VECTOR_DB_PROVIDER: ${VECTOR_DB_PROVIDER:-qdrant}
+      QDRANT_PERSIST_DIR: ./qdrant_db
       CHROMA_PERSIST_DIR: ./chroma_db
     volumes:
+      - qdrant_data:/app/qdrant_db
       - chroma_data:/app/chroma_db
     depends_on:
       postgres:
@@ -51,6 +54,12 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   nginx:
     image: nginx:1.27-alpine
@@ -78,4 +87,5 @@ services:
 
 volumes:
   postgres_data:
+  qdrant_data:
   chroma_data:
