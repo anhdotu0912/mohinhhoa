@@ -432,7 +432,7 @@ export default function PatientAssistantPage() {
                 </p>
               )}
             </div>
-          </aside>
+          </div>
         )}
 
         <div className="flex-1 bg-background flex flex-col h-full max-h-full overflow-hidden relative min-w-0">
@@ -966,7 +966,7 @@ export default function PatientAssistantPage() {
                 ))
               )}
             </div>
-          </aside>
+          </div>
         )}
         {toastMessage && (
           <div className="fixed bottom-20 right-6 z-50 bg-emerald-700 text-white px-md py-sm rounded-xl shadow-lg flex items-center gap-sm animate-fadeIn text-xs font-medium">

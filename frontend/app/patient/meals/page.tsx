@@ -256,7 +256,6 @@ function PatientMealsContent() {
   const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
   const [highlightDayIndex, setHighlightDayIndex] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [highlightDayIndex, setHighlightDayIndex] = useState<number | null>(null);
   const [foodLogs, setFoodLogs] = useState<FoodLogEntry[]>([]);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustNote, setAdjustNote] = useState("");
