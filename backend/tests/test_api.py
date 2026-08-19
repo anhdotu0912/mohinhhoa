@@ -22,7 +22,11 @@ DOCTOR = "demo_doctor@example.com"
 def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] in ("ok", "degraded")
+    assert "database" in body
+    assert "vector_store" in body
+    assert body["database"]["status"] == "ok"
 
 
 def test_register_login_flow(client):

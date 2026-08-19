@@ -11,9 +11,12 @@ services:
       # Pass-through từ .env — set DATABASE_URL=postgresql://... để dùng Postgres
       # (mặc định SQLite file cho local dev không có network)
       - DATABASE_URL=${DATABASE_URL:-sqlite:///./app.db}
+      - VECTOR_DB_PROVIDER=${VECTOR_DB_PROVIDER:-qdrant}
+      - QDRANT_PERSIST_DIR=${QDRANT_PERSIST_DIR:-./qdrant_db}
       - CHROMA_PERSIST_DIR=${CHROMA_PERSIST_DIR:-./chroma_db}
     volumes:
       - ./backend/data:/app/data
+      - ./backend/qdrant_db:/app/qdrant_db
       - ./backend/chroma_db:/app/chroma_db
     restart: unless-stopped
     healthcheck:
@@ -33,3 +36,9 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

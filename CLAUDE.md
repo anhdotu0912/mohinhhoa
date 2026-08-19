@@ -45,15 +45,15 @@
 - LLM: GPT-4o-mini mặc định (`LLM_MODEL` + `OPENAI_API_KEY` trong env); as-built single-provider qua `LLM_PROVIDER` — ADR-004 đã quyết định dual-provider fallback OpenAI↔DeepSeek nhưng **Planned, chưa code**
 - Orchestration: LangGraph (Python) — facade `run_agent`
 - Embedding: **Gemini `gemini-embedding-2`** (default, `EMBEDDING_PROVIDER=gemini`) — `GEMINI_API_KEY=key1,key2,…` xoay khi 401/403/429/503; fallback local `paraphrase-multilingual-MiniLM-L12-v2` khi hết key hoặc lỗi API (ADR-003)
-- Vector DB: **ChromaDB** persist (`CHROMA_PERSIST_DIR` / `chroma_db/`) — ADR-001 (Accepted, giữ Chroma cho prototype)
+- Vector DB: **Qdrant** mặc định (`VECTOR_DB_PROVIDER=qdrant`, `QDRANT_PERSIST_DIR` / `qdrant_db/`) — ADR-001; **ChromaDB** vẫn hỗ trợ fallback (`VECTOR_DB_PROVIDER=chroma`)
 - RAG: dense retrieval (+ BM25 hybrid trong retriever)
-- Demo flag: `DEMO_MOCK=true` (mặc định) — **chỉ** chi phối `POST /interactions/check` (trả 501 khi `false`); meal plan generate luôn chạy qua `meal_planner_agent`, không rẽ nhánh theo cờ này (`specs/05-meal-plan-generation.md`)
+- Meal plan generate luôn chạy qua `meal_planner_agent`; `POST /interactions/check` luôn gọi `interaction_checker_agent` thật (`specs/05`, `specs/08`)
 
 **Backend**
 - Framework: FastAPI (Python)
 - Database: **SQLite** mặc định (`DATABASE_URL`); Postgres-ready — ADR-005
 - Auth: JWT, 2 role API (`patient`, `doctor`)
-- Deploy hiện tại: `docker-compose` local; target prod Railway/Vercel vẫn là mục tiêu gap-closure
+- Deploy hiện tại: `docker-compose` local + `docker-compose.prod.yml` VPS (`deploy/bootstrap.sh`); frontend có thể deploy Vercel qua GitHub Actions
 
 **Frontend**
 - Framework: Next.js 16 (App Router)
@@ -112,11 +112,12 @@ P-014/
 │   │                               # alerts, notifications, doctor
 │   │                               # food_log, metrics
 │   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
-│   ├── rag/                        # indexer, retriever, embeddings (Chroma)
+│   ├── rag/                        # indexer, retriever, embeddings (Qdrant default, Chroma fallback)
 │   ├── guardrails/                 # rules.py đã code (chưa wired graph); source_check.py placeholder
 │   ├── models/ · schemas/ · services/ · db/
 ├── backend/data/                   # food_db_vn.json, drug_food_interactions.json, guidelines/
-├── backend/chroma_db/              # vector store local (gitignore)
+├── backend/qdrant_db/              # vector store Qdrant (tracked snapshot for zero-setup demo)
+├── backend/chroma_db/              # vector store Chroma fallback (gitignore)
 ├── frontend/app/
 │   ├── (auth)/                     # login, register
 │   ├── patient/                    # home, onboarding, meals, notifications, assistant...
@@ -213,7 +214,6 @@ Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 
 | Ưu tiên | Việc | Owner |
 |---|---|---|
-| **P0** | `DEMO_MOCK=false` cho interaction check — wire agent thật vào `POST /interactions/check` (hết 501) | BE1 + BE2 |
 | **P1** | Clinical Constraints HITL approve — `constraints_status` + `POST .../constraints/approve` (`PUT .../constraints` đã Done) | BE2 |
 | **P1** | Optimistic lock review (409) + persist meal plan qua `/chat` (`specs/06`, `specs/05`) | BE2 + BE1 |
 | **P2/P3** | Guardrails bổ sung (`validate_interaction_output`/`sanitize_recommendation`), hybrid RAG chat, mở rộng `preferences`, `unmatched_pairs[]`, LLM dual-provider fallback | BE1 |
@@ -227,9 +227,9 @@ Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 | Rủi ro | Xác suất | Plan B |
 |---|---|---|
 | CSDL thực phẩm VN thiếu/khó collect | Cao | USDA FoodData + map tên VN |
-| LangGraph / LLM không ổn định khi demo | Trung bình | Giữ `DEMO_MOCK=true` cho pitch; test nhánh thật riêng |
+| LangGraph / LLM không ổn định khi demo | Trung bình | Cache response; dùng model nhỏ; có sẵn index Qdrant snapshot trong repo |
 | RAG tiếng Việt accuracy thấp | Trung bình | Hybrid dense + BM25; eval query mẫu |
-| Chroma đủ cho prototype / không migrate Qdrant | Thấp | Giữ Chroma (ADR-001 Accepted) |
+| Qdrant local file lock / không scale multi-instance | Thấp | Chuyển `QDRANT_URL` sang Qdrant Cloud hoặc dùng Chroma fallback |
 | Compliance không có cron thật | Trung bình | Event-driven materialize + `demo/simulate` seed mẫu |
 | API cost LLM vượt budget | Thấp | Cache, model nhỏ, mock mặc định |
 | Scope creep (Food Log quay lại) | Thấp | Food Log đã Done (ADR-009); giữ phạm vi structured manual, không mở NLP/ảnh |

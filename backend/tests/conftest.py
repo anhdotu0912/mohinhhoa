@@ -8,15 +8,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Hermetic tests: no LLM calls, demo mode on, local SQLite (ignore host .env Postgres).
+# Hermetic tests: no LLM calls, local SQLite (ignore host .env Postgres).
 os.environ["PYTEST_RUNNING"] = "1"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["DEEPSEEK_API_KEY"] = ""
 os.environ["LLM_API_KEY"] = ""
-os.environ["DEMO_MOCK"] = "true"
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["EMBEDDING_PROVIDER"] = "local"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ["VECTOR_DB_PROVIDER"] = "qdrant"
 os.environ["SMTP_USERNAME"] = ""
 os.environ["SMTP_PASSWORD"] = ""
 

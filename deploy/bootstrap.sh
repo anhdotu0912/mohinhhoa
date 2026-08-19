@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap VPS stack: build, wait for health, index ChromaDB, optional Let's Encrypt.
+# Bootstrap VPS stack: build, wait for health, index vector store (RAG), optional Let's Encrypt.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,7 +32,7 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-echo "==> Indexing ChromaDB (RAG)..."
+echo "==> Indexing vector store (RAG, provider=${VECTOR_DB_PROVIDER:-qdrant})..."
 $COMPOSE exec -T backend python -m app.rag.indexer
 
 if [[ -n "${DOMAIN:-}" ]]; then
