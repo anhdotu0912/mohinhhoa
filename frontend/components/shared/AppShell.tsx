@@ -33,6 +33,8 @@ export function AppShell({
     [mobileMenuOpen, openMobileMenu, closeMobileMenu, role]
   );
 
+  const isAssistantPage = Boolean(pathname?.includes("/assistant"));
+
   if (hideChrome) {
     return (
       <MobileMenuContext.Provider value={value}>{children}</MobileMenuContext.Provider>
@@ -41,10 +43,10 @@ export function AppShell({
 
   return (
     <MobileMenuContext.Provider value={value}>
-      <div className="bg-[#F7F8FA] min-h-screen text-on-surface flex font-body text-body">
+      <div className={`bg-[#F7F8FA] text-on-surface flex font-body text-body ${isAssistantPage ? "h-screen max-h-screen overflow-hidden" : "min-h-screen"}`}>
         <Sidebar role={role} />
-        <div className="md:ml-[240px] flex-1 flex flex-col min-h-screen w-full">
-          <div className="flex-1 w-full flex flex-col">{children}</div>
+        <div className={`md:ml-[240px] flex-1 flex flex-col w-full ${isAssistantPage ? "h-screen max-h-screen overflow-hidden" : "min-h-screen"}`}>
+          <div className="flex-1 w-full flex flex-col overflow-hidden">{children}</div>
         </div>
       </div>
     </MobileMenuContext.Provider>

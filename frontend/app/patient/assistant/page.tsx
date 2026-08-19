@@ -338,10 +338,10 @@ export default function PatientAssistantPage() {
           </span>
         }
       />
-      <div className="flex-1 flex h-[calc(100vh-64px)] overflow-hidden bg-background">
+      <div className="flex-1 flex h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-background">
         {showHistory && (
-          <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-            <div className="p-md flex items-center justify-between border-b border-outline-variant/40">
+          <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-20">
+            <div className="p-md flex items-center justify-between border-b border-outline-variant/40 shrink-0 bg-surface-container-lowest">
               <span className="font-h2 text-h2 text-on-surface font-semibold text-sm">
                 Phiên chat
               </span>
@@ -354,7 +354,7 @@ export default function PatientAssistantPage() {
                 <span className="material-symbols-outlined text-[18px]">first_page</span>
               </button>
             </div>
-            <div className="p-md pt-xs">
+            <div className="p-md pt-xs shrink-0">
               <button
                 type="button"
                 onClick={handleNewConversation}
@@ -387,7 +387,8 @@ export default function PatientAssistantPage() {
           </div>
         )}
 
-        <div className="flex-1 bg-background flex flex-col h-full overflow-hidden relative">
+        <div className="flex-1 bg-background flex flex-col h-full max-h-full overflow-hidden relative min-w-0">
+
           <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
             <button
               type="button"
@@ -851,8 +852,8 @@ export default function PatientAssistantPage() {
         </div>
 
         {showReferences && (
-          <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col animate-fadeIn transition-all duration-300">
-            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between">
+          <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-20">
+            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between shrink-0 bg-surface-container-lowest z-10">
               <div className="flex items-center gap-sm">
                 <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
                 <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">
@@ -869,7 +870,7 @@ export default function PatientAssistantPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
-              <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs">
+              <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs shrink-0">
                 Nguồn từ câu trả lời AI gần nhất.
               </p>
 
