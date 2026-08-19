@@ -24,6 +24,7 @@ psycopg2-binary>=2.9.0
 
 # Vector Store
 chromadb>=0.5.0
+qdrant-client>=1.10.0
 
 # Text processing
 rank-bm25>=0.2.2

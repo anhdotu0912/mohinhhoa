@@ -347,3 +347,15 @@ class TestNodes:
         state = {"message": "bla bla bla", "force_intent": "meal_plan"}
         result = intent_classifier(state)
         assert result["intent"] == "meal_plan"
+        assert result["secondary_intents"] == []
+
+    def test_intent_classifier_multi_intent(self):
+        """Multi-intent question should extract secondary_intents."""
+        from app.agents.nodes.intent_classifier import intent_classifier
+
+        state = {
+            "message": "Lập thực đơn 7 ngày cho tôi và kiểm tra tương tác thuốc metformin"
+        }
+        result = intent_classifier(state)
+        assert result["intent"] == "meal_plan"
+        assert "interaction_check" in result["secondary_intents"]

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -196,6 +197,86 @@ def _match_term(term: str, target: str, aliases: list[str]) -> bool:
             return True
 
     return False
+
+
+# =====================================================================
+# Food Extraction from User Query
+# =====================================================================
+
+_DEFAULT_INTERACTION_FOODS = [
+    "bưởi",
+    "rượu",
+    "bia",
+    "đường tinh luyện",
+    "mướp đắng",
+    "chuối",
+    "muối",
+]
+
+_STOP_WORDS_FOOD = {
+    "gì", "nào", "gì không", "sao không", "được không", "không", "thì sao", "được",
+    "thuốc", "viên", "bệnh", "tiểu đường", "đái tháo đường", "kỵ", "kiêng", "kị",
+    "tương tác", "tác dụng phụ", "bị", "đang", "dùng", "uống", "ăn", "với", "cùng",
+    "khi", "có", "nên", "metformin", "glipizide", "sitagliptin", "atorvastatin",
+    "insulin", "gliclazide", "empagliflozin", "lisinopril", "amlodipine",
+    "tôi", "em", "anh", "chị", "bác sĩ", "cho", "hỏi", "với", "ạ",
+}
+
+
+def extract_foods_from_message(message: str) -> tuple[list[str], bool]:
+    """Extract food items mentioned in user message.
+
+    Returns:
+        (foods_list, is_specific_query)
+        - is_specific_query: True if the user asks about specific food(s).
+        - is_specific_query: False if it's a general inquiry (e.g., "Metformin kiêng gì?").
+    """
+    message_lower = message.lower().strip()
+    kb = load_interaction_kb()
+
+    # 1. Match against known KB foods & aliases
+    matched_kb: list[str] = []
+    if kb:
+        all_food_entries = []
+        for entry in kb:
+            food_name = entry.get("food", "")
+            aliases = entry.get("food_aliases", [])
+            for name in [food_name] + aliases:
+                if name:
+                    all_food_entries.append((name, food_name))
+
+        all_food_entries.sort(key=lambda x: len(x[0]), reverse=True)
+
+        for alias, canonical_food in all_food_entries:
+            if alias.lower() in message_lower:
+                if canonical_food not in matched_kb:
+                    matched_kb.append(canonical_food)
+
+    if matched_kb:
+        return matched_kb, True
+
+    # 2. Extract food phrase using Vietnamese query patterns
+    patterns = [
+        r"(?:có\s+)?(?:ăn|uống|dùng)\s+([^?.,!]+?)(?:\s+(?:được\s+không|có\s+được\s+không|có\s+sao\s+không|khi|đang|với|cùng|không|\?|$))",
+        r"([^?.,!\s]+(?:\s+[^?.,!\s]+){0,3})\s+(?:có\s+ăn\s+được\s+không|ăn\s+được\s+không|uống\s+được\s+không)",
+    ]
+
+    extracted_candidates: list[str] = []
+    for pat in patterns:
+        matches = re.findall(pat, message_lower)
+        for m in matches:
+            candidate = m.strip()
+            words = candidate.split()
+            filtered_words = [w for w in words if w not in _STOP_WORDS_FOOD]
+            clean_candidate = " ".join(filtered_words).strip()
+            if clean_candidate and len(clean_candidate) >= 2 and clean_candidate not in extracted_candidates:
+                extracted_candidates.append(clean_candidate)
+
+    if extracted_candidates:
+        return extracted_candidates, True
+
+    # 3. Fallback for general interaction inquiry
+    return list(_DEFAULT_INTERACTION_FOODS), False
 
 
 # =====================================================================

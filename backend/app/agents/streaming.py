@@ -87,6 +87,7 @@ def _build_initial_state(input_data: AgentRunInput, db) -> AgentState:
         "db": db,
         "profile": {},
         "intent": "unknown",
+        "secondary_intents": [],
         "rag_context": [],
         "meal_plan": None,
         "meal_preview": None,
@@ -112,6 +113,7 @@ def _state_to_output(final_state: AgentState) -> AgentRunOutput:
 
     return AgentRunOutput(
         intent=final_state.get("intent", "unknown"),
+        secondary_intents=final_state.get("secondary_intents", []),
         message=final_state.get("answer", ""),
         meal_plan_id=meal_plan_id,
         meal_preview=meal_preview,
@@ -141,7 +143,12 @@ def stream_agent_events(input_data: AgentRunInput, db=None) -> Iterator[dict]:
         yield _status_event("intent_classifier")
         state = {**state, **intent_classifier(state)}
         intent = state.get("intent", "unknown")
-        yield {"type": "intent", "intent": intent}
+        secondary_intents = state.get("secondary_intents", [])
+        yield {
+            "type": "intent",
+            "intent": intent,
+            "secondary_intents": secondary_intents,
+        }
 
         if intent == "rag_qa":
             message = state.get("message", "")
