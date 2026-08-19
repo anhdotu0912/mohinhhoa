@@ -40,8 +40,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./app.db"
 
-    # Vector Store (ChromaDB)
+    # Vector Store (qdrant | chroma)
+    VECTOR_DB_PROVIDER: str = "qdrant"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
+    QDRANT_PERSIST_DIR: str = "./qdrant_db"
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
 
     # Auth
     JWT_SECRET: str = "change-me-dev-only"

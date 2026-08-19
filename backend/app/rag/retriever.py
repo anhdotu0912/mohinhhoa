@@ -1,7 +1,7 @@
-"""Retriever module for RAG: query food items and guidelines from ChromaDB.
+"""Retriever module for RAG: query food items and guidelines from Qdrant or ChromaDB.
 
 Supports:
-  - Dense retrieval via sentence-transformer embeddings
+  - Dense retrieval via sentence-transformer embeddings or Gemini Embedding
   - BM25 fallback for keyword matching
   - Hybrid fusion of both
 """
@@ -37,9 +37,29 @@ class RetrievedChunk:
     metadata: dict = field(default_factory=dict)
 
 
-def _get_chroma_client() -> chromadb.ClientAPI:
+def _get_chroma_client():
+    if chromadb is None:
+        raise RuntimeError("chromadb module is not installed")
     persist_dir = os.path.join(_BACKEND_DIR, settings.CHROMA_PERSIST_DIR)
     return chromadb.PersistentClient(path=persist_dir)
+
+
+def _get_qdrant_client():
+    import qdrant_client
+    if settings.QDRANT_URL:
+        return qdrant_client.QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY or None,
+        )
+    persist_dir = os.path.join(_BACKEND_DIR, settings.QDRANT_PERSIST_DIR)
+    return qdrant_client.QdrantClient(path=persist_dir)
+
+
+def _get_vector_client():
+    provider = getattr(settings, "VECTOR_DB_PROVIDER", "qdrant").lower()
+    if provider == "qdrant":
+        return _get_qdrant_client()
+    return _get_chroma_client()
 
 
 def retrieve_foods(
@@ -47,7 +67,7 @@ def retrieve_foods(
     top_k: int = 10,
     category_filter: str | None = None,
     exclude_tags: list[str] | None = None,
-    client: chromadb.ClientAPI | None = None,
+    client=None,
 ) -> list[RetrievedChunk]:
     """Retrieve food items relevant to a query.
 
@@ -56,15 +76,29 @@ def retrieve_foods(
         top_k: Number of results to return
         category_filter: Filter by food category (e.g. "rau", "thit")
         exclude_tags: Exclude foods with these tags (e.g. ["allergen-shellfish"])
-        client: Optional ChromaDB client
+        client: Optional Vector DB client (Qdrant or ChromaDB)
     """
-    client = client or _get_chroma_client()
+    client = client or _get_vector_client()
+    is_qdrant = hasattr(client, "query_points") or hasattr(client, "recreate_collection")
+
+    if is_qdrant:
+        return _retrieve_foods_qdrant(query, top_k, category_filter, exclude_tags, client)
+    return _retrieve_foods_chroma(query, top_k, category_filter, exclude_tags, client)
+
+
+def _retrieve_foods_chroma(
+    query: str,
+    top_k: int,
+    category_filter: str | None,
+    exclude_tags: list[str] | None,
+    client,
+) -> list[RetrievedChunk]:
     ef = get_embedding_function()
 
     try:
         collection = client.get_collection("food_items", embedding_function=ef)
     except Exception:
-        logger.warning("food_items collection not found. Run indexer first.")
+        logger.warning("food_items collection not found in ChromaDB. Run indexer first.")
         return []
 
     where_filter = None
@@ -83,11 +117,8 @@ def retrieve_foods(
             meta = results["metadatas"][0][i] if results["metadatas"] else {}
             doc_text = results["documents"][0][i] if results["documents"] else ""
             distance = results["distances"][0][i] if results["distances"] else 1.0
-
-            # ChromaDB returns distance (lower=better); convert to score
             score = max(0, 1 - distance)
 
-            # Apply tag exclusion post-query
             if exclude_tags:
                 item_tags = meta.get("tags", "")
                 if any(tag in item_tags for tag in exclude_tags):
@@ -104,11 +135,66 @@ def retrieve_foods(
     return chunks
 
 
+def _retrieve_foods_qdrant(
+    query: str,
+    top_k: int,
+    category_filter: str | None,
+    exclude_tags: list[str] | None,
+    client,
+) -> list[RetrievedChunk]:
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    query_vectors = embed_query_texts([query])
+    if not query_vectors:
+        return []
+
+    qdrant_filter = None
+    if category_filter:
+        qdrant_filter = Filter(
+            must=[FieldCondition(key="category", match=MatchValue(value=category_filter))]
+        )
+
+    try:
+        res = client.query_points(
+            collection_name="food_items",
+            query=query_vectors[0],
+            query_filter=qdrant_filter,
+            limit=top_k * 2 if exclude_tags else top_k,
+        )
+    except Exception as exc:
+        logger.warning("Qdrant food_items query failed (%s). Run indexer first.", exc)
+        return []
+
+    chunks = []
+    for pt in res.points:
+        payload = pt.payload or {}
+        chunk_id = payload.get("doc_id", str(pt.id))
+        doc_text = payload.get("text", "")
+        score = pt.score
+        source = payload.get("source", "food_db_vn")
+
+        if exclude_tags:
+            item_tags = payload.get("tags", "")
+            if any(tag in item_tags for tag in exclude_tags):
+                continue
+
+        chunks.append(RetrievedChunk(
+            chunk_id=chunk_id,
+            text=doc_text,
+            source=source,
+            score=score,
+            metadata=payload,
+        ))
+        if len(chunks) >= top_k:
+            break
+
+    return chunks
+
+
 def retrieve_guidelines(
     query: str,
     top_k: int = 5,
     source_filter: str | None = None,
-    client: chromadb.ClientAPI | None = None,
+    client=None,
 ) -> list[RetrievedChunk]:
     """Retrieve guideline chunks relevant to a query.
 
@@ -116,15 +202,28 @@ def retrieve_guidelines(
         query: Search query (e.g. "chế độ ăn cho bệnh nhân tiểu đường type 2")
         top_k: Number of results
         source_filter: Filter by guideline source (e.g. "ada_diabetes")
-        client: Optional ChromaDB client
+        client: Optional Vector DB client (Qdrant or ChromaDB)
     """
-    client = client or _get_chroma_client()
+    client = client or _get_vector_client()
+    is_qdrant = hasattr(client, "query_points") or hasattr(client, "recreate_collection")
+
+    if is_qdrant:
+        return _retrieve_guidelines_qdrant(query, top_k, source_filter, client)
+    return _retrieve_guidelines_chroma(query, top_k, source_filter, client)
+
+
+def _retrieve_guidelines_chroma(
+    query: str,
+    top_k: int,
+    source_filter: str | None,
+    client,
+) -> list[RetrievedChunk]:
     ef = get_embedding_function()
 
     try:
         collection = client.get_collection("guidelines", embedding_function=ef)
     except Exception:
-        logger.warning("guidelines collection not found. Run indexer first.")
+        logger.warning("guidelines collection not found in ChromaDB. Run indexer first.")
         return []
 
     where_filter = None
@@ -156,6 +255,53 @@ def retrieve_guidelines(
     return chunks
 
 
+def _retrieve_guidelines_qdrant(
+    query: str,
+    top_k: int,
+    source_filter: str | None,
+    client,
+) -> list[RetrievedChunk]:
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    query_vectors = embed_query_texts([query])
+    if not query_vectors:
+        return []
+
+    qdrant_filter = None
+    if source_filter:
+        qdrant_filter = Filter(
+            must=[FieldCondition(key="source", match=MatchValue(value=source_filter))]
+        )
+
+    try:
+        res = client.query_points(
+            collection_name="guidelines",
+            query=query_vectors[0],
+            query_filter=qdrant_filter,
+            limit=top_k,
+        )
+    except Exception as exc:
+        logger.warning("Qdrant guidelines query failed (%s). Run indexer first.", exc)
+        return []
+
+    chunks = []
+    for pt in res.points:
+        payload = pt.payload or {}
+        chunk_id = payload.get("chunk_id", str(pt.id))
+        doc_text = payload.get("text", "")
+        source = payload.get("source", "")
+        score = pt.score
+
+        chunks.append(RetrievedChunk(
+            chunk_id=chunk_id,
+            text=doc_text,
+            source=source,
+            score=score,
+            metadata=payload,
+        ))
+
+    return chunks
+
+
 from functools import lru_cache
 
 @lru_cache(maxsize=256)
@@ -172,7 +318,7 @@ def _retrieve_hybrid_uncached(
     query: str,
     top_k: int = 10,
     collection_name: str = "food_items",
-    client: chromadb.ClientAPI | None = None,
+    client = None,
 ) -> list[RetrievedChunk]:
     # Dense retrieval
     if collection_name == "food_items":
@@ -193,16 +339,15 @@ def retrieve_hybrid(
     query: str,
     top_k: int = 10,
     collection_name: str = "food_items",
-    client: chromadb.ClientAPI | None = None,
+    client = None,
 ) -> list[RetrievedChunk]:
-    """Hybrid retrieval combining dense (ChromaDB) + BM25 keyword matching with RRF.
+    """Hybrid retrieval combining dense (Qdrant / ChromaDB) + BM25 keyword matching with RRF.
 
     Uses caching when client is None to improve performance.
     """
     if client is None:
         return _retrieve_hybrid_cached(query, top_k, collection_name)
     return _retrieve_hybrid_uncached(query, top_k, collection_name, client=client)
-
 
 
 def _bm25_search(
@@ -235,16 +380,19 @@ def _bm25_search(
                 "source": "food_db_vn",
             })
     else:
+        from app.rag.indexer import _chunk_markdown
         guidelines_dir = _BACKEND_DIR / "data" / "guidelines"
         if not guidelines_dir.exists():
             return []
         for md_file in sorted(guidelines_dir.glob("*.md")):
             text = md_file.read_text(encoding="utf-8")
-            documents.append({
-                "id": md_file.stem,
-                "text": text[:2000],  # truncate for BM25
-                "source": md_file.stem,
-            })
+            chunks = _chunk_markdown(text, md_file.stem)
+            for c in chunks:
+                documents.append({
+                    "id": c["id"],
+                    "text": c["text"],
+                    "source": c["source"],
+                })
 
     if not documents:
         return []
