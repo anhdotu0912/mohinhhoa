@@ -15,6 +15,10 @@ from app.services.meal_plan_service import get_profile
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 
+def _restrictions_changed(old: dict | None, new: dict) -> bool:
+    return dict(old or {}) != dict(new or {})
+
+
 @router.post("", response_model=PatientProfile)
 def upsert_profile(
     payload: ProfileUpsert,
@@ -22,9 +26,17 @@ def upsert_profile(
     user: User = Depends(require_roles("patient")),
 ) -> PatientProfile:
     row = db.query(Profile).filter(Profile.user_id == user.id).first()
-    if row is None:
+    is_new = row is None
+    if is_new:
         row = Profile(user_id=user.id)
         db.add(row)
+
+    new_restrictions = payload.restrictions.model_dump()
+    constraints_changed = not is_new and (
+        row.target_kcal != payload.target_kcal
+        or _restrictions_changed(row.restrictions, new_restrictions)
+    )
+
     row.disease = payload.disease
     row.medications = payload.medications
     row.allergies = payload.allergies
@@ -38,9 +50,13 @@ def upsert_profile(
     row.blood_pressure = payload.blood_pressure
     row.blood_glucose = payload.blood_glucose
     row.target_kcal = payload.target_kcal
-    row.restrictions = payload.restrictions.model_dump()
+    row.restrictions = new_restrictions
     row.preferences = payload.preferences
     row.treatment_goals = payload.treatment_goals
+    if constraints_changed:
+        row.constraints_status = "pending_doctor_review"
+    elif is_new:
+        row.constraints_status = "confirmed"
     db.commit()
     return get_profile(db, user.id)
 

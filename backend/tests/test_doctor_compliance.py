@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from app.models.alert import Alert
+from app.models.food_log import FoodLog
+from app.models.meal_plan import MealPlan
 from app.models.notification import Notification
 from app.services.compliance import ComplianceService
 
@@ -172,3 +174,90 @@ def test_compliance_patient_not_found(client):
         headers=doctor_headers,
     )
     assert res.status_code == 404
+
+
+def test_compliance_includes_food_logs(client):
+    doctor_headers = _login(client, DOCTOR)
+    today = date.today()
+
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        plan = MealPlan(
+            id="plan_food_log_test",
+            user_id=PATIENT_ID,
+            days=[{"day_index": 1, "meals": []}],
+            status="approved",
+            starts_on=today,
+            ends_on=today,
+        )
+        db.add(plan)
+        db.add(
+            FoodLog(
+                user_id=PATIENT_ID,
+                meal_plan_id=plan.id,
+                day_index=1,
+                slot="morning",
+                type="as_planned",
+            )
+        )
+        db.add(
+            FoodLog(
+                user_id=PATIENT_ID,
+                meal_plan_id=plan.id,
+                day_index=1,
+                slot="noon",
+                type="custom",
+                note="com pho",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    res = client.get(
+        f"/api/v1/doctor/patients/{PATIENT_ID}/compliance?days=14",
+        headers=doctor_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["checkins_done"] == 2
+    assert data["checkins_as_planned"] == 1
+    assert data["overall_adherence_pct"] == 75
+    by_date = {row["date"]: row["adherence_pct"] for row in data["daily_series"]}
+    assert by_date[today.isoformat()] == 75
+
+
+def test_compliance_events_include_reminder_and_food_log(client):
+    doctor_headers = _login(client, DOCTOR)
+    today = date.today()
+
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            Notification(
+                user_id=PATIENT_ID,
+                type="manual_reminder",
+                title="Nhắc nhở tuân thủ từ bác sĩ",
+                body="Nhớ ghi nhận bữa tối nhé.",
+                scheduled_at=datetime.combine(today, datetime.min.time().replace(hour=9)),
+                status="sent",
+                related_ids={},
+                payload={"from_doctor": True},
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    res = client.get(
+        f"/api/v1/doctor/patients/{PATIENT_ID}/compliance?days=14",
+        headers=doctor_headers,
+    )
+    assert res.status_code == 200
+    events = res.json()["events"]
+    assert any(e["type"] == "reminder" for e in events)
+    assert any("Nhớ ghi nhận bữa tối" in e["title"] for e in events)

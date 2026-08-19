@@ -31,13 +31,13 @@ def test_register_login_flow(client):
         json={
             "email": "New.User@Example.com",
             "password": "secret123",
-            "role": "patient",
             "full_name": "Nguyễn Văn Test",
         },
     )
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["email"] == "new.user@example.com"
+    assert body["role"] == "patient"
     assert body["full_name"] == "Nguyễn Văn Test"
 
     response = client.post(
@@ -60,6 +60,26 @@ def test_register_login_flow(client):
     )
     assert response.status_code == 409
     assert response.json()["code"] == "EMAIL_EXISTS"
+
+
+def test_register_doctor_role_ignored(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "wannabe.doctor@example.com",
+            "password": "secret123",
+            "role": "doctor",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["role"] == "patient"
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "wannabe.doctor@example.com", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    assert login.json()["role"] == "patient"
 
 
 def test_login_wrong_password(client):
@@ -192,9 +212,14 @@ def test_interactions_check_persists_alerts(client):
         json={"medications": ["metformin"], "foods": ["rượu", "cơm gạo lứt"]},
     )
     assert response.status_code == 200, response.text
-    interactions = response.json()["interactions"]
+    body = response.json()
+    interactions = body["interactions"]
     assert len(interactions) == 1
     assert interactions[0]["severity"] == "Nguy hiểm"
+    assert any(
+        p["drug"] == "metformin" and p["food"] == "cơm gạo lứt"
+        for p in body.get("unmatched_pairs", [])
+    )
 
     response = client.get("/api/v1/alerts", headers=headers)
     assert any(a["drug"] == "metformin" and a["food"] == "rượu" for a in response.json())

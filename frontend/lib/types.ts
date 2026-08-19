@@ -50,6 +50,7 @@ export interface PatientProfile {
   restrictions: Restrictions;
   preferences: string[];
   treatment_goals?: string[];
+  constraints_status?: "confirmed" | "pending_doctor_review";
 }
 
 export interface ProfileUpsert {
@@ -147,6 +148,7 @@ export interface MealPlanOutput {
   citations: string[];
   status: MealPlanStatus | string;
   trust_badge?: string | null;
+  adjustment_note?: string | null;
   starts_on?: string | null;
   ends_on?: string | null;
   created_at?: string | null;
@@ -163,6 +165,35 @@ export interface AlertOut {
   sources: string[];
   meal_plan_id?: string | null;
   created_at: string;
+}
+
+export interface InteractionCheckInput {
+  medications: string[];
+  foods: string[];
+  profile_user_id?: string | null;
+}
+
+export interface InteractionItem {
+  drug: string;
+  food: string;
+  mechanism: string;
+  severity: string;
+  recommendation: string;
+  sources: string[];
+  drug_class?: string | null;
+  meal_timing?: string | null;
+  hypoglycemia_risk?: string | null;
+  ai_warning?: string | null;
+}
+
+export interface UnmatchedPair {
+  drug: string;
+  food: string;
+}
+
+export interface InteractionCheckOutput {
+  interactions: InteractionItem[];
+  unmatched_pairs?: UnmatchedPair[];
 }
 
 export type NotificationType =
@@ -244,6 +275,7 @@ export interface DoctorPatientSummary {
   salt_daily_g?: number | null;
   sugar_daily_g?: number | null;
   preferences: string[];
+  constraints_status?: "confirmed" | "pending_doctor_review";
   status: DoctorPatientStatus;
   status_key: DoctorPatientStatusKey;
   latest_plan_id?: string | null;
@@ -296,7 +328,7 @@ export interface ComplianceDayPoint {
 }
 
 export interface ComplianceEvent {
-  type: "alert";
+  type: "alert" | "food_log" | "checkin" | "reminder";
   severity: string;
   title: string;
   at: string;

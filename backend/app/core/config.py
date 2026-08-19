@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Embedding — provider: gemini (default) | local
     EMBEDDING_PROVIDER: str = "gemini"
     EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    # Comma-separated pool, e.g. key-1,key-2,key-3
     GEMINI_API_KEY: str = ""
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_EMBEDDING_DIMENSION: int = 768
@@ -55,6 +56,14 @@ class Settings(BaseSettings):
     # App
     APP_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # SMTP — chỉ cần USERNAME + PASSWORD (App Password). Host/port/TLS mặc định Gmail.
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
 
     # Demo mode: return contract-shaped mock data for agent features that
     # are not implemented yet (meal plan, interaction check). Disable in prod.

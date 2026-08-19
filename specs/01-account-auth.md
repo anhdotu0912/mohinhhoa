@@ -1,7 +1,7 @@
 # Spec: Đăng ký, Đăng nhập & Liên hệ
 
 ## Status
-Done (đăng ký/đăng nhập) — hoạt động đúng như mô tả dưới đây. Luồng liên hệ chưa có API, xem §6.
+Done (đăng ký/đăng nhập + quên mật khẩu gửi SMTP). Luồng liên hệ chưa có API, xem §6.
 
 ## 1. Mục tiêu (Why)
 Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để hệ thống phân quyền đúng (patient chỉ thấy dữ liệu của mình, doctor thấy hàng đợi bệnh nhân) và để bác sĩ có thể tạo tài khoản hộ bệnh nhân khi onboarding tại phòng khám.
@@ -38,7 +38,7 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 - Token hợp lệ nhưng `user_id` đã bị xoá khỏi DB (không có API xoá user as-built, chỉ là edge case lý thuyết) → `401 USER_NOT_FOUND`.
 - **Quyết định (2026-08-15): CẦN cho khảo sát người dùng thật.** Team xác nhận dự án sẽ chạy khảo sát với người dùng thật (≥5 responses, `CLAUDE.md` Mục 11) — không chỉ demo nội bộ với tài khoản cố định — nên 2 hạng mục dưới đây chuyển từ "cần xác nhận" sang **Planned, bắt buộc trước khi mở khảo sát**:
   1. **Rate-limit `POST /auth/login`** `[Planned]` — tối đa 5 lần thử sai/15 phút theo `email`+IP, vượt ngưỡng trả `429 TOO_MANY_ATTEMPTS`.
-  2. **Luồng quên mật khẩu** `[Planned]` — `POST /auth/forgot-password` (gửi email chứa token reset) + `POST /auth/reset-password` (dùng token đổi mật khẩu mới). Response `forgot-password` luôn `200` bất kể email có tồn tại hay không, để không lộ thông tin email đã đăng ký.
+  2. **Luồng quên mật khẩu** — `POST /auth/forgot-password` tạo mật khẩu tạm, gửi qua SMTP tới email đã đăng ký, rồi mới ghi đè hash. Response luôn `200` nếu SMTP đã cấu hình, bất kể email có tồn tại hay không, để không lộ thông tin email đã đăng ký. Thiếu SMTP → `503 EMAIL_NOT_CONFIGURED`; gửi thất bại → `500 EMAIL_SEND_FAILED` (mật khẩu cũ giữ nguyên). `POST /auth/reset-password` vẫn còn (token) nhưng không còn là luồng chính.
 
 ## 6. Ngoài phạm vi (Out of scope)
 - **Luồng liên hệ (contact):** không có endpoint backend nào cho "liên hệ hỗ trợ". Nếu FE có trang liên hệ, đó là trang tĩnh không gọi API — **Status: Planned/Out of scope**, không nằm trong North Star demo.
@@ -55,8 +55,8 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 |---|---|---|
 | POST | `/auth/register` | Không cần auth |
 | POST | `/auth/login` | Không cần auth |
-| POST | `/auth/forgot-password` | Không cần auth **[Planned]** |
-| POST | `/auth/reset-password` | Không cần auth **[Planned]** |
+| POST | `/auth/forgot-password` | Không cần auth |
+| POST | `/auth/reset-password` | Không cần auth |
 
 ## 9. Liên quan
 - `specs/02-patient-profile-onboarding.md` — bước tiếp theo sau đăng ký patient.

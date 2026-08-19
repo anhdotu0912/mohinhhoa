@@ -7,11 +7,12 @@ import { TopBar } from "@/components/shared/TopBar";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { dayPlanToUi } from "@/lib/meal-plan-mappers";
-import type { MealDishItem } from "@/lib/plans-store";
+import type { DayMealPlan, MealDishItem } from "@/lib/plans-store";
 import {
   DayNutritionProgress,
   DayTabButton,
   DishCard,
+  LoggedMealBadge,
   MealSectionHeader,
   MedicalApprovalBadge,
 } from "@/components/patient/PatientMealPlanUI";
@@ -25,6 +26,7 @@ import {
   formatDateFull,
   formatDateIso,
   formatDateShort,
+  getMonday,
   parseFlexibleDate,
 } from "@/lib/plan-expiry";
 import { pickDefaultSlot, visibleScheduleSlots, displaySlotTitle } from "@/lib/plan-schedule-helpers";
@@ -32,6 +34,7 @@ import {
   ApiError,
   type DayPlan,
   type FoodItem,
+  type FoodLogEntry,
   type MealPlanOutput,
   type MealPlanScheduleOut,
   type MealPlanScheduleSlot,
@@ -100,18 +103,47 @@ function columnDateForDay(
   return resolveDayDate(plan, dayIndex) ?? shiftDays(weekStart, dayIndex - 1);
 }
 
-function dayIndexForToday(
-  days: { day_index: number }[],
+/** Monday=1 … Sunday=7 for the calendar week starting at `weekStart`. */
+function columnIndexForDate(
   weekStart: Date,
-  today: Date = new Date()
+  target: Date = new Date()
 ): number | undefined {
-  const todayIso = formatDateIso(today);
-  return days.find((d) => {
-    return formatDateIso(shiftDays(weekStart, d.day_index - 1)) === todayIso;
-  })?.day_index;
+  const targetIso = formatDateIso(target);
+  for (let i = 0; i < 7; i++) {
+    if (formatDateIso(shiftDays(weekStart, i)) === targetIso) return i + 1;
+  }
+  return undefined;
 }
 
-function statusMeta(status: string): { label: string; className: string; medical: boolean } {
+function emptyUiDay(columnIndex: number): DayMealPlan {
+  return {
+    dayIndex: columnIndex,
+    dayName: "",
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snack: [],
+    totalCalories: 0,
+    totalSalt: 0,
+    totalSugar: 0,
+    warnings: [],
+  };
+}
+
+function emptyRawDay(isoDate: string): DayPlan {
+  return {
+    day_index: 0,
+    date: isoDate,
+    meals: [],
+    totals: { kcal: 0, carb_g: 0, protein_g: 0, fat_g: 0, sodium_mg: 0 },
+    warnings: [],
+  };
+}
+
+function statusMeta(
+  status: string,
+  adjustmentNote?: string | null
+): { label: string; className: string; medical: boolean } {
   switch (status) {
     case "approved":
       return {
@@ -129,6 +161,19 @@ function statusMeta(status: string): { label: string; className: string; medical
       return {
         label: "Bác sĩ từ chối",
         className: "bg-red-50 border-red-200 text-red-800",
+        medical: false,
+      };
+    case "pending_review":
+      if (adjustmentNote) {
+        return {
+          label: "Đang chờ bác sĩ duyệt lại",
+          className: "bg-amber-50 border-amber-200 text-amber-800",
+          medical: false,
+        };
+      }
+      return {
+        label: "Chờ bác sĩ duyệt",
+        className: "bg-amber-50 border-amber-200 text-amber-800",
         medical: false,
       };
     default:
@@ -211,6 +256,11 @@ function PatientMealsContent() {
   const [logContext, setLogContext] = useState<FoodLogModalContext | null>(null);
   const [highlightDayIndex, setHighlightDayIndex] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [highlightDayIndex, setHighlightDayIndex] = useState<number | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodLogEntry[]>([]);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustNote, setAdjustNote] = useState("");
+  const [adjustBusy, setAdjustBusy] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -260,15 +310,8 @@ function PatientMealsContent() {
         const slotStart =
           parseFlexibleDate(defaultSlot?.starts_on) ??
           parseFlexibleDate(initialPlan.starts_on);
-        const todayDayIndex = slotStart
-          ? dayIndexForToday(initialPlan.days, slotStart)
-          : initialPlan.days.find((d) => {
-              const date = resolveDayDate(initialPlan, d.day_index);
-              return date
-                ? formatDateIso(date) === formatDateIso(new Date())
-                : false;
-            })?.day_index;
-        setSelectedDayIndex(todayDayIndex ?? 1);
+        const monday = slotStart ? getMonday(slotStart) : getMonday(new Date());
+        setSelectedDayIndex(columnIndexForDate(monday) ?? 1);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không tải được thực đơn.");
@@ -318,64 +361,113 @@ function PatientMealsContent() {
     return fallbackPlan;
   }, [urlPlan, selectedSlot, fallbackPlan]);
 
+  const loadFoodLogs = useCallback(async (mealPlanId: string) => {
+    try {
+      const logs = await api.listFoodLogs({ meal_plan_id: mealPlanId });
+      setFoodLogs(logs);
+    } catch {
+      setFoodLogs([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!plan?.id) {
+      setFoodLogs([]);
+      return;
+    }
+    void loadFoodLogs(plan.id);
+  }, [plan?.id, loadFoodLogs]);
+
   const uiDays = useMemo(() => (plan ? plan.days.map(dayPlanToUi) : []), [plan]);
   const validity = useMemo(() => (plan ? computeMealPlanValidity(plan) : null), [plan]);
   const averages = useMemo(() => (plan ? avgFromDays(plan) : { kcal: 0, salt: 0, sugar: 0 }), [plan]);
   const saltLimit = saltTargetG(profile);
   const swapCount = plan?.swaps?.length ?? 0;
-  const status = plan ? statusMeta(plan.status) : null;
+  const status = plan ? statusMeta(plan.status, plan.adjustment_note) : null;
   const weekInPlan = Boolean(plan);
 
-  const weekStart = useMemo(() => {
-    const fromSlot = parseFlexibleDate(selectedSlot?.starts_on);
-    if (fromSlot) return fromSlot;
-    const fromPlan = parseFlexibleDate(plan?.starts_on);
-    if (fromPlan) return fromPlan;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
+  const slotAnchor = useMemo(() => {
+    return (
+      parseFlexibleDate(selectedSlot?.starts_on) ??
+      parseFlexibleDate(plan?.starts_on) ??
+      null
+    );
   }, [selectedSlot?.starts_on, plan?.starts_on]);
 
-  const weekEnd = useMemo(() => {
-    const fromSlot = parseFlexibleDate(selectedSlot?.ends_on);
-    if (fromSlot) return fromSlot;
-    return shiftDays(weekStart, 6);
-  }, [selectedSlot?.ends_on, weekStart]);
+  const weekStart = useMemo(() => {
+    if (slotAnchor) return getMonday(slotAnchor);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return getMonday(today);
+  }, [slotAnchor]);
+
+  const weekEnd = useMemo(() => shiftDays(weekStart, 6), [weekStart]);
 
   const weekRangeLabel = `${formatDateShort(weekStart)} – ${formatDateFull(weekEnd)}`;
 
   const planDays = useMemo(() => {
     if (!plan) return [];
-    // Prefer the schedule slot window so "Hôm nay" tracks the week navigator,
-    // even when plan.starts_on / day.date still stamp an older apply window
-    // (e.g. unassigned plan previewed on empty current week).
+    // Calendar week Mon–Sun. Meals are placed by actual date so weekday
+    // columns stay fixed instead of sliding with a today-based slot window.
     const preferSlotWindow = selectedSlot != null;
     const todayIso = formatDateIso(new Date());
-    return plan.days.map((raw) => {
-      const ui = uiDays.find((d) => d.dayIndex === raw.day_index)!;
+    // Applied plans keep their real dates. Unassigned preview sits on Mon–Sun.
+    const dateAnchor = plan.starts_on && slotAnchor ? slotAnchor : weekStart;
+    const byIso = new Map<string, { raw: DayPlan; ui: DayMealPlan }>();
+    for (const raw of plan.days) {
       const date = columnDateForDay(
         raw.day_index,
-        weekStart,
+        dateAnchor,
         plan,
         preferSlotWindow
       );
+      const ui = uiDays.find((d) => d.dayIndex === raw.day_index);
+      if (!ui) continue;
+      byIso.set(formatDateIso(date), { raw, ui });
+    }
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = shiftDays(weekStart, i);
       const isoDate = formatDateIso(date);
+      const matched = byIso.get(isoDate);
+      const columnIndex = i + 1;
       return {
-        dayIndex: raw.day_index,
-        ui,
-        raw,
+        columnIndex,
+        dayIndex: matched?.raw.day_index ?? columnIndex,
+        planDayIndex: matched?.raw.day_index,
+        ui: matched?.ui ?? emptyUiDay(columnIndex),
+        raw: matched?.raw ?? emptyRawDay(isoDate),
         isoDate,
         isToday: isoDate === todayIso,
         isFuture: isoDate > todayIso,
+        hasPlanDay: matched != null,
         label: `${WEEKDAY_FULL[date.getDay()]} • ${formatDateShort(date)}`,
         shortDate: formatDateShort(date),
         fullDayName: WEEKDAY_FULL[date.getDay()],
         weekdayShort: WEEKDAY_SHORT[date.getDay()],
       };
     });
-  }, [plan, uiDays, selectedSlot, weekStart]);
+  }, [plan, uiDays, selectedSlot, weekStart, slotAnchor]);
 
-  const selectedDay = planDays.find((d) => d.dayIndex === selectedDayIndex) ?? planDays[0];
+  const selectedDay = planDays.find((d) => d.columnIndex === selectedDayIndex) ?? planDays[0];
+
+  const loggedByCell = useMemo(() => {
+    const map = new Map<string, FoodLogEntry>();
+    for (const log of foodLogs) {
+      if (log.day_index == null) continue;
+      const key = `${log.day_index}:${log.slot}`;
+      if (!map.has(key)) map.set(key, log);
+    }
+    return map;
+  }, [foodLogs]);
+
+  const loggedFor = useCallback(
+    (planDayIndex: number | undefined, mealSlot: Exclude<MealSlot, "snack">) =>
+      planDayIndex == null
+        ? null
+        : loggedByCell.get(`${planDayIndex}:${MEAL_SLOT_TO_FOOD_LOG[mealSlot]}`) ?? null,
+    [loggedByCell]
+  );
 
   const slotIndex = selectedSlot
     ? displaySlots.findIndex((slot) => slot.starts_on === selectedSlot.starts_on)
@@ -386,17 +478,21 @@ function PatientMealsContent() {
 
   const openFoodLog = useCallback(
     (
-      day: { dayIndex: number; label: string; isFuture: boolean },
+      day: {
+        planDayIndex?: number;
+        label: string;
+        isFuture: boolean;
+      },
       mealSlot: Exclude<MealSlot, "snack">,
       mealLabel: string
     ) => {
-      if (!plan || day.isFuture) return;
+      if (!plan || day.isFuture || day.planDayIndex == null) return;
       setLogContext({
         slot: MEAL_SLOT_TO_FOOD_LOG[mealSlot],
         slotLabel: mealLabel,
         dayLabel: day.label,
         mealPlanId: plan.id,
-        dayIndex: day.dayIndex,
+        dayIndex: day.planDayIndex,
       });
     },
     [plan]
@@ -405,16 +501,19 @@ function PatientMealsContent() {
   const handleFoodLogSaved = useCallback(() => {
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 4000);
-  }, []);
+    if (plan?.id) void loadFoodLogs(plan.id);
+  }, [plan?.id, loadFoodLogs]);
 
   const handlePrevWeek = () => {
     if (!selectedSlot || !canPrevWeek || slotIndex <= 0) return;
+    setHighlightDayIndex(null);
     setSelectedStartsOn(displaySlots[slotIndex - 1].starts_on);
     setSelectedDayIndex(1);
   };
 
   const handleNextWeek = () => {
     if (!selectedSlot || !canNextWeek || slotIndex < 0) return;
+    setHighlightDayIndex(null);
     setSelectedStartsOn(displaySlots[slotIndex + 1].starts_on);
     setSelectedDayIndex(1);
   };
@@ -422,12 +521,11 @@ function PatientMealsContent() {
   const handleResetCurrentWeek = () => {
     const currentWeek = displaySlots[1];
     if (!currentWeek) return;
+    setHighlightDayIndex(null);
     setSelectedStartsOn(currentWeek.starts_on);
     const start = parseFlexibleDate(currentWeek.starts_on);
-    const planForSlot = currentWeek.plan ?? fallbackPlan;
-    const todayIdx =
-      start && planForSlot ? dayIndexForToday(planForSlot.days, start) : undefined;
-    setSelectedDayIndex(todayIdx ?? 1);
+    const monday = start ? getMonday(start) : getMonday(new Date());
+    setSelectedDayIndex(columnIndexForDate(monday) ?? 1);
   };
 
   const showTodayButton = planDays.some((d) => d.isToday);
@@ -572,6 +670,29 @@ function PatientMealsContent() {
                 </div>
               )}
 
+              {plan?.status === "approved" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdjustNote("");
+                      setAdjustOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                    Yêu cầu điều chỉnh
+                  </button>
+                </div>
+              )}
+
+              {plan?.status === "pending_review" && plan.adjustment_note && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
+                  <span className="font-semibold">Yêu cầu điều chỉnh của bạn: </span>
+                  {plan.adjustment_note}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
@@ -705,11 +826,13 @@ function PatientMealsContent() {
 
                       {planDays.map((day) => (
                         <button
-                          key={day.dayIndex}
+                          key={day.columnIndex}
                           type="button"
-                          onClick={() => { setHighlightDayIndex(null); openDetail(day.dayIndex, setSelectedDayIndex, setViewMode); }}
+                          onClick={() => { setHighlightDayIndex(null); openDetail(day.columnIndex, setSelectedDayIndex, setViewMode); }}
+                          onMouseEnter={() => setHighlightDayIndex(day.columnIndex)}
+                          onMouseLeave={() => setHighlightDayIndex(null)}
                           className={`px-2.5 py-3 text-left transition-colors cursor-pointer border-b-2 border-r border-slate-200 last:border-r-0 ${
-                              day.dayIndex === highlightDayIndex
+                              day.columnIndex === highlightDayIndex
                               ? "bg-blue-50 border-x-2 border-x-blue-500 border-t-2 border-t-blue-500 shadow-[inset_0_-2px_0_0_theme(colors.blue.400)]"
                               : day.isToday
                               ? "bg-teal-100 border-x-2 border-x-teal-500 border-b-teal-300 shadow-[inset_0_-2px_0_0_theme(colors.teal.400)]"
@@ -776,28 +899,31 @@ function PatientMealsContent() {
                           {planDays.map((day, dayIdx) => {
                             const items = day.ui[row.slot] as MealDishItem[];
                             const isLastRow = rowIdx === MEAL_ROWS.length - 1;
-                            const canLog = weekInPlan && !day.isFuture;
+                            const canLog = weekInPlan && !day.isFuture && day.hasPlanDay;
+                            const logged = loggedFor(day.planDayIndex, row.slot);
 
                             return (
                               <div
-                                key={`${day.dayIndex}-${row.slot}`}
+                                key={`${day.columnIndex}-${row.slot}`}
                                 role="button"
                                 tabIndex={0}
-                                onClick={() => openDetail(day.dayIndex, setSelectedDayIndex, setViewMode)}
+                                onClick={() => openDetail(day.columnIndex, setSelectedDayIndex, setViewMode)}
+                                onMouseEnter={() => setHighlightDayIndex(day.columnIndex)}
+                                onMouseLeave={() => setHighlightDayIndex(null)}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    openDetail(day.dayIndex, setSelectedDayIndex, setViewMode);
+                                    openDetail(day.columnIndex, setSelectedDayIndex, setViewMode);
                                   }
                                 }}
                                 className={`relative p-2.5 min-h-[100px] text-left transition-colors cursor-pointer border-r border-slate-200 ${dayIdx === planDays.length - 1 ? "border-r-0" : ""
                                   } ${rowIdx > 0 ? "border-t-[3px] border-t-slate-300" : "border-t border-t-slate-200"
-                                  } ${day.dayIndex === highlightDayIndex
+                                  } ${day.columnIndex === highlightDayIndex
                                     ? "bg-blue-50/50 border-x-2 border-x-blue-500 hover:bg-blue-100/50"
                                     : day.isToday
                                     ? "bg-teal-50/90 border-x-2 border-x-teal-500 hover:bg-teal-100/80"
                                     : "bg-white hover:bg-slate-50/80"
-                                  } ${isLastRow && day.dayIndex === highlightDayIndex 
+                                  } ${isLastRow && day.columnIndex === highlightDayIndex 
                                     ? "border-b-2 border-b-blue-500" 
                                     : isLastRow && day.isToday ? "border-b-2 border-b-teal-400" : ""}`}
                                 title="Xem chi tiết bữa ăn"
@@ -809,11 +935,23 @@ function PatientMealsContent() {
                                       e.stopPropagation();
                                       openFoodLog(day, row.slot, row.label);
                                     }}
-                                    className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md text-emerald-700 bg-emerald-50/90 border border-emerald-200/70 hover:bg-emerald-100 transition-colors cursor-pointer"
-                                    title="Ghi nhận bữa ăn"
-                                    aria-label={`Ghi nhận bữa ăn ${row.label} ${day.shortDate}`}
+                                    className={`absolute top-1.5 right-1.5 z-10 p-1 rounded-md border transition-colors cursor-pointer ${
+                                      logged
+                                        ? logged.type === "custom"
+                                          ? "text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                                          : "text-emerald-800 bg-emerald-100 border-emerald-300 hover:bg-emerald-200"
+                                        : "text-emerald-700 bg-emerald-50/90 border-emerald-200/70 hover:bg-emerald-100"
+                                    }`}
+                                    title={logged ? "Đã ghi nhận — bấm để sửa" : "Ghi nhận bữa ăn"}
+                                    aria-label={
+                                      logged
+                                        ? `Đã ghi nhận bữa ${row.label} ${day.shortDate}, bấm để sửa`
+                                        : `Ghi nhận bữa ăn ${row.label} ${day.shortDate}`
+                                    }
                                   >
-                                    <span className="material-symbols-outlined text-[16px] block">edit_note</span>
+                                    <span className="material-symbols-outlined text-[16px] block">
+                                      {logged ? "check_circle" : "edit_note"}
+                                    </span>
                                   </button>
                                 )}
                                 {items.length > 0 ? (
@@ -826,6 +964,11 @@ function PatientMealsContent() {
                                   </ul>
                                 ) : (
                                   <span className="text-slate-300 text-xs">—</span>
+                                )}
+                                {logged && (
+                                  <div className="mt-2 pr-6">
+                                    <LoggedMealBadge type={logged.type} compact />
+                                  </div>
                                 )}
                               </div>
                             );
@@ -840,12 +983,12 @@ function PatientMealsContent() {
                   <div className="flex gap-0 overflow-x-auto border-b border-slate-200 bg-white rounded-t-xl px-1 pt-1">
                     {planDays.map((day) => (
                       <DayTabButton
-                        key={day.dayIndex}
+                        key={day.columnIndex}
                         weekdayShort={day.weekdayShort}
                         shortDate={day.shortDate}
-                        isSelected={day.dayIndex === selectedDayIndex}
+                        isSelected={day.columnIndex === selectedDayIndex}
                         isToday={day.isToday}
-                        onClick={() => setSelectedDayIndex(day.dayIndex)}
+                        onClick={() => setSelectedDayIndex(day.columnIndex)}
                       />
                     ))}
                   </div>
@@ -886,14 +1029,14 @@ function PatientMealsContent() {
                       />
                     </div>
 
-                    {(plan.swaps || []).filter((s) => s.day_index === selectedDay.dayIndex).length > 0 && (
+                    {(plan.swaps || []).filter((s) => s.day_index === selectedDay.planDayIndex).length > 0 && (
                       <div className="px-4 sm:px-5 py-3 bg-sky-50 border-b border-sky-100 text-xs text-sky-950 space-y-1.5">
                         <p className="font-bold flex items-center gap-1 text-sky-900">
                           <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                           Món đã điều chỉnh do tương tác thuốc
                         </p>
                         {(plan.swaps || [])
-                          .filter((s) => s.day_index === selectedDay.dayIndex)
+                          .filter((s) => s.day_index === selectedDay.planDayIndex)
                           .map((s, idx) => (
                             <p key={idx} className="pl-5">
                               <span className="font-semibold capitalize">{s.slot}:</span> {(s.from || "—")} → {s.to}
@@ -907,6 +1050,10 @@ function PatientMealsContent() {
                       {DETAIL_MEALS.map((meal) => {
                         const items = selectedDay.ui[meal.slot] as MealDishItem[];
                         const rawItems = slotItemsRaw(selectedDay.raw, meal.slot);
+                        const logged =
+                          meal.slot !== "snack"
+                            ? loggedFor(selectedDay.planDayIndex, meal.slot as Exclude<MealSlot, "snack">)
+                            : null;
 
                         if (meal.slot === "snack" && items.length === 0) return null;
 
@@ -918,21 +1065,27 @@ function PatientMealsContent() {
                               action={
                                 meal.slot !== "snack" &&
                                 !selectedDay.isFuture &&
+                                selectedDay.hasPlanDay &&
                                 weekInPlan ? (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openFoodLog(
-                                        selectedDay,
-                                        meal.slot as Exclude<MealSlot, "snack">,
-                                        meal.label
-                                      )
-                                    }
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                                    Ghi nhận
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    {logged && <LoggedMealBadge type={logged.type} />}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openFoodLog(
+                                          selectedDay,
+                                          meal.slot as Exclude<MealSlot, "snack">,
+                                          meal.label
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">
+                                        {logged ? "check_circle" : "edit_note"}
+                                      </span>
+                                      {logged ? "Ghi nhận lại" : "Ghi nhận"}
+                                    </button>
+                                  </div>
                                 ) : undefined
                               }
                             />
@@ -982,6 +1135,64 @@ function PatientMealsContent() {
         onClose={() => setLogContext(null)}
         onSaved={handleFoodLogSaved}
       />
+
+      {adjustOpen && plan && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-md w-full p-5">
+            <h3 className="text-base font-semibold text-slate-900 mb-2">Yêu cầu điều chỉnh thực đơn</h3>
+            <p className="text-sm text-slate-600 mb-3">
+              Mô tả ngắn thay đổi bạn cần. Bác sĩ sẽ xem lại trước khi áp dụng.
+            </p>
+            <textarea
+              value={adjustNote}
+              onChange={(e) => setAdjustNote(e.target.value)}
+              rows={4}
+              className="w-full border border-slate-200 rounded-lg p-3 text-sm"
+              placeholder="Ví dụ: Tôi không ăn được rau ngót ngày 3..."
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setAdjustOpen(false)}
+                disabled={adjustBusy}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-200"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={adjustBusy || !adjustNote.trim()}
+                onClick={() => {
+                  void (async () => {
+                    setAdjustBusy(true);
+                    try {
+                      const updated = await api.requestMealPlanAdjustment(plan.id, adjustNote.trim());
+                      setAdjustOpen(false);
+                      setFallbackPlan(updated);
+                      setSchedule((prev) => {
+                        if (!prev) return prev;
+                        return {
+                          ...prev,
+                          slots: prev.slots.map((slot) =>
+                            slot.plan?.id === updated.id ? { ...slot, plan: updated } : slot
+                          ),
+                        };
+                      });
+                    } catch (err) {
+                      setError(err instanceof ApiError ? err.message : "Không gửi được yêu cầu.");
+                    } finally {
+                      setAdjustBusy(false);
+                    }
+                  })();
+                }}
+                className="px-3 py-2 text-sm rounded-lg bg-emerald-600 text-white disabled:opacity-50"
+              >
+                {adjustBusy ? "Đang gửi…" : "Gửi yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

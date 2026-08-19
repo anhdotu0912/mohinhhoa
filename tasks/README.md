@@ -28,4 +28,4 @@ Tổng quan phân công & North Star demo flow. Backlog chi tiết theo MoSCoW: 
 - Đọc `CLAUDE.md` + `AGENTS.md` trước — đặc biệt luật cứng Mục 7 (guardrails, citation, không đổi thuốc).
 - Đọc spec liên quan trong `specs/` — mỗi spec có mục `Status` cho biết đây là hành vi **đã có** (Done/Partial) hay **thiết kế đề xuất chưa code** (Planned).
 - Sửa `contracts/*.md` trước khi đổi schema/endpoint thật.
-- **Không** implement Food Log trong MVP này (Won't Have, xem `adrs/009-food-log-scope-strategy.md` và `specs/09-food-log-adherence.md`) — trừ khi team họp lại và cập nhật `CLAUDE.md`.
+- **Food Log đã implement (Should Have, Done core 2026-08-17)** — structured manual entry 3-slot theo `adrs/009-food-log-scope-strategy.md`, `specs/09-food-log-adherence.md`; UI modal trong `/patient/meals`, API `POST/GET /food-log`.

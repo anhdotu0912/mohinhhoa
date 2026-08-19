@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 
 from app.core.config import settings
+from app.rag.gemini_keys import (
+    ROTATE_STATUS_CODES,
+    GeminiKeyRotator,
+    parse_gemini_api_keys,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +31,15 @@ def prepare_document_text(content: str, title: str | None = None) -> str:
     return f"title: {title or 'none'} | text: {content}"
 
 
+def gemini_api_keys() -> list[str]:
+    """Resolved Gemini key pool from comma-separated GEMINI_API_KEY."""
+    return parse_gemini_api_keys(settings.GEMINI_API_KEY)
+
+
 def gemini_api_key() -> str:
-    return (settings.GEMINI_API_KEY or "").strip()
+    """First configured Gemini key (empty if none)."""
+    keys = gemini_api_keys()
+    return keys[0] if keys else ""
 
 
 def embedding_provider() -> str:
@@ -49,21 +61,92 @@ class GeminiEmbeddingFunction:
     def __init__(
         self,
         *,
-        api_key: str,
+        api_key: str = "",
+        api_keys: list[str] | None = None,
         model: str,
         output_dimensionality: int,
         input_kind: Literal["document", "query"] = "document",
+        rotator: GeminiKeyRotator | None = None,
     ) -> None:
-        self._api_key = api_key
+        keys = list(api_keys or [])
+        if api_key:
+            keys = [api_key, *keys]
+        self._rotator = rotator or GeminiKeyRotator(keys)
         self._model = model
         self._output_dimensionality = output_dimensionality
         self._input_kind = input_kind
-        self._local_fallback = _local_embedding_function()
+        self._local_fn = None
+
+    @property
+    def _local_fallback(self):
+        if self._local_fn is None:
+            self._local_fn = _local_embedding_function()
+        return self._local_fn
 
     def _format_inputs(self, texts: list[str]) -> list[str]:
         if self._input_kind == "query":
             return [prepare_query_text(t) for t in texts]
         return [prepare_document_text(t) for t in texts]
+
+    def _post_json(self, url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
+        candidates = self._rotator.candidates()
+        if not candidates:
+            raise RuntimeError("All Gemini API keys are marked dead")
+
+        last_error: Exception | None = None
+        for index, key in candidates:
+            try:
+                with httpx.Client(timeout=timeout) as client:
+                    response = client.post(
+                        url,
+                        headers={
+                            "Content-Type": "application/json",
+                            "x-goog-api-key": key,
+                        },
+                        json=payload,
+                    )
+                if response.status_code in ROTATE_STATUS_CODES:
+                    logger.warning(
+                        "Gemini embedding HTTP %s on key #%s/%s — rotating",
+                        response.status_code,
+                        index + 1,
+                        self._rotator.size,
+                    )
+                    self._rotator.mark_failure(index, response.status_code)
+                    last_error = httpx.HTTPStatusError(
+                        f"Gemini embedding HTTP {response.status_code}",
+                        request=response.request,
+                        response=response,
+                    )
+                    continue
+                response.raise_for_status()
+                self._rotator.mark_success(index)
+                return response.json()
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status in ROTATE_STATUS_CODES:
+                    logger.warning(
+                        "Gemini embedding HTTP %s on key #%s/%s — rotating",
+                        status,
+                        index + 1,
+                        self._rotator.size,
+                    )
+                    self._rotator.mark_failure(index, status)
+                    last_error = exc
+                    continue
+                raise
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                logger.warning(
+                    "Gemini embedding network error on key #%s/%s (%s) — rotating",
+                    index + 1,
+                    self._rotator.size,
+                    exc,
+                )
+                self._rotator.mark_failure(index, None)
+                last_error = exc
+                continue
+
+        raise last_error or RuntimeError("All Gemini API keys failed")
 
     def _embed_single(self, text: str) -> list[float]:
         url = f"{_GEMINI_API_BASE}/models/{self._model}:embedContent"
@@ -72,17 +155,7 @@ class GeminiEmbeddingFunction:
             "content": {"parts": [{"text": text}]},
             "output_dimensionality": self._output_dimensionality,
         }
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(
-                url,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": self._api_key,
-                },
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = self._post_json(url, payload, timeout=60.0)
         values = data.get("embedding", {}).get("values")
         if not values:
             raise RuntimeError("Gemini embedContent returned no embedding values")
@@ -101,17 +174,7 @@ class GeminiEmbeddingFunction:
             }
             for text in texts
         ]
-        with httpx.Client(timeout=120.0) as client:
-            response = client.post(
-                url,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": self._api_key,
-                },
-                json={"requests": requests_payload},
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = self._post_json(url, {"requests": requests_payload}, timeout=120.0)
 
         embeddings = data.get("embeddings") or []
         if len(embeddings) != len(texts):
@@ -141,7 +204,10 @@ class GeminiEmbeddingFunction:
             return self._embed_gemini(input)
         except Exception as exc:
             logger.warning(
-                "Gemini embedding failed (%s), falling back to local MiniLM",
+                "Gemini embedding failed after trying %s key(s) (%s), "
+                "falling back to local MiniLM — retrieval quality drops if "
+                "the Chroma index was built with Gemini",
+                self._rotator.size,
                 exc,
             )
             return self._local_fallback(input)
@@ -163,24 +229,32 @@ class LocalEmbeddingFunction:
         return "local_minilm"
 
 
+def _gemini_embedding_function(input_kind: Literal["document", "query"]):
+    keys = gemini_api_keys()
+    if not keys:
+        return None
+    logger.info(
+        "Using Gemini embedding model: %s (dim=%s, keys=%s)",
+        settings.GEMINI_EMBEDDING_MODEL,
+        settings.GEMINI_EMBEDDING_DIMENSION,
+        len(keys),
+    )
+    return GeminiEmbeddingFunction(
+        api_keys=keys,
+        model=settings.GEMINI_EMBEDDING_MODEL,
+        output_dimensionality=settings.GEMINI_EMBEDDING_DIMENSION,
+        input_kind=input_kind,
+    )
+
+
 @lru_cache(maxsize=1)
 def get_embedding_function():
     """Return embedding function for Chroma indexing (document mode)."""
     provider = embedding_provider()
-    if provider == "gemini" and gemini_api_key():
-        logger.info(
-            "Using Gemini embedding model: %s (dim=%s)",
-            settings.GEMINI_EMBEDDING_MODEL,
-            settings.GEMINI_EMBEDDING_DIMENSION,
-        )
-        return GeminiEmbeddingFunction(
-            api_key=gemini_api_key(),
-            model=settings.GEMINI_EMBEDDING_MODEL,
-            output_dimensionality=settings.GEMINI_EMBEDDING_DIMENSION,
-            input_kind="document",
-        )
-
-    if provider == "gemini" and not gemini_api_key():
+    if provider == "gemini":
+        fn = _gemini_embedding_function("document")
+        if fn is not None:
+            return fn
         logger.warning(
             "EMBEDDING_PROVIDER=gemini but GEMINI_API_KEY is empty — using local MiniLM"
         )
@@ -191,13 +265,10 @@ def get_embedding_function():
 def get_query_embedding_function():
     """Return embedding function for retrieval queries (query prefix)."""
     provider = embedding_provider()
-    if provider == "gemini" and gemini_api_key():
-        return GeminiEmbeddingFunction(
-            api_key=gemini_api_key(),
-            model=settings.GEMINI_EMBEDDING_MODEL,
-            output_dimensionality=settings.GEMINI_EMBEDDING_DIMENSION,
-            input_kind="query",
-        )
+    if provider == "gemini":
+        fn = _gemini_embedding_function("query")
+        if fn is not None:
+            return fn
     return LocalEmbeddingFunction()
 
 

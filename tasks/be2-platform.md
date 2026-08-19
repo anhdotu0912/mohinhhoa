@@ -1,7 +1,7 @@
 # BE2 — Platform API
 
 ## Mục tiêu
-Đảm bảo mọi endpoint HTTP đúng contract (`contracts/api-v1.md`), persist đúng model/schema, và lấp các gap Planned có giá trị demo cao (Clinical Constraints, Doctor Compliance View) mà không phá vỡ North Star flow hiện tại.
+Đảm bảo mọi endpoint HTTP đúng contract (`contracts/api-v1.md`), persist đúng model/schema, và lấp các gap Planned còn lại (Clinical Constraints approve flow, optimistic lock, request-adjustment) mà không phá vỡ North Star flow hiện tại.
 
 ## Ownership
 `backend/app/api/`, `backend/app/models/`, `backend/app/schemas/`, `backend/app/services/`, `backend/app/db/`, `backend/app/core/`.
@@ -20,13 +20,15 @@
 ### P1 — Clinical Constraints + HITL (→ `specs/02`, `specs/04-clinical-constraints.md`, quyết định 2026-08-15)
 - [ ] Mở rộng `Restrictions` schema thêm `salt_daily_g`/`sugar_daily_g`/`protein_daily_g` (song song field cũ, không xoá).
 - [ ] Thêm `constraints_status` (`"confirmed"|"pending_doctor_review"`) vào `PatientProfile`; `POST /profile` set `"pending_doctor_review"` khi patient đổi `target_kcal`/`restrictions`.
-- [ ] Thêm `PUT /doctor/patients/{patient_id}/constraints` (partial update, set `constraints_status="confirmed"`) + `POST /doctor/patients/{patient_id}/constraints/approve` (chỉ đổi status, không đổi giá trị).
+- [x] Thêm `PUT /doctor/patients/{patient_id}/constraints` (partial update target_kcal/salt/sugar) — as-built 2026-08-16; FE đã nối `api.updateDoctorConstraints`.
+- [ ] Thêm `POST /doctor/patients/{patient_id}/constraints/approve` (chỉ đổi status, không đổi giá trị).
 - [ ] Đảm bảo `GET /doctor/patients/{patient_id}` trả kèm `target_kcal`/`restrictions`/`constraints_status` để FE hiển thị badge "chờ xác nhận".
 
-### P1 — Doctor Compliance View (→ `specs/10-doctor-compliance-view.md`, ADR-008)
-- [ ] Thêm `GET /doctor/patients/{patient_id}/compliance` — on-the-fly aggregate từ `Notification(type="adherence_checkin")` + `Alert`, mặc định 14 ngày.
-- [ ] Thêm `COMPLIANCE_LOW_THRESHOLD_PCT` vào `backend/app/core/config.py` (default đề xuất `50`) — không hard-code ngưỡng "tuân thủ thấp" trong logic.
-- [ ] Thêm `POST /doctor/patients/{patient_id}/compliance/remind` — tạo `Notification(type="manual_reminder")` (type mới, đã chốt — không dùng lại `meal_reminder`/`adherence_checkin`). Thêm `manual_reminder` vào validate enum type ở mọi nơi cần.
+### Done — Doctor Compliance View (→ `specs/10-doctor-compliance-view.md`, ADR-008)
+- [x] Thêm `GET /doctor/patients/{patient_id}/compliance` — on-the-fly aggregate từ `Notification(type="adherence_checkin")` + `Alert`, mặc định 14 ngày.
+- [x] Thêm `COMPLIANCE_LOW_THRESHOLD_PCT` vào `backend/app/core/config.py` (default `50`).
+- [x] Thêm `POST /doctor/patients/{patient_id}/compliance/remind` — tạo `Notification(type="manual_reminder")`.
+- [x] FE `/doctor/patients/compliance` nối API thật (`getPatientCompliance`, `remindPatientCompliance`).
 
 ### P1 — Optimistic lock review + request-adjustment (→ `specs/06`, `specs/07`, quyết định 2026-08-15)
 - [ ] `POST /doctor/meal-plans/{id}/review`: kiểm tra `status=="pending_review"` trước khi áp dụng action; nếu không còn ở trạng thái chờ → `409 PLAN_ALREADY_REVIEWED`.

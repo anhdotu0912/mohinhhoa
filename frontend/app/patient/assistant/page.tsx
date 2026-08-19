@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
 import {
   ChatThinkingSteps,
@@ -17,6 +18,7 @@ import {
 import { DishCard, MealSectionHeader } from "@/components/patient/PatientMealPlanUI";
 import { api } from "@/lib/api";
 import { foodItemToDish } from "@/lib/meal-plan-mappers";
+import { useAuthStore } from "@/lib/auth-store";
 import { ApiError, type AgentRunOutput, type MealPreviewOut } from "@/lib/types";
 
 interface Message {
@@ -91,6 +93,10 @@ function computeMealPreviewTotals(preview: MealPreviewOut) {
 }
 
 export default function PatientAssistantPage() {
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
+  const [hydrated, setHydrated] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputQuery, setInputQuery] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -162,6 +168,21 @@ export default function PatientAssistantPage() {
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    if (role === "doctor") {
+      router.replace("/doctor");
+    }
+  }, [hydrated, token, role, router]);
 
   useEffect(() => {
     scrollToBottom();
@@ -294,9 +315,6 @@ export default function PatientAssistantPage() {
                 : m
             )
           );
-          if (event.data.citations?.length) {
-            setShowReferences(true);
-          }
         } else if (event.type === "error") {
           setError(event.message);
           setMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
@@ -318,7 +336,37 @@ export default function PatientAssistantPage() {
     setMessages([]);
     setError(null);
     setInputQuery("");
+    setShowReferences(false);
   };
+
+  const isCompactViewport = () =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+
+  const toggleHistory = () => {
+    setShowHistory((open) => {
+      const next = !open;
+      if (next && isCompactViewport()) setShowReferences(false);
+      return next;
+    });
+  };
+
+  const toggleReferences = () => {
+    setShowReferences((open) => {
+      const next = !open;
+      if (next && isCompactViewport()) setShowHistory(false);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const compact = window.matchMedia("(max-width: 1023px)").matches;
+    if (!compact || (!showHistory && !showReferences)) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showHistory, showReferences]);
 
   return (
     <>
@@ -365,11 +413,11 @@ export default function PatientAssistantPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-sm pb-md flex flex-col gap-sm">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-sm pb-md flex flex-col gap-sm">
               {hasConversation ? (
                 <button
                   type="button"
-                  className="w-full text-left p-sm rounded-lg bg-surface-container-low border-l-2 border-primary group transition-all"
+                  className="w-full text-left p-sm rounded-lg bg-primary/10 ring-1 ring-primary/20 group transition-all"
                 >
                   <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
                     {messages.find((m) => m.sender === "user")?.text ?? "Cuộc trò chuyện hiện tại"}
@@ -384,7 +432,7 @@ export default function PatientAssistantPage() {
                 </p>
               )}
             </div>
-          </div>
+          </aside>
         )}
 
         <div className="flex-1 bg-background flex flex-col h-full max-h-full overflow-hidden relative min-w-0">
@@ -392,7 +440,8 @@ export default function PatientAssistantPage() {
           <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
             <button
               type="button"
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={toggleHistory}
+              aria-expanded={showHistory}
               className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
                 showHistory
                   ? "bg-primary/10 text-primary border border-primary/20"
@@ -410,7 +459,8 @@ export default function PatientAssistantPage() {
 
             <button
               type="button"
-              onClick={() => setShowReferences(!showReferences)}
+              onClick={toggleReferences}
+              aria-expanded={showReferences}
               className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
                 showReferences
                   ? "bg-primary/10 text-primary border border-primary/20"
@@ -420,10 +470,15 @@ export default function PatientAssistantPage() {
             >
               <span className="material-symbols-outlined text-[16px]">library_books</span>
               <span>{showReferences ? "Ẩn tham khảo" : "Hiện tham khảo"}</span>
+              {!showReferences && activeCitations.length > 0 ? (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center">
+                  {activeCitations.length}
+                </span>
+              ) : null}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-lg flex flex-col gap-xl scroll-smooth">
+          <div className={`flex-1 p-lg flex flex-col gap-xl ${hasConversation ? "" : "justify-center"}`}>
             {!hasConversation && (
               <div className="flex flex-col items-center justify-center mt-4 mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
@@ -680,7 +735,10 @@ export default function PatientAssistantPage() {
                       {msg.citations && msg.citations.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setShowReferences(true)}
+                          onClick={() => {
+                            if (isCompactViewport()) setShowHistory(false);
+                            setShowReferences(true);
+                          }}
                           className="inline-flex items-center gap-xs px-sm py-xs bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-colors text-on-surface-variant hover:text-primary mt-2 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[14px]">description</span>
@@ -823,7 +881,7 @@ export default function PatientAssistantPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-md bg-background border-t border-outline-variant shrink-0 relative">
+          <div className="sticky bottom-0 z-30 p-md bg-background/95 backdrop-blur-md border-t border-outline-variant shadow-[0_-8px_24px_rgba(18,28,42,0.05)]">
             <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
               <textarea
                 value={inputQuery}
@@ -908,7 +966,7 @@ export default function PatientAssistantPage() {
                 ))
               )}
             </div>
-          </div>
+          </aside>
         )}
         {toastMessage && (
           <div className="fixed bottom-20 right-6 z-50 bg-emerald-700 text-white px-md py-sm rounded-xl shadow-lg flex items-center gap-sm animate-fadeIn text-xs font-medium">

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from tests.test_api import PATIENT, _login
+from tests.test_api import DOCTOR, PATIENT, _login
 
 
 def test_create_food_log_as_planned(client):
@@ -65,3 +65,28 @@ def test_list_food_logs_by_date(client):
     response = client.get(f"/api/v1/food-log?date={today}", headers=headers)
     assert response.status_code == 200
     assert len(response.json()) == 3
+
+
+def test_create_food_log_rejects_foreign_meal_plan(client):
+    doctor_headers = _login(client, DOCTOR)
+    patient2_headers = _login(client, "demo_patient_2@example.com")
+    patient2_id = client.get("/api/v1/auth/me", headers=patient2_headers).json()["id"]
+    gen = client.post(
+        f"/api/v1/doctor/patients/{patient2_id}/meal-plans/generate",
+        headers=doctor_headers,
+    )
+    assert gen.status_code == 200, gen.text
+    foreign_plan_id = gen.json()["id"]
+
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/food-log",
+        json={
+            "slot": "morning",
+            "type": "as_planned",
+            "meal_plan_id": foreign_plan_id,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN"

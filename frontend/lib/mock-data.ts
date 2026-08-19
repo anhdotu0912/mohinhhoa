@@ -39,6 +39,7 @@ export interface Patient {
   targetKcal?: number;
   saltDailyG?: number;
   sugarDailyG?: number;
+  constraintsStatus?: "confirmed" | "pending_doctor_review";
 }
 
 export function statusColorFor(
@@ -101,6 +102,7 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     targetKcal: p.target_kcal,
     saltDailyG: p.salt_daily_g ?? undefined,
     sugarDailyG: p.sugar_daily_g ?? undefined,
+    constraintsStatus: p.constraints_status ?? "confirmed",
   };
 }
 

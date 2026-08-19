@@ -32,6 +32,7 @@ class Profile(Base):
     target_kcal: Mapped[int] = mapped_column(Integer, default=1800)
     restrictions: Mapped[dict] = mapped_column(JSON, default=dict)
     preferences: Mapped[list] = mapped_column(JSON, default=list)
+    constraints_status: Mapped[str] = mapped_column(String(32), default="confirmed")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

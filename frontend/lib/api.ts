@@ -14,6 +14,8 @@ import {
   type FoodLogEntry,
   type GoalsOut,
   type GenerateMealPlanRequest,
+  type InteractionCheckInput,
+  type InteractionCheckOutput,
   type MealPlanOutput,
   type MetricsHistoryPoint,
   type MetricsLogCreate,
@@ -128,6 +130,22 @@ export const api = {
     });
   },
 
+  forgotPassword(email: string): Promise<{ message: string }> {
+    return request("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: { email },
+      auth: false,
+    });
+  },
+
+  resetPassword(token: string, new_password: string): Promise<{ message: string }> {
+    return request("/api/v1/auth/reset-password", {
+      method: "POST",
+      body: { token, new_password },
+      auth: false,
+    });
+  },
+
   getCurrentUser(token?: string | null): Promise<UserMeResponse> {
     return request("/api/v1/auth/me", { token });
   },
@@ -198,6 +216,13 @@ export const api = {
     return request(`/api/v1/alerts${q}`);
   },
 
+  checkInteraction(payload: InteractionCheckInput): Promise<InteractionCheckOutput> {
+    return request("/api/v1/interactions/check", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
   listNotifications(params?: {
     status?: string;
     type?: string;
@@ -225,6 +250,10 @@ export const api = {
       method: "POST",
       body: adherence ? { adherence } : {},
     });
+  },
+
+  simulateNotifications(): Promise<NotificationOut[]> {
+    return request("/api/v1/notifications/demo/simulate", { method: "POST" });
   },
 
   listDoctorPatients(params?: {
@@ -332,6 +361,23 @@ export const api = {
     return request(
       `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/constraints`,
       { method: "PUT", body: payload }
+    );
+  },
+
+  approveDoctorConstraints(patientId: string): Promise<PatientProfile> {
+    return request(
+      `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/constraints/approve`,
+      { method: "POST", body: {} }
+    );
+  },
+
+  requestMealPlanAdjustment(
+    mealPlanId: string,
+    adjustment_note: string
+  ): Promise<MealPlanOutput> {
+    return request(
+      `/api/v1/meal-plans/${encodeURIComponent(mealPlanId)}/request-adjustment`,
+      { method: "POST", body: { adjustment_note } }
     );
   },
 

@@ -41,16 +41,21 @@
 ```
 `full_name` / `avatar` có thể `null`.
 
-### `POST /auth/forgot-password` `[Planned]`
-**Role:** Không cần auth. **Quyết định 2026-08-15:** cần trước khi mở khảo sát người dùng thật (`CLAUDE.md` Mục 11 — ≥5 responses), không chỉ demo nội bộ với tài khoản cố định.
+### `POST /auth/forgot-password` (as-built 2026-08-18)
+**Role:** Không cần auth. **Quyết định 2026-08-18:** gửi **mật khẩu mới** qua SMTP tới email đã đăng ký (không in token ra log). Nếu email không tồn tại vẫn trả 200 cùng message — tránh lộ thông tin tồn tại email. Mật khẩu cũ chỉ bị thay khi gửi email thành công.
 ```json
 // Request
 { "email": "patient1@example.com" }
 // Response 200 (luôn 200 dù email có tồn tại hay không — tránh lộ thông tin tồn tại email)
-{ "message": "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi." }
+{ "message": "Nếu email tồn tại, mật khẩu mới đã được gửi tới email của bạn." }
+// Error 503 { "code": "EMAIL_NOT_CONFIGURED", "detail": "Chưa cấu hình gửi email (SMTP). Liên hệ quản trị viên." }
+// Error 502 { "code": "EMAIL_AUTH_FAILED", "detail": "Gmail từ chối đăng nhập SMTP. ..." }
+// Error 500 { "code": "EMAIL_SEND_FAILED", "detail": "Không gửi được email. Vui lòng thử lại sau." }
 ```
 
-### `POST /auth/reset-password` `[Planned]`
+Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định trong code (xem `how_to_run.md`).
+
+### `POST /auth/reset-password` (as-built 2026-08-18)
 **Role:** Không cần auth, dùng token gửi qua email ở bước trên.
 ```json
 // Request
@@ -60,7 +65,7 @@
 // Error 400 { "code": "INVALID_OR_EXPIRED_TOKEN", "detail": "Token không hợp lệ hoặc đã hết hạn." }
 ```
 
-**Rate-limit `POST /auth/login` `[Planned]`:** quyết định 2026-08-15 — cần thêm giới hạn số lần thử đăng nhập sai (đề xuất: tối đa 5 lần/15 phút theo `email`+IP, sau đó `429 TOO_MANY_ATTEMPTS`) trước khi mở khảo sát người dùng thật.
+**Rate-limit `POST /auth/login` (as-built 2026-08-18):** giới hạn 5 lần thử sai / 15 phút theo `email`+IP → `429 TOO_MANY_ATTEMPTS`.
 
 ---
 
@@ -73,7 +78,7 @@
 { "disease": ["diabetes_t2"], "medications": ["metformin"], "allergies": ["hải sản"], "bmi": 26.5, "weight": 72, "height": 170, "target_kcal": 1800, "restrictions": { "carb_per_meal": 45, "sodium_daily": 1500 }, "preferences": ["thích ăn cơm"] }
 // Response 200 → PatientProfile (xem contracts/agent-io-schema.md §1)
 ```
-**`[Planned]`, quyết định 2026-08-15:** nếu request thay đổi `target_kcal`/`restrictions` so với giá trị đang lưu, BE set `constraints_status="pending_doctor_review"` (giá trị mới vẫn áp dụng ngay cho lần generate kế tiếp, chỉ là cờ hiển thị cho doctor) — xem `contracts/agent-io-schema.md` §1 và `specs/04-clinical-constraints.md`.
+**`constraints_status` (as-built 2026-08-18):** nếu request thay đổi `target_kcal`/`restrictions` so với giá trị đang lưu, BE set `constraints_status="pending_doctor_review"` (giá trị mới vẫn áp dụng ngay cho lần generate kế tiếp).
 
 ### `GET /profile/me`
 **Role:** `patient`. Response 200 → `PatientProfile`.
@@ -89,9 +94,7 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 - **Schema `Restrictions`:** giữ song song `carb_per_meal`/`sodium_daily` (patient) + `salt_daily_g`/`sugar_daily_g` (doctor). Meal planner dùng `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị.
 - **`protein_daily_g`:** bỏ khỏi scope ràng buộc (Won't Have MVP này).
 
-**Deferred `[Planned]`:**
-- **HITL `constraints_status`:** patient tự sửa → `pending_doctor_review`; doctor approve qua endpoint riêng — chưa implement trong MVP này.
-- **`POST /doctor/patients/{id}/constraints/approve`:** deferred cùng HITL.
+**HITL as-built (2026-08-18):** patient tự sửa `target_kcal`/`restrictions` → `pending_doctor_review`; doctor approve qua endpoint bên dưới.
 
 ### `PUT /doctor/patients/{patient_id}/constraints` (as-built)
 **Role:** `doctor`. Partial update — chỉ field gửi lên mới bị ghi đè.
@@ -107,7 +110,7 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 // Error 422 — target_kcal/salt/sugar ngoài range validation
 ```
 
-### `POST /doctor/patients/{patient_id}/constraints/approve` `[Planned]` (deferred)
+### `POST /doctor/patients/{patient_id}/constraints/approve` (as-built 2026-08-18)
 **Role:** `doctor`. Xác nhận thay đổi ràng buộc mà **patient tự sửa** trước đó (không đổi giá trị, chỉ chuyển `constraints_status` từ `"pending_doctor_review"` → `"confirmed"`).
 ```json
 // Request: rỗng (không cần body)
@@ -158,7 +161,7 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 // Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
 ```
 
-### `POST /meal-plans/{meal_plan_id}/request-adjustment` `[Planned]`
+### `POST /meal-plans/{meal_plan_id}/request-adjustment` (as-built 2026-08-18)
 **Role:** `patient`, chỉ chủ plan. **Quyết định 2026-08-15:** patient có thể yêu cầu điều chỉnh 1 plan đã `approved`, nhưng yêu cầu **phải qua bác sĩ duyệt lại** — không tự động regenerate. Tái sử dụng luồng review sẵn có: set `status` plan về lại `"pending_review"` kèm `adjustment_note`, plan sẽ xuất hiện lại trong `GET /doctor/meal-plans` (default filter) để doctor xử lý qua `POST /doctor/meal-plans/{id}/review` như bình thường.
 ```json
 // Request
@@ -178,11 +181,9 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 ```json
 // Request
 { "medications": ["warfarin"], "foods": ["rau muống", "bưởi"], "profile_user_id": null }
-// Response 200 (khi DEMO_MOCK=true) → InteractionCheckOutput (xem contracts/agent-io-schema.md §6, gồm unmatched_pairs[] [Planned])
-// Error 501 (khi DEMO_MOCK=false)
-{ "code": "INTERACTION_CHECK_NOT_READY", "detail": "InteractionCheckerAgent chưa sẵn sàng. Bật DEMO_MOCK hoặc chờ BE1 hoàn thiện." }
+// Response 200 → InteractionCheckOutput (xem contracts/agent-io-schema.md §6, gồm unmatched_pairs[])
 ```
-Mỗi interaction phát hiện được cũng tự động tạo 1 `Alert` (persist DB) + có thể tạo `Notification(type="interaction_followup")` nếu severity ∈ `{Nguy hiểm, Cần chú ý}`. **Quyết định 2026-08-15:** cặp `drug`×`food` không tìm thấy dữ liệu trong KB phải xuất hiện trong `unmatched_pairs[]` (`[Planned]`) — không im lặng bỏ qua như as-built hiện tại.
+Mỗi interaction phát hiện được cũng tự động tạo 1 `Alert` (persist DB) + có thể tạo `Notification(type="interaction_followup")` nếu severity ∈ `{Nguy hiểm, Cần chú ý}`. Cặp `drug`×`food` không tìm thấy dữ liệu trong KB xuất hiện trong `unmatched_pairs[]` (as-built 2026-08-18).
 
 **Gap KB đầy đủ vs KB rút gọn (xem `contracts/agent-io-schema.md` §6):** đã được team chấp nhận là hạn chế biết trước cho vòng demo hiện tại (2026-08-15), không nằm trong backlog ưu tiên cao — xem `tasks/roadmap-mvp.md`.
 
@@ -614,6 +615,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 - Version hiện tại: **1.3**.
 - **Changelog 1.2 → 1.3 (2026-08-17):** thêm `DELETE /metrics/{id}` (patient xóa bản ghi chỉ số của mình); response 204, lỗi 404 `METRICS_NOT_FOUND`.
+- **2026-08-18 (auth):** `POST /auth/forgot-password` gửi mật khẩu mới qua SMTP; `503 EMAIL_NOT_CONFIGURED` / `500 EMAIL_SEND_FAILED`. Rate-limit login as-built.
 - **Changelog 1.1 → 1.2 (2026-08-17):** Food Log §12 as-built; thêm Patient Metrics History §13 (`POST /metrics`, `GET /metrics/history`); Health chuyển §14. `GET .../meal-plan-schedule`: `unassigned_plans` gồm cả `pending_review`; slot `past` cho plan đã hết tuần.
   1. Thêm `POST /auth/forgot-password`, `POST /auth/reset-password` `[Planned]` + rate-limit `POST /auth/login` `[Planned]`.
   2. `PUT /doctor/patients/{id}/constraints` as-built (`target_kcal`, `salt_daily_g`, `sugar_daily_g`); `POST /doctor/patients/{id}/constraints/approve` + `constraints_status` HITL vẫn `[Planned]`/deferred.
