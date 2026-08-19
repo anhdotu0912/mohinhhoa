@@ -32,7 +32,6 @@ jobs:
         env:
           APP_ENV: test
           OPENAI_API_KEY: test-key
-          VECTOR_DB_PROVIDER: qdrant
 
   frontend:
     runs-on: ubuntu-latest

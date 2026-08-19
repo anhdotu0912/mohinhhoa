@@ -23,12 +23,9 @@ services:
     environment:
       APP_ENV: production
       DATABASE_URL: postgresql://p014:${POSTGRES_PASSWORD}@postgres:5432/p014
-      VECTOR_DB_PROVIDER: ${VECTOR_DB_PROVIDER:-qdrant}
       QDRANT_PERSIST_DIR: ./qdrant_db
-      CHROMA_PERSIST_DIR: ./chroma_db
     volumes:
       - qdrant_data:/app/qdrant_db
-      - chroma_data:/app/chroma_db
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,4 +85,3 @@ services:
 volumes:
   postgres_data:
   qdrant_data:
-  chroma_data:

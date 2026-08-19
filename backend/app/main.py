@@ -47,26 +47,6 @@ def _check_database() -> dict[str, str]:
         return {"status": "error", "detail": str(exc)}
 
 
-def _check_chroma_readiness() -> dict[str, object]:
-    from app.rag.indexer import _get_chroma_client
-
-    client = _get_chroma_client()
-    existing = {collection.name for collection in client.list_collections()}
-    missing = [name for name in _REQUIRED_COLLECTIONS if name not in existing]
-    empty = [
-        name
-        for name in _REQUIRED_COLLECTIONS
-        if name in existing and client.get_collection(name).count() == 0
-    ]
-    ready = not missing and not empty
-    return {
-        "provider": "chroma",
-        "ready": ready,
-        "missing": missing,
-        "empty": empty,
-    }
-
-
 def _check_qdrant_readiness() -> dict[str, object]:
     from app.rag.indexer import _get_qdrant_client
 
@@ -91,15 +71,12 @@ def _check_qdrant_readiness() -> dict[str, object]:
 
 
 def check_vector_store_readiness() -> dict[str, object]:
-    """Return vector-store readiness for the configured provider."""
-    provider = getattr(settings, "VECTOR_DB_PROVIDER", "qdrant").lower()
+    """Return Qdrant readiness."""
     try:
-        if provider == "qdrant":
-            return _check_qdrant_readiness()
-        return _check_chroma_readiness()
+        return _check_qdrant_readiness()
     except Exception as exc:  # noqa: BLE001 — health probe only
         return {
-            "provider": provider,
+            "provider": "qdrant",
             "ready": False,
             "missing": list(_REQUIRED_COLLECTIONS),
             "empty": [],
@@ -117,7 +94,7 @@ def _warn_if_vector_store_empty() -> None:
             logger.warning(
                 "Vector store (%s) not ready (missing=%s empty=%s) — "
                 "run `python -m app.rag.indexer` or deploy/bootstrap.sh",
-                status.get("provider", settings.VECTOR_DB_PROVIDER),
+                status.get("provider", "qdrant"),
                 missing or "none",
                 empty or "none",
             )

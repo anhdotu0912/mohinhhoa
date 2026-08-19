@@ -1,4 +1,9 @@
-"""Shared test fixtures — isolated temp SQLite DB + seeded demo accounts."""
+"""Shared test fixtures — isolated in-memory SQLite DB + seeded demo accounts.
+
+Note: production/deployment only supports PostgreSQL (see ADR-005). The tests
+use an in-memory SQLite DB purely as a fast, hermetic test double — it is not
+a supported runtime configuration.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Hermetic tests: no LLM calls, local SQLite (ignore host .env Postgres).
+# Hermetic tests: no LLM calls, in-memory SQLite (ignore host .env Postgres).
 os.environ["PYTEST_RUNNING"] = "1"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["DEEPSEEK_API_KEY"] = ""
@@ -16,12 +21,11 @@ os.environ["LLM_API_KEY"] = ""
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["EMBEDDING_PROVIDER"] = "local"
 os.environ["GEMINI_API_KEY"] = ""
-os.environ["VECTOR_DB_PROVIDER"] = "qdrant"
 os.environ["SMTP_USERNAME"] = ""
 os.environ["SMTP_PASSWORD"] = ""
 
-import pytest  # noqa: E402
 import app.models  # noqa: E402,F401 — register nutrition catalog tables
+import pytest  # noqa: E402
 from app.db.init_db import seed_catalog, seed_demo_accounts  # noqa: E402
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402

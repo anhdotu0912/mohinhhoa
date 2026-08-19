@@ -1,17 +1,21 @@
-from app.rag.indexer import index_food_items
-from app.rag.retriever import retrieve_foods
-import chromadb
-from app.rag.embeddings import get_embedding_function
+"""Manual debug script: index + retrieve against an in-memory Qdrant client.
+
+Usage: python test_retriever.py (run from backend/)
+"""
+
 import traceback
 
-client = chromadb.Client() # ephemeral
+import qdrant_client
+from app.rag.indexer import index_food_items
+from app.rag.retriever import retrieve_foods
+
+client = qdrant_client.QdrantClient(":memory:")  # ephemeral
 print("Indexing...")
 index_food_items(client)
-print("Collections:", client.list_collections())
+print("Collections:", client.get_collections().collections)
 try:
     retrieve_foods("cơm", client=client)
     print("Retrieve success!")
-except Exception as e:
+except Exception:
     print("Retrieve failed:")
     traceback.print_exc()
-

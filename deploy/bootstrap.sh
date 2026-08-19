@@ -32,7 +32,7 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-echo "==> Indexing vector store (RAG, provider=${VECTOR_DB_PROVIDER:-qdrant})..."
+echo "==> Indexing vector store (RAG, Qdrant)..."
 $COMPOSE exec -T backend python -m app.rag.indexer
 
 if [[ -n "${DOMAIN:-}" ]]; then

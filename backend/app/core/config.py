@@ -1,8 +1,8 @@
 """Application settings loaded from environment / .env."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
-import os
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,12 +38,10 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_EMBEDDING_DIMENSION: int = 768
 
-    # Database
-    DATABASE_URL: str = "sqlite:///./app.db"
+    # Database — PostgreSQL only (see ADR-005 update 2026-08-19)
+    DATABASE_URL: str = "postgresql://p014:p014@localhost:5432/p014"
 
-    # Vector Store (qdrant | chroma)
-    VECTOR_DB_PROVIDER: str = "qdrant"
-    CHROMA_PERSIST_DIR: str = "./chroma_db"
+    # Vector Store — Qdrant only (see ADR-001 update 2026-08-19)
     QDRANT_PERSIST_DIR: str = "./qdrant_db"
     QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""

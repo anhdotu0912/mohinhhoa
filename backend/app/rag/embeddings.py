@@ -47,16 +47,21 @@ def embedding_provider() -> str:
 
 
 def _local_embedding_function():
-    from chromadb.utils import embedding_functions
+    """Callable wrapper around a local sentence-transformers model."""
+    from sentence_transformers import SentenceTransformer
 
     logger.info("Loading local embedding model: %s", settings.EMBEDDING_MODEL)
-    return embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name=settings.EMBEDDING_MODEL
-    )
+    model = SentenceTransformer(settings.EMBEDDING_MODEL)
+
+    def _encode(texts: list[str]) -> list[list[float]]:
+        vectors = model.encode(texts, convert_to_numpy=True)
+        return vectors.tolist()
+
+    return _encode
 
 
 class GeminiEmbeddingFunction:
-    """Chroma-compatible embedding function via Gemini embedContent / batchEmbedContents."""
+    """Embedding function via Gemini embedContent / batchEmbedContents."""
 
     def __init__(
         self,
@@ -206,7 +211,7 @@ class GeminiEmbeddingFunction:
             logger.warning(
                 "Gemini embedding failed after trying %s key(s) (%s), "
                 "falling back to local MiniLM — retrieval quality drops if "
-                "the Chroma index was built with Gemini",
+                "the Qdrant index was built with Gemini",
                 self._rotator.size,
                 exc,
             )
@@ -217,7 +222,7 @@ class GeminiEmbeddingFunction:
 
 
 class LocalEmbeddingFunction:
-    """Thin wrapper so Chroma always gets a callable object."""
+    """Thin wrapper exposing the local model as a callable embedding function."""
 
     def __init__(self) -> None:
         self._inner = _local_embedding_function()
@@ -249,7 +254,7 @@ def _gemini_embedding_function(input_kind: Literal["document", "query"]):
 
 @lru_cache(maxsize=1)
 def get_embedding_function():
-    """Return embedding function for Chroma indexing (document mode)."""
+    """Return embedding function for Qdrant indexing (document mode)."""
     provider = embedding_provider()
     if provider == "gemini":
         fn = _gemini_embedding_function("document")

@@ -2,6 +2,8 @@
 
 **Cập nhật 2026-08-18:** đồng bộ as-built sau Food Log + Metrics (2026-08-17) và Doctor Compliance View Done.
 
+**Cập nhật 2026-08-19:** đơn giản hoá hạ tầng dữ liệu — dự án chỉ còn dùng **2 database: Postgres (RDBMS) + Qdrant (vector store)**. Đã gỡ SQLite (default/dev) và ChromaDB (fallback) khỏi code, `docker-compose.yml`, `.env.example` (xem ADR-001, ADR-005 update).
+
 **Nguyên tắc thứ tự triển khai:** Guardrails thật (`guardrails/rules.py`/`source_check.py`) + `profile_loader` đọc DB thật khi chat luôn ưu tiên cao nhất (P0) — đây là gap chặn trực tiếp North Star demo chạy "thật" và vi phạm luật cứng `CLAUDE.md` Mục 7 nếu bỏ qua. **Gap KB tương tác thuốc–thực phẩm (Alert dùng KB rút gọn) đã được team chấp nhận cho vòng demo này (2026-08-15) — hạ khỏi P0.** Mọi tính năng mới khác đứng sau theo P1/P2.
 
 ## Bảng ánh xạ
@@ -26,7 +28,7 @@
 
 | # | Nội dung | ADR | MoSCoW | Owner |
 |---|---|---|---|---|
-| A1 | Migrate embedding: local MiniLM → **Gemini Embedding (`gemini-embedding-2`, gọi API)**, giữ MiniLM làm fallback offline, re-index toàn bộ Chroma | `adrs/003-embedding-model-choice.md` | Should | BE1 |
+| A1 | Migrate embedding: local MiniLM → **Gemini Embedding (`gemini-embedding-2`, gọi API)**, giữ MiniLM làm fallback offline, re-index toàn bộ vector store | `adrs/003-embedding-model-choice.md` | Should | BE1 |
 | A2 | LLM dual-provider fallback: OpenAI ↔ DeepSeek tự động thử provider phụ trước khi rơi về rule-based | `adrs/004-llm-provider-and-fallback-strategy.md` | Should | BE1 |
 
 ## Thứ tự triển khai đề xuất (theo mức độ chặn demo)

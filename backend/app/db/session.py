@@ -1,4 +1,11 @@
-"""SQLAlchemy engine/session — DATABASE_URL driven (SQLite local, Postgres prod)."""
+"""SQLAlchemy engine/session — PostgreSQL only (see ADR-005 update 2026-08-19).
+
+Note: pytest fixtures (`tests/conftest.py`) use an in-memory SQLite engine for
+hermetic/fast test isolation. That is a test-harness detail only — it is not a
+supported deployment target; `docker-compose.yml`/`.env.example` always point
+DATABASE_URL at Postgres. The `check_same_thread` shim below exists solely so
+those pytest fixtures keep working across FastAPI's threadpool.
+"""
 
 from __future__ import annotations
 
@@ -15,9 +22,8 @@ class Base(DeclarativeBase):
 def _database_url() -> str:
     """Normalize DATABASE_URL for SQLAlchemy.
 
-    - ``postgres://`` → ``postgresql://`` (các provider external hay trả scheme này;
-      SQLAlchemy 2.x chỉ chấp nhận ``postgresql://``).
-    - Giữ nguyên SQLite URL.
+    ``postgres://`` → ``postgresql://`` — some managed Postgres providers hand out
+    the former scheme, but SQLAlchemy 2.x only accepts ``postgresql://``.
     """
     url = settings.DATABASE_URL.strip()
     if url.startswith("postgres://"):
@@ -27,7 +33,7 @@ def _database_url() -> str:
 
 _engine_kwargs: dict = {}
 if settings.DATABASE_URL.startswith("sqlite"):
-    # SQLite: cần check_same_thread=False cho FastAPI multi-thread
+    # Test-harness only (see module docstring) — never used in deployment.
     _engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
     # Postgres: pool_pre_ping để né connection bị drop bởi managed DB

@@ -4,9 +4,7 @@ Target: ≥80% pass rate on 20 retrieval accuracy questions.
 """
 
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -20,26 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # ============================================================
 
 @pytest.fixture(scope="module")
-def chroma_dir():
-    """Create a temporary directory for test ChromaDB data."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Override settings
-        os.environ["CHROMA_PERSIST_DIR"] = tmpdir
-        yield tmpdir
-
-
-@pytest.fixture(scope="module")
-def indexed_client(chroma_dir):
-    """Build index and return ChromaDB client."""
-    # Need to reimport after env change
-    import importlib
-    from app.core import config as config_module
-    importlib.reload(config_module)
-
-    import chromadb
+def indexed_client():
+    """Build index and return a fully in-memory Qdrant client."""
+    import qdrant_client
     from app.rag.indexer import index_food_items, index_guidelines
 
-    client = chromadb.PersistentClient(path=chroma_dir)
+    client = qdrant_client.QdrantClient(":memory:")
     food_count = index_food_items(client)
     guideline_count = index_guidelines(client)
     assert food_count >= 20, f"Expected ≥20 food items, got {food_count}"
@@ -107,7 +91,7 @@ class TestIndexer:
             foods = json.load(f)
 
         for food in foods[:50]:  # Check first 50
-            assert "id" in food, f"Missing 'id' in food item"
+            assert "id" in food, "Missing 'id' in food item"
             assert "name" in food, f"Missing 'name' in {food.get('id', '?')}"
             assert "kcal" in food, f"Missing 'kcal' in {food['name']}"
             assert "macros" in food, f"Missing 'macros' in {food['name']}"
@@ -130,7 +114,7 @@ class TestIndexer:
 
     def test_index_builds_successfully(self, indexed_client):
         """Indexing should complete without errors."""
-        collections = indexed_client.list_collections()
+        collections = indexed_client.get_collections().collections
         col_names = [c.name for c in collections]
         assert "food_items" in col_names
         assert "guidelines" in col_names
@@ -176,7 +160,7 @@ class TestRetriever:
     )
     def test_retrieval_accuracy(self, indexed_client, query, expected_substr, collection_type):
         """Each RAG query should return at least one relevant result."""
-        from app.rag.retriever import retrieve_foods, retrieve_guidelines, retrieve_hybrid
+        from app.rag.retriever import retrieve_hybrid
 
         if collection_type == "food":
             results = retrieve_hybrid(query, top_k=10, collection_name="food_items", client=indexed_client)

@@ -26,7 +26,7 @@ RUN useradd -m appuser
 COPY backend/ /app/
 COPY data/ /data/
 
-RUN mkdir -p /app/data /app/chroma_db \
+RUN mkdir -p /app/data /app/qdrant_db \
     && chown -R appuser:appuser /app \
     && chmod +x /app/entrypoint.sh
 

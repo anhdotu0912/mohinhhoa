@@ -31,7 +31,6 @@ Thumbs.db
 # Runtime DB / vector index (corpus JSON in backend/data and data/clean is tracked)
 *.db
 *.sqlite3
-backend/chroma_db/
 backend/app.db
 # backend/qdrant_db/ is intentionally tracked — pre-built Qdrant snapshot for zero-setup demo deploy
 

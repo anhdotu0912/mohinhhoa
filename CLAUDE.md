@@ -45,13 +45,13 @@
 - LLM: GPT-4o-mini mặc định (`LLM_MODEL` + `OPENAI_API_KEY` trong env); as-built single-provider qua `LLM_PROVIDER` — ADR-004 đã quyết định dual-provider fallback OpenAI↔DeepSeek nhưng **Planned, chưa code**
 - Orchestration: LangGraph (Python) — facade `run_agent`
 - Embedding: **Gemini `gemini-embedding-2`** (default, `EMBEDDING_PROVIDER=gemini`) — `GEMINI_API_KEY=key1,key2,…` xoay khi 401/403/429/503; fallback local `paraphrase-multilingual-MiniLM-L12-v2` khi hết key hoặc lỗi API (ADR-003)
-- Vector DB: **Qdrant** mặc định (`VECTOR_DB_PROVIDER=qdrant`, `QDRANT_PERSIST_DIR` / `qdrant_db/`) — ADR-001; **ChromaDB** vẫn hỗ trợ fallback (`VECTOR_DB_PROVIDER=chroma`)
+- Vector DB: **Qdrant duy nhất** (`QDRANT_PERSIST_DIR` / `qdrant_db/`, hoặc `QDRANT_URL`/`QDRANT_API_KEY` cho remote/Cloud) — ADR-001 (update 2026-08-19: bỏ ChromaDB fallback)
 - RAG: dense retrieval (+ BM25 hybrid trong retriever)
 - Meal plan generate luôn chạy qua `meal_planner_agent`; `POST /interactions/check` luôn gọi `interaction_checker_agent` thật (`specs/05`, `specs/08`)
 
 **Backend**
 - Framework: FastAPI (Python)
-- Database: **SQLite** mặc định (`DATABASE_URL`); Postgres-ready — ADR-005
+- Database: **PostgreSQL duy nhất** (`DATABASE_URL`, mặc định `docker-compose.yml` service `postgres`) — ADR-005 (update 2026-08-19: bỏ SQLite khỏi default/dev; SQLite in-memory chỉ còn dùng nội bộ trong pytest fixtures)
 - Auth: JWT, 2 role API (`patient`, `doctor`)
 - Deploy hiện tại: `docker-compose` local + `docker-compose.prod.yml` VPS (`deploy/bootstrap.sh`); frontend có thể deploy Vercel qua GitHub Actions
 
@@ -112,12 +112,11 @@ P-014/
 │   │                               # alerts, notifications, doctor
 │   │                               # food_log, metrics
 │   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
-│   ├── rag/                        # indexer, retriever, embeddings (Qdrant default, Chroma fallback)
+│   ├── rag/                        # indexer, retriever, embeddings (Qdrant only)
 │   ├── guardrails/                 # rules.py đã code (chưa wired graph); source_check.py placeholder
 │   ├── models/ · schemas/ · services/ · db/
 ├── backend/data/                   # food_db_vn.json, drug_food_interactions.json, guidelines/
 ├── backend/qdrant_db/              # vector store Qdrant (tracked snapshot for zero-setup demo)
-├── backend/chroma_db/              # vector store Chroma fallback (gitignore)
 ├── frontend/app/
 │   ├── (auth)/                     # login, register
 │   ├── patient/                    # home, onboarding, meals, notifications, assistant...
@@ -229,7 +228,7 @@ Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 | CSDL thực phẩm VN thiếu/khó collect | Cao | USDA FoodData + map tên VN |
 | LangGraph / LLM không ổn định khi demo | Trung bình | Cache response; dùng model nhỏ; có sẵn index Qdrant snapshot trong repo |
 | RAG tiếng Việt accuracy thấp | Trung bình | Hybrid dense + BM25; eval query mẫu |
-| Qdrant local file lock / không scale multi-instance | Thấp | Chuyển `QDRANT_URL` sang Qdrant Cloud hoặc dùng Chroma fallback |
+| Qdrant local file lock / không scale multi-instance | Thấp | Chuyển `QDRANT_URL` sang Qdrant Server/Cloud |
 | Compliance không có cron thật | Trung bình | Event-driven materialize + `demo/simulate` seed mẫu |
 | API cost LLM vượt budget | Thấp | Cache, model nhỏ, mock mặc định |
 | Scope creep (Food Log quay lại) | Thấp | Food Log đã Done (ADR-009); giữ phạm vi structured manual, không mở NLP/ảnh |
@@ -276,7 +275,7 @@ Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
 
 | Skill | Trigger | Mục đích |
 |---|---|---|
-| `rag-indexing` | Index CSDL thực phẩm/guideline vào Chroma | Chuẩn hoá format chunk/metadata |
+| `rag-indexing` | Index CSDL thực phẩm/guideline vào Qdrant | Chuẩn hoá format chunk/metadata |
 | `langgraph-agent-node` | Tạo node mới trong LangGraph | Pattern input/output/error handling |
 | `interaction-checker` | Thêm cặp thuốc–thực phẩm | Format `{drug, food, mechanism, severity, recommendation}` |
 | `compliance-notification` | Thêm loại nhắc tuân thủ | Format type/schedule/status + API |
