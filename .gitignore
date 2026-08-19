@@ -91,3 +91,5 @@ reasonix.toml
 
 .cursor/
 .data/
+
+backend/data/chroma/
