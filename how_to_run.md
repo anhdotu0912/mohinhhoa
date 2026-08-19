@@ -96,6 +96,8 @@ Nếu bạn muốn chạy cả Frontend và Backend cùng lúc thông qua Docker
    ```
 3. Sau khi build xong, hệ thống sẽ tự động khởi chạy cả hai dịch vụ.
 
+**Deploy lên VPS (Postgres + Nginx + HTTPS):** xem [`deploy/README.md`](deploy/README.md) và chạy `./deploy/bootstrap.sh` sau khi cấu hình `.env` production.
+
 BÁC SĨ
 Email: demo_doctor@example.com
 Mật khẩu: demo1234

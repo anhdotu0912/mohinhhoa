@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -26,14 +27,40 @@ from app.core.errors import register_error_handlers
 from app.core.startup_checks import validate_security_settings
 from app.db.init_db import init_db
 
+logger = logging.getLogger(__name__)
+
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _warn_if_chroma_empty() -> None:
+    """Log when RAG collections are missing (run `python -m app.rag.indexer` after deploy)."""
+    try:
+        from app.rag.indexer import _get_chroma_client
+
+        client = _get_chroma_client()
+        existing = {collection.name for collection in client.list_collections()}
+        missing = [name for name in ("food_items", "guidelines") if name not in existing]
+        empty = [
+            name
+            for name in ("food_items", "guidelines")
+            if name in existing and client.get_collection(name).count() == 0
+        ]
+        if missing or empty:
+            logger.warning(
+                "ChromaDB not ready (missing=%s empty=%s) — run `python -m app.rag.indexer` or deploy/bootstrap.sh",
+                missing or "none",
+                empty or "none",
+            )
+    except Exception as exc:  # noqa: BLE001 — startup hint only
+        logger.warning("ChromaDB index check skipped: %s", exc)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_security_settings()
     init_db()
+    _warn_if_chroma_empty()
     yield
 
 
