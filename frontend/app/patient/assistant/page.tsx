@@ -115,7 +115,9 @@ export default function PatientAssistantPage() {
     setTimeout(() => setToastMessage(null), 4000);
   }, []);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
 
   const handleOpenFoodLog = async (msgMealPlanId?: string | null) => {
     setIsFetchingLogPlan(true);
@@ -165,8 +167,22 @@ export default function PatientAssistantPage() {
   const activeCitations = latestAiMessage?.citations ?? [];
   const hasConversation = messages.length > 0;
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleScroll = useCallback(() => {
+    if (!chatScrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollRef.current;
+    const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+    const nearBottom = distanceToBottom < 100;
+    isNearBottomRef.current = nearBottom;
+    setShowScrollBottomBtn(distanceToBottom > 180);
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior,
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -185,7 +201,9 @@ export default function PatientAssistantPage() {
   }, [hydrated, token, role, router]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (isNearBottomRef.current || isSending) {
+      scrollToBottom("smooth");
+    }
   }, [messages, isSending, scrollToBottom]);
 
   const mapAgentResponse = (response: AgentRunOutput): Omit<Message, "id" | "sender"> => ({
@@ -242,6 +260,8 @@ export default function PatientAssistantPage() {
       },
     ]);
     setIsSending(true);
+    isNearBottomRef.current = true;
+    setTimeout(() => scrollToBottom("smooth"), 50);
 
     let streamingText = "";
     let thinkingSteps: ThinkingStep[] = [];
@@ -337,6 +357,7 @@ export default function PatientAssistantPage() {
     setError(null);
     setInputQuery("");
     setShowReferences(false);
+    setShowHistory(false);
   };
 
   const isCompactViewport = () =>
@@ -386,99 +407,127 @@ export default function PatientAssistantPage() {
           </span>
         }
       />
-      <div className="flex-1 flex h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-background">
+      <div className="flex-1 flex min-h-0 h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-background relative">
         {showHistory && (
-          <div className="w-[240px] flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-20">
-            <div className="p-md flex items-center justify-between border-b border-outline-variant/40 shrink-0 bg-surface-container-lowest">
-              <span className="font-h2 text-h2 text-on-surface font-semibold text-sm">
-                Phiên chat
-              </span>
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 z-30 lg:hidden animate-fadeIn"
+              onClick={() => setShowHistory(false)}
+            />
+            <div className="w-[280px] lg:w-[240px] fixed lg:relative inset-y-0 left-0 lg:inset-auto flex-shrink-0 bg-surface-container-lowest border-r border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-40 lg:z-20 shadow-xl lg:shadow-none">
+              <div className="p-md flex items-center justify-between border-b border-outline-variant/40 shrink-0 bg-surface-container-lowest">
+                <span className="font-h2 text-h2 text-on-surface font-semibold text-sm flex items-center gap-xs">
+                  <span className="material-symbols-outlined text-primary text-[18px]">history</span>
+                  Phiên chat
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowHistory(false)}
+                  className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  title="Ẩn lịch sử"
+                >
+                  <span className="material-symbols-outlined text-[18px]">first_page</span>
+                </button>
+              </div>
+              <div className="p-md pt-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={handleNewConversation}
+                  className="w-full bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg py-sm px-md flex items-center justify-center gap-sm hover:bg-surface-container-low transition-colors shadow-xs text-xs cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  Cuộc trò chuyện mới
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto overscroll-contain px-sm pb-md flex flex-col gap-sm">
+                {hasConversation ? (
+                  <button
+                    type="button"
+                    className="w-full text-left p-sm rounded-lg bg-primary/10 ring-1 ring-primary/20 group transition-all"
+                  >
+                    <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
+                      {messages.find((m) => m.sender === "user")?.text ?? "Cuộc trò chuyện hiện tại"}
+                    </p>
+                    <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
+                      Phiên này · {messages.length} tin nhắn
+                    </p>
+                  </button>
+                ) : (
+                  <p className="px-sm py-md font-caption text-caption text-on-surface-variant text-xs">
+                    Chưa có hội thoại trong phiên này. Hãy gửi câu hỏi đầu tiên.
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="flex-1 bg-background flex flex-col min-h-0 h-full max-h-full overflow-hidden relative min-w-0">
+
+          <div className="bg-surface-container-lowest border-b border-outline-variant/60 px-md py-2 flex justify-between items-center z-10 shrink-0 shadow-2xs">
+            <div className="flex items-center gap-xs">
               <button
                 type="button"
-                onClick={() => setShowHistory(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
-                title="Ẩn lịch sử"
+                onClick={toggleHistory}
+                aria-expanded={showHistory}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  showHistory
+                    ? "bg-primary/10 text-primary border border-primary/30"
+                    : "bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant"
+                }`}
+                title={showHistory ? "Ẩn lịch sử trò chuyện" : "Mở lịch sử trò chuyện"}
               >
-                <span className="material-symbols-outlined text-[18px]">first_page</span>
+                <span className="material-symbols-outlined text-[16px]">history</span>
+                <span>{showHistory ? "Ẩn lịch sử" : "Lịch sử chat"}</span>
               </button>
-            </div>
-            <div className="p-md pt-xs shrink-0">
+
               <button
                 type="button"
                 onClick={handleNewConversation}
-                className="w-full bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg py-sm px-md flex items-center justify-center gap-sm hover:bg-surface-container-low transition-colors shadow-xs text-xs"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant transition-colors cursor-pointer"
+                title="Tạo cuộc trò chuyện mới"
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                Cuộc trò chuyện mới
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span className="hidden sm:inline">Đoạn chat mới</span>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain px-sm pb-md flex flex-col gap-sm">
-              {hasConversation ? (
-                <button
-                  type="button"
-                  className="w-full text-left p-sm rounded-lg bg-primary/10 ring-1 ring-primary/20 group transition-all"
-                >
-                  <p className="font-body-bold text-on-surface truncate text-sm font-semibold">
-                    {messages.find((m) => m.sender === "user")?.text ?? "Cuộc trò chuyện hiện tại"}
-                  </p>
-                  <p className="font-caption text-caption text-on-surface-variant truncate mt-xs text-xs">
-                    Phiên này · {messages.length} tin nhắn
-                  </p>
-                </button>
-              ) : (
-                <p className="px-sm py-md font-caption text-caption text-on-surface-variant text-xs">
-                  Chưa có hội thoại trong phiên này. Hãy gửi câu hỏi đầu tiên.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 bg-background flex flex-col h-full max-h-full overflow-hidden relative min-w-0">
-
-          <div className="bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 px-md py-xs flex justify-between items-center z-10 shrink-0 shadow-xs">
-            <button
-              type="button"
-              onClick={toggleHistory}
-              aria-expanded={showHistory}
-              className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
-                showHistory
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
-              }`}
-              title={showHistory ? "Ẩn lịch sử trò chuyện" : "Hiện lịch sử trò chuyện"}
-            >
-              <span className="material-symbols-outlined text-[16px]">history</span>
-              <span>{showHistory ? "Ẩn lịch sử" : "Hiện lịch sử"}</span>
-            </button>
-
-            <div className="text-xs text-on-surface-variant font-medium hidden sm:block">
-              Phân tích y khoa & Tư vấn Dinh dưỡng Cá nhân
+            <div className="text-xs text-on-surface-variant font-medium hidden md:flex items-center gap-xs">
+              <span className="material-symbols-outlined text-primary text-[15px]">verified_user</span>
+              <span>Phân tích y khoa & Tư vấn Dinh dưỡng Cá nhân</span>
             </div>
 
-            <button
-              type="button"
-              onClick={toggleReferences}
-              aria-expanded={showReferences}
-              className={`flex items-center gap-1.5 px-sm py-1 rounded-md text-xs font-medium transition-all ${
-                showReferences
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant"
-              }`}
-              title={showReferences ? "Ẩn tài liệu tham khảo" : "Hiện tài liệu tham khảo"}
-            >
-              <span className="material-symbols-outlined text-[16px]">library_books</span>
-              <span>{showReferences ? "Ẩn tham khảo" : "Hiện tham khảo"}</span>
-              {!showReferences && activeCitations.length > 0 ? (
-                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center">
-                  {activeCitations.length}
-                </span>
-              ) : null}
-            </button>
+            <div className="flex items-center gap-xs">
+              <button
+                type="button"
+                onClick={toggleReferences}
+                aria-expanded={showReferences}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  showReferences
+                    ? "bg-primary/10 text-primary border border-primary/30"
+                    : "bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant"
+                }`}
+                title={showReferences ? "Ẩn tài liệu tham khảo" : "Mở tài liệu tham khảo"}
+              >
+                <span className="material-symbols-outlined text-[16px]">library_books</span>
+                <span>{showReferences ? "Ẩn tham khảo" : "Tài liệu tham khảo"}</span>
+                {activeCitations.length > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center">
+                    {activeCitations.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className={`flex-1 p-lg flex flex-col gap-xl ${hasConversation ? "" : "justify-center"}`}>
+          <div
+            ref={chatScrollRef}
+            onScroll={handleScroll}
+            className={`flex-1 min-h-0 overflow-y-auto p-md md:p-lg flex flex-col gap-lg md:gap-xl overscroll-contain ${
+              hasConversation ? "" : "justify-center"
+            }`}
+          >
             {!hasConversation && (
               <div className="flex flex-col items-center justify-center mt-4 mb-4">
                 <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
@@ -877,11 +926,25 @@ export default function PatientAssistantPage() {
                 </div>
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
 
-          <div className="sticky bottom-0 z-30 p-md bg-background/95 backdrop-blur-md border-t border-outline-variant shadow-[0_-8px_24px_rgba(18,28,42,0.05)]">
+          {/* Floating scroll-to-bottom button */}
+          {showScrollBottomBtn && (
+            <button
+              type="button"
+              onClick={() => {
+                isNearBottomRef.current = true;
+                scrollToBottom("smooth");
+              }}
+              className="absolute bottom-24 right-6 z-20 bg-surface-container-lowest text-primary border border-primary/30 hover:border-primary px-3 py-1.5 rounded-full shadow-md flex items-center gap-1 text-xs font-medium transition-all hover:scale-105 active:scale-95 cursor-pointer animate-fadeIn"
+              title="Cuộn xuống tin nhắn mới nhất"
+            >
+              <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
+              <span>Tin mới nhất</span>
+            </button>
+          )}
+
+          <div className="shrink-0 z-10 p-md bg-background/95 backdrop-blur-md border-t border-outline-variant shadow-[0_-8px_24px_rgba(18,28,42,0.05)]">
             <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
               <textarea
                 value={inputQuery}
@@ -910,63 +973,69 @@ export default function PatientAssistantPage() {
         </div>
 
         {showReferences && (
-          <div className="w-[320px] flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-20">
-            <div className="p-md border-b border-outline-variant/50 flex items-center justify-between shrink-0 bg-surface-container-lowest z-10">
-              <div className="flex items-center gap-sm">
-                <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
-                <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">
-                  Tài liệu tham khảo
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowReferences(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors"
-                title="Ẩn tham khảo"
-              >
-                <span className="material-symbols-outlined text-[18px]">last_page</span>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
-              <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs shrink-0">
-                Nguồn từ câu trả lời AI gần nhất.
-              </p>
-
-              {activeCitations.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-outline-variant p-md text-center">
-                  <span className="material-symbols-outlined text-on-surface-variant text-[28px]">
-                    menu_book
-                  </span>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-sm">
-                    Chưa có nguồn trích dẫn cho tin nhắn này.
-                  </p>
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 z-30 lg:hidden animate-fadeIn"
+              onClick={() => setShowReferences(false)}
+            />
+            <div className="w-[320px] max-w-[85vw] fixed lg:relative inset-y-0 right-0 lg:inset-auto flex-shrink-0 bg-surface-container-lowest border-l border-outline-variant flex flex-col h-full max-h-full overflow-hidden sticky top-0 animate-fadeIn transition-all duration-300 z-40 lg:z-20 shadow-xl lg:shadow-none">
+              <div className="p-md border-b border-outline-variant/50 flex items-center justify-between shrink-0 bg-surface-container-lowest z-10">
+                <div className="flex items-center gap-sm">
+                  <span className="material-symbols-outlined text-primary text-[20px]">library_books</span>
+                  <h3 className="font-h2 text-h2 text-on-surface font-semibold text-base">
+                    Tài liệu tham khảo
+                  </h3>
                 </div>
-              ) : (
-                activeCitations.map((cite, idx) => (
-                  <div
-                    key={`${cite}-${idx}`}
-                    className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-sm">
-                      <div className="flex items-center gap-xs text-primary bg-primary/10 px-xs py-[2px] rounded text-[10px] font-bold">
-                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        NGUỒN #{idx + 1}
-                      </div>
-                    </div>
-                    <h4 className="font-body-bold text-body-bold text-on-surface mb-xs flex items-start gap-xs font-semibold text-sm">
-                      <span className="material-symbols-outlined text-[18px] text-primary mt-[2px] shrink-0">
-                        article
-                      </span>
-                      {formatCitationLabel(cite)}
-                    </h4>
-                    <p className="font-caption text-caption text-on-surface-variant text-xs break-all">
-                      {cite}
+                <button
+                  type="button"
+                  onClick={() => setShowReferences(false)}
+                  className="text-on-surface-variant hover:text-primary p-1 rounded-md hover:bg-surface-container-low transition-colors cursor-pointer"
+                  title="Ẩn tham khảo"
+                >
+                  <span className="material-symbols-outlined text-[18px]">last_page</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md bg-surface/50">
+                <p className="font-caption text-caption text-on-surface-variant text-xs mb-xs shrink-0">
+                  Nguồn từ câu trả lời AI gần nhất.
+                </p>
+
+                {activeCitations.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-outline-variant p-md text-center">
+                    <span className="material-symbols-outlined text-on-surface-variant text-[28px]">
+                      menu_book
+                    </span>
+                    <p className="font-caption text-caption text-on-surface-variant text-xs mt-sm">
+                      Chưa có nguồn trích dẫn cho tin nhắn này.
                     </p>
                   </div>
-                ))
-              )}
+                ) : (
+                  activeCitations.map((cite, idx) => (
+                    <div
+                      key={`${cite}-${idx}`}
+                      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm"
+                    >
+                      <div className="flex justify-between items-start mb-sm">
+                        <div className="flex items-center gap-xs text-primary bg-primary/10 px-xs py-[2px] rounded text-[10px] font-bold">
+                          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          NGUỒN #{idx + 1}
+                        </div>
+                      </div>
+                      <h4 className="font-body-bold text-body-bold text-on-surface mb-xs flex items-start gap-xs font-semibold text-sm">
+                        <span className="material-symbols-outlined text-[18px] text-primary mt-[2px] shrink-0">
+                          article
+                        </span>
+                        {formatCitationLabel(cite)}
+                      </h4>
+                      <p className="font-caption text-caption text-on-surface-variant text-xs break-all">
+                        {cite}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          </>
         )}
         {toastMessage && (
           <div className="fixed bottom-20 right-6 z-50 bg-emerald-700 text-white px-md py-sm rounded-xl shadow-lg flex items-center gap-sm animate-fadeIn text-xs font-medium">
