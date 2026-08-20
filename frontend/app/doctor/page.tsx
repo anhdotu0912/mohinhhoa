@@ -351,7 +351,7 @@ export default function DoctorDashboardPage() {
                         <div className="flex items-center gap-sm">
                           <div className="relative w-9 h-9 shrink-0">
                             <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
-                              {initials(patient.name)}
+                              <span translate="no" className="notranslate">{initials(patient.name)}</span>
                             </div>
                             {patient.avatar && (
                               <img
@@ -614,7 +614,7 @@ export default function DoctorDashboardPage() {
                   >
                     <div className="flex items-center gap-md">
                       <div className="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary font-body-bold shrink-0 font-bold">
-                        {plan.patientName.charAt(0)}
+                        <span translate="no" className="notranslate">{plan.patientName.charAt(0)}</span>
                       </div>
                       <div>
                         <div className="flex items-center gap-xs">
@@ -763,7 +763,7 @@ export default function DoctorDashboardPage() {
                     <div className="flex items-center gap-md">
                       {/* Avatar — chuẩn theo trang /doctor/patients */}
                       <div className="relative w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
-                        {initials(p.name)}
+                        <span translate="no" className="notranslate">{initials(p.name)}</span>
                         {p.avatar &&
                           !p.avatar.startsWith("https://api.dicebear.com") && (
                           <img

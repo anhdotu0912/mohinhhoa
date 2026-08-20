@@ -47,16 +47,14 @@ function NavLinks({
             key={item.id}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 cursor-pointer active:translate-x-1 ${
-              isActive
+            className={`flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 cursor-pointer active:translate-x-1 ${isActive
                 ? "text-primary font-body-bold border-r-4 border-primary bg-primary-container/10 font-semibold"
                 : "text-on-surface-variant font-body hover:text-primary hover:bg-surface-container-low"
-            }`}
+              }`}
           >
             <span
-              className={`material-symbols-outlined text-[26px] ${
-                isActive ? "text-primary" : ""
-              }`}
+              className={`material-symbols-outlined text-[26px] ${isActive ? "text-primary" : ""
+                }`}
             >
               {item.icon}
             </span>
