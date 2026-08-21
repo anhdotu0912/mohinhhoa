@@ -95,12 +95,21 @@ export function TopBar({
             >
               <span className="material-symbols-outlined">notifications</span>
             </Link>
-            <button
-              type="button"
-              className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant hidden md:flex"
-            >
-              <span className="material-symbols-outlined">settings</span>
-            </button>
+            {role === "patient" ? (
+              <Link
+                href="/patient/profile"
+                className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant hidden md:flex"
+              >
+                <span className="material-symbols-outlined">settings</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant hidden md:flex"
+              >
+                <span className="material-symbols-outlined">settings</span>
+              </button>
+            )}
             <img
               alt="User Avatar"
               className="w-[32px] h-[32px] rounded-full object-cover md:hidden border border-outline-variant"

@@ -113,33 +113,49 @@ function SidebarFooter({
     router.push("/login");
   };
 
+  const profileBlock = (
+    <>
+      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
+        <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
+          {initials(resolvedName)}
+        </div>
+        {avatarSrc ? (
+          <img
+            alt={`${meta.roleLabel} Profile`}
+            className="absolute inset-0 w-full h-full object-cover"
+            src={avatarSrc}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : null}
+      </div>
+      <div className="overflow-hidden">
+        <p className="font-body-bold text-body-bold text-on-surface truncate font-semibold">
+          {resolvedName}
+        </p>
+        <p className="font-caption text-caption text-on-surface-variant truncate">
+          {meta.roleLabel}
+        </p>
+      </div>
+    </>
+  );
+
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
-      <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
-        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
-          <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
-            {initials(resolvedName)}
-          </div>
-          {avatarSrc ? (
-            <img
-              alt={`${meta.roleLabel} Profile`}
-              className="absolute inset-0 w-full h-full object-cover"
-              src={avatarSrc}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ) : null}
+      {role === "patient" ? (
+        <Link
+          href="/patient/profile"
+          onClick={onNavigate}
+          className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm"
+        >
+          {profileBlock}
+        </Link>
+      ) : (
+        <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
+          {profileBlock}
         </div>
-        <div className="overflow-hidden">
-          <p className="font-body-bold text-body-bold text-on-surface truncate font-semibold">
-            {resolvedName}
-          </p>
-          <p className="font-caption text-caption text-on-surface-variant truncate">
-            {meta.roleLabel}
-          </p>
-        </div>
-      </div>
+      )}
 
       <button
         type="button"

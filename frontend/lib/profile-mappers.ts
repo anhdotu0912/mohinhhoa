@@ -58,6 +58,16 @@ export function diseaseLabelsToCodes(labels: string[]): string[] {
     .filter(Boolean);
 }
 
+/** Map API disease code → Vietnamese label (fallback: humanize code). */
+export function diseaseCodeToLabel(code: string): string {
+  const found = DISEASE_OPTIONS.find((d) => d.code === code);
+  return found?.label ?? code.replace(/_/g, " ");
+}
+
+export function diseaseCodesToLabels(codes: string[]): string[] {
+  return codes.map(diseaseCodeToLabel);
+}
+
 /** Normalize free-text med like "Metformin 500mg" → "metformin". */
 export function normalizeMedication(raw: string): string {
   const first = raw.trim().split(/[\s(,/\-]+/)[0] || "";
