@@ -115,7 +115,7 @@ function SidebarFooter({
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
       <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
         <div className="relative w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
-          <div className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
+          <div translate="no" className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
             {initials(resolvedName)}
           </div>
           {avatarSrc ? (

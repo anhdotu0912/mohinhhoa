@@ -464,7 +464,6 @@ export default function PatientAssistantPage() {
         )}
 
         <div className="flex-1 bg-background flex flex-col min-h-0 h-full max-h-full overflow-hidden relative min-w-0">
-
           <div className="w-full px-8 py-2.5 bg-white border-b border-outline-variant/30 flex items-center justify-between z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hidden md:flex shrink-0">
             {/* Left Side */}
             <div className="flex items-center gap-3">
@@ -474,7 +473,7 @@ export default function PatientAssistantPage() {
                 className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">history</span>
-                {showHistory ? "Hide history" : "Chat history"}
+                {showHistory ? "Ẩn lịch sử" : "Lịch sử chat"}
               </button>
               <button
                 type="button"
@@ -482,7 +481,7 @@ export default function PatientAssistantPage() {
                 className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
-                New chat
+                Chat mới
               </button>
             </div>
 
@@ -494,7 +493,7 @@ export default function PatientAssistantPage() {
                 className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm relative cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">article</span>
-                References
+                Tài liệu tham khảo
                 {activeCitations.length > 0 && (
                   <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center border-2 border-white shadow-sm">
                     {activeCitations.length}
@@ -504,7 +503,7 @@ export default function PatientAssistantPage() {
               
               <div className="flex items-center gap-1.5 text-[#006857] text-[13px] font-medium">
                 <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                Medical Analysis & Personalized Nutrition Advice
+                Phân tích Y khoa & Lời khuyên Dinh dưỡng Cá nhân hóa
               </div>
             </div>
           </div>
@@ -532,10 +531,10 @@ export default function PatientAssistantPage() {
 
                 {/* Greeting */}
                 <h1 className="text-4xl font-bold text-on-surface mb-2 text-center tracking-tight">
-                  Good morning, {displayName?.trim() ? displayName : "Nguyen Van A"}
+                  Chào mừng trở lại, {displayName?.trim() ? displayName : "Nguyen Van A"}
                 </h1>
                 <p className="text-on-surface-variant text-base mb-12 text-center">
-                  How can I help your health today?
+                  Tôi có thể giúp gì cho sức khỏe của bạn hôm nay?
                 </p>
 
                 {/* Quick Actions Grid */}
@@ -545,8 +544,8 @@ export default function PatientAssistantPage() {
                       <span className="material-symbols-outlined text-[24px]">restaurant</span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-on-surface text-base">What to eat today?</h3>
-                      <p className="text-on-surface-variant text-sm mt-0.5">Personalized menu suggestions</p>
+                      <h3 className="font-bold text-on-surface text-base">Hôm nay ăn gì?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Gợi ý thực đơn cá nhân hóa</p>
                     </div>
                   </button>
 
@@ -555,8 +554,8 @@ export default function PatientAssistantPage() {
                       <span className="material-symbols-outlined text-[24px]">show_chart</span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-on-surface text-base">How are my metrics?</h3>
-                      <p className="text-on-surface-variant text-sm mt-0.5">See heart rate & blood glucose</p>
+                      <h3 className="font-bold text-on-surface text-base">Chỉ số của tôi thế nào?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Xem nhịp tim & đường huyết</p>
                     </div>
                   </button>
 
@@ -565,8 +564,8 @@ export default function PatientAssistantPage() {
                       <span className="material-symbols-outlined text-[24px]">assignment</span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-on-surface text-base">What did the doctor say?</h3>
-                      <p className="text-on-surface-variant text-sm mt-0.5">Review expert advice</p>
+                      <h3 className="font-bold text-on-surface text-base">Bác sĩ dặn gì?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Xem lại lời khuyên chuyên gia</p>
                     </div>
                   </button>
 
@@ -575,8 +574,8 @@ export default function PatientAssistantPage() {
                       <span className="material-symbols-outlined text-[24px]">playlist_add_check</span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-on-surface text-base">Meal Recognition</h3>
-                      <p className="text-on-surface-variant text-sm mt-0.5">Quick calorie updates</p>
+                      <h3 className="font-bold text-on-surface text-base">Nhận diện bữa ăn</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Cập nhật calo nhanh chóng</p>
                     </div>
                   </button>
                 </div>
@@ -978,7 +977,7 @@ export default function PatientAssistantPage() {
                 }}
                 disabled={isSending}
                 className="flex-1 bg-transparent py-4 pl-6 pr-16 outline-none text-on-surface text-[15px] placeholder:text-on-surface-variant/50 relative z-0 resize-none h-[56px] min-h-[56px] leading-[24px]"
-                placeholder="Text VMEC-10..."
+                placeholder="Nhập câu hỏi hoặc ghi nhận bữa ăn..."
                 rows={1}
               />
               <button

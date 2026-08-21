@@ -8,6 +8,8 @@ import { MobileMenuContext } from "@/components/shared/MobileMenuContext";
 
 export { useMobileMenu } from "@/components/shared/MobileMenuContext";
 
+import { RightFloatingBar } from "@/components/shared/RightFloatingBar";
+
 export function AppShell({
   role,
   children,
@@ -48,6 +50,9 @@ export function AppShell({
         <div className={`md:ml-[240px] flex-1 flex flex-col w-full ${isAssistantPage ? "h-screen max-h-screen overflow-hidden" : "min-h-screen"}`}>
           <div className="flex-1 w-full flex flex-col overflow-hidden">{children}</div>
         </div>
+        
+        {/* Global Right Floating Bar */}
+        {role === "patient" && <RightFloatingBar />}
       </div>
     </MobileMenuContext.Provider>
   );
