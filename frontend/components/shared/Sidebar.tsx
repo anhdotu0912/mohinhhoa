@@ -47,16 +47,14 @@ function NavLinks({
             key={item.id}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 cursor-pointer active:translate-x-1 ${
-              isActive
+            className={`flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 cursor-pointer active:translate-x-1 ${isActive
                 ? "text-primary font-body-bold border-r-4 border-primary bg-primary-container/10 font-semibold"
                 : "text-on-surface-variant font-body hover:text-primary hover:bg-surface-container-low"
-            }`}
+              }`}
           >
             <span
-              className={`material-symbols-outlined text-[26px] ${
-                isActive ? "text-primary" : ""
-              }`}
+              className={`material-symbols-outlined text-[26px] ${isActive ? "text-primary" : ""
+                }`}
             >
               {item.icon}
             </span>
@@ -143,17 +141,21 @@ function SidebarFooter({
 
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
-      {role === "patient" ? (
-        <Link
-          href="/patient/profile"
-          onClick={onNavigate}
-          className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm"
-        >
-          {profileBlock}
-        </Link>
-      ) : (
-        <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
-          {profileBlock}
+      <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
+        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
+          <div translate="no" className="absolute inset-0 bg-primary/15 text-primary flex items-center justify-center font-label text-label font-semibold">
+            {initials(resolvedName)}
+          </div>
+          {avatarSrc ? (
+            <img
+              alt={`${meta.roleLabel} Profile`}
+              className="absolute inset-0 w-full h-full object-cover"
+              src={avatarSrc}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : null}
         </div>
       )}
 

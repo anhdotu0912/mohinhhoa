@@ -51,6 +51,7 @@ const config: Config = {
         secondary: "#005db6",
         "surface-tint": "#006b59",
         primary: "#006857",
+        "on-primary": "#ffffff",
         "error-container": "#ffdad6",
         surface: "#f8f9ff",
         "on-surface": "#121c2a",

@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { TopBar } from "@/components/shared/TopBar";
+import { TOPBAR_PATIENT_AVATAR_SRC } from "@/lib/nav-config";
 import {
   ChatThinkingSteps,
   ChatTypingDots,
@@ -96,6 +96,7 @@ export default function PatientAssistantPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
+  const displayName = useAuthStore((s) => s.displayName);
   const [hydrated, setHydrated] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputQuery, setInputQuery] = useState("");
@@ -391,22 +392,21 @@ export default function PatientAssistantPage() {
 
   return (
     <>
-      <TopBar
-        title="Trợ lý AI"
-        rightSlot={
-          <span className="px-sm py-[2px] rounded-full bg-primary/10 text-primary font-label text-xs border border-primary/20 flex items-center gap-xs shadow-2xs">
-            <span
-              className={`w-2 h-2 rounded-full bg-primary ${
-                isSending ? "animate-radar-pulse" : ""
-              }`}
-            />
-            {isSending
-              ? latestAiMessage?.thinkingSteps?.find((s) => s.status === "active")?.message ??
-                "Đang trả lời…"
-              : "Đang hoạt động"}
+      <header className="flex justify-between items-center px-8 py-5 w-full bg-[#F7F9F9] sticky top-0 z-30 shrink-0">
+        <div className="font-h1 text-h1 text-primary font-bold tracking-tight opacity-0 md:opacity-100">
+          VMEC-10
+        </div>
+        <div className="flex items-center gap-4 ml-auto">
+          <span className="material-symbols-outlined text-primary text-[20px]">
+            sensors
           </span>
-        }
-      />
+          <img
+            src={TOPBAR_PATIENT_AVATAR_SRC}
+            alt="User avatar"
+            className="w-8 h-8 rounded-full border border-outline-variant object-cover"
+          />
+        </div>
+      </header>
       <div className="flex-1 flex min-h-0 h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-background relative">
         {showHistory && (
           <>
@@ -464,60 +464,47 @@ export default function PatientAssistantPage() {
         )}
 
         <div className="flex-1 bg-background flex flex-col min-h-0 h-full max-h-full overflow-hidden relative min-w-0">
-
-          <div className="bg-surface-container-lowest border-b border-outline-variant/60 px-md py-2 flex justify-between items-center z-10 shrink-0 shadow-2xs">
-            <div className="flex items-center gap-xs">
+          <div className="w-full px-8 py-2.5 bg-white border-b border-outline-variant/30 flex items-center justify-between z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)] hidden md:flex shrink-0">
+            {/* Left Side */}
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={toggleHistory}
-                aria-expanded={showHistory}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  showHistory
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant"
-                }`}
-                title={showHistory ? "Ẩn lịch sử trò chuyện" : "Mở lịch sử trò chuyện"}
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">history</span>
-                <span>{showHistory ? "Ẩn lịch sử" : "Lịch sử chat"}</span>
+                {showHistory ? "Ẩn lịch sử" : "Lịch sử chat"}
               </button>
-
               <button
                 type="button"
                 onClick={handleNewConversation}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant transition-colors cursor-pointer"
-                title="Tạo cuộc trò chuyện mới"
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
-                <span className="hidden sm:inline">Đoạn chat mới</span>
+                Chat mới
               </button>
             </div>
 
-            <div className="text-xs text-on-surface-variant font-medium hidden md:flex items-center gap-xs">
-              <span className="material-symbols-outlined text-primary text-[15px]">verified_user</span>
-              <span>Phân tích y khoa & Tư vấn Dinh dưỡng Cá nhân</span>
-            </div>
-
-            <div className="flex items-center gap-xs">
+            {/* Right Side */}
+            <div className="flex items-center gap-6">
               <button
                 type="button"
                 onClick={toggleReferences}
-                aria-expanded={showReferences}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  showReferences
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:bg-surface-container-low border border-outline-variant"
-                }`}
-                title={showReferences ? "Ẩn tài liệu tham khảo" : "Mở tài liệu tham khảo"}
+                className="flex items-center gap-2 px-3 py-1.5 border border-[#006857] rounded-md text-[13px] text-[#006857] hover:bg-[#E4F2EE] transition-colors font-medium bg-white shadow-sm relative cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">library_books</span>
-                <span>{showReferences ? "Ẩn tham khảo" : "Tài liệu tham khảo"}</span>
+                <span className="material-symbols-outlined text-[16px]">article</span>
+                Tài liệu tham khảo
                 {activeCitations.length > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center">
+                  <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-none flex items-center justify-center border-2 border-white shadow-sm">
                     {activeCitations.length}
                   </span>
                 )}
               </button>
+              
+              <div className="flex items-center gap-1.5 text-[#006857] text-[13px] font-medium">
+                <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                Phân tích Y khoa & Lời khuyên Dinh dưỡng Cá nhân hóa
+              </div>
             </div>
           </div>
 
@@ -529,35 +516,68 @@ export default function PatientAssistantPage() {
             }`}
           >
             {!hasConversation && (
-              <div className="flex flex-col items-center justify-center mt-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-sm border border-outline-variant/30">
-                  <span className="material-symbols-outlined text-[32px] text-on-primary-container">
-                    smart_toy
-                  </span>
+              <div className="flex flex-col items-center w-full max-w-3xl mx-auto h-full justify-center mt-[-60px]">
+                {/* AI Avatar */}
+                <div className="w-40 h-40 rounded-full bg-gradient-to-br from-green-100 via-blue-50 to-white shadow-lg flex items-center justify-center mb-8 border-[6px] border-white relative">
+                  <div className="w-24 h-24 bg-[#006857] rounded-full flex items-center justify-center relative overflow-hidden shadow-inner">
+                    <div className="w-16 h-16 relative flex flex-col items-center justify-center">
+                      <div className="w-12 h-10 bg-[#34d399] rounded-xl flex items-center justify-center gap-2">
+                        <div className="w-2.5 h-2.5 bg-[#064e3b] rounded-full"></div>
+                        <div className="w-2.5 h-2.5 bg-[#064e3b] rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="font-h2 text-h2 text-on-surface mb-sm font-bold text-xl">
-                  Xin chào, tôi có thể giúp gì cho bạn?
-                </h3>
-                <p className="font-body text-body text-on-surface-variant text-center max-w-md text-sm">
-                  Tôi là Trợ lý AI NutriAI — hỗ trợ lập thực đơn, kiểm tra tương tác thuốc–thực
-                  phẩm và trả lời câu hỏi dinh dưỡng có nguồn trích dẫn.
+
+                {/* Greeting */}
+                <h1 className="text-4xl font-bold text-on-surface mb-2 text-center tracking-tight">
+                  Chào mừng trở lại, {displayName?.trim() ? displayName : "Nguyen Van A"}
+                </h1>
+                <p className="text-on-surface-variant text-base mb-12 text-center">
+                  Tôi có thể giúp gì cho sức khỏe của bạn hôm nay?
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-sm mt-lg w-full max-w-2xl">
-                  {SAMPLE_QUESTIONS.map((q) => (
-                    <button
-                      key={q.text}
-                      type="button"
-                      disabled={isSending}
-                      onClick={() => void handleSend(q.text)}
-                      className="p-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-left hover:border-primary hover:bg-surface-container-low transition-colors shadow-sm flex items-start gap-sm cursor-pointer disabled:opacity-60"
-                    >
-                      <span className="material-symbols-outlined text-primary mt-[2px] text-[18px]">
-                        {q.icon}
-                      </span>
-                      <span className="font-body text-body text-on-surface text-sm">{q.text}</span>
-                    </button>
-                  ))}
+                {/* Quick Actions Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                  <button onClick={() => handleSend("What to eat today?")} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#006857] bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-all group text-left cursor-pointer">
+                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-[#2f8f7a] shrink-0 group-hover:bg-[#2f8f7a] group-hover:text-white transition-colors">
+                      <span className="material-symbols-outlined text-[24px]">restaurant</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-on-surface text-base">Hôm nay ăn gì?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Gợi ý thực đơn cá nhân hóa</p>
+                    </div>
+                  </button>
+
+                  <button onClick={() => handleSend("How are my metrics?")} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#006857] bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-all group text-left cursor-pointer">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <span className="material-symbols-outlined text-[24px]">show_chart</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-on-surface text-base">Chỉ số của tôi thế nào?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Xem nhịp tim & đường huyết</p>
+                    </div>
+                  </button>
+
+                  <button onClick={() => handleSend("What did the doctor say?")} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#006857] bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-all group text-left cursor-pointer">
+                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500 shrink-0 group-hover:bg-red-500 group-hover:text-white transition-colors">
+                      <span className="material-symbols-outlined text-[24px]">assignment</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-on-surface text-base">Bác sĩ dặn gì?</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Xem lại lời khuyên chuyên gia</p>
+                    </div>
+                  </button>
+
+                  <button onClick={() => handleSend("Meal Recognition")} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#006857] bg-white shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-md transition-all group text-left cursor-pointer">
+                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-[#2f8f7a] shrink-0 group-hover:bg-[#2f8f7a] group-hover:text-white transition-colors">
+                      <span className="material-symbols-outlined text-[24px]">playlist_add_check</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-on-surface text-base">Nhận diện bữa ăn</h3>
+                      <p className="text-on-surface-variant text-sm mt-0.5">Cập nhật calo nhanh chóng</p>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -944,8 +964,8 @@ export default function PatientAssistantPage() {
             </button>
           )}
 
-          <div className="shrink-0 z-10 p-md bg-background/95 backdrop-blur-md border-t border-outline-variant shadow-[0_-8px_24px_rgba(18,28,42,0.05)]">
-            <div className="relative bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all flex items-end p-xs">
+          <div className="w-full max-w-3xl mx-auto px-4 mt-auto z-10 sticky bottom-0 bg-[#F7F9F9]/90 backdrop-blur-sm pb-8 pt-4">
+            <div className="relative flex items-center w-full bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.06)] rounded-full overflow-hidden border-2 border-[#006857]">
               <textarea
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
@@ -956,17 +976,17 @@ export default function PatientAssistantPage() {
                   }
                 }}
                 disabled={isSending}
-                className="flex-1 bg-transparent border-none focus:ring-0 resize-none font-body text-body text-on-surface p-sm min-h-[40px] max-h-[120px] focus:outline-none disabled:opacity-60"
-                placeholder="Nhập câu hỏi của bạn..."
+                className="flex-1 bg-transparent py-4 pl-6 pr-16 outline-none text-on-surface text-[15px] placeholder:text-on-surface-variant/50 relative z-0 resize-none h-[56px] min-h-[56px] leading-[24px]"
+                placeholder="Nhập câu hỏi hoặc ghi nhận bữa ăn..."
                 rows={1}
               />
               <button
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={isSending || !inputQuery.trim()}
-                className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-colors shrink-0 mb-[2px] mr-[2px] cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="absolute right-2 w-10 h-10 bg-[#006857] text-white rounded-full flex items-center justify-center hover:bg-[#005142] transition-colors shadow-md z-10 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span className="material-symbols-outlined text-[20px]">send</span>
+                <span className="material-symbols-outlined text-[18px]">send</span>
               </button>
             </div>
           </div>

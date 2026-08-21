@@ -201,17 +201,14 @@ export function MetricsProgressChart({ history, loading = false }: Props) {
   };
 
   return (
-    <section className="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-subtle p-card-padding">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-5 pb-4 border-b border-outline-variant">
+    <section className="bg-white rounded-[24px] border border-gray-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] p-6 md:p-8 relative overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-8">
         <div>
-          <h2 className="font-h2 text-h2 text-on-surface font-semibold text-lg">
-            Biểu đồ tiến triển
+          <h2 className="font-bold text-lg text-on-surface">
+            Biểu đồ tiến trình
           </h2>
-          <p className="text-xs text-on-surface-variant mt-1">
-            Mỗi ngày lấy lần ghi nhận gần nhất. Trục đứng riêng cho từng chỉ số.
-          </p>
         </div>
-        <span className="text-xs text-on-surface-variant shrink-0">7 ngày qua</span>
+        <span className="text-[13px] font-medium text-on-surface-variant shrink-0 mt-1">7 ngày qua</span>
       </div>
 
       {loading ? (
@@ -227,7 +224,7 @@ export function MetricsProgressChart({ history, loading = false }: Props) {
           onMouseMove={onMove}
           onMouseLeave={() => setHoverIndex(null)}
         >
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {METRICS.map((metric) => {
               const values = days
                 .map((d) => metricValue(d, metric.id))
@@ -345,8 +342,8 @@ export function MetricsProgressChart({ history, loading = false }: Props) {
             {days.map((day, i) => (
               <span
                 key={day.key}
-                className={`absolute top-0 whitespace-nowrap text-[11px] tabular-nums -translate-x-1/2 ${
-                  day.isToday ? "text-[#2F8F7A] font-semibold" : "text-on-surface-variant"
+                className={`absolute top-0 whitespace-nowrap text-[12px] font-medium tabular-nums -translate-x-1/2 ${
+                  day.isToday ? "text-[#006857] font-bold" : "text-on-surface-variant"
                 }`}
                 style={{ left: `${(plotX(i, days.length) / VIEW_W) * 100}%` }}
               >
