@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import DoctorMessagesPage from "../page";
-
+// Tin nhắn chưa có backend (chưa từng có spec) — ẩn khỏi doctor portal production.
 export default function ConversationDetailPage() {
-  return <DoctorMessagesPage />;
+  redirect("/doctor");
 }

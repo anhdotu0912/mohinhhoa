@@ -35,7 +35,6 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
       href: "/doctor/history",
       icon: "history",
     },
-    { id: "messages", label: "Tin nhắn", href: "/doctor/messages", icon: "forum" },
   ],
   patient: [
     { id: "home", label: "Trang chủ", href: "/patient", icon: "dashboard" },

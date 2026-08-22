@@ -81,28 +81,19 @@ function matchesTimeFilter(
     planDate.getDate()
   ).getTime();
 
-  // Mock reference date (12/10/2023)
-  const mockRefDate = new Date(2023, 9, 12);
-  const mockRefStart = new Date(2023, 9, 12).getTime();
-
   if (preset === "today") {
-    return planDayStart === todayStart || planDayStart === mockRefStart;
+    return planDayStart === todayStart;
   }
 
   if (preset === "week") {
-    return (
-      isDateInSameWeek(planDate, now) || isDateInSameWeek(planDate, mockRefDate)
-    );
+    return isDateInSameWeek(planDate, now);
   }
 
   if (preset === "month") {
-    const isCurrentMonth =
+    return (
       planDate.getMonth() === now.getMonth() &&
-      planDate.getFullYear() === now.getFullYear();
-    const isMockMonth =
-      planDate.getMonth() === mockRefDate.getMonth() &&
-      planDate.getFullYear() === mockRefDate.getFullYear();
-    return isCurrentMonth || isMockMonth;
+      planDate.getFullYear() === now.getFullYear()
+    );
   }
 
   if (preset === "custom") {

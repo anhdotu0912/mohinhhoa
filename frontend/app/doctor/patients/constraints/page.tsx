@@ -8,7 +8,7 @@ import { TopBar } from "@/components/shared/TopBar";
 import Pagination, { getPageItems } from "@/components/shared/Pagination";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { doctorPatientToUi, type Patient, MOCK_PATIENTS } from "@/lib/mock-data";
+import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { shortCondition } from "@/lib/format";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 
@@ -154,15 +154,13 @@ export default function PatientConstraintsPage() {
     setLoadError(null);
     try {
       const rows = await api.listDoctorPatients();
-      if (rows && rows.length > 0) {
-        setPatients(rows.map(toUiPatient));
-      } else {
-        setPatients(MOCK_PATIENTS);
-      }
+      setPatients(rows.map(toUiPatient));
     } catch (err) {
-      setPatients(MOCK_PATIENTS);
+      setPatients([]);
       if (err instanceof ApiError && err.status !== 401) {
         setLoadError(err.message);
+      } else if (!(err instanceof ApiError)) {
+        setLoadError("Không tải được danh sách bệnh nhân. Kiểm tra backend.");
       }
     } finally {
       setLoading(false);
