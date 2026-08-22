@@ -141,7 +141,7 @@ export default function PatientHistoryPage() {
           return {
             period,
             date: new Date(l.logged_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
-            name: l.meal_id || "Bữa ăn tự do",
+            name: l.note || (l.slot === "morning" ? "Bữa sáng" : l.slot === "noon" ? "Bữa trưa" : "Bữa tối") + (l.type === "custom" ? " tự do" : ""),
             calories: "500 kcal", // Mock calories for now
             status: l.type === "as_planned" ? "completed" : "custom"
           };

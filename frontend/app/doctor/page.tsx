@@ -209,7 +209,7 @@ export default function DoctorDashboardPage() {
         </div>
       )}
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-lg w-full">
         {/* Summary Cards (4 columns) */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-section-gap">
           {/* Card 1 */}
@@ -305,10 +305,10 @@ export default function DoctorDashboardPage() {
           </Link>
         </section>
 
-        {/* Main Section (2 cols, 2:1 ratio) */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-lg mb-section-gap">
-          {/* Left Col (2/3 width) - Bệnh nhân cần chú ý */}
-          <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden flex flex-col">
+        {/* Main Section (1:1 ratio) */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-lg mb-section-gap">
+          {/* Left Col (1/2 width) - Bệnh nhân cần chú ý */}
+          <div className="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden flex flex-col">
             <div className="p-card-padding border-b border-outline-variant bg-surface flex justify-between items-center">
               <div>
                 <h3 className="font-h2 text-h2 text-on-surface font-semibold">
@@ -400,7 +400,7 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
 
-          {/* Right Col (1/3 width) - Biểu đồ tuân thủ dinh dưỡng */}
+          {/* Right Col (1/2 width) - Biểu đồ tuân thủ dinh dưỡng */}
           <div className="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs p-card-padding flex flex-col justify-between">
             <div>
               {/* Header & Controls */}
