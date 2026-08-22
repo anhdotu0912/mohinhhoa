@@ -93,3 +93,7 @@ reasonix.toml
 .data/
 
 backend/data/chroma/
+
+.agents/
+.agent/
+.gemini/skills/

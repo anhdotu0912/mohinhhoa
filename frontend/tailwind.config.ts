@@ -58,6 +58,11 @@ const config: Config = {
         background: "#f8f9ff",
         "tertiary-container": "#9c6b00",
         "custom-teal": "#2f8f7a",
+        // --- patient-chat mockup tokens (ui/stitch_vmec_10_health_assistant) ---
+        "text-primary": "#141b2b",
+        "text-secondary": "#3c4a42",
+        "glass-surface": "rgba(255, 255, 255, 0.7)",
+        "emerald-ring": "rgba(16, 185, 129, 0.4)",
       },
       borderRadius: {
         DEFAULT: "0.25rem",
@@ -78,6 +83,11 @@ const config: Config = {
         md: "16px",
         "container-max-width": "1500px",
         "section-py": "96px",
+        // patient-chat mockup spacing
+        gutter: "20px",
+        "margin-mobile": "16px",
+        "margin-desktop": "64px",
+        unit: "4px",
       },
       maxWidth: {
         "container-max-width": "1500px",
@@ -91,6 +101,15 @@ const config: Config = {
         label: ["var(--font-inter)", "sans-serif"],
         h1: ["var(--font-inter)", "sans-serif"],
         "body-bold": ["var(--font-inter)", "sans-serif"],
+        // patient-chat mockup typography
+        "display-lg": ["var(--font-inter)", "sans-serif"],
+        "label-md": ["var(--font-inter)", "sans-serif"],
+        "title-lg": ["var(--font-inter)", "sans-serif"],
+        "headline-lg-mobile": ["var(--font-inter)", "sans-serif"],
+        "headline-lg": ["var(--font-inter)", "sans-serif"],
+        "label-caps": ["var(--font-inter)", "sans-serif"],
+        "body-md": ["var(--font-inter)", "sans-serif"],
+        "body-lg": ["var(--font-inter)", "sans-serif"],
       },
       fontSize: {
         h2: ["18px", { lineHeight: "26px", letterSpacing: "-0.01em", fontWeight: "600" }],
@@ -101,10 +120,22 @@ const config: Config = {
         "body-bold": ["14px", { lineHeight: "20px", fontWeight: "600" }],
         display: ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
         title: ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        // patient-chat mockup font sizes
+        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+        "title-lg": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
       },
       boxShadow: {
         subtle: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
         hover: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+        // --- patient-chat mockup shadows ---
+        "emerald-ring": "0 0 20px rgba(16, 185, 129, 0.4)",
+        "glass-card": "0 8px 32px rgba(16, 185, 129, 0.05)",
       },
     },
   },

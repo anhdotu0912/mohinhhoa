@@ -5,17 +5,47 @@ Reads JSON from stdin, normalizes to common format, appends to .ai-log/session.j
 """
 import json
 import os
+import shutil
 import sys
 import subprocess
 from datetime import datetime, timezone, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 VN_TZ = timezone(timedelta(hours=7))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_WIN_GIT_CANDIDATES = (
+    Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "cmd" / "git.exe",
+    Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "git.exe",
+    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Git" / "cmd" / "git.exe",
+    Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Git" / "cmd" / "git.exe",
+)
 
 
-def git(cmd):
+@lru_cache(maxsize=1)
+def _git_exe() -> str | None:
+    """Locate git even when Cursor's hook PATH omits Git for Windows."""
+    found = shutil.which("git")
+    if found:
+        return found
+    for cand in _WIN_GIT_CANDIDATES:
+        if cand and cand.is_file():
+            return str(cand)
+    return None
+
+
+def git(*args: str) -> str:
+    exe = _git_exe()
+    if not exe:
+        return ""
     try:
-        return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip()
+        return subprocess.check_output(
+            [exe, *args],
+            cwd=REPO_ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
     except Exception:
         return ""
 
@@ -34,8 +64,9 @@ def detect_tool(data: dict) -> str:
     tool_env = os.environ.get("AI_TOOL_NAME", "").lower()
     if tool_env:
         return tool_env
-    # Heuristics
-    if "transcript_path" in data:
+    # Heuristics. Cursor 3.x always sends transcript_path (often null);
+    # only a non-empty path means Codex.
+    if data.get("transcript_path"):
         return "codex"
     if data.get("hook_event_name", "").startswith(("Before", "After", "Session", "Pre", "Notification")):
         return "gemini"
@@ -59,7 +90,7 @@ def normalize(data: dict, tool: str) -> dict | None:
     # origin isn't set), skip the event entirely — these entries can't be
     # tied back to a team on the server and would just clutter the pending
     # queue forever.
-    origin = git("git remote get-url origin")
+    origin = git("remote", "get-url", "origin")
     if not origin:
         return None
     repo = origin.rstrip("/").split("/")[-1]
@@ -77,9 +108,9 @@ def normalize(data: dict, tool: str) -> dict | None:
         ),
         "model": data.get("model", ""),
         "repo": repo,
-        "branch": git("git rev-parse --abbrev-ref HEAD"),
-        "commit": git("git rev-parse --short HEAD"),
-        "student": git("git config user.email"),
+        "branch": git("rev-parse", "--abbrev-ref", "HEAD"),
+        "commit": git("rev-parse", "--short", "HEAD"),
+        "student": git("config", "user.email"),
     }
 
     if tool == "claude":
@@ -173,15 +204,17 @@ def main():
     if not entry:
         sys.exit(0)
 
-    log_dir = Path(os.environ.get("AI_LOG_DIR", ".ai-log"))
+    log_dir = Path(os.environ.get("AI_LOG_DIR", REPO_ROOT / ".ai-log"))
+    if not log_dir.is_absolute():
+        log_dir = REPO_ROOT / log_dir
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / "session.jsonl"
 
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    # Output valid JSON (required by some tools like Gemini)
-    print(json.dumps({"status": "logged"}))
+    # Valid JSON on stdout. `continue` is recognized by Cursor beforeSubmitPrompt.
+    print(json.dumps({"status": "logged", "continue": True}))
 
 
 if __name__ == "__main__":

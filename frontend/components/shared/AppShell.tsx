@@ -5,10 +5,9 @@ import { usePathname } from "next/navigation";
 import type { AppRole } from "@/lib/nav-config";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { MobileMenuContext } from "@/components/shared/MobileMenuContext";
+import { PatientChatShell } from "@/components/patient-chat/PatientChatShell";
 
 export { useMobileMenu } from "@/components/shared/MobileMenuContext";
-
-import { RightFloatingBar } from "@/components/shared/RightFloatingBar";
 
 export function AppShell({
   role,
@@ -35,25 +34,31 @@ export function AppShell({
     [mobileMenuOpen, openMobileMenu, closeMobileMenu, role]
   );
 
-  const isAssistantPage = Boolean(pathname?.includes("/assistant"));
-
   if (hideChrome) {
     return (
       <MobileMenuContext.Provider value={value}>{children}</MobileMenuContext.Provider>
     );
   }
 
+  // Branch for Patient: Use modern PatientChatShell (No sidebar)
+  if (role === "patient") {
+    return (
+      <MobileMenuContext.Provider value={value}>
+        <PatientChatShell>{children}</PatientChatShell>
+      </MobileMenuContext.Provider>
+    );
+  }
+
+  // Branch for Doctor: Keep 100% identical layout and Sidebar
   return (
     <MobileMenuContext.Provider value={value}>
-      <div className={`bg-[#F7F8FA] text-on-surface flex font-body text-body ${isAssistantPage ? "h-screen max-h-screen overflow-hidden" : "min-h-screen"}`}>
+      <div className="bg-[#F7F8FA] text-on-surface flex font-body text-body min-h-screen">
         <Sidebar role={role} />
-        <div className={`md:ml-[240px] flex-1 flex flex-col w-full ${isAssistantPage ? "h-screen max-h-screen overflow-hidden" : "min-h-screen"}`}>
+        <div className="md:ml-[240px] flex-1 flex flex-col w-full min-h-screen">
           <div className="flex-1 w-full flex flex-col overflow-hidden">{children}</div>
         </div>
-        
-        {/* Global Right Floating Bar */}
-        {role === "patient" && <RightFloatingBar />}
       </div>
     </MobileMenuContext.Provider>
   );
 }
+

@@ -1,19 +1,149 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
+import { ApiError, type AgentRunOutput, type MealPreviewOut } from "@/lib/types";
+import { ChatThinkingSteps, ChatTypingDots, type ThinkingStep } from "@/components/patient/ChatThinkingSteps";
+import { detectMockCardIntent, type MockCardIntent } from "@/lib/patient-chat-mock-intents";
+import { usePatientPanel } from "@/components/patient-chat/PatientPanelProvider";
+import {
+  usePatientChatHistoryStore,
+  type ChatMessage as Message,
+} from "@/lib/patient-chat-history-store";
 
-export default function PatientDashboardPage() {
+// Generative-UI Cards
+import { MealSuggestionCard } from "@/components/patient-chat/cards/MealSuggestionCard";
+import { IngredientMapCard } from "@/components/patient-chat/cards/IngredientMapCard";
+import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComplianceCard";
+import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
+
+export type { Message };
+
+const SAMPLE_CHIPS = [
+  {
+    id: "meal",
+    title: "Hôm nay ăn gì?",
+    subtitle: "Gợi ý thực đơn cá nhân hóa",
+    icon: "restaurant",
+    colorClass: "bg-emerald-50 text-[#006857]",
+    prompt: "Hôm nay tôi nên ăn gì?",
+  },
+  {
+    id: "metrics",
+    title: "Chỉ số của tôi thế nào?",
+    subtitle: "Xem nhịp tim & đường huyết",
+    icon: "monitoring",
+    colorClass: "bg-blue-50 text-blue-600",
+    prompt: "Tuân thủ của tôi tuần này thế nào?",
+  },
+  {
+    id: "doctor",
+    title: "Bác sĩ dặn gì?",
+    subtitle: "Xem lại lời khuyên chuyên môn",
+    icon: "clinical_notes",
+    colorClass: "bg-amber-50 text-amber-600",
+    prompt: "Bác sĩ có dặn gì tôi không?",
+  },
+  {
+    id: "foodlog",
+    title: "Ghi nhận bữa ăn",
+    subtitle: "Cập nhật calo nhanh chóng",
+    icon: "edit_note",
+    colorClass: "bg-emerald-50 text-[#006857]",
+    prompt: "",
+    action: "open_meal_panel",
+  },
+];
+
+const BOT_VIDEO_SRC = "/video/video_chatbot.mp4";
+
+function CitationsAccordion({ citations }: { citations: string[] }) {
+  const [open, setOpen] = useState(false);
+  if (!citations || citations.length === 0) return null;
+
+  return (
+    <div className="pt-1.5 text-xs">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-medium py-1 px-2 rounded-md hover:bg-slate-200/50 transition-colors cursor-pointer group"
+      >
+        <span className="material-symbols-outlined text-[15px] text-emerald-600 group-hover:scale-110 transition-transform">
+          menu_book
+        </span>
+        <span>Nguồn trích dẫn ({citations.length})</span>
+        <span
+          className={`material-symbols-outlined text-[15px] text-slate-400 group-hover:text-slate-600 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          expand_more
+        </span>
+      </button>
+
+      {open && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 pl-1 animate-in fade-in duration-200">
+          {citations.map((c, i) => (
+            <span
+              key={i}
+              className="bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 px-2.5 py-0.5 rounded-md text-[11px] text-slate-700 font-medium transition-colors shadow-2xs"
+            >
+              {c.replace(/_/g, " ").replace(/\.md$/i, "")}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const emptySubscribe = () => () => {};
+
+export default function PatientChatHomePage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
   const displayName = useAuthStore((s) => s.displayName);
-  const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => {
-    setHydrated(true);
+  const { openPanel } = usePatientPanel();
+
+  const sessions = usePatientChatHistoryStore((s) => s.sessions);
+  const activeSessionId = usePatientChatHistoryStore((s) => s.activeSessionId);
+  const createNewSession = usePatientChatHistoryStore((s) => s.createNewSession);
+  const saveActiveSessionMessages = usePatientChatHistoryStore((s) => s.saveActiveSessionMessages);
+  const autoUpdateTitleIfFirstMessage = usePatientChatHistoryStore((s) => s.autoUpdateTitleIfFirstMessage);
+
+  const hydrated = React.useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputQuery, setInputQuery] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [appliedPlans, setAppliedPlans] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const messageIdCounter = useRef(0);
+  const getNextMessageId = useCallback((prefix: string) => {
+    messageIdCounter.current += 1;
+    return `${prefix}-${messageIdCounter.current}`;
   }, []);
+
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  // Synchronize active session messages into local component state
+  useEffect(() => {
+    if (!hydrated) return;
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    if (currentSession) {
+      setMessages(currentSession.messages || []);
+      setAppliedPlans(currentSession.appliedPlans || {});
+    } else if (!activeSessionId) {
+      setMessages([]);
+      setAppliedPlans({});
+    }
+  }, [activeSessionId, hydrated, sessions]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -26,322 +156,469 @@ export default function PatientDashboardPage() {
     }
   }, [hydrated, token, role, router]);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!chatScrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollRef.current;
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 150;
+  }, []);
+
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
+    }
+  }, [messages, scrollToBottom]);
+
+  const handleApplyMealPlan = useCallback((planId: string) => {
+    setAppliedPlans((prev) => {
+      const updated = { ...prev, [planId]: true };
+      saveActiveSessionMessages(messages, updated);
+      return updated;
+    });
+    setToastMessage("Đã lưu và áp dụng thực đơn!");
+    setTimeout(() => setToastMessage(null), 4000);
+  }, [messages, saveActiveSessionMessages]);
+
+  const mapAgentResponse = (response: AgentRunOutput): Omit<Message, "id" | "sender"> => ({
+    text: response.message,
+    intent: response.intent,
+    secondaryIntents: response.secondary_intents ?? [],
+    citations: response.citations ?? [],
+    guardrailTriggered: response.guardrail_triggered,
+    mealPlanId: response.meal_plan_id,
+    mealPreview: response.meal_preview ?? null,
+    isStreaming: false,
+  });
+
+  const upsertThinkingStep = (
+    steps: ThinkingStep[],
+    node: string,
+    message: string
+  ): ThinkingStep[] => {
+    const next = steps.map((s) =>
+      s.status === "active" ? { ...s, status: "done" as const } : s
+    );
+    const existingIdx = next.findIndex((s) => s.node === node && s.message === message);
+    if (existingIdx >= 0) {
+      next[existingIdx] = { ...next[existingIdx], status: "active" };
+      return next;
+    }
+    return [...next, { node, message, status: "active" }];
+  };
+
+  const handleSend = async (textToSend?: string) => {
+    const query = (textToSend ?? inputQuery).trim();
+    if (!query || isSending) return;
+
+    let curSessionId = activeSessionId;
+    if (!curSessionId) {
+      curSessionId = createNewSession();
+    }
+    autoUpdateTitleIfFirstMessage(curSessionId, query);
+
+    setInputQuery("");
+
+    const userMsg: Message = {
+      id: getNextMessageId("user"),
+      sender: "user",
+      text: query,
+    };
+
+    const aiMsgId = getNextMessageId("ai");
+    const mockIntent = detectMockCardIntent(query);
+
+    // Xử lý mock card intent (Giai đoạn 1)
+    if (mockIntent) {
+      const initialMessages: Message[] = [
+        ...messages,
+        userMsg,
+        {
+          id: aiMsgId,
+          sender: "ai",
+          text: "",
+          isStreaming: true,
+          thinkingSteps: [],
+        },
+      ];
+      setMessages(initialMessages);
+      saveActiveSessionMessages(initialMessages);
+      setIsSending(true);
+
+      setTimeout(() => {
+        let aiText = "";
+        if (mockIntent === "grocery_list") {
+          aiText = "Dưới đây là các địa điểm mua sắm nguyên liệu tươi sạch gần vị trí của bạn tại Quận 3:";
+        } else if (mockIntent === "weekly_compliance") {
+          aiText = "Bạn đang duy trì phong độ rất tốt với tỉ lệ tuân thủ đạt 92% tuần này.";
+        } else if (mockIntent === "doctor_note") {
+          aiText = "Bác sĩ Minh Nguyễn đã để lại một lời nhắc quan trọng dành cho bạn:";
+        }
+
+        const finalMessages: Message[] = initialMessages.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                text: aiText,
+                isStreaming: false,
+                mockCard: mockIntent,
+              }
+            : m
+        );
+        setMessages(finalMessages);
+        saveActiveSessionMessages(finalMessages);
+        setIsSending(false);
+      }, 400);
+
+      return;
+    }
+
+    // Luồng stream thật từ Backend (meal_plan, interaction_check, food_log, rag_qa)
+    const initialMessages: Message[] = [
+      ...messages,
+      userMsg,
+      {
+        id: aiMsgId,
+        sender: "ai",
+        text: "",
+        isStreaming: true,
+        thinkingSteps: [],
+      },
+    ];
+    setMessages(initialMessages);
+    saveActiveSessionMessages(initialMessages);
+    setIsSending(true);
+
+    let streamingText = "";
+    let thinkingSteps: ThinkingStep[] = [];
+
+    try {
+      for await (const event of api.chatStream(query)) {
+        if (event.type === "status") {
+          thinkingSteps = upsertThinkingStep(thinkingSteps, event.node, event.message);
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId ? { ...m, thinkingSteps: [...thinkingSteps] } : m
+            );
+            saveActiveSessionMessages(next);
+            return next;
+          });
+        } else if (event.type === "intent") {
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    intent: event.intent,
+                    secondaryIntents: event.secondary_intents ?? [],
+                  }
+                : m
+            );
+            saveActiveSessionMessages(next);
+            return next;
+          });
+        } else if (event.type === "token") {
+          streamingText += event.content;
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId ? { ...m, text: streamingText } : m
+            );
+            return next;
+          });
+        } else if (event.type === "correction") {
+          streamingText = event.message;
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    text: event.message,
+                    corrected: true,
+                    correctionReason: event.reason,
+                  }
+                : m
+            );
+            saveActiveSessionMessages(next);
+            return next;
+          });
+        } else if (event.type === "done") {
+          const finalized = mapAgentResponse(event.data);
+          const completedSteps = thinkingSteps.map((s) => ({
+            ...s,
+            status: "done" as const,
+          }));
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    ...finalized,
+                    text: event.data.message,
+                    thinkingSteps: completedSteps,
+                    corrected: m.corrected,
+                    correctionReason: m.correctionReason,
+                  }
+                : m
+            );
+            saveActiveSessionMessages(next);
+            return next;
+          });
+        } else if (event.type === "error") {
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    text: event.message || "Đã xảy ra lỗi khi xử lý câu hỏi.",
+                    isStreaming: false,
+                  }
+                : m
+            );
+            saveActiveSessionMessages(next);
+            return next;
+          });
+        }
+      }
+    } catch (err) {
+      const errorMsg =
+        err instanceof ApiError
+          ? err.message
+          : "Không thể kết nối trợ lý AI. Vui lòng thử lại sau.";
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === aiMsgId ? { ...m, text: errorMsg, isStreaming: false } : m
+        );
+        saveActiveSessionMessages(next);
+        return next;
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleChipClick = (chip: (typeof SAMPLE_CHIPS)[0]) => {
+    if (chip.action === "open_meal_panel") {
+      openPanel("menu");
+      return;
+    }
+    if (chip.prompt) {
+      void handleSend(chip.prompt);
+    }
+  };
+
+  const hasConversation = messages.length > 0;
+  const userName = displayName?.trim() ? displayName : "Bạn";
+
+  const getGreeting = (name: string) => {
+    const hour = new Date().getHours();
+    if (hour < 12) return `Chào buổi sáng, ${name}`;
+    if (hour < 18) return `Chào buổi chiều, ${name}`;
+    return `Chào buổi tối, ${name}`;
+  };
+
   if (!hydrated) return null;
 
-  const greetingName = displayName?.trim() ? displayName : "Nguyen Van A";
-
   return (
-    <div className="flex flex-col relative w-full h-full bg-[#F7F8FA] font-body overflow-x-hidden pb-24">
-      {/* Top Header */}
-      <header className="flex justify-between items-center px-8 py-5 w-full bg-white border-b border-outline-variant/30 sticky top-0 z-30">
-        <h1 className="font-h1 text-h1 text-[#006857] font-bold text-xl tracking-tight">Trang chủ</h1>
-        <div className="flex items-center gap-4 ml-auto">
-          <button className="text-[#006857] hover:bg-[#E4F2EE] p-2 rounded-full transition-colors flex items-center justify-center cursor-pointer">
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-          </button>
-          <button className="text-[#006857] hover:bg-[#E4F2EE] p-2 rounded-full transition-colors flex items-center justify-center cursor-pointer">
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-          </button>
+    <div className="flex-1 w-full h-full min-h-0 flex flex-col relative overflow-hidden bg-[#f8fafc]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 bg-[#006857] text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 border border-emerald-400/40">
+          <span className="material-symbols-outlined text-[18px] text-emerald-300">check_circle</span>
+          <span>{toastMessage}</span>
         </div>
-      </header>
+      )}
 
-
-
-      <main className="flex-1 w-full px-8 py-8 flex flex-col gap-6 max-w-7xl mx-auto">
-        {/* Welcome Section */}
-        <div>
-          <h2 className="text-[28px] font-bold text-on-surface tracking-tight mb-1">
-            Chào mừng trở lại, {greetingName}.
-          </h2>
-          <p className="text-on-surface-variant text-[15px]">
-            Dưới đây là bảng thông tin cá nhân hóa của bạn hôm nay.
-          </p>
-        </div>
-
-        {/* Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-          
-          {/* Card 1: Today's Progress (col-span-8) */}
-          <div className="lg:col-span-8 bg-white rounded-2xl p-6 border-2 border-[#006857] shadow-sm flex flex-col justify-between">
-            <h3 className="font-bold text-lg text-on-surface mb-6">Tiến độ hôm nay</h3>
-            
-            <div className="flex flex-col md:flex-row items-center gap-12">
-              {/* Donut Chart */}
-              <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" stroke="#E2E8F0" strokeWidth="12" fill="transparent" />
-                  <circle cx="50" cy="50" r="40" stroke="#006857" strokeWidth="12" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - 1250/1800)} strokeLinecap="round" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs text-on-surface-variant font-medium">Lượng Calo<br/>Đã nạp / Mục tiêu</span>
-                  <span className="text-xl font-bold text-on-surface mt-1">1.250 <span className="text-sm font-normal text-on-surface-variant">/ 1.800<br/>kcal</span></span>
+      {/* Messages Scroll Area - Full width scroll container so scrollbar is at the natural right edge */}
+      <div
+        ref={chatScrollRef}
+        onScroll={handleScroll}
+        className="w-full flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar"
+      >
+        {/* Centered Chat Stream Column */}
+        <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pt-4 pb-36 flex flex-col gap-6">
+          {/* Welcome State when no messages */}
+          {!hasConversation && (
+            <div className="flex flex-col items-center text-center space-y-6 w-full my-auto animate-in fade-in duration-500 max-w-2xl mx-auto pt-6">
+              {/* Robot Avatar with Glow */}
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full blur-md opacity-30 group-hover:opacity-50 transition-opacity" />
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white shadow-xl relative bg-slate-900">
+                  <video
+                    src={BOT_VIDEO_SRC}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
 
-              {/* Progress Bars */}
-              <div className="flex-1 w-full flex flex-col gap-6">
-                <div className="text-xs font-medium text-on-surface-variant mb-2">Các chỉ số quan trọng dựa trên hồ sơ y tế:</div>
-                
-                {/* Sodium */}
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="font-bold text-sm text-on-surface">Natri (Muối)</span>
-                    <span className="text-xs text-on-surface-variant">Hiện tại / Tối đa</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-[#2f8f7a]">60%</span>
-                    <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#2f8f7a] rounded-full" style={{ width: "60%" }}></div>
-                    </div>
-                  </div>
+              {/* Greeting */}
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+                  <span className="material-symbols-outlined text-[15px] text-[#006857]">verified_user</span>
+                  <span>Trợ lý Dinh dưỡng Lâm sàng Cá nhân hoá</span>
                 </div>
-                
-                {/* Sugar */}
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="font-bold text-sm text-on-surface">Đường</span>
-                    <span className="text-xs text-on-surface-variant">Hiện tại / Tối đa</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-[#2f8f7a]">40%</span>
-                    <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#2f8f7a] rounded-full" style={{ width: "40%" }}></div>
-                    </div>
-                  </div>
-                </div>
+                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {getGreeting(userName)}
+                </h1>
+                <p className="text-sm md:text-base text-slate-600 max-w-md mx-auto leading-relaxed">
+                  Tôi có thể hỗ trợ gì cho bữa ăn &amp; kế hoạch sức khỏe của bạn hôm nay?
+                </p>
+              </div>
 
-                {/* Protein */}
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="font-bold text-sm text-on-surface">Đạm (Protein)</span>
-                    <span className="text-xs text-red-500 font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warning</span> Hiện tại / Tối đa</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-amber-500 flex items-center"><span className="material-symbols-outlined text-[16px] text-amber-500 mr-1">warning</span></span>
-                    <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden relative">
-                      <div className="h-full bg-amber-400 rounded-full" style={{ width: "80%" }}></div>
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-white leading-none">80%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Safety & Medical Notes (col-span-4) */}
-          <div className="lg:col-span-4 bg-[#FEE2E2] rounded-2xl p-6 border-2 border-[#FCA5A5] shadow-sm flex flex-col justify-center">
-            <div className="flex justify-between items-start mb-6">
-              <h3 className="font-bold text-lg text-red-950">Lưu ý Y tế & An toàn</h3>
-              <span className="material-symbols-outlined text-red-600 text-[24px]">warning</span>
-            </div>
-            
-            <div className="flex flex-col gap-5">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-red-700 text-[18px]">pill</span>
-                </div>
-                <div className="pt-1 text-sm font-medium text-red-950">
-                  <span className="font-bold">Nhắc nhở uống thuốc:</span> Metformin lúc 09:00
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-red-700 text-[18px]">restaurant</span>
-                </div>
-                <div className="pt-1 text-sm font-medium text-red-950">
-                  <span className="font-bold">Cảnh báo tương tác:</span> Tránh thực phẩm giàu Vitamin K (Warfarin)
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-red-700 text-[18px]">do_not_disturb</span>
-                </div>
-                <div className="pt-1 text-sm font-medium text-red-950">
-                  <span className="font-bold">Cảnh báo dị ứng:</span> Có chứa đậu phộng (Bữa xế)
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Today's Meal Plan (col-span-12) */}
-          <div className="lg:col-span-12 bg-white rounded-2xl p-6 border-2 border-[#006857] shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-on-surface">Thực đơn hôm nay</h3>
-              <div className="flex items-center gap-1.5 text-sm font-medium text-[#006857]">
-                Trạng thái: <span className="material-symbols-outlined text-[16px] text-[#22c55e] bg-green-100 rounded-sm">check_box</span> Đã duyệt bởi BS. Trần Văn B
-              </div>
-            </div>
-            
-            <div className="flex relative mt-4 pb-2">
-              {/* Timeline line */}
-              <div className="absolute top-[10px] left-[60px] right-[40%] md:right-[20%] h-[2px] bg-gray-200 -z-10"></div>
-              
-              <div className="grid grid-cols-3 w-full gap-4">
-                {/* Breakfast */}
-                <div className="flex flex-col border-r border-gray-100 pr-4 relative">
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="text-sm font-bold text-on-surface-variant w-10 text-right">T.gian</span>
-                    <div className="w-3.5 h-3.5 rounded-full bg-gray-300 relative z-10 border-[3px] border-white ring-1 ring-gray-200 shrink-0"></div>
-                    <span className="font-bold text-base text-on-surface">Bữa sáng</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm font-bold text-on-surface-variant w-10 text-right mt-1 shrink-0">19:00</span>
-                    <div className="flex flex-col border-l-2 border-gray-100 pl-4 pb-2 -ml-[25px] flex-1 translate-x-[25px]">
-                      <div className="text-[15px] text-on-surface mb-3">Pho Ga, 350 kcal</div>
-                      <div className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-gray-400">check</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lunch */}
-                <div className="flex flex-col border-r border-gray-100 pr-4 relative">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-3.5 h-3.5 rounded-full bg-gray-300 relative z-10 border-[3px] border-white ring-1 ring-gray-200 shrink-0"></div>
-                    <span className="font-bold text-base text-on-surface">Bữa trưa</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="flex flex-col border-l-2 border-gray-100 pl-4 pb-2 -ml-[7px] flex-1 translate-x-[7px]">
-                      <div className="text-[15px] text-on-surface mb-3">Cơm sườn, 600 kcal</div>
-                      <div className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-gray-400">check</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dinner */}
-                <div className="flex flex-col relative">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-3.5 h-3.5 rounded-full bg-gray-300 relative z-10 border-[3px] border-white ring-1 ring-gray-200 shrink-0"></div>
-                    <span className="font-bold text-base text-on-surface">Bữa tối</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="flex flex-col border-l-2 border-gray-100 pl-4 pb-2 -ml-[7px] flex-1 translate-x-[7px]">
-                      <div className="text-[15px] text-on-surface mb-3 pr-28">Canh cá,<br/>300 kcal</div>
-                      <div className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-gray-400">check</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Action Buttons for Lunch and Dinner */}
-              <div className="absolute right-0 top-10 bottom-0 flex flex-col justify-between py-2 items-end">
-                <button className="px-3 py-1 rounded border border-[#006857] text-[#006857] font-semibold text-xs hover:bg-[#E4F2EE] transition-colors bg-white mt-1 cursor-pointer w-[90px]">
-                  Đã ăn
-                </button>
-                <button className="px-3 py-1 rounded border border-[#006857] text-[#006857] font-semibold text-xs hover:bg-[#E4F2EE] transition-colors bg-white mb-2 cursor-pointer w-[90px]">
-                  Đã ăn
-                </button>
-              </div>
-            </div>
-          </div>
-
-
-
-          {/* Card 5: Health Indicators (col-span-12) */}
-          <div className="lg:col-span-12 bg-[#F4F9F7] rounded-3xl p-6 md:p-8 border-none shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_20px_rgba(0,104,87,0.05)] relative flex flex-col justify-between">
-            
-            <div className="flex justify-between items-start mb-12">
-              <div>
-                <h3 className="font-bold text-[22px] text-on-surface mb-1">Đường huyết theo thời gian</h3>
-                <p className="text-[15px] text-on-surface-variant">Tóm tắt các chỉ số đo gần đây.</p>
-              </div>
-              
-              {/* Date Filter Pill */}
-              <div className="flex bg-[#E4EAE7] rounded-full p-1 shadow-[inset_0_1px_3px_rgba(0,0,0,0.05)]">
-                <button className="px-4 py-1.5 rounded-full text-[13px] font-medium text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">12T</button>
-                <button className="px-4 py-1.5 rounded-full text-[13px] font-medium text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">30N</button>
-                <button className="px-4 py-1.5 rounded-full bg-white text-[#006857] text-[13px] font-bold shadow-sm cursor-pointer">7N</button>
-              </div>
-            </div>
-            
-            <div className="flex flex-col w-full relative">
-              {/* Large Line Chart Simulation */}
-              <div className="w-full h-56 md:h-72 relative flex items-end">
-                {/* Y-axis labels and grid lines */}
-                <div className="absolute left-10 right-4 top-0 h-0 border-t border-[#006857]/10"></div>
-                <div className="absolute left-10 right-4 top-1/2 h-0 border-t border-[#006857]/10"></div>
-                <div className="absolute left-10 right-4 bottom-8 h-0 border-t border-[#006857]/10"></div>
-                
-                <div className="absolute left-0 top-[-8px] text-[13px] font-medium text-on-surface-variant">140</div>
-                <div className="absolute left-0 top-[calc(50%-8px)] text-[13px] font-medium text-on-surface-variant">110</div>
-                <div className="absolute left-0 bottom-[24px] text-[13px] font-medium text-on-surface-variant">80</div>
-                
-                {/* SVG Wrapper exactly matching SVG dimension */}
-                <div className="w-[calc(100%-56px)] h-[calc(100%-32px)] ml-10 mb-8 relative">
-                  
-                  {/* HTML Tooltip at 80%, 41.5% */}
-                  <div 
-                    className="absolute z-10 flex flex-col items-center pointer-events-none -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: '80%', top: '41.5%' }}
+              {/* Recommendation Chips Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 w-full mt-2">
+                {SAMPLE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => handleChipClick(chip)}
+                    className="bg-white/90 backdrop-blur-md p-3.5 rounded-xl flex items-center gap-3 hover:bg-white hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group text-left border border-slate-200/80 shadow-2xs cursor-pointer active:scale-[0.99]"
                   >
-                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] p-3 min-w-[100px] flex flex-col items-start absolute bottom-full mb-2.5 border border-gray-50">
-                      <span className="text-[12px] text-gray-500 font-medium mb-1.5">Thứ 6</span>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#006857]"></div>
-                        <span className="text-base font-bold text-gray-900 leading-none">115 <span className="text-[11px] font-normal text-gray-500">mg/dL</span></span>
-                      </div>
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${chip.colorClass} group-hover:scale-105 transition-transform shadow-2xs`}
+                    >
+                      <span className="material-symbols-outlined text-[22px]">
+                        {chip.icon}
+                      </span>
                     </div>
-                    {/* Circle on line perfectly centered */}
-                    <div className="w-4 h-4 rounded-full bg-white border-[3px] border-[#006857] shadow-sm"></div>
-                  </div>
-
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 100 40" preserveAspectRatio="none">
-                    {/* Smooth curve matching the previous data points */}
-                    <path d="M0,20 C 10,20 10,23.3 20,23.3 C 30,23.3 30,13.3 40,13.3 C 50,13.3 50,21.3 60,21.3 C 70,21.3 70,16.6 80,16.6 C 90,16.6 90,20 100,20" fill="none" stroke="#2f8f7a" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M0,20 C 10,20 10,23.3 20,23.3 C 30,23.3 30,13.3 40,13.3 C 50,13.3 50,21.3 60,21.3 C 70,21.3 70,16.6 80,16.6 C 90,16.6 90,20 100,20 L100,40 L0,40 Z" fill="url(#gradient)" opacity="0.4" />
-                    <defs>
-                      <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2f8f7a" stopOpacity="0.8" />
-                        <stop offset="100%" stopColor="#F4F9F7" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  
-                  {/* X-axis labels */}
-                  <div className="absolute top-full left-0 right-0 h-8 mt-3">
-                    <span className="absolute left-[0%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T2</span>
-                    <span className="absolute left-[20%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T3</span>
-                    <span className="absolute left-[40%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T4</span>
-                    <span className="absolute left-[60%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T5</span>
-                    <span className="absolute left-[80%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T6</span>
-                    <span className="absolute left-[100%] -translate-x-1/2 text-[13px] text-on-surface-variant font-medium">T7</span>
-                  </div>
-                </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-sm text-slate-900 group-hover:text-[#006857] transition-colors truncate">
+                        {chip.title}
+                      </span>
+                      <span className="text-xs text-slate-500 truncate">
+                        {chip.subtitle}
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-[18px] text-slate-400 ml-auto group-hover:text-[#006857] group-hover:translate-x-0.5 transition-all">
+                      chevron_right
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Card 6: Medical Analysis Summary (col-span-12) */}
-          <div className="lg:col-span-12 bg-white rounded-2xl p-6 border border-[#006857] shadow-sm flex flex-col justify-center">
-            <h3 className="font-bold text-lg text-on-surface mb-4">Tóm tắt Phân tích Y khoa</h3>
-            <p className="text-[15px] text-on-surface leading-relaxed">
-              <span className="font-bold">Ghi chú từ AI:</span> Dựa trên tiến độ hiện tại, bạn nên cân nhắc bổ sung thêm một chút chất xơ vào bữa tối.
-            </p>
-          </div>
+          {/* Messages List */}
+          {hasConversation &&
+            messages.map((msg) =>
+              msg.sender === "user" ? (
+                <div key={msg.id} className="flex justify-end w-full animate-in fade-in duration-200">
+                  <div className="max-w-[80%] sm:max-w-[68%] md:max-w-[62%] ml-auto bg-[#006857] text-white rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-2xs break-words">
+                    <p className="text-sm md:text-[15px] whitespace-pre-wrap leading-relaxed break-words">
+                      {msg.text}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div key={msg.id} className="flex items-start gap-3 md:gap-3.5 w-full animate-in fade-in duration-200">
+                  {/* Bot Video Avatar */}
+                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden border border-emerald-500/30 shrink-0 mt-0.5 bg-slate-900 shadow-2xs">
+                    <video
+                      src={BOT_VIDEO_SRC}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
-        </div>
-      </main>
+                  {/* Bot Content (Flat, clean, content-first Gemini style) */}
+                  <div className="flex-1 min-w-0 flex flex-col gap-2">
+                    {/* Thinking Steps (Gemini Minimalist Reasoning Trigger) */}
+                    {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                      <ChatThinkingSteps steps={msg.thinkingSteps} />
+                    )}
 
-      {/* Bottom Floating Search Bar */}
-      <div className="fixed bottom-6 left-[240px] right-0 z-40 px-4 pointer-events-none hidden md:flex justify-center">
-        <div className="bg-white rounded-full shadow-lg border border-outline-variant/30 flex items-center h-[52px] px-6 w-full max-w-[600px] pointer-events-auto">
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm nhanh thực phẩm hoặc chỉ số..." 
-            className="flex-1 bg-transparent border-none outline-none text-[15px] placeholder:text-on-surface-variant font-medium text-on-surface h-full"
-          />
+                    {/* Typing indicator */}
+                    {msg.isStreaming && !msg.text && (
+                      <div className="py-0.5">
+                        <ChatTypingDots />
+                      </div>
+                    )}
+
+                    {/* AI Message Text */}
+                    {msg.text && (
+                      <div className="text-[15px] leading-relaxed text-slate-800 break-words font-normal">
+                        {msg.text}
+                        {msg.isStreaming && (
+                          <span className="inline-block w-1.5 h-4 bg-[#006857] ml-1 animate-pulse rounded-xs align-middle" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Safety Correction Badge */}
+                    {msg.corrected && (
+                      <div className="inline-flex items-center gap-1.5 text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1 w-fit shadow-2xs mt-1">
+                        <span className="material-symbols-outlined text-[15px] text-amber-600 shrink-0">shield</span>
+                        <span>Đã điều chỉnh theo hướng dẫn an toàn y khoa (HITL)</span>
+                      </div>
+                    )}
+
+                    {/* Sub-Cards (Clean, independent with generous breathing room) */}
+                    {msg.mealPreview && msg.mealPreview.meals.length > 0 && (
+                      <MealSuggestionCard
+                        preview={msg.mealPreview}
+                        onApplyPlan={handleApplyMealPlan}
+                        isApplied={Boolean(appliedPlans[msg.mealPreview.meal_plan_id])}
+                      />
+                    )}
+
+                    {msg.mockCard === "grocery_list" && <IngredientMapCard />}
+                    {msg.mockCard === "weekly_compliance" && <WeeklyComplianceCard />}
+                    {msg.mockCard === "doctor_note" && <DoctorNoteCard />}
+
+                    {/* Citations (Gemini Dropdown Accordion) */}
+                    {msg.citations && msg.citations.length > 0 && (
+                      <CitationsAccordion citations={msg.citations} />
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          {/* Bottom clearance cushion */}
+          <div className="h-4 shrink-0" />
         </div>
       </div>
-      
 
+      {/* Bottom Input Area */}
+      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 pb-16 md:pb-6 z-30 pointer-events-none flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent pt-8">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSend();
+          }}
+          className="w-full max-w-3xl bg-white/95 backdrop-blur-2xl rounded-full flex items-center p-1.5 shadow-[0_12px_36px_rgba(0,104,87,0.12)] pointer-events-auto border border-slate-200/90 focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/15 transition-all duration-300"
+        >
+          <input
+            type="text"
+            value={inputQuery}
+            onChange={(e) => setInputQuery(e.target.value)}
+            placeholder="Hỏi trợ lý VMEC-10 về thực đơn, dinh dưỡng, tương tác thuốc..."
+            disabled={isSending}
+            className="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-[15px] text-slate-900 placeholder:text-slate-400 py-2.5 px-4 outline-none disabled:opacity-50"
+          />
 
+          <button
+            type="submit"
+            disabled={!inputQuery.trim() || isSending}
+            className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-tr from-[#006857] to-emerald-600 hover:from-[#005245] hover:to-emerald-700 text-white flex items-center justify-center shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95 shrink-0"
+            title="Gửi tin nhắn"
+          >
+            <span className="material-symbols-outlined text-[20px]">send</span>
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
