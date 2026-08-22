@@ -35,7 +35,7 @@ Cần một quyết định rõ để BE1 (agent side) và BE2 (API/DB side) kh�
 - Không tốn effort trong 2 tuần cho 1 feature Won't Have — giữ đúng nguyên tắc vàng của CLAUDE.md.
 
 **Negative**
-- `schemas/food_log.py` hiện có (`FoodLogCreate.profile_id: int`) dùng kiểu `int` cho `profile_id`, không khớp convention `str` (UUID) của toàn hệ thống (`User.id`, `Profile.id` đều `String(36)`) — nếu implement theo schema hiện tại sẽ tạo type mismatch, cần sửa lại `profile_id: str` khi thực sự code (ghi chú cho BE2, không sửa trong phạm vi ADR).
+- Không có workflow sửa/xoá 1 log đã ghi (chỉ ghi 1 lần, không có `PUT`/`DELETE`) — nếu patient log sai, không có cách sửa lại qua API, chỉ có thể log thêm 1 lần mới cho cùng slot (chấp nhận được ở quy mô demo).
 
 **Alternatives đã cân nhắc**
 - Nâng lên Must Have ngay để khớp UML đầy đủ: bị loại — vi phạm nguyên tắc vàng "demo mượt hơn đầy đủ tính năng"; North Star không cần Food Log.

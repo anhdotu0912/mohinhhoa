@@ -1,7 +1,7 @@
 # ADR-006: Chiến lược HITL & Guardrails
 
 ## Status
-Accepted (kiến trúc) — **Implementation: Planned/Partial**, xem ghi chú As-built.
+Accepted — Implemented (as-built 2026-08-18). Còn 1 gap thật: `validate_interaction_output`/`sanitize_recommendation` đã viết nhưng chưa wired vào runtime (xem Negative).
 
 ## Context
 Luật cứng của dự án (`CLAUDE.md` Mục 7):
@@ -9,37 +9,31 @@ Luật cứng của dự án (`CLAUDE.md` Mục 7):
 - Mọi kế hoạch dinh dưỡng **phải** được bác sĩ duyệt trước khi coi là chính thức (HITL bắt buộc).
 - Mọi số liệu dinh dưỡng AI trả về phải có nguồn trích dẫn từ RAG/KB — không hallucinate.
 
-Cần một vị trí kiến trúc rõ ràng cho các guardrail này trong pipeline agent, và một quyết định về việc implement thật (`backend/app/guardrails/rules.py`, `source_check.py`) so với hành vi tạm thời hiện có nằm rải rác trong code.
-
-**As-built xác nhận khi audit:**
-```python
-"""Placeholder"""
-```
-Đây là **toàn bộ nội dung** của cả `backend/app/guardrails/rules.py` và `backend/app/guardrails/source_check.py` — chưa có logic thật nào được implement ở 2 file này.
-
-Guardrail đang hoạt động thật hiện nay nằm **inline, rải rác**, không tập trung:
-1. **HITL kế hoạch dinh dưỡng:** thực hiện đúng — mọi `MealPlanOutput` sinh ra có `status="pending_review"` mặc định (`meal_planner_agent.py`, model `MealPlan.status` default), chỉ chuyển `approved`/`edited` qua `POST /doctor/meal-plans/{id}/review` (`routes_doctor.py`). Đây là guardrail **có thật và đang chạy đúng**.
-2. **Từ chối đổi thuốc/chẩn đoán:** thực hiện qua 2 lớp độc lập, không dùng `guardrails/rules.py`:
-   - `intent_classifier._INTENT_PATTERNS["refuse"]` — regex tiếng Việt (`đổi thuốc`, `tăng liều`, `chẩn đoán`, `kê đơn`, ...) để route sang `refuse_node`.
-   - `refuse_node` (`graph.py`) — trả câu trả lời từ chối hard-code, không gọi guardrail module nào.
-   - Prompt LLM của `meal_plan_node`/`rag_qa_node` có dòng chỉ dẫn "KHÔNG khuyến nghị đổi thuốc/liều" — đây là **prompt-level guardrail**, không có kiểm tra output sau khi LLM trả lời (không có step verify LLM có tuân thủ chỉ dẫn không).
-3. **Citation bắt buộc cho `rag_qa`:** `rag_qa_node` luôn gắn `citations` từ `chunk.source` của kết quả retrieve — nhưng **không có bước kiểm tra/redact** nếu retrieval trả về rỗng (which đang xảy ra trong thực tế vì corpus RAG chưa đầy đủ, xem `adrs/001-vector-database-choice.md`). Khi không có context, `_generate_answer` vẫn để LLM trả lời tự do (nếu có key) hoặc trả template chung — **không guarantee** "không có citation thì redact/từ chối" như luật cứng yêu cầu.
+Cần một vị trí kiến trúc rõ ràng cho các guardrail này trong pipeline agent, tập trung vào `backend/app/guardrails/rules.py` và `source_check.py` thay vì để rải rác trong từng node.
 
 ## Decision
-1. **Vị trí kiến trúc (giữ nguyên, Accepted):** guardrails chạy như một **post-processing step cuối** trong graph, ngay trước khi node trả `answer` — tức là mỗi node xử lý intent (`rag_qa`, `meal_plan`, `interaction_check`) phải gọi qua `guardrails/source_check.py::check_citations(answer, citations)` (kiểm tra output có citation hay không, nếu không → redact phần không có nguồn hoặc trả câu từ chối chuẩn) và `guardrails/rules.py::check_refusal(message, answer)` (danh sách từ khoá/luật từ chối tập trung, dùng chung cho `intent_classifier` lẫn kiểm tra output LLM) — thay vì để rải rác trong từng node như hiện tại.
-2. **Danh sách câu AI phải từ chối:** tập trung hoá vào `guardrails/rules.py` (theo đúng luật cứng CLAUDE.md Mục 7 "Danh sách câu AI phải từ chối & redirect bác sĩ → định nghĩa trong `backend/app/guardrails/rules.py`") — hiện các pattern đang nằm ở `intent_classifier._INTENT_PATTERNS["refuse"]`, cần di chuyển/tham chiếu chung khi implement thật.
-3. **HITL meal plan:** giữ nguyên as-built (`pending_review` → duyệt qua doctor review endpoint) — không cần thay đổi kiến trúc, chỉ cần đảm bảo **mọi** đường sinh plan (kể cả qua `/chat` intent `meal_plan`, xem `adrs/002`) đều persist với status khởi tạo `pending_review`, không có đường tắt nào set `approved` trực tiếp.
-4. **HITL mở rộng sang ràng buộc lâm sàng (mới, 2026-08-15, Planned):** nguyên tắc "mọi thay đổi ảnh hưởng điều trị phải qua bác sĩ" không chỉ áp dụng cho meal plan mà còn cho `target_kcal`/`restrictions` — khi **patient tự sửa** 2 field này (qua `POST /profile`), thay đổi phải ở trạng thái `pending_doctor_review` cho tới khi bác sĩ xác nhận; khi **doctor tự sửa** (qua `PUT /doctor/patients/{id}/constraints`), có hiệu lực ngay vì doctor là người có chuyên môn xác nhận trực tiếp. Xem thiết kế chi tiết ở `specs/04-clinical-constraints.md`.
-5. **Trạng thái implementation:** việc dời logic vào `guardrails/rules.py`/`source_check.py` là **Planned**, chưa thực hiện. Mọi spec có nhắc "guardrail chặn X" phải ghi rõ đây là hành vi kỳ vọng, không phải as-built (đúng chỉ dẫn Mục 2 của brief).
+1. **Vị trí kiến trúc (as-built):** guardrails chạy như một **post-processing node cuối** trong LangGraph graph — `apply_guardrails` (`agents/graph.py`), nối từ mọi node xử lý intent (`rag_qa`, `meal_plan`, `interaction_check`, `food_log`, `refuse`, `unknown`) trước khi tới `END`. Node này gọi:
+   - `guardrails/source_check.py::enforce_citation_guardrail(intent, answer, citations)` — kiểm tra output có citation hợp lệ hay không (chủ yếu áp dụng cho `rag_qa`), redact/thay câu trả lời nếu thiếu nguồn.
+   - `guardrails/rules.py::enforce_output_safety(answer)` — quét `answer` cuối cùng theo `_FORBIDDEN_PATTERNS` (đổi thuốc, tăng/giảm liều, ngưng thuốc, kê đơn, chẩn đoán...); nếu khớp, ép `intent="refuse"` và thay `answer` bằng `get_refuse_message()`.
+2. **Danh sách câu AI phải từ chối — tập trung hoá (as-built):** `guardrails/rules.py::REFUSE_REGEX_PATTERNS` là **nguồn duy nhất** cho cả 2 nơi cần dùng — `intent_classifier._INTENT_PATTERNS["refuse"]` import trực tiếp từ `guardrails.rules` (không định nghĩa lại pattern riêng), và `enforce_output_safety` dùng `_FORBIDDEN_PATTERNS` (superset gần giống, dạng chuỗi để match cả có/không dấu) để hậu kiểm output. Đúng luật cứng `CLAUDE.md` Mục 7.
+3. **HITL meal plan (as-built, không đổi từ thiết kế gốc):** mọi `MealPlanOutput` sinh ra qua `POST /meal-plans/generate` (patient/doctor) có `status="pending_review"` mặc định (`meal_planner_agent.py`, model `MealPlan.status`), chỉ chuyển `approved`/`edited` qua `POST /doctor/meal-plans/{id}/review` (`routes_doctor.py`, `specs/06`). Đường sinh plan qua `/chat` (`meal_plan_node`) không tạo plan mới nên không có "đường tắt" set `approved` trực tiếp (xem `adrs/002`).
+4. **HITL mở rộng sang ràng buộc lâm sàng (as-built 2026-08-18):** nguyên tắc "mọi thay đổi ảnh hưởng điều trị phải qua bác sĩ" áp dụng cho cả `target_kcal`/`restrictions` — khi **patient tự sửa** 2 field này (qua `POST /profile`), `PatientProfile.constraints_status` chuyển `"pending_doctor_review"` cho tới khi bác sĩ xác nhận qua `POST /doctor/patients/{id}/constraints/approve`; khi **doctor tự sửa** (qua `PUT /doctor/patients/{id}/constraints`), có hiệu lực ngay và `constraints_status="confirmed"` vì doctor là người có chuyên môn xác nhận trực tiếp. Chi tiết: `specs/04-clinical-constraints.md`.
+
+## As-built (xác nhận qua code 2026-08-18)
+- `backend/app/guardrails/rules.py` — implement đầy đủ: `REFUSE_MESSAGE`, `REFUSE_REGEX_PATTERNS`, `_FORBIDDEN_PATTERNS`, `check_recommendation_safety`, `validate_interaction_output`, `validate_severity`, `sanitize_recommendation`, `get_refuse_message`, `message_triggers_refuse`, `enforce_output_safety`.
+- `backend/app/guardrails/source_check.py` — implement `enforce_citation_guardrail` (redact `rag_qa` answer thiếu citation).
+- Cả 2 module **đã wired** vào `apply_guardrails` node trong `agents/graph.py` (dòng import + gọi trong hàm `apply_guardrails`) — không còn là placeholder rỗng.
+- `intent_classifier.py` import `REFUSE_REGEX_PATTERNS` trực tiếp từ `guardrails.rules`, không định nghĩa lại danh sách riêng.
 
 ## Consequences
 **Positive**
-- Guardrail tập trung 1 nơi giúp audit/test dễ hơn (viết `tests/guardrails/` cho riêng module này) và tránh việc mỗi node tự viết logic từ chối khác nhau.
-- HITL kế hoạch dinh dưỡng — phần quan trọng nhất về an toàn y tế — đã có thật và đúng thiết kế ngay từ bây giờ.
+- Guardrail tập trung 1 nơi (`apply_guardrails` + `guardrails/rules.py`/`source_check.py`) giúp audit/test dễ hơn, tránh mỗi node tự viết logic từ chối khác nhau.
+- HITL kế hoạch dinh dưỡng và HITL ràng buộc lâm sàng — 2 phần quan trọng nhất về an toàn y tế — đều đã có thật và đúng thiết kế.
+- Refuse-list dùng chung 1 nguồn (`REFUSE_REGEX_PATTERNS`) cho cả routing (`intent_classifier`) và hậu kiểm output (`enforce_output_safety`) — giảm rủi ro 2 nơi lệch nhau.
 
 **Negative**
-- Citation-guardrail cho `rag_qa` **chưa** có thật → rủi ro thật: nếu corpus RAG rỗng, hệ thống hiện trả lời chung/mơ hồ chứ không **từ chối rõ ràng** như luật cứng mô tả — cần BE1 implement trước khi công bố demo RAG Q&A là "an toàn, có nguồn trích dẫn 100%".
-- Refuse-list hiện chỉ bắt được câu hỏi khớp regex tiếng Việt định sẵn — câu hỏi diễn đạt khác (đồng nghĩa, viết tắt, tiếng Anh) có thể lọt qua và được LLM trả lời tự do (chỉ có prompt-level chỉ dẫn, không có hard block).
+- **`validate_interaction_output`/`sanitize_recommendation` đã viết nhưng chưa wired vào runtime (gap thật):** 2 hàm này kiểm tra/thay thế cụm từ vi phạm ở mức **từng `recommendation` riêng lẻ** trong `InteractionItem`, nhưng không có nơi nào gọi (`interaction_check_node` và `apply_guardrails` đều không dùng). Guardrail thực tế hiện chỉ chặn ở mức `answer` tổng thể sau khi đã ghép nội dung — vẫn an toàn (vì `enforce_output_safety` quét toàn bộ `answer`), nhưng thiếu 1 tầng chặn sớm hơn, chi tiết hơn theo từng interaction. Xem `tasks/be1-ai-core.md`.
+- Refuse-list hiện chỉ bắt được câu hỏi khớp regex tiếng Việt định sẵn — câu hỏi diễn đạt khác (đồng nghĩa, viết tắt, tiếng Anh ít gặp) có thể lọt qua tầng routing nhưng vẫn có cơ hội bị chặn ở tầng hậu kiểm `enforce_output_safety` nếu LLM tự sinh cụm từ vi phạm trong câu trả lời.
 
 **Alternatives đã cân nhắc**
 - Guardrail ở tầng API (BE2, sau khi Agent trả kết quả): bị loại vì tách rời khỏi ngữ cảnh state (`citations`, `guardrail_flags` đã có sẵn trong `AgentState`), sẽ phải serialize/deserialize lại thông tin không cần thiết.

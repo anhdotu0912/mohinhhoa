@@ -17,7 +17,7 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
    - Doctor nhập qua `PUT /doctor/patients/{id}/metrics` → BE **tự tính lại `bmi`** từ `weight`/`height` gửi lên, kèm tự gán `bmi_category` (`Thiếu cân | Bình thường | Thừa cân nhẹ | Béo phì`, theo ngưỡng BMI **châu Á** 18.5/23/25 — không phải ngưỡng WHO chuẩn quốc tế 18.5/25/30, cần lưu ý khi so sánh với tài liệu y khoa quốc tế khác).
 3. Không có validation chặn giá trị bất thường (ví dụ `weight=0` hoặc `height=300`) ở cả 2 endpoint — trách nhiệm nhập đúng thuộc về người dùng (patient/doctor), hệ thống hiện không tự phát hiện outlier.
 4. **`POST /metrics` (patient self-tracking):** ghi entry mới vào `body_metrics_history`; ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có; `bmi` tự tính từ `weight` + `height` (height từ payload hoặc snapshot cũ).
-5. **`PUT /doctor/patients/{id}/metrics` — `[Planned]`, quyết định 2026-08-15:** phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 request (không cho cập nhật riêng lẻ 1 trong 2, tránh tính BMI sai do dùng giá trị cũ/thiếu ngữ cảnh) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
+5. **`PUT /doctor/patients/{id}/metrics` (as-built):** phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 request (không cho cập nhật riêng lẻ 1 trong 2, tránh tính BMI sai do dùng giá trị cũ/thiếu ngữ cảnh) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
 
 ## 4. Luồng chính (happy path)
 **Patient tự cập nhật:**
@@ -39,7 +39,7 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
 
 ## 5. Edge cases
 - Patient tự nhập BMI mâu thuẫn với weight/height đã nhập → hệ thống chấp nhận, không cảnh báo (rule 2, cố ý không validate chéo ở endpoint patient).
-- Doctor cập nhật metrics nhưng chỉ gửi 1 trong 2 field (`weight` hoặc `height`) → theo rule 4 (Planned), BE trả `400 METRICS_INCOMPLETE`, không cố suy ra từ giá trị cũ trong `profiles`.
+- Doctor cập nhật metrics nhưng chỉ gửi 1 trong 2 field (`weight` hoặc `height`) → theo rule 5, BE trả `400 METRICS_INCOMPLETE`, không cố suy ra từ giá trị cũ trong `profiles`.
 
 ## 6. Ngoài phạm vi (Out of scope)
 - **"Lời khuyên khi chỉ số đổi"** (Should Have theo brief) — **Status: Planned**, cần 1 intent Agent mới (chưa có trong `VALID_INTENTS` hiện tại: `meal_plan | interaction_check | food_log | rag_qa | refuse | unknown`) để AI chủ động tư vấn khi phát hiện thay đổi đáng kể giữa 2 lần cập nhật snapshot. Vì chỉ lưu snapshot (không có lịch sử), thiết kế thật cho intent này cần thêm cơ chế lưu "giá trị lần trước" tạm thời để so sánh — chưa thiết kế cụ thể trong tài liệu này, để dành cho khi feature được ưu tiên.

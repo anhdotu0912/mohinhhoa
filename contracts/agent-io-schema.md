@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.3 (2026-08-17 — FoodLogEntry as-built; Alert.food_log_id; thêm BodyMetricsEntry §3.5. Xem changelog ở §7 Versioning.)
+**Version:** 1.4 (2026-08-22 — dọn tag `[Planned]` còn sót cho các field đã as-built từ lâu (`constraints_status`, `secondary_intents[]`, `unmatched_pairs[]`); xác nhận KB tương tác duy nhất (không còn KB rút gọn/`DEMO_MOCK`). Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -61,7 +61,7 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
 - `restrictions.carb_per_meal`/`restrictions.sodium_daily` optional, `null` = không áp giới hạn đó — **as-built**.
 - **`restrictions.salt_daily_g`/`sugar_daily_g` — as-built (2026-08-16):** doctor set qua `PUT /doctor/patients/{id}/constraints`; optional, `null` = không áp giới hạn. Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ (patient set qua `POST /profile`). Meal planner quy đổi `salt_daily_g` → natri hiệu lực: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị (hằng số 400 mg natri/g muối).
 - **`protein_daily_g` — Won't Have (2026-08-16):** bỏ khỏi scope ràng buộc doctor; `protein_g` vẫn có trong `Macros`/`DayTotals` như thông tin dinh dưỡng, không phải ngưỡng ràng buộc.
-- **`constraints_status` — `[Planned]`, quyết định 2026-08-15:** enum `"confirmed" | "pending_doctor_review"`. Default `"confirmed"`. Chuyển sang `"pending_doctor_review"` khi **patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile`; reset lại `"confirmed"` khi **doctor xác nhận** (qua `POST /doctor/patients/{id}/constraints/approve` hoặc khi doctor tự sửa trực tiếp qua `PUT /doctor/patients/{id}/constraints`). Giá trị mới của patient **vẫn được áp dụng ngay** cho lần generate plan kế tiếp trong lúc chờ duyệt (không block demo flow) — `constraints_status` chỉ là cờ hiển thị cho doctor biết cần xem lại, không phải cờ chặn sử dụng. Xem thiết kế đầy đủ ở `specs/04-clinical-constraints.md`.
+- **`constraints_status` — as-built (2026-08-18):** enum `"confirmed" | "pending_doctor_review"`. Default `"confirmed"`. Chuyển sang `"pending_doctor_review"` khi **patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile`; reset lại `"confirmed"` khi **doctor xác nhận** (qua `POST /doctor/patients/{id}/constraints/approve` hoặc khi doctor tự sửa trực tiếp qua `PUT /doctor/patients/{id}/constraints`). Giá trị mới của patient **vẫn được áp dụng ngay** cho lần generate plan kế tiếp trong lúc chờ duyệt (không block demo flow) — `constraints_status` chỉ là cờ hiển thị cho doctor biết cần xem lại, không phải cờ chặn sử dụng. Xem thiết kế đầy đủ ở `specs/04-clinical-constraints.md`.
 
 ---
 
@@ -234,7 +234,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
 
-**`secondary_intents` — `[Planned]`, quyết định 2026-08-15** (đáp ứng gap "multi-intent ambiguous" từng ghi ở `specs/13-ai-chat-assistant.md`): mảng intent phụ (cùng enum `VALID_INTENTS`) mà `intent_classifier` phát hiện thêm trong cùng 1 câu hỏi nhưng **không** xử lý đầy đủ trong lượt trả lời này — chỉ để FE/patient biết còn ý định khác chưa được trả lời, không phải xử lý song song đầy đủ. Ví dụ: câu hỏi vừa yêu cầu lập thực đơn vừa hỏi tương tác thuốc → `intent="meal_plan"` (xử lý đầy đủ), `secondary_intents=["interaction_check"]`, và `message` nên kèm gợi ý "Bạn cũng hỏi về tương tác thuốc — vui lòng hỏi lại riêng câu này để tôi trả lời đầy đủ." Default `[]` khi không phát hiện ý định phụ nào (tương thích ngược 100% với code hiện tại).
+**`secondary_intents` — as-built** (đáp ứng gap "multi-intent ambiguous" ghi ở `specs/13-ai-chat-assistant.md`): mảng intent phụ (cùng enum `VALID_INTENTS`) mà `intent_classifier` phát hiện thêm trong cùng 1 câu hỏi nhưng **không** xử lý đầy đủ trong lượt trả lời này — chỉ để FE/patient biết còn ý định khác chưa được trả lời, không phải xử lý song song đầy đủ. Ví dụ: câu hỏi vừa yêu cầu lập thực đơn vừa hỏi tương tác thuốc → `intent="meal_plan"` (xử lý đầy đủ), `secondary_intents=["interaction_check"]`, và `message` nên kèm gợi ý "Bạn cũng hỏi về tương tác thuốc — vui lòng hỏi lại riêng câu này để tôi trả lời đầy đủ." Default `[]` khi không phát hiện ý định phụ nào.
 
 **Danh sách intent hợp lệ (`VALID_INTENTS`, `nodes/intent_classifier.py`):**
 ```
@@ -292,19 +292,16 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
   ]
 }
 ```
-**`unmatched_pairs[]` — `[Planned]`, quyết định 2026-08-15:** liệt kê các cặp `drug`×`food` gửi trong `InteractionCheckInput` nhưng **không tìm được dữ liệu nào trong KB** (kể cả sau khi unidecode/alias). Quy tắc: mọi cặp `medications × foods` gửi lên phải rơi vào đúng 1 trong 2 nhóm — có match (`interactions[]`, kể cả khi severity là `An toàn`) hoặc không tìm thấy dữ liệu (`unmatched_pairs[]`) — thay cho hành vi as-built hiện tại là **im lặng bỏ qua** cặp không khớp, dễ khiến người dùng hiểu nhầm "không thấy cảnh báo" = "đã kiểm tra và an toàn". Xem `specs/08-drug-food-interaction-check.md` §5.
+**`unmatched_pairs[]` — as-built:** liệt kê các cặp `drug`×`food` gửi trong `InteractionCheckInput` nhưng **không tìm được dữ liệu nào trong KB** (kể cả sau khi unidecode/alias). Mọi cặp `medications × foods` gửi lên rơi vào đúng 1 trong 2 nhóm — có match (`interactions[]`, kể cả khi severity là `An toàn`) hoặc không tìm thấy dữ liệu (`unmatched_pairs[]`, tính bởi `interaction_checker_agent.compute_unmatched_pairs`) — không còn im lặng bỏ qua cặp không khớp. Xem `specs/08-drug-food-interaction-check.md` §3.
 
-**Lưu ý as-built quan trọng — 2 KB khác nhau dùng cùng shape:**
-1. **KB đầy đủ** (`backend/data/drug_food_interactions.json`, 28 cặp, severity: 11 Nguy hiểm / 16 Cần chú ý / 1 An toàn) qua `agents/interaction_checker_agent.py` — có alias tiếng Anh/không dấu + so khớp accent-insensitive (`unidecode`). Dùng **nội bộ** trong `meal_planner_agent` để quyết định swap món khi sinh plan.
-2. **KB rút gọn demo** (`services/meal_plan_demo.py::INTERACTION_KB`, chỉ 2 cặp: `warfarin+rau muống`, `warfarin+bông cải xanh`) — so khớp substring đơn giản, không unidecode, không alias. Dùng **chỉ** để tạo `Alert` sau khi sinh plan (`meal_plan_service._persist_interaction_alerts`). **`POST /interactions/check`** luôn dùng KB đầy đủ qua `interaction_checker_agent` (as-built 2026-08-18).
-
-→ Nghĩa là: món ăn trong thực đơn được swap an toàn dựa trên KB đầy đủ (28 cặp), nhưng `Alert` hiển thị cho bác sĩ/patient sau khi plan được tạo chỉ phản ánh KB rút gọn (2 cặp). **Quyết định team (2026-08-15): chấp nhận gap này cho vòng demo hiện tại**, không ưu tiên đóng ngay — 2 cặp demo đủ minh hoạ flow guardrail cho North Star. Xem `specs/08-drug-food-interaction-check.md` §5 và `tasks/roadmap-mvp.md` (đã hạ mức ưu tiên khỏi P0).
+**Lưu ý as-built quan trọng — 1 KB đầy đủ duy nhất (2026-08-18):** cả luồng "gắn plan" (nội bộ `meal_planner_agent`, quyết định swap món) và luồng "ad-hoc" (`POST /interactions/check`) đều dùng chung **KB đầy đủ** (`backend/data/drug_food_interactions.json`, 28 cặp, severity: 11 Nguy hiểm / 16 Cần chú ý / 1 An toàn) qua `agents/interaction_checker_agent.py` — có alias tiếng Anh/không dấu + so khớp accent-insensitive (`unidecode`), resolve tên thuốc thương mại qua `drug_products`/`drug_rules`. Không còn KB rút gọn/`DEMO_MOCK` riêng — `services/meal_plan_demo.py` đã bị gỡ bỏ hoàn toàn khỏi codebase. `Alert` hiển thị cho bác sĩ/patient sau khi sinh plan phản ánh đúng cùng KB đầy đủ dùng để swap món. Xem `specs/08-drug-food-interaction-check.md` §3–4.
 
 ---
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.3**.
+- Version hiện tại của contract này: **1.4**.
+- **Changelog 1.3 → 1.4 (2026-08-22):** dọn tag `[Planned]` còn sót cho các field thực ra đã as-built — `PatientProfile.constraints_status`, `AgentRunOutput.secondary_intents[]`, `InteractionCheckOutput.unmatched_pairs[]` (đều chuyển thành "as-built" trong mô tả); xác nhận `POST /interactions/check` và luồng gắn plan dùng chung 1 KB đầy đủ duy nhất (không còn KB rút gọn/`DEMO_MOCK`, `services/meal_plan_demo.py` đã bị gỡ khỏi codebase). Không đổi shape field nào — chỉ sửa mô tả trạng thái, không cần code thay đổi kèm theo.
 - **Changelog 1.2 → 1.3 (2026-08-17):** `FoodLogEntry` chuyển Planned → as-built; `Alert` thêm `food_log_id`; thêm `BodyMetricsEntry` §3.5 (ADR-013).
 - **Changelog 1.0 → 1.1 (2026-08-15):** thêm `PatientProfile.restrictions.{salt_daily_g,sugar_daily_g,protein_daily_g}` `[Planned]`, `PatientProfile.constraints_status` `[Planned]`, `FoodLogEntry.slot` đổi sang 3-giá-trị `morning|noon|evening` `[Planned]` (thay đề xuất 4-slot ban đầu), `InteractionCheckOutput.unmatched_pairs[]` `[Planned]`, `AgentRunOutput.secondary_intents[]` `[Planned]`. Toàn bộ đều là field mới optional với default an toàn (`null`/`[]`/`"confirmed"`) — không breaking change với code hiện tại, minor bump.
 - Mọi thay đổi field/enum/shape phải: (1) bump version ở đầu file, (2) note ngày + lý do đổi ngay dưới tiêu đề version, (3) cập nhật `contracts/api-v1.md` nếu ảnh hưởng tới response HTTP, (4) cập nhật spec liên quan trong `specs/`.

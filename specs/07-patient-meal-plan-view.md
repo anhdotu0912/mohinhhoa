@@ -1,7 +1,7 @@
 # Spec: Bệnh nhân Xem Thực đơn
 
 ## Status
-Partial — xem chi tiết + xem món thay thế (`swaps[]`/`alternatives[]`) đã Done; danh sách đi chợ và gợi ý khu vực bán là Planned (Could Have); yêu cầu điều chỉnh plan (§3 rule 6, 2026-08-15) là Planned.
+Done (Must/Should Have) — xem chi tiết, xem món thay thế (`swaps[]`/`alternatives[]`), và yêu cầu điều chỉnh plan (§3 rule 6) đều as-built. Danh sách đi chợ và gợi ý khu vực bán vẫn Planned (Could Have, xem §6).
 
 ## 1. Mục tiêu (Why)
 Sau khi thực đơn được sinh (và lý tưởng là đã được bác sĩ duyệt), bệnh nhân cần xem chi tiết từng ngày/từng bữa, hiểu vì sao 1 món bị đổi (swap do tương tác thuốc), và biết món nào có thể thay thế nếu không thích/không có sẵn.
@@ -15,7 +15,7 @@ Là **bệnh nhân**, tôi muốn xem chi tiết thực đơn 7 ngày của mìn
 3. Hiển thị `status` rõ ràng cho patient biết plan đã được duyệt hay chưa (`pending_review`/`approved`/`rejected`/`edited`) — đặc biệt quan trọng để patient không nhầm 1 plan `pending_review` là "chính thức" trước khi bác sĩ duyệt (nguyên tắc HITL, `specs/06`).
 4. `FoodItem.alternatives[]` đã được lọc an toàn từ trước (không dị ứng, không phạm preference cứng, không tương tác nguy hiểm) — patient chọn món thay thế trong danh sách này **không cần gọi thêm API kiểm tra an toàn**, vì đã lọc sẵn ở bước generate (`specs/05` §3.3).
 5. `swaps[]` hiển thị lý do cụ thể (`reason`, ví dụ "Tương tác thuốc (warfarin + rau muống)...") — patient cần thấy rõ vì sao món gốc bị đổi, tăng minh bạch/niềm tin vào AI.
-6. **Yêu cầu điều chỉnh plan — `[Planned]`, quyết định 2026-08-15:** patient có thể gửi yêu cầu điều chỉnh trên 1 plan đã `approved` (ví dụ không ăn được món cụ thể nào đó), nhưng **yêu cầu này cần được bác sĩ duyệt lại**, không tự động áp dụng/regenerate. Qua `POST /meal-plans/{meal_plan_id}/request-adjustment`, plan quay lại `status="pending_review"` kèm `adjustment_note`, tái sử dụng đúng luồng review đã có (`specs/06-meal-plan-review.md`) — không cần bác sĩ dùng API/luồng riêng nào khác.
+6. **Yêu cầu điều chỉnh plan (as-built):** patient có thể gửi yêu cầu điều chỉnh trên 1 plan đã `approved` (ví dụ không ăn được món cụ thể nào đó), nhưng **yêu cầu này cần được bác sĩ duyệt lại**, không tự động áp dụng/regenerate. Qua `POST /meal-plans/{meal_plan_id}/request-adjustment` (`routes_meal_plan.py`), plan quay lại `status="pending_review"` kèm `adjustment_note`, tái sử dụng đúng luồng review đã có (`specs/06-meal-plan-review.md`) — không cần bác sĩ dùng API/luồng riêng nào khác.
 
 ## 4. Luồng chính (happy path)
 1. Patient mở trang "Thực đơn của tôi" → FE gọi `GET /meal-plans/me`.
@@ -42,7 +42,7 @@ Là **bệnh nhân**, tôi muốn xem chi tiết thực đơn 7 ngày của mìn
 |---|---|---|
 | GET | `/meal-plans/me` | patient |
 | GET | `/meal-plans/{meal_plan_id}` | patient (chỉ plan của mình) |
-| POST | `/meal-plans/{meal_plan_id}/request-adjustment` | patient (chỉ plan của mình) **[Planned]** |
+| POST | `/meal-plans/{meal_plan_id}/request-adjustment` | patient (chỉ plan của mình) |
 
 ## 9. Liên quan
 - `specs/05-meal-plan-generation.md` — nguồn dữ liệu hiển thị.

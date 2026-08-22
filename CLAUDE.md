@@ -30,10 +30,11 @@
 | Nutrition calculator | Chat Q&A sâu hơn | Wearable sync | |
 | Guardrails + nguồn trích dẫn | **Doctor Compliance View** (`specs/10`, Done core) | | |
 | Dietitian review UI (approve/edit/reject) | **Food Log** (structured manual entry, ADR-009) | | |
-| | **Clinical Constraints HITL** (`specs/04`, Planned) | | |
+| | **Clinical Constraints HITL** (`specs/04`, Done — approve flow as-built) | | |
 | | **Patient Metrics History** (time-series, ADR-013) | | |
 
 > **Thay đổi scope (2026-08-17):** Food Log (phạm vi tối thiểu ADR-009) và Patient Metrics time-series (ADR-013) đã được nâng lên Should Have và implement. Compliance Notification và Drug-food interaction vẫn Must Have.
+> **Cập nhật (2026-08-22):** Clinical Constraints HITL (workflow `constraints_status` + `POST .../constraints/approve`) đã Done — xem `specs/04-clinical-constraints.md`.
 
 ---
 
@@ -58,7 +59,7 @@
 **Frontend**
 - Framework: Next.js 16 (App Router)
 - Styling: Tailwind CSS
-- State: Zustand (stores cục bộ / mock); `lib/api.ts` đã nối nhiều endpoint thật — còn thiếu `checkInteraction`, `simulateNotifications` (xem `tasks/fe-frontend.md`)
+- State: Zustand (stores cục bộ / mock); `lib/api.ts` đã nối hầu hết endpoint thật (kể cả `checkInteraction`, `simulateNotifications`) — vài trang vẫn còn mock cục bộ (`/patient` dashboard, `/doctor/messages`, phần `/doctor` dashboard) — xem `tasks/fe-frontend.md`
 - Shell: `/patient/*` (bệnh nhân) · `/doctor/*` (role API `doctor`)
 
 ---
@@ -113,7 +114,7 @@ P-014/
 │   │                               # food_log, metrics
 │   ├── agents/                     # graph.py, nodes/, meal_planner, interaction_checker
 │   ├── rag/                        # indexer, retriever, embeddings (Qdrant only)
-│   ├── guardrails/                 # rules.py đã code (chưa wired graph); source_check.py placeholder
+│   ├── guardrails/                 # rules.py + source_check.py — implemented, wired vào graph qua node apply_guardrails
 │   ├── models/ · schemas/ · services/ · db/
 ├── backend/data/                   # food_db_vn.json, drug_food_interactions.json, guidelines/
 ├── backend/qdrant_db/              # vector store Qdrant (tracked snapshot for zero-setup demo)
@@ -207,17 +208,19 @@ Backlog hiện tại: `/tasks/roadmap-mvp.md`. Ownership rút gọn: `/tasks/be1
 
 Roadmap 14 ngày gốc đã **superseded**. Backlog đóng gap as-built → North Star:
 
-→ **[`/tasks/roadmap-mvp.md`](/tasks/roadmap-mvp.md)** (bảng ánh xạ spec→task→MoSCoW→owner, cập nhật 2026-08-18).
+→ **[`/tasks/roadmap-mvp.md`](/tasks/roadmap-mvp.md)** (bảng ánh xạ spec→task→MoSCoW→owner, cập nhật 2026-08-22).
 
-Tóm tắt ưu tiên (chi tiết đầy đủ xem file trên):
+**Cập nhật 2026-08-22:** đợt rà soát as-built cho thấy hầu hết mục từng ghi `[Planned]` (Clinical Constraints HITL approve, optimistic lock review 409, `POST /meal-plans/{id}/request-adjustment`, `unmatched_pairs[]`, `secondary_intents[]`, mở rộng `preferences`, validate `weight`+`height`, rate-limit login, idempotent `/notifications/demo/simulate`, guardrails `rules.py`/`source_check.py`) **đã Done** trong code — tài liệu trước đó không được đồng bộ theo. Backlog thật còn lại nhỏ hơn nhiều:
 
 | Ưu tiên | Việc | Owner |
 |---|---|---|
-| **P1** | Clinical Constraints HITL approve — `constraints_status` + `POST .../constraints/approve` (`PUT .../constraints` đã Done) | BE2 |
-| **P1** | Optimistic lock review (409) + persist meal plan qua `/chat` (`specs/06`, `specs/05`) | BE2 + BE1 |
-| **P2/P3** | Guardrails bổ sung (`validate_interaction_output`/`sanitize_recommendation`), hybrid RAG chat, mở rộng `preferences`, `unmatched_pairs[]`, LLM dual-provider fallback | BE1 |
+| **P2** | Wire `validate_interaction_output`/`sanitize_recommendation` (đã viết ở `guardrails/rules.py`, chưa có nơi gọi) vào runtime | BE1 |
+| **P2** | Chuyển `rag_qa_node` sang `retrieve_hybrid()` (BM25+dense RRF đã có trong `retriever.py`, chat hiện vẫn dense-only) | BE1 |
+| **P2/FE** | Nối `/patient` home dashboard + phần mock còn lại của `/doctor` dashboard với API thật; dọn `frontend/lib/plans-store.ts` (dead code) | FE |
+| **P3** | LLM dual-provider fallback OpenAI↔DeepSeek tự động (`adrs/004`) | BE1 |
+| **Could Have** | Danh sách đi chợ, gợi ý điểm bán, Export PDF, intent mới "lời khuyên khi chỉ số cơ thể đổi" (`specs/12`) | — |
 
-**Đã Done (core), không chặn North Star:** Doctor Compliance View (`specs/10` — `GET/POST .../compliance*`, FE nối API thật).
+**Đã Done (core), không chặn North Star:** Doctor Compliance View (`specs/10`), Clinical Constraints HITL (`specs/04`), Food Log (`specs/09`), Patient Metrics time-series (`specs/12`), optimistic lock review, request-adjustment, guardrails wired.
 
 ---
 

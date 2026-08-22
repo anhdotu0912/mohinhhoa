@@ -9,16 +9,16 @@ Bác sĩ cần 1 cái nhìn tổng hợp về việc bệnh nhân có tuân th�
 ## 2. User story
 Là **bác sĩ**, tôi muốn xem biểu đồ tuân thủ theo thời gian và danh sách sự kiện cảnh báo của 1 bệnh nhân cụ thể, và có thể gửi nhắc nhở thủ công nếu thấy tuân thủ thấp, để tôi can thiệp kịp thời.
 
-## 3. Business rules (thiết kế đề xuất — theo ADR-008)
-1. **On-the-fly aggregation** — không có bảng tổng hợp riêng (`compliance_summary`), tính trực tiếp mỗi lần bác sĩ mở trang, từ 2 nguồn có sẵn:
+## 3. Business rules (as-built, theo ADR-008)
+1. **On-the-fly aggregation** — không có bảng tổng hợp riêng (`compliance_summary`), tính trực tiếp mỗi lần bác sĩ mở trang (`services/compliance.py::ComplianceService`), từ 2 nguồn có sẵn:
    - `Notification` (`type="adherence_checkin"`, `status="done"`, `payload.adherence` ∈ `{yes, partial, no}`) → nguồn chính tính "% tuân thủ" mỗi ngày (`yes=100%`, `partial=50%`, `no=0%`; ngày không có checkin `done` = không tính vào trung bình).
    - `Alert` (`severity ∈ {Nguy hiểm, Cần chú ý}`, theo `user_id`, trong khoảng ngày) → nguồn cho timeline sự kiện cảnh báo.
-2. **[Planned]** `GET /doctor/patients/{patient_id}/compliance` — query mặc định 14 ngày gần nhất (khớp UI mock hiện có), trả `{daily_series: [...], events: [...]}` — không cache, không lưu lịch sử tính toán.
-3. **Ngưỡng cảnh báo tuân thủ thấp (quyết định 2026-08-15):** giá trị số cụ thể **vẫn là quyết định lâm sàng/sản phẩm**, chưa chốt số trong tài liệu này (ví dụ "tuân thủ trung bình <50% trong 7 ngày gần nhất → cảnh báo đỏ" chỉ là ví dụ minh hoạ, không phải giá trị chính thức). Thiết kế kỹ thuật đã chốt: ngưỡng phải là **1 giá trị cấu hình được** (`COMPLIANCE_LOW_THRESHOLD_PCT` trong `backend/app/core/config.py`, default đề xuất `50`) — không hard-code trong logic aggregation, để team lâm sàng/sản phẩm điều chỉnh mà không cần sửa code.
-4. **[Planned]** `POST /doctor/patients/{patient_id}/compliance/remind` — cho phép bác sĩ gửi 1 nhắc nhở thủ công. **Quyết định 2026-08-15: thêm type mới `"manual_reminder"`** (không dùng lại `meal_reminder`/`adherence_checkin`) — tạo `Notification(type="manual_reminder", status="sent")`, cần thêm giá trị này vào enum `Notification.type` ở cả `contracts/api-v1.md` và mọi nơi validate type.
-5. Dữ liệu food log thực tế (`specs/09`, Won't Have) **không** phải nguồn chính cho tuân thủ ở vòng demo này — vì Food Log Won't Have, tín hiệu tuân thủ hiện tại chỉ dựa vào `adherence_checkin` (patient tự khai qua notification action), không có dữ liệu "ăn gì thực tế" chi tiết.
+2. `GET /doctor/patients/{patient_id}/compliance` — query mặc định 14 ngày gần nhất (`days` param), trả `PatientComplianceOut` `{daily_series: [...], events: [...]}` — không cache, không lưu lịch sử tính toán.
+3. **Ngưỡng cảnh báo tuân thủ thấp:** giá trị số cụ thể **vẫn là quyết định lâm sàng/sản phẩm**, chưa chốt số trong tài liệu này (ví dụ "tuân thủ trung bình <50% trong 7 ngày gần nhất → cảnh báo đỏ" chỉ là ví dụ minh hoạ, không phải giá trị chính thức áp cứng ở BE hiện tại). Ngưỡng nên là **1 giá trị cấu hình được** trong `backend/app/core/config.py` khi được chốt, không hard-code trong logic aggregation.
+4. **`POST /doctor/patients/{patient_id}/compliance/remind` (as-built):** cho phép bác sĩ gửi 1 nhắc nhở thủ công. Dùng type riêng `"manual_reminder"` (không dùng lại `meal_reminder`/`adherence_checkin`) qua `NotificationService.create_manual_reminder` — tạo `Notification(type="manual_reminder", status="sent")`. `manual_reminder` đã có trong enum `Notification.type` ở `contracts/api-v1.md`.
+5. Dữ liệu food log thực tế (`specs/09`, Should Have, đã Done) **vẫn không** phải nguồn chính cho aggregation tuân thủ ở vòng demo này — tín hiệu tuân thủ hiện tại chỉ dựa vào `adherence_checkin` (patient tự khai qua notification action), chưa nối `FoodLog` vào `ComplianceService`.
 
-## 4. Luồng chính (happy path — thiết kế đề xuất)
+## 4. Luồng chính (happy path)
 1. Bác sĩ mở trang chi tiết bệnh nhân → tab "Tuân thủ".
 2. FE gọi `GET /doctor/patients/{patient_id}/compliance`.
 3. BE aggregate on-the-fly từ `Notification`+`Alert`, trả về series theo ngày + timeline sự kiện.
@@ -27,7 +27,7 @@ Là **bác sĩ**, tôi muốn xem biểu đồ tuân thủ theo thời gian và 
 ## 5. Edge cases
 - Bệnh nhân chưa từng có `adherence_checkin` nào (chưa từng tương tác notification) → `daily_series` toàn bộ "không có dữ liệu" cho khoảng ngày yêu cầu, không phải lỗi.
 - Số lượng `Notification`/`Alert` tăng lớn (nhiều tháng lịch sử) → on-the-fly aggregation có thể chậm dần (xem điều kiện revisit ADR-008: >500 patient hoạt động đồng thời hoặc vài nghìn bản ghi/patient).
-- [CẦN XÁC NHẬN] UI mock hiện tại hiển thị biểu đồ 14 ngày cố định — cần xác nhận khoảng ngày này có nên cho bác sĩ tuỳ chọn (7/30/90 ngày) hay giữ cố định 14 ngày cho vòng demo.
+- FE hiện hiển thị biểu đồ 14 ngày cố định qua default `days=14`; BE cho phép truyền `days` khác qua query param nếu cần, nhưng FE chưa có UI đổi khoảng ngày.
 
 ## 6. Ngoài phạm vi (Out of scope)
 - Bảng tổng hợp riêng (materialized summary) — hoãn theo ADR-008, chỉ revisit khi vượt ngưỡng quy mô.
@@ -37,13 +37,13 @@ Là **bác sĩ**, tôi muốn xem biểu đồ tuân thủ theo thời gian và 
 ## 7. Schema tham chiếu
 - `Notification`, `NotificationActionRequest.adherence` — `contracts/api-v1.md` §7.
 - `Alert` — `contracts/agent-io-schema.md` §4.
-- Response `{daily_series, events}` — đề xuất, xem `contracts/api-v1.md` §10 (Doctor Compliance `[Planned]`).
+- `PatientComplianceOut` `{daily_series, events}` — `contracts/api-v1.md` §10.
 
 ## 8. API liên quan
 | Method | Path | Role |
 |---|---|---|
-| GET | `/doctor/patients/{patient_id}/compliance` | doctor **[Planned]** |
-| POST | `/doctor/patients/{patient_id}/compliance/remind` | doctor **[Planned]** |
+| GET | `/doctor/patients/{patient_id}/compliance` | doctor |
+| POST | `/doctor/patients/{patient_id}/compliance/remind` | doctor |
 
 ## 9. Liên quan
 - `adrs/008-compliance-summary-aggregation-strategy.md` — quyết định kiến trúc gốc.

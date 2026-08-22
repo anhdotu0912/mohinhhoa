@@ -17,7 +17,7 @@ profile_loader → intent_classifier → route_intent (conditional) → {
   rag_qa            (app/agents/nodes/rag_tool.py)
   meal_plan         (meal_plan_node → meal_planner_agent)
   interaction_check (interaction_check_node → interaction_checker_agent)
-  food_log          (food_log_node — stub, xem adrs/009)
+  food_log          (food_log_node — đọc FoodLog thật từ DB, xem adrs/009)
   refuse            (refuse_node — từ chối yêu cầu đổi thuốc/chẩn đoán)
   unknown           (unknown_node — gợi ý lại các chức năng)
 } → END
@@ -36,8 +36,8 @@ profile_loader → intent_classifier → route_intent (conditional) → {
 - Facade pattern giữ đúng boundary BE1 (nội bộ agent) / BE2 (API, DB) theo `CLAUDE.md`.
 
 **Negative**
-- `profile_loader` hiện dùng `_DEMO_PROFILES` hard-code theo `user_id` demo (`demo_patient_1/2/3`) hoặc fallback profile mặc định — **chưa** query DB thật qua BE2 khi chạy qua `/chat`. Nghĩa là hồ sơ bệnh nhân thật (đã lưu qua `POST /profile`) không được `meal_plan`/`interaction_check` node trong luồng chat sử dụng, trừ khi `user_id` trùng đúng 1 trong 3 tài khoản demo. Đây là gap cần đóng trước khi demo với tài khoản patient tự đăng ký (xem `tasks/be1-ai-core.md`).
-- `meal_plan_node` (chat) gọi `meal_planner_agent()` và trả `meal_plan_id` trong `AgentRunOutput`, nhưng **không persist** kế hoạch vào DB (khác với `POST /meal-plans/generate` — xem `specs/05-meal-plan-generation.md`, Edge cases). `meal_plan_id` trả về qua chat hiện không thể `GET /meal-plans/{id}` sau đó.
+- `profile_loader` (as-built 2026-08-18) đọc `PatientProfile` thật từ Postgres (`get_profile_row(db, user_id)`) trước — chỉ fallback sang `_DEMO_PROFILES` hard-code (`demo_patient_1/2/3`) hoặc profile mặc định khi **không có** `db` session hoặc patient thật sự chưa có profile trong DB. Gap "luôn dùng demo" đã được đóng; điểm cần lưu ý còn lại: nếu `db` không được truyền vào `run_agent()` (ví dụ gọi facade ngoài context HTTP có session), node vẫn fallback demo/default — không phải bug, chỉ là hành vi graceful-degradation có chủ đích.
+- `meal_plan_node` (chat) gọi `build_meal_preview()` — chỉ **đọc** plan đã tồn tại của patient để hiển thị preview trong hội thoại, **không generate/persist** plan mới. Đây là **thiết kế có chủ đích** (tránh chat tạo nhiều bản draft rác trong DB mỗi lần patient hỏi thử), không phải gap thiếu implement — muốn có plan chính thức, dùng `POST /meal-plans/generate` (`specs/05-meal-plan-generation.md`).
 
 **Alternatives đã cân nhắc**
 - Tự viết state machine thủ công (if/elif theo intent): bị loại vì khó mở rộng, khó test node độc lập, không có sẵn cơ chế conditional edge/observability như LangGraph.

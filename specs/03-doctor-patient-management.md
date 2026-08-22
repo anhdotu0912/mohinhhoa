@@ -14,7 +14,7 @@ Là **bác sĩ**, tôi muốn thêm bệnh nhân mới vào hệ thống, xem da
 2. Thêm bệnh nhân mới = gọi lại `POST /auth/register` với `role="patient"` (xem `specs/01-account-auth.md`) — **không có** endpoint riêng `POST /doctor/patients`. Sau khi có `user_id`, doctor gọi tiếp `PUT /doctor/patients/{id}/profile` để bổ sung chi tiết.
 3. `PUT /doctor/patients/{id}/profile` validate `age` trong khoảng **0–130** (validation này **chỉ áp dụng ở endpoint doctor này**, **không** áp dụng khi patient tự đăng ký — `POST /auth/register` không có field `age`, `age` chỉ tồn tại trong `PatientProfile`/`DoctorPatientUpdate`).
 4. `PUT /doctor/patients/{id}/profile` **không bao gồm** `target_kcal`/`restrictions` — 2 field này **chỉ** sửa được qua endpoint riêng ở `specs/04-clinical-constraints.md`. Đây là chủ ý tách bạch: thông tin hành chính/nhân trắc (spec này) vs ràng buộc điều trị (spec 04).
-5. `PUT /doctor/patients/{id}/metrics` (weight/height) — BE **tự tính lại `bmi`** và `bmi_category` (`Thiếu cân/Bình thường/Thừa cân nhẹ/Béo phì`, ngưỡng BMI châu Á 18.5/23/25), khác với `POST /profile` (patient tự nhập `bmi` tay, không tự tính) — 2 endpoint có hành vi tính BMI **khác nhau có chủ đích**, cần lưu ý khi so sánh dữ liệu. **[Planned, quyết định 2026-08-15]** request phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 lần gọi (không cho cập nhật riêng lẻ 1 trong 2) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
+5. `PUT /doctor/patients/{id}/metrics` (weight/height) — BE **tự tính lại `bmi`** và `bmi_category` (`Thiếu cân/Bình thường/Thừa cân nhẹ/Béo phì`, ngưỡng BMI châu Á 18.5/23/25), khác với `POST /profile` (patient tự nhập `bmi` tay, không tự tính) — 2 endpoint có hành vi tính BMI **khác nhau có chủ đích**, cần lưu ý khi so sánh dữ liệu. **As-built:** request phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 lần gọi (không cho cập nhật riêng lẻ 1 trong 2) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE` (`routes_doctor.py`).
 6. `PUT /doctor/patients/{id}/goals` sửa mục tiêu sức khoẻ chung (tách biệt khỏi `target_kcal` — xem field cụ thể trong `contracts/api-v1.md` §8).
 7. `GET /doctor/catalog` trả danh mục chuẩn hoá (bệnh lý/thuốc) để FE gợi ý autocomplete khi doctor nhập — không bắt buộc chọn từ danh mục, vẫn có thể nhập text tự do ở các field liên quan.
 8. `POST /doctor/patients/{id}/avatar` upload ảnh đại diện hộ bệnh nhân — không giới hạn nghiệp vụ đặc biệt ngoài giới hạn kỹ thuật (kích thước/định dạng file, xem `contracts/api-v1.md`).
@@ -42,7 +42,6 @@ Là **bác sĩ**, tôi muốn thêm bệnh nhân mới vào hệ thống, xem da
 
 ## 7. Schema tham chiếu
 - `DoctorPatientSummary`, `DoctorPatientDetail`, `DoctorPatientUpdate`, `MetricsUpdateRequest`, `GoalsUpdateRequest` — `contracts/api-v1.md` §8.
-- Lưu ý: `DoctorPatientSummary` có khai báo trùng field `age` 2 lần trong `schemas/doctor.py` (không gây lỗi runtime vì Pydantic lấy khai báo sau, nhưng là code smell cần dọn khi có thời gian — không thuộc phạm vi tài liệu này để sửa).
 
 ## 8. API liên quan
 | Method | Path | Role |

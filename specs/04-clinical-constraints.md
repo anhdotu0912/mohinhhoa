@@ -1,7 +1,7 @@
 # Spec: Bác sĩ Xem/Sửa Ràng buộc Lâm sàng (target_kcal & restrictions)
 
 ## Status
-Partial — **`PUT /doctor/patients/{id}/constraints` as-built (2026-08-16):** doctor ghi trực tiếp `target_kcal`/`salt_daily_g`/`sugar_daily_g`, áp dụng ngay cho lần generate kế tiếp. **HITL patient-tự-sửa (`constraints_status`, `POST .../approve`) vẫn Planned/deferred.** **`protein_daily_g` bỏ khỏi scope** — ràng buộc doctor chỉ còn Calo · Muối · Đường.
+Done — **`PUT /doctor/patients/{id}/constraints`** (as-built 2026-08-16): doctor ghi trực tiếp `target_kcal`/`salt_daily_g`/`sugar_daily_g`, áp dụng ngay cho lần generate kế tiếp. **HITL patient-tự-sửa** (`constraints_status` + `POST .../constraints/approve`, as-built 2026-08-18) cũng đã hoạt động đầy đủ. **`protein_daily_g` bỏ khỏi scope** — ràng buộc doctor chỉ còn Calo · Muối · Đường.
 
 ## 1. Mục tiêu (Why)
 Bác sĩ là người có chuyên môn xác định mục tiêu calo và ngưỡng dinh dưỡng phù hợp với bệnh lý — không nên chỉ dựa vào patient tự khai. Thiếu endpoint này, bác sĩ phải yêu cầu bệnh nhân tự sửa hồ sơ theo hướng dẫn miệng, không kiểm soát được trực tiếp — rủi ro sai lệch trong luồng lâm sàng thật.
@@ -10,18 +10,18 @@ Bác sĩ là người có chuyên môn xác định mục tiêu calo và ngưỡ
 - Là **bác sĩ**, tôi muốn xem và chỉnh sửa trực tiếp mục tiêu calo và ngưỡng ràng buộc dinh dưỡng của bệnh nhân, để đảm bảo thực đơn AI sinh ra tuân đúng chỉ định điều trị tôi đưa ra.
 - Là **bệnh nhân**, tôi muốn tự cập nhật ràng buộc của mình khi cần (ví dụ nhận chỉ định mới từ 1 buổi khám ngoài hệ thống), nhưng hiểu rằng thay đổi đó cần bác sĩ của tôi xác nhận lại.
 
-## 3. Business rules (đã chốt 2026-08-15)
-1. **Endpoint mới `PUT /doctor/patients/{patient_id}/constraints`** — nhận `target_kcal` (int, optional) và `restrictions` (optional), cập nhật trực tiếp lên `profiles` của patient đó (cùng bảng `PatientProfile`, khác endpoint với `PUT /doctor/patients/{id}/profile`).
+## 3. Business rules (as-built)
+1. **`PUT /doctor/patients/{patient_id}/constraints`** — nhận `target_kcal` (int, optional) và `restrictions` (optional), cập nhật trực tiếp lên `profiles` của patient đó (cùng bảng `PatientProfile`, khác endpoint với `PUT /doctor/patients/{id}/profile`).
 2. **Idempotent & partial update** — chỉ field được gửi mới bị ghi đè (khác với `POST /profile` là full-replace); field không gửi giữ nguyên giá trị cũ.
 3. **Ràng buộc mới chỉ áp dụng từ lần `POST /meal-plans/generate` kế tiếp** — plan đã tồn tại **không** tự động tính lại (nhất quán với `MealPlanOutput.profile_snapshot` là bản chụp tại thời điểm generate).
 4. **Mở rộng schema `Restrictions` (as-built 2026-08-16):** thêm `salt_daily_g`/`sugar_daily_g` — khớp UI `frontend/app/doctor/patients/constraints/page.tsx`. Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ. **`protein_daily_g` bỏ khỏi scope ràng buộc.**
-5. **HITL — patient tự sửa cần bác sĩ duyệt (quyết định 2026-08-15):**
+5. **HITL — patient tự sửa cần bác sĩ duyệt (as-built 2026-08-18):**
    - **Doctor sửa** qua `PUT /doctor/patients/{patient_id}/constraints` → có hiệu lực **ngay**, `PatientProfile.constraints_status="confirmed"` (doctor là người xác nhận trực tiếp, không cần bước duyệt thêm).
    - **Patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile` (`specs/02`) → giá trị mới **vẫn áp dụng ngay** cho lần generate kế tiếp (không chặn patient, giữ demo flow mượt), nhưng `constraints_status` chuyển thành `"pending_doctor_review"`.
-   - Bác sĩ xác nhận lại qua **endpoint mới** `POST /doctor/patients/{patient_id}/constraints/approve` (không đổi giá trị, chỉ chuyển `constraints_status` về `"confirmed"`) — hoặc tự động về `"confirmed"` nếu bác sĩ tự sửa trực tiếp bằng `PUT .../constraints` (rule 5 dòng 1).
+   - Bác sĩ xác nhận lại qua `POST /doctor/patients/{patient_id}/constraints/approve` (không đổi giá trị, chỉ chuyển `constraints_status` về `"confirmed"`) — hoặc tự động về `"confirmed"` nếu bác sĩ tự sửa trực tiếp bằng `PUT .../constraints` (rule 5 dòng 1).
    - Đây là ứng dụng cụ thể của nguyên tắc HITL mở rộng (`adrs/006-hitl-guardrails-strategy.md` rule 4): "mọi thay đổi ảnh hưởng điều trị do patient tự thực hiện phải được bác sĩ xác nhận lại", tương tự cách meal plan luôn cần duyệt (`specs/06`).
 6. Response trả về `PatientProfile` đầy đủ sau khi update (giống pattern `POST /profile`) để FE cập nhật UI ngay không cần gọi lại `GET /profile/me`.
-7. `GET /doctor/patients/{patient_id}` phải trả kèm `target_kcal`/`restrictions`/`constraints_status` hiện tại để doctor biết có đang chờ duyệt hay không (hiển thị badge "Chờ xác nhận ràng buộc mới" nếu `pending_doctor_review`).
+7. `GET /doctor/patients/{patient_id}` trả kèm `target_kcal`/`restrictions`/`constraints_status` hiện tại để doctor biết có đang chờ duyệt hay không (FE hiển thị badge "Chờ bác sĩ xác nhận" nếu `pending_doctor_review`, `frontend/app/doctor/patients/constraints/page.tsx`).
 
 ## 4. Luồng chính (happy path)
 
@@ -57,19 +57,18 @@ Bác sĩ là người có chuyên môn xác định mục tiêu calo và ngưỡ
     "carb_per_meal": 40,
     "sodium_daily": 1200,
     "salt_daily_g": 5,
-    "sugar_daily_g": 20,
-    "protein_daily_g": 65
+    "sugar_daily_g": 20
   }
 }
 // POST /doctor/patients/{patient_id}/constraints/approve — request rỗng
 ```
-Toàn bộ chi tiết + response mẫu tại `contracts/api-v1.md` §3 (Clinical Constraints `[Planned]`); `constraints_status` enum tại `contracts/agent-io-schema.md` §1.
+Toàn bộ chi tiết + response mẫu tại `contracts/api-v1.md` §3 (Clinical Constraints); `constraints_status` enum tại `contracts/agent-io-schema.md` §1.
 
 ## 8. API liên quan
 | Method | Path | Role |
 |---|---|---|
-| PUT | `/doctor/patients/{patient_id}/constraints` | doctor **[Planned]** |
-| POST | `/doctor/patients/{patient_id}/constraints/approve` | doctor **[Planned]** |
+| PUT | `/doctor/patients/{patient_id}/constraints` | doctor |
+| POST | `/doctor/patients/{patient_id}/constraints/approve` | doctor |
 
 ## 9. Liên quan
 - `specs/02-patient-profile-onboarding.md` — patient tự sửa cùng field qua `POST /profile`, kích hoạt `constraints_status="pending_doctor_review"`.

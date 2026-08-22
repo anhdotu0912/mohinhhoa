@@ -1,7 +1,7 @@
 # Spec: Bác sĩ Duyệt Thực đơn (HITL)
 
 ## Status
-Done — `approve`/`reject`/`edit` hoạt động đúng side-effect mô tả dưới đây. **Cập nhật 2026-08-15:** optimistic lock (rule 8) là **Planned**, chưa implement.
+Done — `approve`/`reject`/`edit` hoạt động đúng side-effect mô tả dưới đây. **Cập nhật 2026-08-18:** optimistic lock (rule 8, `409 PLAN_ALREADY_REVIEWED`) đã **Done**.
 
 ## 1. Mục tiêu (Why)
 AI không được tự chẩn đoán hoặc tự quyết định thực đơn cuối cùng cho bệnh nhân (luật cứng `CLAUDE.md` Mục 7) — mọi plan phải qua con người có chuyên môn xác nhận trước khi bệnh nhân coi đó là "thực đơn chính thức". Đây là bước HITL bắt buộc của North Star demo.
@@ -17,8 +17,8 @@ Là **bác sĩ**, tôi muốn xem danh sách thực đơn đang chờ duyệt, v
 5. Thiếu `edited_plan` khi `action="edit"` → `400 EDITED_PLAN_REQUIRED`.
 6. `GET /doctor/meal-plans` mặc định chỉ trả `status="pending_review"` (hàng đợi cần xử lý); dùng `status=all` để xem toàn bộ lịch sử review.
 7. **Guardrail liên quan:** khi review, bác sĩ có thể thấy `swaps[]` (món đã bị AI tự đổi do tương tác thuốc) — bác sĩ **không** có quyền qua API này để "đổi thuốc" của bệnh nhân, chỉ đổi được nội dung thực đơn (`edited_plan`). Đổi thuốc là quyết định y khoa riêng, nằm ngoài phạm vi hệ thống này.
-8. **Optimistic lock — `[Planned]`, quyết định 2026-08-15:** để tránh race condition 2 doctor cùng review 1 plan (xem Edge case), endpoint **phải** kiểm tra `status == "pending_review"` ngay trước khi áp dụng action — nếu plan không còn ở trạng thái chờ (đã bị doctor khác xử lý trước), trả `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm như as-built hiện tại.
-9. **Patient yêu cầu điều chỉnh (`specs/07`) tái sử dụng luồng này:** khi patient gọi `POST /meal-plans/{id}/request-adjustment` (Planned) trên 1 plan đã `approved`, BE set lại `status="pending_review"` kèm `adjustment_note` — plan quay lại hàng đợi `GET /doctor/meal-plans` để doctor xử lý qua đúng endpoint `review` này (không cần API riêng cho trường hợp này).
+8. **Optimistic lock (as-built 2026-08-18):** để tránh race condition 2 doctor cùng review 1 plan (xem Edge case), endpoint kiểm tra `status == "pending_review"` ngay trước khi áp dụng action (`routes_doctor.py`) — nếu plan không còn ở trạng thái chờ (đã bị doctor khác xử lý trước), trả `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm.
+9. **Patient yêu cầu điều chỉnh (`specs/07`) tái sử dụng luồng này:** khi patient gọi `POST /meal-plans/{id}/request-adjustment` (Done) trên 1 plan đã `approved`, BE set lại `status="pending_review"` kèm `adjustment_note` — plan quay lại hàng đợi `GET /doctor/meal-plans` để doctor xử lý qua đúng endpoint `review` này (không cần API riêng cho trường hợp này).
 10. **Gán lịch tuần (ADR-012):** sau `approve`/`edit`, bác sĩ chọn slot trên `/doctor/history/{patientId}` (tuần này / tuần sau / trống) → generate → review → `POST .../apply` với `start_date` + `slot_key` đã chốt. Trang review ẩn date picker tự do khi có slot intent; redirect về history sau apply.
 
 ## 4. Luồng chính (happy path)
@@ -29,8 +29,8 @@ Là **bác sĩ**, tôi muốn xem danh sách thực đơn đang chờ duyệt, v
 5. Patient thấy trạng thái mới khi mở lại `GET /meal-plans/me` hoặc nhận notification (nếu `approve`).
 
 ## 5. Edge cases
-- **Race condition 2 doctor cùng review 1 plan — đã quyết định (2026-08-15):** hệ thống hiện "1 doctor thấy toàn bộ hàng đợi" (`specs/03` rule 1) — nếu 2 doctor cùng mở 1 plan `pending_review` và cùng bấm action gần như đồng thời, as-built hiện tại **không có optimistic lock**, request thứ 2 ghi đè âm thầm request thứ 1 (ví dụ doctor A approve, doctor B reject ngay sau → kết quả cuối `rejected` nhưng notification `plan_approved` đã gửi trước đó, tạo trạng thái không nhất quán). **Quyết định: thêm optimistic lock** (rule 8 ở trên) — request thứ 2 khi plan không còn `pending_review` sẽ nhận `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè.
-- Doctor review 1 plan đã ở trạng thái `approved`/`rejected`/`edited` (không còn `pending_review`) — as-built hiện tại **không chặn**; sau khi implement rule 8 (Planned), sẽ trả `409` cho trường hợp này.
+- **Race condition 2 doctor cùng review 1 plan (đã đóng, as-built 2026-08-18):** hệ thống "1 doctor thấy toàn bộ hàng đợi" (`specs/03` rule 1) — nếu 2 doctor cùng mở 1 plan `pending_review` và cùng bấm action gần như đồng thời, request thứ 2 (khi plan không còn `pending_review`) nhận `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm (rule 8), tránh trạng thái không nhất quán (ví dụ doctor A approve xong, doctor B reject ngay sau sẽ bị chặn).
+- Doctor review 1 plan đã ở trạng thái `approved`/`rejected`/`edited` (không còn `pending_review`) → `409 PLAN_ALREADY_REVIEWED` (rule 8).
 - `edited_plan` gửi thiếu field bắt buộc trong `DayPlan`/`FoodItem` (ví dụ thiếu `days_count=7`) → tuỳ mức validation Pydantic của `MealPlanOutput`, có thể `422` nếu field required không khớp type, nhưng **không có validation nghiệp vụ** kiểm tra đủ 7 ngày hay tổng dinh dưỡng hợp lý khi doctor tự `edit` — trách nhiệm đảm bảo tính hợp lý thuộc về doctor khi dùng `edit`.
 - Doctor review plan của patient không tồn tại/plan không tồn tại → `404 MEAL_PLAN_NOT_FOUND`.
 

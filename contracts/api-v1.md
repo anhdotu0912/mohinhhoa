@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.3 (2026-08-17 — thêm DELETE /metrics/{id}. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.4 (2026-08-22 — dọn tag `[Planned]` còn sót cho các endpoint/field đã as-built từ lâu (`409 PLAN_ALREADY_REVIEWED`, `secondary_intents[]`, `constraints_status`). Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -397,7 +397,7 @@ GET /notifications?status=pending&type=meal_reminder
 { "meal_plan_id": "plan_uuid", "status": "approved", "trust_badge": "doctor_reviewed", "reviewed_at": "2026-08-15T09:10:00+07:00", "reviewer_id": "doctor_uuid" }
 // Error 400 (edit thiếu edited_plan) { "code": "EDITED_PLAN_REQUIRED", "detail": "Cần edited_plan khi action=edit." }
 // Error 404 { "code": "MEAL_PLAN_NOT_FOUND", "detail": "Không tìm thấy thực đơn." }
-// Error 409 [Planned] (plan không còn ở pending_review) { "code": "PLAN_ALREADY_REVIEWED", "detail": "Thực đơn này đã được xử lý (status hiện tại: approved). Tải lại danh sách để xem trạng thái mới nhất." }
+// Error 409 (as-built — plan không còn ở pending_review) { "code": "PLAN_ALREADY_REVIEWED", "detail": "Thực đơn này đã được xử lý (status hiện tại: approved). Tải lại danh sách để xem trạng thái mới nhất." }
 ```
 **Side-effect theo action (as-built, ADR-011):**
 - `approve`: `status="approved"`, `trust_badge="doctor_reviewed"` → tạo `Notification(type="plan_approved", status="sent")` only. **Không** materialize `meal_reminder`/`adherence_checkin` — gọi `POST /doctor/meal-plans/{id}/apply` sau khi chọn ngày áp dụng.
@@ -475,10 +475,10 @@ On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `
 ```json
 // Request
 { "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
-// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] [Planned])
+// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] as-built)
 // Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
 ```
-**Multi-intent `[Planned]`, quyết định 2026-08-15:** `intent_classifier` cần nâng cấp để phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
+**Multi-intent (as-built):** `intent_classifier` phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) qua keyword pattern — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
 
 ### `POST /chat/stream`
 **Role:** `patient` **hoặc** `doctor`.
@@ -602,32 +602,34 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `PlanExpiryDemoRequest.mode` / `DoctorPatientSummary.plan_expiry` | `expiring` \| `expired` (request) — `expiring` \| `expired` \| `ok` \| `none` (summary field) | `schemas/doctor.py`, `services/plan_expiry.py` |
 | Meal slot (`Meal.slot`, `Swap.slot`) | `breakfast` \| `lunch` \| `dinner` \| `snack` | `schemas/meal_plan.py` — **khác** `FoodLogEntry.slot` (xem dòng dưới) |
 | Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` | `agents/nodes/intent_classifier.py::VALID_INTENTS` |
-| `AgentRunOutput.secondary_intents[]` `[Planned]` | cùng enum intent phía trên, dạng mảng | Quyết định 2026-08-15, đáp ứng multi-intent |
+| `AgentRunOutput.secondary_intents[]` | cùng enum intent phía trên, dạng mảng | As-built, đáp ứng multi-intent (`intent_classifier.py`) |
 | `FoodLogEntry.type` | `as_planned` \| `custom` | `schemas/food_log.py` |
 | `FoodLogEntry.status` | `logged` \| `adjusted` | `adrs/009-food-log-scope-strategy.md` |
 | `FoodLogEntry.slot` | `morning` \| `noon` \| `evening` | ADR-009, khớp UI 3-slot |
 | `BodyMetricsEntry.recorded_by` | `patient` \| `doctor` | `models/body_metrics.py` |
-| `PatientProfile.constraints_status` `[Planned]` | `confirmed` \| `pending_doctor_review` | Quyết định 2026-08-15, `specs/04-clinical-constraints.md` |
+| `PatientProfile.constraints_status` | `confirmed` \| `pending_doctor_review` | As-built, `specs/04-clinical-constraints.md` |
 
 ---
 
 ## Versioning
 
-- Version hiện tại: **1.3**.
+- Version hiện tại: **1.4**.
+- **Changelog 1.3 → 1.4 (2026-08-22):** dọn tag `[Planned]` còn sót trong body cho các mục đã as-built từ các đợt trước — `409 PLAN_ALREADY_REVIEWED` (optimistic lock review), `AgentRunOutput.secondary_intents[]`, `PatientProfile.constraints_status` (bảng Enum tham chiếu). Không đổi shape/behavior nào, chỉ sửa mô tả trạng thái cho khớp code.
 - **Changelog 1.2 → 1.3 (2026-08-17):** thêm `DELETE /metrics/{id}` (patient xóa bản ghi chỉ số của mình); response 204, lỗi 404 `METRICS_NOT_FOUND`.
 - **2026-08-18 (auth):** `POST /auth/forgot-password` gửi mật khẩu mới qua SMTP; `503 EMAIL_NOT_CONFIGURED` / `500 EMAIL_SEND_FAILED`. Rate-limit login as-built.
 - **Changelog 1.1 → 1.2 (2026-08-17):** Food Log §12 as-built; thêm Patient Metrics History §13 (`POST /metrics`, `GET /metrics/history`); Health chuyển §14. `GET .../meal-plan-schedule`: `unassigned_plans` gồm cả `pending_review`; slot `past` cho plan đã hết tuần.
-  1. Thêm `POST /auth/forgot-password`, `POST /auth/reset-password` `[Planned]` + rate-limit `POST /auth/login` `[Planned]`.
-  2. `PUT /doctor/patients/{id}/constraints` as-built (`target_kcal`, `salt_daily_g`, `sugar_daily_g`); `POST /doctor/patients/{id}/constraints/approve` + `constraints_status` HITL vẫn `[Planned]`/deferred.
-  3. Thêm `POST /meal-plans/{id}/request-adjustment` `[Planned]`; ghi nhận quyết định persist meal plan sinh qua `/chat`.
-  4. `InteractionCheckOutput` thêm `unmatched_pairs[]` `[Planned]`.
-  5. `POST /doctor/meal-plans/{id}/review` thêm optimistic lock + `409 PLAN_ALREADY_REVIEWED` `[Planned]`.
-  6. `POST /doctor/patients/{id}/compliance/remind` đổi type notification sang `manual_reminder` (mới) `[Planned]`; threshold tuân thủ thấp thành config value.
-  7. `POST /chat` thêm `secondary_intents[]` `[Planned]` cho multi-intent.
-  8. `POST /food-log` đổi `slot` sang 3-giá-trị `morning|noon|evening` `[Planned]`.
-  9. `PUT /doctor/patients/{id}/metrics` thêm validation bắt buộc gửi đủ `weight`+`height` `[Planned]`.
-  10. `POST /notifications/demo/simulate` — ghi nhận cần sửa lại cho idempotent hơn `[Planned fix]`.
-  11. Thêm `GET /doctor/foods` — tra cứu món từ nutrition catalog DB cho UI chỉnh thực đơn.
-  - Toàn bộ đều optional/không breaking với client hiện tại → minor bump (1.0 → 1.1).
+- **Changelog 1.0 → 1.1 (lịch sử, đã Done — không còn Planned):** khi phát hành 1.1 (2026-08-15), 9 mục dưới đây được đánh dấu `[Planned]`; tính đến 1.4 (2026-08-22) toàn bộ đã as-built, giữ lại nguyên văn để tham khảo lịch sử quyết định:
+  1. `POST /auth/forgot-password`, `POST /auth/reset-password` + rate-limit `POST /auth/login` — Done.
+  2. `PUT /doctor/patients/{id}/constraints` — Done; `POST /doctor/patients/{id}/constraints/approve` + `constraints_status` HITL — Done.
+  3. `POST /meal-plans/{id}/request-adjustment` — Done. (Quyết định "persist meal plan sinh qua `/chat`" đã bị đảo — chat `meal_plan` chốt lại là read-only theo thiết kế, xem `specs/05` §5.)
+  4. `InteractionCheckOutput.unmatched_pairs[]` — Done.
+  5. `POST /doctor/meal-plans/{id}/review` optimistic lock + `409 PLAN_ALREADY_REVIEWED` — Done.
+  6. `POST /doctor/patients/{id}/compliance/remind` với type `manual_reminder` — Done; threshold tuân thủ thấp vẫn là giá trị minh hoạ, chưa chốt số chính thức.
+  7. `POST /chat` `secondary_intents[]` — Done.
+  8. `POST /food-log` slot 3-giá-trị `morning|noon|evening` — Done.
+  9. `PUT /doctor/patients/{id}/metrics` validation bắt buộc gửi đủ `weight`+`height` — Done.
+  10. `POST /notifications/demo/simulate` idempotent theo `existing_types` — Done.
+  11. `GET /doctor/foods` — Done (tra cứu món từ nutrition catalog DB cho UI chỉnh thực đơn).
+  - Toàn bộ đều optional/không breaking với client hiện tại → minor bump (1.0 → 1.1) tại thời điểm đó.
 - Mọi thay đổi endpoint/response phải bump version + note lý do, đồng bộ với `contracts/agent-io-schema.md` khi field Agent bị ảnh hưởng.
 - Luật cứng: sửa contract trước, code sau.

@@ -19,10 +19,11 @@ Là **AI/hệ thống**, khi có 1 sự kiện đáng thông báo (plan được
    | `POST /doctor/meal-plans/{id}/review` action=`reject` | Không tạo mới; **huỷ** (set `status="cancelled"`) mọi notification `pending` liên quan `meal_plan_id` đó |
    | `POST /doctor/meal-plans/{id}/review` action=`edit` | Không tạo/huỷ notification nào |
    | `GET /meal-plans/me` khi plan mới nhất có `status` ∈ `{approved, edited}` và bucket hạn = `expiring`/`expired` | `Notification(type="plan_expiring"|"plan_expired", status="sent")` **một lần** (idempotent theo `meal_plan_id` + type) |
-   | Phát hiện interaction (qua `POST /interactions/check` hoặc lúc generate plan, dùng KB rút gọn) | `Notification(type="interaction_followup")` nếu severity ∈ `{Nguy hiểm, Cần chú ý}` |
-3. **Type hiện có (as-built):** `meal_reminder | interaction_followup | plan_approved | adherence_checkin | plan_expiring | plan_expired`. **[Planned, quyết định 2026-08-15]** thêm type `manual_reminder` — dùng riêng cho nhắc nhở thủ công của bác sĩ (`specs/10-doctor-compliance-view.md`), không dùng lại các type cũ.
+   | Phát hiện interaction (qua `POST /interactions/check`, lúc generate plan, hoặc food log `custom` — cùng KB đầy đủ, xem `specs/08`) | `Notification(type="interaction_followup")` nếu severity ∈ `{Nguy hiểm, Cần chú ý}` |
+   | `POST /doctor/patients/{id}/compliance/remind` | `Notification(type="manual_reminder", status="sent")` |
+3. **Type hiện có (as-built):** `meal_reminder | interaction_followup | plan_approved | adherence_checkin | plan_expiring | plan_expired | manual_reminder` — `manual_reminder` dùng riêng cho nhắc nhở thủ công của bác sĩ (`specs/10-doctor-compliance-view.md`), không dùng lại các type cũ.
 4. **Status hiện có:** `pending | sent | read | dismissed | done | cancelled`.
-5. **`POST /notifications/demo/simulate`** — **chỉ seed 3 bản ghi mẫu cố định** (không phải bulk-flip toàn bộ `pending → sent`, không phải cron giả lập chạy liên tục) — mục đích thuần demo để có dữ liệu hiển thị nhanh khi trình bày. Bị **guard `DEMO_DISABLED`** khi `APP_ENV=production` — không gọi được ở môi trường production.
+5. **`POST /notifications/demo/simulate`** — **chỉ seed 3 bản ghi mẫu cố định** (không phải bulk-flip toàn bộ `pending → sent`, không phải cron giả lập chạy liên tục) — mục đích thuần demo để có dữ liệu hiển thị nhanh khi trình bày. **Idempotent (as-built):** trước khi tạo, kiểm tra `existing_types` của patient trong ngày hôm nay — chỉ thêm sample có `type` chưa tồn tại, tránh nhân bản khi bấm nhiều lần. Bị **guard `DEMO_DISABLED`** khi `APP_ENV=production` — không gọi được ở môi trường production.
 6. Patient tương tác notification qua action: `read` (đã đọc), `dismissed` (bỏ qua), `done` (hoàn thành — ví dụ xác nhận đã ăn theo kế hoạch, kèm `adherence` ∈ `{yes, partial, no}` cho type `adherence_checkin`).
 7. **Chỉ `role=patient` gọi được `GET /notifications`** — bác sĩ hiện không có endpoint đọc notification của bệnh nhân trực tiếp (xem `specs/10-doctor-compliance-view.md` cho hướng tổng hợp riêng dành cho doctor, dùng aggregation, không phải đọc raw notification list).
 
@@ -34,7 +35,7 @@ Là **AI/hệ thống**, khi có 1 sự kiện đáng thông báo (plan được
 
 ## 5. Edge cases
 - Plan bị `reject` sau khi đã có notification `sent`/`read`/`done` (bệnh nhân đã tương tác trước khi bị reject) — các bản ghi đó **giữ nguyên trạng thái cũ**, chỉ bản `pending` bị `cancelled` (rule 2 dòng reject, nhất quán `specs/06` §3 rule 3).
-- Gọi `POST /notifications/demo/simulate` nhiều lần — **quyết định 2026-08-15: cần sửa lại cho hợp lý.** As-built hiện tại chưa rõ có tạo trùng lặp hay không khi gọi lại nhiều lần; hành vi mong đợi (Planned fix, BE2): mỗi lần gọi chỉ tạo bản ghi mẫu mới nếu **chưa có** bản ghi mẫu cùng loại đang `pending`/`sent` cho user đó, tránh nhân bản notification giả khi demo bấm nút nhiều lần.
+- Gọi `POST /notifications/demo/simulate` nhiều lần trong cùng ngày → không tạo trùng lặp (rule 5, as-built) — chỉ thêm type chưa từng seed hôm nay; nếu cả 3 type mẫu đã tồn tại, trả về danh sách rỗng.
 - Gọi endpoint demo ở `APP_ENV=production` → `403 DEMO_DISABLED`.
 
 ## 6. Ngoài phạm vi (Out of scope)

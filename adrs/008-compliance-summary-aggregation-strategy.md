@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Use case "bác sĩ xem tuân thủ tổng hợp của bệnh nhân" (UML/`specs/10-doctor-compliance-view.md`) **chưa có endpoint nào** as-built — `GET /notifications` hiện chỉ cho role `patient` (`require_roles("patient")`, `routes_notifications.py:36`). FE đã có sẵn UI mock hoàn chỉnh (`frontend/app/doctor/patients/compliance/page.tsx`) — biểu đồ đường 14 ngày (SVG hard-code) + timeline sự kiện (dữ liệu hard-code theo `patient_id` mẫu), hoàn toàn chưa gọi API nào.
+Use case "bác sĩ xem tuân thủ tổng hợp của bệnh nhân" (UML/`specs/10-doctor-compliance-view.md`) lúc quyết định ADR này **chưa có endpoint nào** as-built — `GET /notifications` hiện chỉ cho role `patient` (`require_roles("patient")`, `routes_notifications.py:36`). FE đã có sẵn UI mock hoàn chỉnh (`frontend/app/doctor/patients/compliance/page.tsx`) — biểu đồ đường 14 ngày (SVG hard-code) + timeline sự kiện (dữ liệu hard-code theo `patient_id` mẫu), hoàn toàn chưa gọi API nào. (Đã Done — xem mục "As-built" cuối file.)
 
 Cần quyết định kiến trúc lưu trữ cho dữ liệu tổng hợp: tính **on-the-fly** mỗi lần doctor xem, hay build một **bảng tổng hợp riêng** (materialized summary table) được cập nhật dần theo event.
 
@@ -14,7 +14,7 @@ Input để tính tuân thủ đã tồn tại rải rác:
 - Không có bảng `FoodLog` thật (xem `adrs/009-food-log-scope-strategy.md`) nên chưa có dữ liệu "ăn gì thực tế" chi tiết, chỉ có tín hiệu tuân thủ dạng yes/partial/no theo ngày.
 
 ## Decision
-**On-the-fly aggregation** (theo khuyến nghị của brief) cho quy mô demo hiện tại — **không** tạo bảng tổng hợp riêng (`compliance_summary` hay tương tự). Endpoint mới (Planned) `GET /doctor/patients/{id}/compliance` sẽ:
+**On-the-fly aggregation** (theo khuyến nghị của brief) cho quy mô demo hiện tại — **không** tạo bảng tổng hợp riêng (`compliance_summary` hay tương tự). Endpoint `GET /doctor/patients/{id}/compliance` (as-built):
 1. Query `Notification` của `patient_id` với `type="adherence_checkin"` trong khoảng ngày yêu cầu (mặc định 14 ngày gần nhất, khớp UI mock) → tính % tuân thủ mỗi ngày theo quy tắc `yes=100%, partial=50%, no=0%`, ngày không có checkin `done` = không có dữ liệu (không tính vào trung bình, hoặc hiển thị "chưa ghi nhận" — quyết định UI cụ thể để FE quyết, không phải phạm vi backend).
 2. Query `Alert` của `patient_id` trong cùng khoảng ngày, severity ∈ `{Nguy hiểm, Cần chú ý}` → build timeline sự kiện cảnh báo.
 3. Trả về 1 response tổng hợp `{daily_series: [...], events: [...]}` tại thời điểm gọi — không cache, không lưu kết quả tính toán.
