@@ -7,6 +7,8 @@ edit (400 without edited_plan, success path), and role/ownership boundaries
 
 from __future__ import annotations
 
+from datetime import date
+
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
     response = client.post(
@@ -38,7 +40,47 @@ def _pending_ids_for_plan(notifications: list[dict], plan_id: str) -> list[str]:
     ]
 
 
-def test_doctor_reject_plan_cancels_pending_notifications(client):
+def _apply_plan(client, doctor_headers: dict, plan_id: str) -> None:
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/apply",
+        headers=doctor_headers,
+        json={"start_date": date.today().isoformat(), "replace_active": True},
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_doctor_reject_plan_before_approve_cancels_notifications(client):
+    """Reject while still pending_review: no reminders exist yet (only after apply),
+    so reject is a clean status transition with nothing pending to cancel."""
+    patient_headers = _login(client, PATIENT)
+    plan = _generate_plan(client, patient_headers)
+    plan_id = plan["id"]
+
+    doctor_headers = _login(client, DOCTOR)
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/review",
+        headers=doctor_headers,
+        json={"action": "reject", "notes": "Cần giảm carb bữa tối"},
+    )
+    assert response.status_code == 200, response.text
+    review = response.json()
+    assert review["status"] == "rejected"
+    assert review["trust_badge"] is None
+    assert review["reviewer_id"] == "demo_doctor"
+
+    response = client.get("/api/v1/notifications", headers=patient_headers)
+    assert response.status_code == 200, response.text
+    notifications = response.json()
+    assert _pending_ids_for_plan(notifications, plan_id) == []
+    assert not any(n["type"] == "plan_approved" for n in notifications)
+
+    response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=patient_headers)
+    assert response.json()["status"] == "rejected"
+
+
+def test_doctor_cannot_re_review_after_approve_and_apply(client):
+    """Optimistic lock (409 PLAN_ALREADY_REVIEWED): once approved, review is locked
+    even after materializing reminders via apply — reminders survive the rejected retry."""
     patient_headers = _login(client, PATIENT)
     plan = _generate_plan(client, patient_headers)
     plan_id = plan["id"]
@@ -51,36 +93,27 @@ def test_doctor_reject_plan_cancels_pending_notifications(client):
     )
     assert response.status_code == 200, response.text
 
-    # Materialized notifications exist after approve (pending reminders + checkins).
+    _apply_plan(client, doctor_headers, plan_id)
+
     response = client.get("/api/v1/notifications", headers=patient_headers)
     assert response.status_code == 200, response.text
     before = _pending_ids_for_plan(response.json(), plan_id)
-    assert len(before) == 35  # 7 days × (4 reminders + 1 checkin)
+    assert len(before) > 0
 
     response = client.post(
         f"/api/v1/doctor/meal-plans/{plan_id}/review",
         headers=doctor_headers,
         json={"action": "reject", "notes": "Cần giảm carb bữa tối"},
     )
-    assert response.status_code == 200, response.text
-    review = response.json()
-    assert review["status"] == "rejected"
-    assert review["trust_badge"] is None
-    assert review["reviewer_id"] == "demo_doctor"
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "PLAN_ALREADY_REVIEWED"
 
-    # Rejected plan: future reminders/checkins cancelled, no plan_approved.
     response = client.get("/api/v1/notifications", headers=patient_headers)
-    assert response.status_code == 200, response.text
-    notifications = response.json()
-    assert _pending_ids_for_plan(notifications, plan_id) == []
-    assert all(
-        n["status"] == "cancelled" for n in notifications if n["id"] in before
-    )
-    # plan_approved from the prior approve step remains (already sent, not cancelled).
-    assert any(n["type"] == "plan_approved" for n in notifications)
+    after = _pending_ids_for_plan(response.json(), plan_id)
+    assert after == before
 
     response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=patient_headers)
-    assert response.json()["status"] == "rejected"
+    assert response.json()["status"] == "approved"
 
 
 def test_doctor_edit_requires_edited_plan(client):
@@ -169,6 +202,7 @@ def test_patient_cannot_touch_other_patients_notification(client):
         json={"action": "approve", "notes": "OK"},
     )
     assert response.status_code == 200, response.text
+    _apply_plan(client, doctor_headers, plan_id)
 
     response = client.get("/api/v1/notifications", headers=patient_headers)
     assert response.status_code == 200, response.text

@@ -3,6 +3,8 @@ notifications, doctor review, chat)."""
 
 from __future__ import annotations
 
+from datetime import date
+
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
     response = client.post(
@@ -194,15 +196,32 @@ def test_north_star_flow(client):
     assert review["status"] == "approved"
     assert review["trust_badge"] == "doctor_reviewed"
 
-    # 6. After approve: reminders + checkins materialized + plan_approved notification.
+    # 6. After approve (before apply): only plan_approved notification, no reminders yet.
     response = client.get("/api/v1/notifications", headers=headers)
     assert response.status_code == 200, response.text
     notifications = response.json()
     reminders = [n for n in notifications if n["type"] == "meal_reminder"]
     checkins = [n for n in notifications if n["type"] == "adherence_checkin"]
-    assert len(reminders) == 28
-    assert len(checkins) == 7
+    assert len(reminders) == 0
+    assert len(checkins) == 0
     assert any(n["type"] == "plan_approved" for n in notifications)
+
+    # 7. Doctor applies the plan to a date window — this materializes reminders/checkins.
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/apply",
+        headers=doctor_headers,
+        json={"start_date": date.today().isoformat(), "replace_active": True},
+    )
+    assert response.status_code == 200, response.text
+
+    response = client.get("/api/v1/notifications", headers=headers)
+    assert response.status_code == 200, response.text
+    notifications = response.json()
+    reminders = [n for n in notifications if n["type"] == "meal_reminder"]
+    checkins = [n for n in notifications if n["type"] == "adherence_checkin"]
+    assert len(reminders) <= 28
+    assert len(checkins) <= 7
+    assert len(checkins) > 0
 
     response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=headers)
     assert response.json()["status"] == "approved"
@@ -242,6 +261,13 @@ def test_notification_actions(client):
         f"/api/v1/doctor/meal-plans/{plan_id}/review",
         headers=doctor_headers,
         json={"action": "approve", "notes": "OK"},
+    )
+    assert response.status_code == 200, response.text
+
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/apply",
+        headers=doctor_headers,
+        json={"start_date": date.today().isoformat(), "replace_active": True},
     )
     assert response.status_code == 200, response.text
 

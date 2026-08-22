@@ -27,3 +27,17 @@ Người bệnh đái tháo đường type 2 không cần bỏ hoàn toàn tinh 
 ## Chế Đồ Vận Động và Kiểm Soát Chỉ Số Đường Huyết
 - Vận động: Đi bộ nhẹ nhàng khoảng 15-30 phút sau bữa ăn chính 1 tiếng giúp tế bào tăng hấp thu glucose, hạ đường huyết sau ăn hiệu quả. Tổng thời gian vận động khuyến nghị là 150 phút/tuần.
 - Mục tiêu đường huyết: Đường huyết lúc đói nên duy trì trong khoảng 80 - 130 mg/dL (4.4 - 7.2 mmol/L). Đường huyết 2 giờ sau bữa ăn nên dưới 180 mg/dL (10.0 mmol/L). HbA1c mục tiêu thường dưới 7.0%.
+
+## BMI Chuẩn Châu Á và Đánh Giá Thừa Cân
+- Chỉ số khối cơ thể BMI = cân nặng (kg) / [chiều cao (m)]². Với người châu Á (bao gồm người Việt Nam), ngưỡng phân loại thấp hơn chuẩn quốc tế do nguy cơ chuyển hóa cao hơn ở cùng mức BMI:
+  - BMI < 18.5: Thiếu cân.
+  - BMI 18.5 - 22.9: Bình thường.
+  - BMI 23 - 24.9: Thừa cân (tiền béo phì).
+  - BMI 25 - 29.9: Béo phì độ I.
+  - BMI ≥ 30: Béo phì độ II.
+- Người bệnh đái tháo đường type 2 thừa cân/béo phì nên đặt mục tiêu giảm 5-10% cân nặng hiện tại trong 6 tháng đầu, giúp cải thiện rõ độ nhạy insulin và kiểm soát đường huyết. Giảm cân nên thực hiện từ từ (0.5kg/tuần) qua kết hợp chế độ ăn giảm năng lượng và vận động, tránh nhịn ăn cực đoan.
+
+## Protein và Biến Chứng Thận (Bệnh Thận Đái Tháo Đường)
+- Bệnh nhân đái tháo đường chưa có biến chứng thận: vẫn cần đủ protein trong khẩu phần (khoảng 0.8g - 1g protein/kg cân nặng/ngày), ưu tiên đạm chất lượng cao như cá, thịt gia cầm bỏ da, trứng, đậu hũ, sữa ít béo.
+- Bệnh nhân đã có biến chứng thận đái tháo đường (đạm niệu, giảm độ lọc cầu thận eGFR): cần giảm lượng protein xuống khoảng 0.6g - 0.8g protein/kg cân nặng/ngày theo chỉ định bác sĩ, hạn chế đạm động vật nhiều purin/phốt pho (nội tạng, hải sản khô), và cần bác sĩ chuyên khoa thận theo dõi định kỳ eGFR, đạm niệu.
+- Không tự ý ăn kiêng protein quá mức khi chưa có chỉ định của bác sĩ vì có thể gây suy dinh dưỡng, mất khối cơ ở người lớn tuổi.

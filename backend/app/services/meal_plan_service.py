@@ -174,11 +174,13 @@ def generate_meal_plan(
     return persist_generated_plan(db, user.id, plan)
 
 
-def resolve_patient_plan_row(db: Session, user_id: str) -> MealPlan | None:
+def resolve_patient_plan_row(
+    db: Session, user_id: str, today: date | None = None
+) -> MealPlan | None:
     """Resolve plan for patient view: active → upcoming → latest."""
     from app.services.plan_apply import find_active_plan, find_upcoming_plan
 
-    today = date.today()
+    today = today or date.today()
     active = find_active_plan(db, user_id, today)
     if active is not None:
         return active
@@ -260,12 +262,12 @@ def build_meal_preview(
     today: date | None = None,
 ) -> MealPreviewOut | None:
     """Build structured preview from existing patient plan (read-only)."""
-    row = resolve_patient_plan_row(db, user_id)
+    today = today or date.today()
+    row = resolve_patient_plan_row(db, user_id, today)
     if row is None:
         return None
 
     plan = meal_plan_from_row(row)
-    today = today or date.today()
     day_index = _day_index_for_plan(row, plan, today)
     day_plan = _day_plan_for_index(plan, day_index)
     if day_plan is None:

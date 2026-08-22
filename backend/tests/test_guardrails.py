@@ -58,7 +58,13 @@ class TestGraphGuardrails:
         assert output.guardrail_triggered is True
         assert "bác sĩ" in output.message.lower()
 
-    def test_run_agent_rag_qa_without_citations_redacted(self):
+    def test_run_agent_rag_qa_without_citations_redacted(self, monkeypatch):
+        # Force retrieval to yield no context, independent of corpus/retriever
+        # quality, so this test only exercises the guardrail wiring itself.
+        monkeypatch.setattr(
+            "app.agents.nodes.rag_tool._build_rag_context",
+            lambda message, profile: ([], []),
+        )
         output = run_agent(
             AgentRunInput(
                 user_id="demo_patient_1",
