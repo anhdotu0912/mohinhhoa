@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.5 (2026-08-23 — thêm intent `weekly_compliance` | `doctor_note` cho patient chat redesign Phase 2; mở rộng `AgentRunOutput`/`AgentState` với `WeeklyComplianceOut` + `DoctorNoteOut`. Xem changelog ở §7 Versioning.)
+**Version:** 1.7 (2026-08-24 — `FoodLogEntry.logged_at` timezone-aware; ngày tuân thủ food-log theo Asia/Ho_Chi_Minh. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -146,6 +146,8 @@ Nguồn: `backend/app/models/food_log.py`, `backend/app/schemas/food_log.py`.
 - `status`: `"logged" | "adjusted"` — không có `pending/rejected` (không cần workflow duyệt, xem ADR-009).
 - `slot`: dùng đúng **3-slot theo UI**: `"morning" | "noon" | "evening"` — **KHÁC** 4-slot meal plan.
 - `alert_ids[]`: liên kết tới `Alert` được tạo nếu `custom` log trùng khớp 1 cặp tương tác nguy hiểm trong KB.
+- `logged_at`: ISO-8601 timezone-aware (`Z` hoặc offset, ví dụ `+07:00` / `+00:00`). Giá trị naive trong DB được coi là UTC khi serialize. Ngày lịch để lọc/tuân thủ = ngày dương lịch **Asia/Ho_Chi_Minh**, không phải `date()` UTC của timestamp.
+- Một user / một ngày VN / một slot: một log (upsert khi `POST /food-log` lần 2 trong cùng ngày VN).
 
 ---
 
@@ -372,7 +374,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.6**.
+- Version hiện tại của contract này: **1.7**.
+- **Changelog 1.6 → 1.7 (2026-08-24):** `FoodLogEntry.logged_at` chốt timezone-aware; ngày tuân thủ / filter food-log theo Asia/Ho_Chi_Minh; upsert 1 log / user / ngày VN / slot. Đồng bộ `contracts/api-v1.md` v1.8. Không đổi enum `slot`.
 - **Changelog 1.5 → 1.6 (2026-08-23):** `BodyMetricsEntry` §3.5 — `POST /metrics` upsert 1 entry patient/ngày VN (merge field, giữ `id`); đồng bộ `contracts/api-v1.md` v1.7. Không đổi JSON shape.
 - **Changelog 1.4 → 1.5 (2026-08-23):** thêm 2 intent `weekly_compliance` | `doctor_note` vào `VALID_INTENTS` (patient chat redesign Phase 2); mở rộng `AgentRunOutput` với field optional `weekly_compliance: WeeklyComplianceOut | null`, `doctor_note: DoctorNoteOut | null`; mở rộng `AgentState` với state trung gian tương ứng. Quyết định nguồn dữ liệu: compliance từ `ComplianceService.get_patient_compliance(days=7)`; doctor note từ `manual_reminder` notification hoặc fallback `adjustment_note` meal plan — không hallucinate tên bác sĩ. `WeeklyMealPlanCard` không thêm intent mới (vẫn `meal_plan`). Không breaking change — field mới default `null`.
 - **Changelog 1.3 → 1.4 (2026-08-22):** dọn tag `[Planned]` còn sót cho các field thực ra đã as-built — `PatientProfile.constraints_status`, `AgentRunOutput.secondary_intents[]`, `InteractionCheckOutput.unmatched_pairs[]` (đều chuyển thành "as-built" trong mô tả); xác nhận `POST /interactions/check` và luồng gắn plan dùng chung 1 KB đầy đủ duy nhất (không còn KB rút gọn/`DEMO_MOCK`, `services/meal_plan_demo.py` đã bị gỡ khỏi codebase). Không đổi shape field nào — chỉ sửa mô tả trạng thái, không cần code thay đổi kèm theo.

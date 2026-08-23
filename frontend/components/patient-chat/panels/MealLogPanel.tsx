@@ -36,6 +36,7 @@ const SLOT_META: Record<string, { label: string; icon: string }> = {
   lunch: { label: "Bữa trưa", icon: "wb_sunny" },
   evening: { label: "Bữa tối", icon: "bedtime" },
   dinner: { label: "Bữa tối", icon: "bedtime" },
+  snack: { label: "Bữa phụ", icon: "cookie" },
 };
 
 function getLocalDateString(d: Date = new Date()): string {
@@ -43,6 +44,22 @@ function getLocalDateString(d: Date = new Date()): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** Parse API datetime. Naive ISO (no Z/offset) is UTC — backend stores UTC. */
+function parseLoggedAt(value: string): Date {
+  if (!value) return new Date(NaN);
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
+    return new Date(value);
+  }
+  return new Date(`${value}Z`);
+}
+
+function toFoodLogSlot(slot: string): "morning" | "noon" | "evening" | null {
+  if (slot === "breakfast" || slot === "morning") return "morning";
+  if (slot === "lunch" || slot === "noon") return "noon";
+  if (slot === "dinner" || slot === "evening") return "evening";
+  return null;
 }
 
 const DAY_LABELS = [
@@ -54,13 +71,6 @@ const DAY_LABELS = [
   { short: "T7", full: "Thứ 7", index: 5, dayIndex: 6 },
   { short: "CN", full: "Chủ nhật", index: 6, dayIndex: 7 },
 ];
-
-function normalizeSlot(slot: string): "morning" | "noon" | "evening" {
-  if (slot === "breakfast" || slot === "morning") return "morning";
-  if (slot === "lunch" || slot === "noon") return "noon";
-  if (slot === "dinner" || slot === "evening") return "evening";
-  return "noon";
-}
 
 export function MealLogPanel() {
   const { closePanel } = usePatientPanel();
@@ -155,9 +165,10 @@ export function MealLogPanel() {
   // Determine logged status for each slot today
   const isSlotLogged = useCallback(
     (slotKey: string) => {
-      const target = normalizeSlot(slotKey);
+      const target = toFoodLogSlot(slotKey);
+      if (!target) return false;
       return foodLogs.some((log) => {
-        const logDate = log.logged_at ? getLocalDateString(new Date(log.logged_at)) : "";
+        const logDate = log.logged_at ? getLocalDateString(parseLoggedAt(log.logged_at)) : "";
         return logDate === todayDateStr && log.slot === target;
       });
     },
@@ -186,16 +197,17 @@ export function MealLogPanel() {
   };
 
   const handleLogPlanned = async (slotKey: string) => {
-    if (!mealPlan || !activeDayPlan) return;
+    const slot = toFoodLogSlot(slotKey);
+    if (!mealPlan || !activeDayPlan || !slot) return;
     setSavingSlot(slotKey);
     try {
-      const slot = normalizeSlot(slotKey);
-      await api.createFoodLog({
+      const created = await api.createFoodLog({
         meal_plan_id: mealPlan.id,
         day_index: activeDayPlan.day_index,
         slot,
         type: "as_planned",
       });
+      setFoodLogs((prev) => [created, ...prev.filter((log) => log.id !== created.id)]);
       await loadData();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Không thể ghi nhận bữa ăn.");
@@ -205,11 +217,11 @@ export function MealLogPanel() {
   };
 
   const handleLogCustom = async (slotKey: string) => {
-    if (!mealPlan || !activeDayPlan || !customNote.trim()) return;
+    const slot = toFoodLogSlot(slotKey);
+    if (!mealPlan || !activeDayPlan || !slot || !customNote.trim()) return;
     setSavingSlot(slotKey);
     try {
-      const slot = normalizeSlot(slotKey);
-      await api.createFoodLog({
+      const created = await api.createFoodLog({
         meal_plan_id: mealPlan.id,
         day_index: activeDayPlan.day_index,
         slot,
@@ -218,6 +230,7 @@ export function MealLogPanel() {
       });
       setCustomSlot(null);
       setCustomNote("");
+      setFoodLogs((prev) => [created, ...prev.filter((log) => log.id !== created.id)]);
       await loadData();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Không thể ghi nhận bữa ăn.");
@@ -470,7 +483,9 @@ export function MealLogPanel() {
                 );
 
                 const imageSrc = DEFAULT_MEAL_IMAGES[slotKey] || DEFAULT_MEAL_IMAGES.noon;
-                const isLogged = isToday ? isSlotLogged(slotKey) : false;
+                const foodLogSlot = toFoodLogSlot(slotKey);
+                const canLogSlot = foodLogSlot !== null;
+                const isLogged = isToday && canLogSlot ? isSlotLogged(slotKey) : false;
                 const isSaving = savingSlot === slotKey;
                 const isCustomOpen = customSlot === slotKey;
 
@@ -504,7 +519,7 @@ export function MealLogPanel() {
                             <span className="material-symbols-outlined text-[15px] text-[#006857]">check_circle</span>
                             <span>Đã ghi nhận</span>
                           </div>
-                        ) : isToday ? (
+                        ) : isToday && canLogSlot ? (
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               type="button"

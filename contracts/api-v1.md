@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.6 (2026-08-23 — thêm Chat Sessions (persist lịch sử hội thoại patient trên Postgres). Xem changelog ở mục Versioning cuối file)
+**Version:** 1.8 (2026-08-24 — Food Log/`GET /compliance*` dùng ngày lịch Asia/Ho_Chi_Minh; `logged_at` timezone-aware. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -661,11 +661,14 @@ Theo `adrs/009-food-log-scope-strategy.md`, `specs/09-food-log-adherence.md`.
 ```
 `slot` ∈ `"morning" | "noon" | "evening"`. Custom log khớp KB tương tác → tạo `Alert` + `alert_ids[]`.
 
+**Một user / một ngày lịch Asia/Ho_Chi_Minh / một slot = một log** (upsert): lần ghi sau trong cùng ngày VN + cùng slot cập nhật row hiện có (giữ `id`), không tạo bản ghi trùng. `logged_at` trên response là ISO-8601 timezone-aware (UTC `Z` hoặc offset). Timestamp naive trong DB được coi là UTC.
+
 ### `GET /food-log`
-**Role:** `patient`. Query optional `date` (YYYY-MM-DD), `meal_plan_id`.
+**Role:** `patient`. Query optional `date` (YYYY-MM-DD = ngày dương lịch **Asia/Ho_Chi_Minh**, không phải ngày UTC của container), `meal_plan_id`.
 ```json
 // Response 200 → list[FoodLogEntry]
 ```
+`date` không hợp lệ → bỏ qua filter ngày, không lỗi. `logged_at` timezone-aware như `POST`.
 
 ---
 
@@ -745,7 +748,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.7**.
+- Version hiện tại: **1.8**.
+- **Changelog 1.7 → 1.8 (2026-08-24):** Food Log + compliance dùng ngày lịch **Asia/Ho_Chi_Minh** — `GET /food-log?date=` lọc theo cửa sổ UTC của ngày VN; `POST /food-log` upsert 1 log / user / ngày VN / slot; `FoodLogEntry.logged_at` serialize timezone-aware (naive DB = UTC). `GET /compliance/me` và `GET /doctor/patients/{id}/compliance` lấy `today` + gán food-log vào ngày VN (không còn `date.today()` UTC của container). Không đổi request shape / enum slot.
 - **Changelog 1.6 → 1.7 (2026-08-23):** `POST /metrics` đổi từ insert-only sang upsert 1 entry patient/ngày (Asia/Ho_Chi_Minh); lần ghi sau merge field vào cùng `id`. Không đổi request/response shape — behavior change có chủ đích cho UI ghi chỉ số hàng ngày.
 - **Changelog 1.5 → 1.6 (2026-08-23):** thêm Chat Sessions (`GET|POST /chat/sessions`, `GET|PATCH|DELETE /chat/sessions/{id}`, `DELETE /chat/sessions`, `PUT /chat/sessions/{id}/messages`) — role `patient` only; persist transcript UI + card payload trên Postgres; agent `/chat` vẫn stateless. Không breaking change cho client cũ (endpoint mới).
 - **Changelog 1.4 → 1.5 (2026-08-23):** thêm as-built `GET /compliance/me?days=7` (role `patient`, response `PatientComplianceOut`) cho patient tự xem tuân thủ — tái dùng `ComplianceService` doctor; mở rộng enum intent chat/SSE với `weekly_compliance` | `doctor_note`; tham chiếu field `AgentRunOutput.weekly_compliance` / `.doctor_note` trong §11 Chat. Đồng bộ với `contracts/agent-io-schema.md` v1.5. Không breaking change.

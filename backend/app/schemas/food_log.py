@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
+
+from app.core.datetime_vn import assume_utc
 
 
 class FoodLogCreate(BaseModel):
@@ -35,3 +37,7 @@ class FoodLogOut(BaseModel):
     logged_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("logged_at")
+    def _logged_at_utc(self, value: datetime) -> datetime:
+        return assume_utc(value)

@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.datetime_vn import utc_now_naive
 from app.db.session import Base
 
 
@@ -23,4 +24,9 @@ class FoodLog(Base):
     note: Mapped[str] = mapped_column(String(500), default="")
     status: Mapped[str] = mapped_column(String(20), default="logged")
     alert_ids: Mapped[list] = mapped_column(JSON, default=list)
-    logged_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Naive UTC wall-clock (same as other timestamp columns). API serializes TZ-aware.
+    logged_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now_naive,
+        server_default=func.now(),
+    )

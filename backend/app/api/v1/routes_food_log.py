@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date as date_type, datetime, time
+from datetime import date as date_type
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import vn_day_bounds_utc
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.food_log import FoodLog
@@ -42,7 +43,6 @@ def list_food_logs(
         except ValueError:
             day = None
         if day is not None:
-            start = datetime.combine(day, time.min)
-            end = datetime.combine(day, time.max)
-            query = query.filter(FoodLog.logged_at >= start, FoodLog.logged_at <= end)
+            start, end = vn_day_bounds_utc(day=day)
+            query = query.filter(FoodLog.logged_at >= start, FoodLog.logged_at < end)
     return query.order_by(FoodLog.logged_at.desc()).all()

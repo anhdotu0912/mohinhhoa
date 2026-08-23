@@ -17,6 +17,8 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 5. `FoodLog.user_id`/`meal_plan_id`/`id` đều kiểu `str` (UUID) — nhất quán convention toàn hệ thống.
 6. **Mức ưu tiên: Should Have**, không nằm trên North Star demo flow (đăng nhập bác sĩ → generate → duyệt → bệnh nhân xem → chat hỏi lại — không cần Food Log để hoàn thành).
 7. Nếu `meal_plan_id` được gửi kèm, BE kiểm tra plan đó thuộc đúng patient đang gọi API → không khớp trả `403 FORBIDDEN`.
+8. **Ngày lịch = Asia/Ho_Chi_Minh (UTC+7)** — "hôm nay", filter `GET /food-log?date=`, và aggregation tuân thủ (`specs/10`) đều dùng ngày dương lịch Việt Nam, không dùng `date.today()` UTC của container. `logged_at` lưu UTC (naive trong DB) và serialize timezone-aware trên API.
+9. **Một user / một ngày VN / một slot = một log** — `POST /food-log` upsert row hiện có (giữ `id`) thay vì tạo bản ghi trùng khi bệnh nhân bấm lại.
 
 ## 4. Luồng chính (happy path)
 1. Patient mở trang ghi nhận bữa ăn (3 slot cố định: sáng/trưa/tối).
@@ -29,7 +31,7 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 ## 5. Edge cases
 - Intent `food_log` trong `/chat` map tới `food_log_node` — đọc 3 `FoodLog` gần nhất từ DB theo `user_id` và tóm tắt tuân thủ (fallback message cố định khi không có log nào), xem `specs/13`.
 - `POST /food-log` với `type="custom"` và `note` rỗng → `422` validation error (`note_required_for_custom`).
-- `GET /food-log?date=YYYY-MM-DD` lọc theo ngày `logged_at` (giờ server, `date.fromisoformat` không hợp lệ → bỏ qua filter ngày, không lỗi).
+- `GET /food-log?date=YYYY-MM-DD` lọc theo **ngày dương lịch Asia/Ho_Chi_Minh** của `logged_at` (cửa sổ UTC tương ứng, ví dụ 17:10 UTC ngày 23 = 00:10 VN ngày 24). `date.fromisoformat` không hợp lệ → bỏ qua filter ngày, không lỗi.
 - `meal_plan_id` gửi kèm không thuộc về patient gọi API → `403 FORBIDDEN`.
 
 ## 6. Ngoài phạm vi (Out of scope)

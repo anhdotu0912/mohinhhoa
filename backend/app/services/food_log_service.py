@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.agents.interaction_checker_agent import check_interactions
+from app.core.datetime_vn import utc_now_naive, vn_day_bounds_utc
 from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.food_log import FoodLog
@@ -52,6 +53,25 @@ def _persist_food_log_alerts(
     return alert_ids
 
 
+def _find_slot_for_vn_day(
+    db: Session,
+    user_id: str,
+    slot: str,
+) -> FoodLog | None:
+    start, end = vn_day_bounds_utc()
+    return (
+        db.query(FoodLog)
+        .filter(
+            FoodLog.user_id == user_id,
+            FoodLog.slot == slot,
+            FoodLog.logged_at >= start,
+            FoodLog.logged_at < end,
+        )
+        .order_by(FoodLog.logged_at.desc())
+        .first()
+    )
+
+
 def create_food_log(
     db: Session,
     user_id: str,
@@ -69,27 +89,48 @@ def create_food_log(
                 "meal_plan_id không thuộc về bạn.",
             )
 
-    row = FoodLog(
-        user_id=user_id,
-        meal_plan_id=payload.meal_plan_id,
-        day_index=payload.day_index,
-        slot=payload.slot,
-        type=payload.type,
-        note=payload.note.strip() if payload.type == "custom" else "",
-        status="logged",
-        alert_ids=[],
-    )
-    db.add(row)
-    db.flush()
+    note = payload.note.strip() if payload.type == "custom" else ""
+    now = utc_now_naive()
+    existing = _find_slot_for_vn_day(db, user_id, payload.slot)
+    should_check_alerts = False
 
-    if payload.type == "custom" and payload.note.strip():
+    if existing is not None:
+        changed = existing.type != payload.type or existing.note != note
+        existing.type = payload.type
+        existing.note = note
+        existing.logged_at = now
+        if payload.meal_plan_id:
+            existing.meal_plan_id = payload.meal_plan_id
+        if payload.day_index is not None:
+            existing.day_index = payload.day_index
+        if changed:
+            existing.status = "adjusted"
+        should_check_alerts = payload.type == "custom" and note and not existing.alert_ids
+        row = existing
+    else:
+        row = FoodLog(
+            user_id=user_id,
+            meal_plan_id=payload.meal_plan_id,
+            day_index=payload.day_index,
+            slot=payload.slot,
+            type=payload.type,
+            note=note,
+            status="logged",
+            alert_ids=[],
+            logged_at=now,
+        )
+        db.add(row)
+        db.flush()
+        should_check_alerts = payload.type == "custom" and bool(note)
+
+    if should_check_alerts:
         row.alert_ids = _persist_food_log_alerts(
             db,
             user_id,
             row.id,
             medications,
             payload.note,
-            payload.meal_plan_id,
+            payload.meal_plan_id or row.meal_plan_id,
         )
 
     db.commit()

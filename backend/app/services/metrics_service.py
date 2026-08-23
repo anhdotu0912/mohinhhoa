@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import utc_now_naive, vn_day_bounds_utc
 from app.models.body_metrics import BodyMetricsEntry
 from app.models.profile import Profile
 from app.schemas.body_metrics import MetricsLogCreate
-
-VN_TZ = timezone(timedelta(hours=7))
 
 
 def _calc_bmi(weight: float, height_cm: float) -> float:
@@ -25,22 +24,6 @@ def _get_or_create_profile(db: Session, user_id: str) -> Profile:
         db.add(profile)
         db.flush()
     return profile
-
-
-def _vn_day_bounds_utc(now: datetime | None = None) -> tuple[datetime, datetime]:
-    """Naive UTC window for the current calendar day in Asia/Ho_Chi_Minh."""
-    if now is None:
-        now = datetime.now(UTC)
-    elif now.tzinfo is None:
-        now = now.replace(tzinfo=UTC)
-
-    vn_now = now.astimezone(VN_TZ)
-    vn_start = vn_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    vn_end = vn_start + timedelta(days=1)
-    return (
-        vn_start.astimezone(UTC).replace(tzinfo=None),
-        vn_end.astimezone(UTC).replace(tzinfo=None),
-    )
 
 
 def _find_patient_entry_for_vn_day(
@@ -133,7 +116,7 @@ def record_patient_metrics(
     payload: MetricsLogCreate,
 ) -> BodyMetricsEntry:
     profile = _get_or_create_profile(db, user_id)
-    day_start, day_end = _vn_day_bounds_utc()
+    day_start, day_end = vn_day_bounds_utc()
     existing = _find_patient_entry_for_vn_day(db, user_id, day_start, day_end)
 
     weight, height, blood_pressure, blood_glucose, note = _resolve_metric_values(
@@ -146,7 +129,7 @@ def record_patient_metrics(
 
     _update_profile_snapshot(profile, payload, bmi)
 
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = utc_now_naive()
 
     if existing is not None:
         existing.weight = weight

@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.datetime_vn import assume_utc, vn_calendar_date, vn_today
 from app.models.alert import Alert
 from app.models.food_log import FoodLog
 from app.models.meal_plan import MealPlan
@@ -32,7 +33,7 @@ class ComplianceService:
 
     def get_patient_compliance(self, patient_id: str, days: int = 14) -> PatientComplianceOut:
         days = max(1, min(days, 90))
-        today = date.today()
+        today = vn_today()
         start_date = today - timedelta(days=days - 1)
 
         checkins = (
@@ -133,7 +134,7 @@ def _food_log_calendar_date(
     db: Session,
 ) -> date | None:
     if log.logged_at:
-        return log.logged_at.date()
+        return vn_calendar_date(log.logged_at)
     if log.meal_plan_id and log.day_index:
         plan = plan_cache.get(log.meal_plan_id)
         if log.meal_plan_id not in plan_cache:
@@ -144,6 +145,25 @@ def _food_log_calendar_date(
     return None
 
 
+def _latest_food_logs_by_vn_slot(
+    db: Session,
+    patient_id: str,
+) -> list[tuple[date, FoodLog]]:
+    """One log per (VN calendar day, slot) — keep the latest logged_at."""
+    logs = db.query(FoodLog).filter(FoodLog.user_id == patient_id).all()
+    plan_cache: dict[str, MealPlan | None] = {}
+    best: dict[tuple[date, str], FoodLog] = {}
+    for log in logs:
+        event_date = _food_log_calendar_date(log, plan_cache, db)
+        if event_date is None:
+            continue
+        key = (event_date, log.slot)
+        prev = best.get(key)
+        if prev is None or (log.logged_at and (prev.logged_at is None or log.logged_at > prev.logged_at)):
+            best[key] = log
+    return [(event_date, log) for (event_date, _slot), log in best.items()]
+
+
 def _aggregate_food_logs(
     db: Session,
     patient_id: str,
@@ -151,15 +171,12 @@ def _aggregate_food_logs(
     today: date,
 ) -> tuple[dict[date, list[int]], int, int]:
     """Derive slot-level adherence scores from structured food logs (spec 09)."""
-    logs = db.query(FoodLog).filter(FoodLog.user_id == patient_id).all()
-    plan_cache: dict[str, MealPlan | None] = {}
     by_day: dict[date, list[int]] = defaultdict(list)
     checkins_done = 0
     checkins_as_planned = 0
 
-    for log in logs:
-        event_date = _food_log_calendar_date(log, plan_cache, db)
-        if event_date is None or event_date < start_date or event_date > today:
+    for event_date, log in _latest_food_logs_by_vn_slot(db, patient_id):
+        if event_date < start_date or event_date > today:
             continue
         score = FOOD_LOG_SCORES.get(log.type, 50)
         by_day[event_date].append(score)
@@ -199,20 +216,18 @@ def _build_compliance_events(
             )
         )
 
-    food_logs = db.query(FoodLog).filter(FoodLog.user_id == patient_id).all()
-    plan_cache: dict[str, MealPlan | None] = {}
-    for log in food_logs:
-        event_date = _food_log_calendar_date(log, plan_cache, db)
-        if event_date is None or event_date < start_date or event_date > today:
+    for event_date, log in _latest_food_logs_by_vn_slot(db, patient_id):
+        if event_date < start_date or event_date > today:
             continue
         slot_label = FOOD_LOG_SLOT_LABELS.get(log.slot, log.slot)
+        event_at = assume_utc(log.logged_at).isoformat() if log.logged_at else event_date.isoformat()
         if log.type == "as_planned":
             events.append(
                 ComplianceEvent(
                     type="food_log",
                     severity="Tuân thủ",
                     title=f"Ghi nhận bữa {slot_label} — đúng kế hoạch",
-                    at=log.logged_at.isoformat(),
+                    at=event_at,
                 )
             )
         else:
@@ -221,7 +236,7 @@ def _build_compliance_events(
                     type="food_log",
                     severity="Sai lệch",
                     title=f"Ghi nhận bữa {slot_label} — ăn khác",
-                    at=log.logged_at.isoformat(),
+                    at=event_at,
                 )
             )
 

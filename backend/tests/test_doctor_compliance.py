@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
+from app.core.datetime_vn import VN_TZ, vn_day_bounds_utc, vn_today
 from app.models.alert import Alert
 from app.models.food_log import FoodLog
 from app.models.meal_plan import MealPlan
@@ -221,7 +222,7 @@ def test_compliance_patient_not_found(client):
 
 def test_compliance_includes_food_logs(client):
     doctor_headers = _login(client, DOCTOR)
-    today = date.today()
+    today = vn_today()
 
     from tests.conftest import TestingSessionLocal
 
@@ -270,6 +271,71 @@ def test_compliance_includes_food_logs(client):
     assert data["overall_adherence_pct"] == 75
     by_date = {row["date"]: row["adherence_pct"] for row in data["daily_series"]}
     assert by_date[today.isoformat()] == 75
+
+
+def test_compliance_dedupes_duplicate_slot_same_vn_day(client, db_session):
+    today_vn = vn_today()
+    start, _end = vn_day_bounds_utc(day=today_vn)
+    db_session.add(
+        FoodLog(
+            user_id="user_dup",
+            slot="morning",
+            type="as_planned",
+            logged_at=start + timedelta(minutes=10),
+        )
+    )
+    db_session.add(
+        FoodLog(
+            user_id="user_dup",
+            slot="morning",
+            type="custom",
+            note="trùng",
+            logged_at=start + timedelta(minutes=20),
+        )
+    )
+    db_session.flush()
+
+    out = ComplianceService(db_session).get_patient_compliance("user_dup", days=7)
+    assert out.checkins_done == 1
+    assert out.checkins_as_planned == 0
+    assert out.overall_adherence_pct == 50
+
+
+def test_compliance_food_log_utc_evening_counts_on_vn_next_day(client):
+    doctor_headers = _login(client, DOCTOR)
+    today_vn = vn_today()
+    yesterday_vn = today_vn - timedelta(days=1)
+    logged_at = (
+        datetime(today_vn.year, today_vn.month, today_vn.day, 0, 10, tzinfo=VN_TZ)
+        .astimezone(UTC)
+        .replace(tzinfo=None)
+    )
+
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            FoodLog(
+                user_id=PATIENT_ID,
+                slot="evening",
+                type="as_planned",
+                logged_at=logged_at,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    res = client.get(
+        f"/api/v1/doctor/patients/{PATIENT_ID}/compliance?days=7",
+        headers=doctor_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    by_date = {row["date"]: row["adherence_pct"] for row in data["daily_series"]}
+    assert by_date[today_vn.isoformat()] == 100
+    assert by_date[yesterday_vn.isoformat()] is None
 
 
 def test_compliance_events_include_reminder_and_food_log(client):
