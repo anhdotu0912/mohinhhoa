@@ -217,6 +217,36 @@ def food_log_node(state: AgentState) -> AgentState:
     }
 
 
+def greeting_node(state: AgentState) -> AgentState:
+    """Handle greetings, introductions, thanks, and polite chit-chat."""
+    message = (state.get("message") or "").strip().lower()
+
+    if any(thanks_word in message for thanks_word in ["cảm ơn", "cám ơn", "thank", "tks"]):
+        answer = (
+            "Rất vui được hỗ trợ bạn! Chúc bạn luôn dồi dào sức khỏe và kiểm soát đường huyết ổn định. "
+            "Nếu bạn cần thêm thực đơn hay tra cứu dinh dưỡng, đừng ngần ngại nhắn tôi nhé!"
+        )
+    elif any(bye_word in message for bye_word in ["tạm biệt", "bye", "goodbye"]):
+        answer = (
+            "Tạm biệt bạn! Chúc bạn một ngày tốt lành và luôn duy trì lối sống lành mạnh."
+        )
+    else:
+        answer = (
+            "Xin chào! Tôi là Trợ lý Dinh dưỡng AI chuyên hỗ trợ bệnh nhân đái tháo đường type 2. "
+            "Tôi có thể hỗ trợ bạn:\n\n"
+            "1. 📋 **Xem & tra cứu thực đơn dinh dưỡng** phù hợp mức đường huyết\n"
+            "2. ⚠️ **Kiểm tra tương tác thuốc - thực phẩm** (ví dụ: Metformin, Sulfonylurea uống khi nào, nên kiêng gì)\n"
+            "3. 🥗 **Giải đáp dinh dưỡng & lối sống** (tinh bột, hoa quả, đếm carb, xử trí hạ đường huyết, chăm sóc bàn chân)\n\n"
+            "Hôm nay tôi có thể giúp gì cho bạn?"
+        )
+
+    return {
+        **state,
+        "answer": answer,
+        "citations": [],
+    }
+
+
 def refuse_node(state: AgentState) -> AgentState:
     """Handle requests outside scope (e.g. change medication, prescribe)."""
     return {
@@ -267,12 +297,12 @@ def apply_guardrails(state: AgentState) -> AgentState:
 # --- Router ---
 
 def route_intent(state: AgentState) -> Literal[
-    "rag_qa", "meal_plan", "interaction_check", "food_log", "refuse", "unknown"
+    "greeting", "rag_qa", "meal_plan", "interaction_check", "food_log", "refuse", "unknown"
 ]:
     """Route to the appropriate node based on classified intent."""
     intent = state.get("intent", "unknown")
 
-    if intent in ("rag_qa", "meal_plan", "interaction_check", "food_log", "refuse"):
+    if intent in ("greeting", "rag_qa", "meal_plan", "interaction_check", "food_log", "refuse"):
         return intent
 
     return "unknown"
@@ -286,6 +316,7 @@ def build_graph() -> StateGraph:
 
     graph.add_node("profile_loader", profile_loader)
     graph.add_node("intent_classifier", intent_classifier)
+    graph.add_node("greeting", greeting_node)
     graph.add_node("rag_qa", rag_qa_node)
     graph.add_node("meal_plan", meal_plan_node)
     graph.add_node("interaction_check", interaction_check_node)
@@ -301,6 +332,7 @@ def build_graph() -> StateGraph:
         "intent_classifier",
         route_intent,
         {
+            "greeting": "greeting",
             "rag_qa": "rag_qa",
             "meal_plan": "meal_plan",
             "interaction_check": "interaction_check",
@@ -310,6 +342,7 @@ def build_graph() -> StateGraph:
         },
     )
 
+    graph.add_edge("greeting", "apply_guardrails")
     graph.add_edge("rag_qa", "apply_guardrails")
     graph.add_edge("meal_plan", "apply_guardrails")
     graph.add_edge("interaction_check", "apply_guardrails")

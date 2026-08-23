@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Valid intents per contract §2
 VALID_INTENTS = {
+    "greeting",
     "meal_plan",
     "interaction_check",
     "food_log",
@@ -35,13 +36,24 @@ _INTENT_PATTERNS = {
         r"bữa sáng", r"bữa trưa", r"bữa tối", r"xem thực đơn",
     ],
     "interaction_check": [
-        r"tương tác.*thuốc", r"thuốc.*thực phẩm", r"drug.*food",
-        r"interaction", r"metformin", r"uống thuốc.*ăn",
-        r"kiểm tra tương tác", r"có ăn được không.*đang uống",
+        r"tương tác.*(thuốc|metformin|gliclazide|insulin)",
+        r"(thuốc|metformin|gliclazide|insulin).*thực phẩm",
+        r"drug.*food",
+        r"interaction",
+        r"uống\s*(thuốc|metformin|gliclazide).*ăn",
+        r"kiểm tra tương tác",
+        r"có ăn được không.*đang uống",
     ],
     "food_log": [
         r"ghi lại", r"log", r"vừa ăn", r"đã ăn", r"hôm nay ăn rồi",
         r"sáng nay ăn rồi", r"tối qua ăn", r"bữa.*ăn.*xong",
+    ],
+    "greeting": [
+        r"\b(hello|hi|hey|alo|chào|xin chào|good morning|good afternoon|good evening)\b",
+        r"(chào bạn|chào bác sĩ|chào bot|chào trợ lý|chào em|chào anh|chào chị|chào ad)",
+        r"(bạn là ai|bạn có thể làm gì|bạn giúp được gì|chức năng của bạn|giới thiệu bản thân)",
+        r"(cảm ơn|cám ơn|thank you|thanks|tks)",
+        r"(tạm biệt|goodbye|bye bye|\bbye\b)",
     ],
 }
 
@@ -83,10 +95,11 @@ def _classify_by_llm(message: str) -> str:
             return _classify_by_keywords(message)
 
         prompt = f"""Phân loại intent của tin nhắn bệnh nhân sau vào ĐÚNG MỘT trong các loại:
+- greeting: câu chào hỏi (hello, hi, xin chào), cảm ơn, tạm biệt, hỏi bạn là ai
 - meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng
 - interaction_check: hỏi về tương tác thuốc-thực phẩm
 - food_log: ghi lại bữa ăn đã ăn
-- rag_qa: câu hỏi chung về dinh dưỡng, sức khỏe
+- rag_qa: câu hỏi kiến thức về dinh dưỡng, sức khỏe, bệnh tiểu đường
 - refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
 
 Tin nhắn: "{message}"
