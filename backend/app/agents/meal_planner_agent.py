@@ -381,10 +381,7 @@ def _guideline_citations(diseases: list[str]) -> list[str]:
     citations = ["byt_vn_notes.md"]
     if any("diabetes" in d for d in diseases):
         citations.append("ada_diabetes.md")
-    if any("hypertension" in d or "cardio" in d for d in diseases):
-        citations.append("aha_cardiovascular.md")
-    if any("gout" in d for d in diseases):
-        citations.append("acr_gout.md")
+        citations.append("dinh_duong_thuc_hanh.md")
     return citations
 
 
