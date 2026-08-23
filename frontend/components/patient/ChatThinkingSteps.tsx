@@ -62,7 +62,13 @@ export function ChatThinkingSteps({
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 py-1 transition-colors cursor-pointer group select-none"
       >
-        <span className="material-symbols-outlined text-[16px] text-emerald-600 group-hover:scale-110 transition-transform">
+        <span
+          className={`material-symbols-outlined text-[16px] text-emerald-600 ${
+            !isAllDone
+              ? "animate-spin"
+              : "group-hover:scale-110 transition-transform"
+          }`}
+        >
           {isAllDone ? "psychology" : "progress_activity"}
         </span>
         <span className="font-medium">
@@ -91,7 +97,9 @@ export function ChatThinkingSteps({
               {step.status === "done" ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               ) : step.status === "active" ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#006857] animate-ping shrink-0" />
+                <span className="material-symbols-outlined text-[12px] text-[#006857] animate-spin shrink-0">
+                  progress_activity
+                </span>
               ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
               )}

@@ -220,10 +220,37 @@ def food_log_node(state: AgentState) -> AgentState:
     }
 
 
+def weekly_compliance_node(state: AgentState) -> AgentState:
+    """Summarize patient weekly adherence from ComplianceService."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Không thể tải dữ liệu tuân thủ lúc này. Vui lòng thử lại sau.",
+            "weekly_compliance": None,
+        }
+
+    from app.services.compliance import ComplianceService
+
+    compliance = ComplianceService(db).get_patient_compliance(user_id, days=7)
+    weekly = WeeklyComplianceOut(
+        overall_adherence_pct=compliance.overall_adherence_pct,
+        daily_series=[
+            {"date": point.date, "adherence_pct": point.adherence_pct}
+            for point in compliance.daily_series
+        ],
+    )
+    pct = compliance.overall_adherence_pct
+    if pct is not None:
+        answer = f"Tuân thủ tuần này của bạn đạt {pct}%."
+    else:
         answer = (
             "Bạn chưa có dữ liệu tuân thủ tuần này. "
             "Hãy ghi nhận bữa ăn hoặc phản hồi check-in để theo dõi tiến độ."
         )
+
     return {
         **state,
         "answer": answer,
@@ -252,14 +279,6 @@ def greeting_node(state: AgentState) -> AgentState:
             "2. ⚠️ **Kiểm tra tương tác thuốc - thực phẩm** (ví dụ: Metformin, Sulfonylurea uống khi nào, nên kiêng gì)\n"
             "3. 🥗 **Giải đáp dinh dưỡng & lối sống** (tinh bột, hoa quả, đếm carb, xử trí hạ đường huyết, chăm sóc bàn chân)\n\n"
             "Hôm nay tôi có thể giúp gì cho bạn?"
-        )
-
-    return {
-        **state,
-        "answer": answer,
-        "citations": [],
-    }
-
         )
 
     return {
@@ -331,8 +350,6 @@ def doctor_note_node(state: AgentState) -> AgentState:
         **state,
         "answer": answer,
         "doctor_note": doctor_note.model_dump(mode="json"),
-    }
-
     }
 
 
