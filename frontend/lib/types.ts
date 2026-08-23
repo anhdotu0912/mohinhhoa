@@ -475,6 +475,18 @@ export interface MealPreviewOut {
   meals: MealPreviewMeal[];
 }
 
+export interface WeeklyComplianceOut {
+  overall_adherence_pct?: number | null;
+  daily_series?: { date: string; adherence_pct: number | null }[];
+}
+
+export interface DoctorNoteOut {
+  doctor_name: string;
+  note: string;
+  created_at: string;
+  tags?: string[];
+}
+
 export interface AgentRunOutput {
   intent: string;
   secondary_intents?: string[];
@@ -485,6 +497,8 @@ export interface AgentRunOutput {
   alert_ids: string[];
   citations: string[];
   guardrail_triggered: boolean;
+  weekly_compliance?: WeeklyComplianceOut | null;
+  doctor_note?: DoctorNoteOut | null;
 }
 
 export type ChatStreamEvent =
@@ -494,6 +508,50 @@ export type ChatStreamEvent =
   | { type: "correction"; message: string; reason?: string }
   | { type: "done"; data: AgentRunOutput }
   | { type: "error"; message: string };
+
+export interface ChatThinkingStepOut {
+  node: string;
+  message: string;
+  status: string;
+}
+
+export interface ChatMessageOut {
+  id: string;
+  sender: "user" | "ai";
+  text: string;
+  intent?: string | null;
+  secondary_intents?: string[];
+  citations?: string[];
+  guardrail_triggered?: boolean;
+  meal_plan_id?: string | null;
+  meal_preview?: MealPreviewOut | null;
+  weekly_compliance?: WeeklyComplianceOut | null;
+  doctor_note?: DoctorNoteOut | null;
+  meal_plan_week?: MealPlanOutput | null;
+  show_weekly_plan?: boolean;
+  thinking_steps?: ChatThinkingStepOut[];
+  corrected?: boolean;
+  correction_reason?: string | null;
+}
+
+export interface ChatSessionSummaryOut {
+  id: string;
+  title: string;
+  pinned: boolean;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSessionOut {
+  id: string;
+  title: string;
+  pinned: boolean;
+  applied_plans: Record<string, boolean>;
+  messages: ChatMessageOut[];
+  created_at: string;
+  updated_at: string;
+}
 
 export class ApiError extends Error {
   status: number;

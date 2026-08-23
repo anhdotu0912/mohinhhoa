@@ -1,6 +1,6 @@
 """Pydantic schemas for MealPlan, Agent I/O — matches contract §1.2, §2."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -179,6 +179,26 @@ class MealPreviewOut(BaseModel):
     meals: list[MealPreviewMeal] = Field(default_factory=list)
 
 
+class WeeklyComplianceDayPoint(BaseModel):
+    """Same shape as doctor.ComplianceDayPoint (duplicate here to avoid circular import)."""
+    date: str
+    adherence_pct: int | None = None
+
+
+class WeeklyComplianceOut(BaseModel):
+    """Weekly adherence summary for chat — subset of PatientComplianceOut."""
+    overall_adherence_pct: int | None = None
+    daily_series: list[WeeklyComplianceDayPoint] = Field(default_factory=list)
+
+
+class DoctorNoteOut(BaseModel):
+    """Doctor reminder/note surfaced in patient chat."""
+    doctor_name: str
+    note: str
+    created_at: datetime
+    tags: list[str] = Field(default_factory=list)
+
+
 class AgentRunOutput(BaseModel):
     """Output of run_agent facade."""
     intent: str = "unknown"
@@ -190,6 +210,8 @@ class AgentRunOutput(BaseModel):
     alert_ids: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     guardrail_triggered: bool = False
+    weekly_compliance: WeeklyComplianceOut | None = None
+    doctor_note: DoctorNoteOut | None = None
 
 
 FoodItem.model_rebuild()

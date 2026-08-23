@@ -5,6 +5,8 @@ import {
   type AgentRunOutput,
   type AlertOut,
   type CatalogOut,
+  type ChatSessionOut,
+  type ChatSessionSummaryOut,
   type ChatStreamEvent,
   type DoctorPatientSummary,
   type DoctorConstraintsUpdate,
@@ -313,6 +315,10 @@ export const api = {
     );
   },
 
+  getMyCompliance(days = 7): Promise<PatientComplianceOut> {
+    return request(`/api/v1/compliance/me?days=${days}`);
+  },
+
   remindPatientCompliance(
     patientId: string,
     message: string
@@ -473,6 +479,53 @@ export const api = {
     return request("/api/v1/chat", {
       method: "POST",
       body: { message },
+    });
+  },
+
+  listChatSessions(): Promise<ChatSessionSummaryOut[]> {
+    return request("/api/v1/chat/sessions");
+  },
+
+  createChatSession(title = "Cuộc trò chuyện mới"): Promise<ChatSessionOut> {
+    return request("/api/v1/chat/sessions", {
+      method: "POST",
+      body: { title },
+    });
+  },
+
+  getChatSession(sessionId: string): Promise<ChatSessionOut> {
+    return request(`/api/v1/chat/sessions/${encodeURIComponent(sessionId)}`);
+  },
+
+  patchChatSession(
+    sessionId: string,
+    payload: { title?: string; pinned?: boolean; applied_plans?: Record<string, boolean> }
+  ): Promise<ChatSessionOut> {
+    return request(`/api/v1/chat/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "PATCH",
+      body: payload,
+    });
+  },
+
+  deleteChatSession(sessionId: string): Promise<void> {
+    return request(`/api/v1/chat/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  deleteAllChatSessions(): Promise<void> {
+    return request("/api/v1/chat/sessions", {
+      method: "DELETE",
+    });
+  },
+
+  replaceChatSessionMessages(
+    sessionId: string,
+    messages: ChatSessionOut["messages"]
+  ): Promise<ChatSessionOut> {
+    return request(`/api/v1/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
+      method: "PUT",
+      body: { messages },
     });
   },
 

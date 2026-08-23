@@ -9,17 +9,20 @@ from collections.abc import Iterator
 
 from app.agents.graph import (
     apply_guardrails,
+    build_agent_run_output,
+    doctor_note_node,
     food_log_node,
     interaction_check_node,
     meal_plan_node,
     refuse_node,
     unknown_node,
+    weekly_compliance_node,
 )
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import retrieve_rag_context, stream_answer_tokens
 from app.agents.state import AgentState
-from app.schemas.meal_plan import AgentRunInput, AgentRunOutput, MealPreviewOut
+from app.schemas.meal_plan import AgentRunInput, AgentRunOutput
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,8 @@ _STATUS_MESSAGES: dict[str, str] = {
     "meal_plan": "Đang đọc thực đơn từ hệ thống...",
     "interaction_check": "Đang kiểm tra tương tác thuốc–thực phẩm...",
     "food_log": "Đang xử lý ghi nhận bữa ăn...",
+    "weekly_compliance": "Đang tổng hợp tuân thủ tuần...",
+    "doctor_note": "Đang tải ghi chú từ bác sĩ...",
     "refuse": "Đang xử lý yêu cầu...",
     "unknown": "Đang phân tích câu hỏi...",
     "apply_guardrails": "Đang kiểm tra an toàn & nguồn trích dẫn...",
@@ -40,6 +45,8 @@ _INTENT_NODE_HANDLERS = {
     "meal_plan": meal_plan_node,
     "interaction_check": interaction_check_node,
     "food_log": food_log_node,
+    "weekly_compliance": weekly_compliance_node,
+    "doctor_note": doctor_note_node,
     "refuse": refuse_node,
     "unknown": unknown_node,
 }
@@ -53,8 +60,8 @@ def _status_event(node: str, message: str | None = None) -> dict:
     }
 
 
-def _chunk_text_for_tokens(text: str, chunk_size: int = 12) -> list[str]:
-    """Split text into small chunks for simulated typing effect."""
+def _chunk_text_for_tokens(text: str, chunk_size: int = 4) -> list[str]:
+    """Split text into small word/syllable chunks for realistic streaming typing effect."""
     if not text:
         return []
     words = re.split(r"(\s+)", text)
@@ -94,6 +101,8 @@ def _build_initial_state(input_data: AgentRunInput, db) -> AgentState:
         "meal_plan_id": None,
         "food_log": None,
         "interactions": None,
+        "weekly_compliance": None,
+        "doctor_note": None,
         "answer": None,
         "citations": [],
         "guardrail_flags": [],
@@ -102,33 +111,14 @@ def _build_initial_state(input_data: AgentRunInput, db) -> AgentState:
 
 
 def _state_to_output(final_state: AgentState) -> AgentRunOutput:
-    meal_plan_obj = final_state.get("meal_plan")
-    meal_plan_id = final_state.get("meal_plan_id") or (
-        meal_plan_obj.id if meal_plan_obj else None
-    )
-    meal_preview_raw = final_state.get("meal_preview")
-    meal_preview = None
-    if meal_preview_raw:
-        meal_preview = MealPreviewOut(**meal_preview_raw)
-
-    return AgentRunOutput(
-        intent=final_state.get("intent", "unknown"),
-        secondary_intents=final_state.get("secondary_intents", []),
-        message=final_state.get("answer", ""),
-        meal_plan_id=meal_plan_id,
-        meal_preview=meal_preview,
-        food_log_id=None,
-        alert_ids=[],
-        citations=final_state.get("citations", []),
-        guardrail_triggered=bool(final_state.get("guardrail_flags")),
-    )
+    return build_agent_run_output(final_state)
 
 
 def _yield_tokens_from_text(text: str, *, simulate_delay: bool = True) -> Iterator[dict]:
-    for chunk in _chunk_text_for_tokens(text):
+    for chunk in _chunk_text_for_tokens(text, chunk_size=4):
         yield {"type": "token", "content": chunk}
         if simulate_delay:
-            time.sleep(0.02)
+            time.sleep(0.025)
 
 
 def stream_agent_events(input_data: AgentRunInput, db=None) -> Iterator[dict]:

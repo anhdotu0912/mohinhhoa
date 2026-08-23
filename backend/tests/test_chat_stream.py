@@ -162,3 +162,76 @@ class TestChatStreamHTTP:
         assert any(e["type"] == "done" for e in events)
         done = next(e for e in events if e["type"] == "done")
         assert done["data"]["message"]
+
+    @patch("app.agents.streaming.time.sleep")
+    def test_chat_stream_weekly_compliance_done_payload(self, _sleep, client, db_session):
+        from datetime import date, datetime
+
+        from app.models.notification import Notification
+
+        headers = _login(client, "demo_patient_1@example.com")
+        today = date.today()
+        db_session.add(
+            Notification(
+                user_id="demo_patient_1",
+                type="adherence_checkin",
+                title="Check-in",
+                body="Test",
+                scheduled_at=datetime.combine(today, datetime.min.time().replace(hour=21)),
+                status="done",
+                related_ids={"meal_plan_id": "plan_test"},
+                payload={"adherence": "yes"},
+            )
+        )
+        db_session.commit()
+
+        with client.stream(
+            "POST",
+            "/api/v1/chat/stream",
+            headers=headers,
+            json={"message": "Tuân thủ tuần này của tôi thế nào?"},
+        ) as response:
+            assert response.status_code == 200
+            body = response.read().decode("utf-8")
+
+        events = _parse_sse_body(body)
+        done = next(e for e in events if e["type"] == "done")
+        assert done["data"]["intent"] == "weekly_compliance"
+        assert done["data"]["weekly_compliance"] is not None
+        assert len(done["data"]["weekly_compliance"]["daily_series"]) == 7
+
+    @patch("app.agents.streaming.time.sleep")
+    def test_chat_stream_doctor_note_done_payload(self, _sleep, client, db_session):
+        from datetime import datetime
+
+        from app.models.notification import Notification
+
+        headers = _login(client, "demo_patient_1@example.com")
+        db_session.add(
+            Notification(
+                user_id="demo_patient_1",
+                type="manual_reminder",
+                title="Nhắc nhở",
+                body="Uống thuốc đúng giờ trước bữa sáng.",
+                scheduled_at=datetime.now(),
+                status="sent",
+                related_ids={},
+                payload={"tags": ["Uống thuốc"]},
+            )
+        )
+        db_session.commit()
+
+        with client.stream(
+            "POST",
+            "/api/v1/chat/stream",
+            headers=headers,
+            json={"message": "Bác sĩ dặn gì?"},
+        ) as response:
+            assert response.status_code == 200
+            body = response.read().decode("utf-8")
+
+        events = _parse_sse_body(body)
+        done = next(e for e in events if e["type"] == "done")
+        assert done["data"]["intent"] == "doctor_note"
+        assert done["data"]["doctor_note"] is not None
+        assert "Uống thuốc" in done["data"]["doctor_note"]["note"]

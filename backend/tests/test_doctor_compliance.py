@@ -167,6 +167,49 @@ def test_patient_cannot_access_compliance(client):
     assert res.status_code == 403
 
 
+def test_patient_get_my_compliance(client):
+    patient_headers = _login(client, PATIENT)
+    res = client.get("/api/v1/compliance/me?days=7", headers=patient_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["patient_id"] == PATIENT_ID
+    assert data["days"] == 7
+    assert "daily_series" in data
+    assert len(data["daily_series"]) == 7
+    assert "overall_adherence_pct" in data
+    assert "events" in data
+
+
+def test_patient_get_my_compliance_matches_doctor_view(client):
+    patient_headers = _login(client, PATIENT)
+    doctor_headers = _login(client, DOCTOR)
+    today = date.today()
+
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        _add_checkin(db, PATIENT_ID, today, "yes")
+        db.commit()
+    finally:
+        db.close()
+
+    patient_res = client.get("/api/v1/compliance/me?days=7", headers=patient_headers)
+    doctor_res = client.get(
+        f"/api/v1/doctor/patients/{PATIENT_ID}/compliance?days=7",
+        headers=doctor_headers,
+    )
+    assert patient_res.status_code == 200
+    assert doctor_res.status_code == 200
+    assert patient_res.json() == doctor_res.json()
+
+
+def test_doctor_cannot_access_patient_compliance_me(client):
+    doctor_headers = _login(client, DOCTOR)
+    res = client.get("/api/v1/compliance/me?days=7", headers=doctor_headers)
+    assert res.status_code == 403
+
+
 def test_compliance_patient_not_found(client):
     doctor_headers = _login(client, DOCTOR)
     res = client.get(

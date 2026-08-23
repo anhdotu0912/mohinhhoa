@@ -30,7 +30,7 @@ class AgentState(TypedDict, total=False):
     db: object | None  # SQLAlchemy Session (internal, set by run_agent from POST /chat)
 
     # Classification
-    intent: str  # meal_plan | interaction_check | food_log | rag_qa | refuse | unknown
+    intent: str  # meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note
     secondary_intents: list[str]  # multi-intent secondary detected intents
 
     # RAG
@@ -42,6 +42,8 @@ class AgentState(TypedDict, total=False):
     meal_plan_id: str | None
     food_log: dict | None
     interactions: dict | None
+    weekly_compliance: dict | None
+    doctor_note: dict | None
 
     # Response
     answer: str | None

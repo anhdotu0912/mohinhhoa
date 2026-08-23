@@ -41,8 +41,8 @@ Kết quả sau khi sửa: backend 197/197 pytest pass, frontend `next build` + 
 | B3 | LLM dual-provider fallback OpenAI ↔ DeepSeek tự động thử provider phụ trước khi rơi về rule-based (as-built hiện tại chỉ single-provider qua `LLM_PROVIDER`) | `adrs/004` | Should | BE1 |
 | B4 | Intent Agent mới "lời khuyên khi chỉ số cơ thể đổi" — cần thêm vào `VALID_INTENTS` + cơ chế so sánh snapshot trước/sau | `specs/12` §6 | Should | BE1 |
 | B5 | Nâng cấp chất lượng corpus RAG guideline — `byt_vn_notes.md`, `ada_diabetes.md`, `diabetes.md`, `aha_cardiovascular.md`, `acr_gout.md` vẫn là placeholder lặp câu mock, không phải nội dung guideline thật (`patient_faq.md` đã có nội dung đầy đủ + 2 mục mới BMI/protein-thận bổ sung 2026-08-22). `data/food_db_vn.json` (phần food cho RAG) đã dọn sạch placeholder — **phần food coi như Done**, phần guideline còn lại vẫn Should | `adrs/001` | Should | BE1 |
-| B6 | FE: nối `/patient` home dashboard (100% static/mock) và phần còn mock của `/doctor` dashboard với API thật; dọn `frontend/lib/plans-store.ts` (dead code, không còn import) | `tasks/fe-frontend.md` | Could | FE |
-| B7 | Danh sách đi chợ (`GET /meal-plans/{id}/shopping-list`), gợi ý điểm bán, Export PDF thực đơn | `specs/07` §6 | Could | — |
+| B6 | FE: nối phần còn mock của `/doctor` dashboard với API thật (`/patient` chat-home redesign **Done** — không còn dashboard static) | `tasks/fe-frontend.md` | Could | FE |
+| B7 | Danh sách đi chợ (`GET /meal-plans/{id}/shopping-list`), gợi ý điểm bán, Export PDF thực đơn — mock FE `IngredientMapCard` đã xoá Phase 3; backend shopping-list vẫn chưa có | `specs/07` §6 | Could | — |
 | B8 | Adopt Alembic thay migration thủ công `_migrate_add_*` — chỉ cần khi chuẩn bị lên production thật, không gấp cho demo | `adrs/005` | Could | BE2 |
 | B9 | `frontend/app/doctor/messages/**` — hoàn toàn mock, chưa có backend messaging feature nào (chưa từng có spec, cần quyết định có làm hay bỏ trước khi động vào) | `tasks/fe-frontend.md` | Could | — |
 | B10 | FE lint debt — 47 lỗi `react-hooks/set-state-in-effect` (pattern hydration guard `useEffect(() => setHydrated(true), [])` lặp ở nhiều trang `doctor/`, `patient/`) + 15 warning `no-unused-vars`/`exhaustive-deps`, phát hiện sau khi sửa script `next lint`→`eslint .` (2026-08-22). Không chặn build/runtime, nhưng cần dọn theo đúng khuyến nghị React 19/Next 16 khi có dịp sửa các trang liên quan | `tasks/fe-frontend.md` | Could | FE |
@@ -52,7 +52,7 @@ Kết quả sau khi sửa: backend 197/197 pytest pass, frontend `next build` + 
 1. **P1 — Guardrails runtime bổ sung (B1):** chặn sớm hơn ở mức từng `recommendation` riêng lẻ trong `InteractionItem`, không chỉ ở mức `answer` tổng thể.
 2. **P1 — Hybrid RAG cho chat (B2):** cải thiện chất lượng `rag_qa` bằng cách tận dụng code BM25+dense đã có sẵn nhưng chưa gọi.
 3. **P2 — Chất lượng corpus RAG (B5):** thay nội dung placeholder trong `data/guidelines/*.md` bằng guideline thật — ảnh hưởng trực tiếp độ tin cậy khi demo RAG Q&A.
-4. **P2 — FE dọn mock còn lại (B6):** `/patient` home, phần mock của `/doctor` dashboard, dọn dead code `plans-store.ts`.
+4. **P2 — FE dọn mock còn lại (B6):** phần mock của `/doctor` dashboard (patient chat-home redesign Done).
 5. **P3 — Kiến trúc mới (B3):** dual-provider LLM fallback OpenAI↔DeepSeek — cải thiện độ sẵn sàng nhưng không chặn demo North Star hiện tại.
 6. **P3 — Could Have (B4, B7, B8, B9):** intent metrics-advice, danh sách đi chợ/export PDF, Alembic, doctor messages — không ưu tiên cho vòng demo hiện tại.
 

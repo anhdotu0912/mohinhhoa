@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.4 (2026-08-22 — dọn tag `[Planned]` còn sót cho các field đã as-built từ lâu (`constraints_status`, `secondary_intents[]`, `unmatched_pairs[]`); xác nhận KB tương tác duy nhất (không còn KB rút gọn/`DEMO_MOCK`). Xem changelog ở §7 Versioning.)
+**Version:** 1.5 (2026-08-23 — thêm intent `weekly_compliance` | `doctor_note` cho patient chat redesign Phase 2; mở rộng `AgentRunOutput`/`AgentState` với `WeeklyComplianceOut` + `DoctorNoteOut`. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -194,7 +194,8 @@ Nguồn: `backend/app/models/body_metrics.py`, `backend/app/schemas/body_metrics
 
 - `recorded_by`: `"patient" | "doctor"`.
 - Ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có khi ghi qua `POST /metrics`.
-- Snapshot `profiles` vẫn cập nhật song song mỗi lần ghi entry mới.
+- **`POST /metrics` upsert theo ngày VN (Asia/Ho_Chi_Minh):** tối đa 1 entry `recorded_by=patient` / user / ngày; lần ghi sau cập nhật cùng `id`, merge field (field không gửi giữ nguyên). Doctor metrics vẫn insert entry mới mỗi lần.
+- Snapshot `profiles` vẫn cập nhật song song mỗi lần ghi.
 
 ---
 
@@ -229,22 +230,89 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
   "food_log_id": null,
   "alert_ids": [],
   "citations": ["byt_vn_notes.md"],
-  "guardrail_triggered": false
+  "guardrail_triggered": false,
+  "weekly_compliance": null,
+  "doctor_note": null
 }
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
+
+**Ví dụ khi intent = `weekly_compliance`:**
+```json
+{
+  "intent": "weekly_compliance",
+  "secondary_intents": [],
+  "message": "Tuân thủ tuần này của bạn đạt 92%. Bạn đã ghi nhận đúng kế hoạch hầu hết các ngày.",
+  "meal_plan_id": null,
+  "meal_preview": null,
+  "food_log_id": null,
+  "alert_ids": [],
+  "citations": [],
+  "guardrail_triggered": false,
+  "weekly_compliance": {
+    "overall_adherence_pct": 92,
+    "daily_series": [
+      { "date": "2026-08-17", "adherence_pct": 100 },
+      { "date": "2026-08-18", "adherence_pct": 80 },
+      { "date": "2026-08-19", "adherence_pct": null }
+    ]
+  },
+  "doctor_note": null
+}
+```
+
+**Ví dụ khi intent = `doctor_note`:**
+```json
+{
+  "intent": "doctor_note",
+  "secondary_intents": [],
+  "message": "Bác sĩ điều trị nhắc bạn hạn chế muối và tái khám sau 2 tuần.",
+  "meal_plan_id": null,
+  "meal_preview": null,
+  "food_log_id": null,
+  "alert_ids": [],
+  "citations": [],
+  "guardrail_triggered": false,
+  "weekly_compliance": null,
+  "doctor_note": {
+    "doctor_name": "Bác sĩ điều trị",
+    "note": "Hạn chế muối trong 2 tuần tới. Tái khám ngày 06/09/2026.",
+    "created_at": "2026-08-23T08:15:00+07:00",
+    "tags": ["Hạn chế muối", "Tái khám 2 tuần"]
+  }
+}
+```
 
 **`secondary_intents` — as-built** (đáp ứng gap "multi-intent ambiguous" ghi ở `specs/13-ai-chat-assistant.md`): mảng intent phụ (cùng enum `VALID_INTENTS`) mà `intent_classifier` phát hiện thêm trong cùng 1 câu hỏi nhưng **không** xử lý đầy đủ trong lượt trả lời này — chỉ để FE/patient biết còn ý định khác chưa được trả lời, không phải xử lý song song đầy đủ. Ví dụ: câu hỏi vừa yêu cầu lập thực đơn vừa hỏi tương tác thuốc → `intent="meal_plan"` (xử lý đầy đủ), `secondary_intents=["interaction_check"]`, và `message` nên kèm gợi ý "Bạn cũng hỏi về tương tác thuốc — vui lòng hỏi lại riêng câu này để tôi trả lời đầy đủ." Default `[]` khi không phát hiện ý định phụ nào.
 
 **Danh sách intent hợp lệ (`VALID_INTENTS`, `nodes/intent_classifier.py`):**
 ```
-meal_plan | interaction_check | food_log | rag_qa | refuse | unknown
+meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note
 ```
-Không có intent nào khác được thêm trong vòng cập nhật tài liệu này (đề xuất intent mới cho "lời khuyên khi chỉ số cơ thể đổi" ở `specs/12-patient-metrics-tracking.md` là **Planned**, chưa thêm vào enum thật).
+
+**`weekly_compliance` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi tuân thủ tuần của bệnh nhân. Node gọi `ComplianceService.get_patient_compliance(user_id, days=7)` và map sang `WeeklyComplianceOut` (subset của `PatientComplianceOut` §10 `contracts/api-v1.md`). Field `weekly_compliance` populated khi intent khớp; `null` khi intent khác. Không sinh dữ liệu giả — nếu chưa có check-in, `overall_adherence_pct` có thể `null`, `daily_series[].adherence_pct` có thể `null` theo ngày.
+
+**`doctor_note` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi "bác sĩ dặn gì / lời nhắc bác sĩ". Nguồn dữ liệu (theo thứ tự ưu tiên): (1) `Notification` mới nhất `type="manual_reminder"` của patient; (2) fallback `adjustment_note` trên meal plan active. `doctor_name` default `"Bác sĩ điều trị"` khi model chưa có field tên — **không hallucinate tên**. Nếu không có ghi chú: `doctor_note = null`, `message` fallback "Bạn chưa có ghi chú nào từ bác sĩ gần đây." `tags[]` optional — trích từ metadata notification/plan nếu có.
+
+**`WeeklyMealPlanCard` (FE, không intent mới):** câu "thực đơn tuần / xem thực đơn / lịch ăn 7 ngày" vẫn classify về `meal_plan` (mở rộng pattern classifier hiện có). FE gọi `GET /meal-plans/me` khi render card — **không** thêm intent riêng.
+
+Đề xuất intent "lời khuyên khi chỉ số cơ thể đổi" ở `specs/12-patient-metrics-tracking.md` vẫn **Planned**, chưa thêm vào enum.
 
 **`meal_preview` — optional:** populated khi intent = `meal_plan` và patient có thực đơn trong DB để hiển thị. FE dùng field này render UI bữa ăn trong chat. `null` khi không có plan hoặc intent khác.
 
 **`meal_plan_id` qua `/chat` (read-only):** khi intent = `meal_plan`, field này là ID plan **đang đọc** từ DB — **không** tạo/persist record mới. Chat **không** gọi meal planner generate; sinh plan chỉ qua `POST /meal-plans/generate` hoặc luồng bác sĩ.
+
+**`weekly_compliance` / `doctor_note` — optional, default `null`:** populated tương ứng khi intent khớp. FE render `WeeklyComplianceCard` / `DoctorNoteCard` từ 2 field này (pattern giống `meal_preview`). Schema con:
+
+```json
+// WeeklyComplianceOut — subset PatientComplianceOut (§10 api-v1)
+{ "overall_adherence_pct": 92, "daily_series": [{ "date": "2026-08-15", "adherence_pct": 80 }] }
+
+// DoctorNoteOut
+{ "doctor_name": "Bác sĩ điều trị", "note": "...", "created_at": "2026-08-23T08:15:00+07:00", "tags": ["Hạn chế muối"] }
+```
+
+Nguồn Pydantic dự kiến: `backend/app/schemas/meal_plan.py` (`WeeklyComplianceOut`, `DoctorNoteOut`); `ComplianceDayPoint` tái dùng từ `backend/app/schemas/doctor.py`.
 
 ### 5.3 `AgentState` (nội bộ, không public — tham khảo khi thêm node mới)
 ```json
@@ -253,17 +321,21 @@ Không có intent nào khác được thêm trong vòng cập nhật tài liệu
   "message": "string",
   "force_intent": "string | null",
   "profile": {"...": "PatientProfile as dict"},
-  "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown",
+  "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note",
   "rag_context": [{"chunk_id": "string", "text": "string", "source": "string", "score": 0.0}],
   "meal_plan": {"...": "MealPlanOutput | null"},
   "food_log": {"...": "null (stub, chưa dùng)"},
   "interactions": {"...": "InteractionCheckOutput | null"},
+  "weekly_compliance": {"...": "WeeklyComplianceOut | null"},
+  "doctor_note": {"...": "DoctorNoteOut | null"},
   "answer": "string | null",
   "citations": ["string"],
   "guardrail_flags": ["string"],
   "errors": ["string"]
 }
 ```
+
+State trung gian `weekly_compliance` / `doctor_note` được node tương ứng populate trước khi `run_agent()` map sang `AgentRunOutput`.
 
 ---
 
@@ -300,7 +372,9 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.4**.
+- Version hiện tại của contract này: **1.6**.
+- **Changelog 1.5 → 1.6 (2026-08-23):** `BodyMetricsEntry` §3.5 — `POST /metrics` upsert 1 entry patient/ngày VN (merge field, giữ `id`); đồng bộ `contracts/api-v1.md` v1.7. Không đổi JSON shape.
+- **Changelog 1.4 → 1.5 (2026-08-23):** thêm 2 intent `weekly_compliance` | `doctor_note` vào `VALID_INTENTS` (patient chat redesign Phase 2); mở rộng `AgentRunOutput` với field optional `weekly_compliance: WeeklyComplianceOut | null`, `doctor_note: DoctorNoteOut | null`; mở rộng `AgentState` với state trung gian tương ứng. Quyết định nguồn dữ liệu: compliance từ `ComplianceService.get_patient_compliance(days=7)`; doctor note từ `manual_reminder` notification hoặc fallback `adjustment_note` meal plan — không hallucinate tên bác sĩ. `WeeklyMealPlanCard` không thêm intent mới (vẫn `meal_plan`). Không breaking change — field mới default `null`.
 - **Changelog 1.3 → 1.4 (2026-08-22):** dọn tag `[Planned]` còn sót cho các field thực ra đã as-built — `PatientProfile.constraints_status`, `AgentRunOutput.secondary_intents[]`, `InteractionCheckOutput.unmatched_pairs[]` (đều chuyển thành "as-built" trong mô tả); xác nhận `POST /interactions/check` và luồng gắn plan dùng chung 1 KB đầy đủ duy nhất (không còn KB rút gọn/`DEMO_MOCK`, `services/meal_plan_demo.py` đã bị gỡ khỏi codebase). Không đổi shape field nào — chỉ sửa mô tả trạng thái, không cần code thay đổi kèm theo.
 - **Changelog 1.2 → 1.3 (2026-08-17):** `FoodLogEntry` chuyển Planned → as-built; `Alert` thêm `food_log_id`; thêm `BodyMetricsEntry` §3.5 (ADR-013).
 - **Changelog 1.0 → 1.1 (2026-08-15):** thêm `PatientProfile.restrictions.{salt_daily_g,sugar_daily_g,protein_daily_g}` `[Planned]`, `PatientProfile.constraints_status` `[Planned]`, `FoodLogEntry.slot` đổi sang 3-giá-trị `morning|noon|evening` `[Planned]` (thay đề xuất 4-slot ban đầu), `InteractionCheckOutput.unmatched_pairs[]` `[Planned]`, `AgentRunOutput.secondary_intents[]` `[Planned]`. Toàn bộ đều là field mới optional với default an toàn (`null`/`[]`/`"confirmed"`) — không breaking change với code hiện tại, minor bump.

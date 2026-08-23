@@ -40,7 +40,7 @@ Là **bệnh nhân**, tôi muốn gõ 1 câu hỏi tự nhiên (ví dụ "hôm n
 - Câu trả lời sinh ra (ở bất kỳ intent nào, kể cả `rag_qa`/`meal_plan`) vô tình chứa cụm từ vi phạm guardrail (ví dụ do LLM tự sinh) → `apply_guardrails` chặn lại, ép về `refuse`, trả `get_refuse_message()` (rule 5).
 
 ## 6. Ngoài phạm vi (Out of scope)
-- Lưu lịch sử hội thoại nhiều lượt (context giữa các lượt chat) — mỗi request `/chat` độc lập, không có session/thread lưu trạng thái hội thoại trước đó.
+- **Multi-turn agent memory** — mỗi request `/chat` vẫn độc lập; transcript trước đó **không** được đưa vào `run_agent`. (As-built 2026-08-23: FE persist session + tin nhắn hiển thị qua `GET|PUT /chat/sessions/*` trên Postgres — chỉ phục vụ sidebar/lịch sử UI, xem `contracts/api-v1.md` §11 Chat Sessions.)
 - Đa ngôn ngữ — chỉ tiếng Việt, Won't Have cố định.
 - Voice input/output — không có.
 - Xử lý đầy đủ song song nhiều intent trong 1 lượt trả lời (chỉ gợi ý qua `secondary_intents[]`, xem rule 8).
@@ -53,6 +53,10 @@ Là **bệnh nhân**, tôi muốn gõ 1 câu hỏi tự nhiên (ví dụ "hôm n
 |---|---|---|
 | POST | `/chat` | patient, doctor |
 | POST | `/chat/stream` | patient, doctor |
+| GET, POST | `/chat/sessions` | patient |
+| GET, PATCH, DELETE | `/chat/sessions/{id}` | patient |
+| DELETE | `/chat/sessions` | patient |
+| PUT | `/chat/sessions/{id}/messages` | patient |
 
 ## 9. Liên quan
 - `specs/05-meal-plan-generation.md` — intent `meal_plan` (read-only qua chat).

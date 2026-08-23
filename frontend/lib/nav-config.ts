@@ -38,8 +38,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
   ],
   patient: [
     { id: "home", label: "Trang chủ", href: "/patient", icon: "dashboard" },
-    { id: "assistant", label: "Trợ lý AI", href: "/patient/assistant", icon: "smart_toy" },
-    { id: "meals", label: "Thực đơn", href: "/patient/meals", icon: "restaurant" },
+    { id: "meals", label: "Thực đơn", href: "/patient", icon: "restaurant" },
     {
       id: "notifications",
       label: "Thông báo",

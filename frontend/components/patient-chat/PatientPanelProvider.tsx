@@ -1,15 +1,51 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import type { NotificationOut } from "@/lib/types";
 
 export type PatientPanelKey = "menu" | "notifications" | "health" | null;
 export type HealthPanelView = "dock" | "record";
 export type NotificationsPanelView = "list" | { detailId: string };
 
+const NOTIF_SEEN_KEY_PREFIX = "p014.notif.seenAt:";
+
+function getLastSeenAt(userId: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(`${NOTIF_SEEN_KEY_PREFIX}${userId}`);
+}
+
+function setLastSeenAt(userId: string, iso: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${NOTIF_SEEN_KEY_PREFIX}${userId}`, iso);
+}
+
+function computeHasUnseenBadge(
+  notifications: NotificationOut[],
+  lastSeenAt: string | null
+): boolean {
+  const unread = notifications.filter(
+    (n) => n.status === "pending" || n.status === "sent"
+  );
+  if (unread.length === 0) return false;
+  if (!lastSeenAt) return true;
+  const lastSeenMs = new Date(lastSeenAt).getTime();
+  return unread.some((n) => new Date(n.created_at).getTime() > lastSeenMs);
+}
+
 export interface PatientPanelState {
   activePanel: PatientPanelKey;
   healthView: HealthPanelView;
   notificationsView: NotificationsPanelView;
+  hasUnseenBadge: boolean;
 }
 
 export interface PatientPanelContextValue extends PatientPanelState {
@@ -19,20 +55,60 @@ export interface PatientPanelContextValue extends PatientPanelState {
   backToNotificationList: () => void;
   goToRecordMetricsForm: () => void;
   backToHealthDock: () => void;
+  markNotificationsSeen: () => void;
+  refreshNotificationsBadge: () => Promise<void>;
 }
 
 const PatientPanelContext = createContext<PatientPanelContextValue | undefined>(undefined);
 
 export function PatientPanelProvider({ children }: { children: ReactNode }) {
+  const userId = useAuthStore((s) => s.userId);
   const [activePanel, setActivePanel] = useState<PatientPanelKey>(null);
   const [healthView, setHealthView] = useState<HealthPanelView>("dock");
   const [notificationsView, setNotificationsView] = useState<NotificationsPanelView>("list");
+  const [hasUnseenBadge, setHasUnseenBadge] = useState(false);
 
-  const openPanel = useCallback((key: Exclude<PatientPanelKey, null>) => {
-    setActivePanel(key);
-    setHealthView("dock");
-    setNotificationsView("list");
-  }, []);
+  const refreshNotificationsBadge = useCallback(async () => {
+    if (!userId) {
+      setHasUnseenBadge(false);
+      return;
+    }
+    try {
+      const data = await api.listNotifications();
+      const lastSeen = getLastSeenAt(userId);
+      setHasUnseenBadge(computeHasUnseenBadge(data, lastSeen));
+    } catch {
+      // Ignore badge refresh errors silently
+    }
+  }, [userId]);
+
+  const markNotificationsSeen = useCallback(() => {
+    if (!userId) return;
+    setLastSeenAt(userId, new Date().toISOString());
+    setHasUnseenBadge(false);
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshNotificationsBadge();
+  }, [refreshNotificationsBadge]);
+
+  useEffect(() => {
+    if (activePanel === null) {
+      void refreshNotificationsBadge();
+    }
+  }, [activePanel, refreshNotificationsBadge]);
+
+  const openPanel = useCallback(
+    (key: Exclude<PatientPanelKey, null>) => {
+      setActivePanel(key);
+      setHealthView("dock");
+      setNotificationsView("list");
+      if (key === "notifications") {
+        markNotificationsSeen();
+      }
+    },
+    [markNotificationsSeen]
+  );
 
   const closePanel = useCallback(() => {
     setActivePanel(null);
@@ -80,12 +156,15 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
     activePanel,
     healthView,
     notificationsView,
+    hasUnseenBadge,
     openPanel,
     closePanel,
     openNotificationDetail,
     backToNotificationList,
     goToRecordMetricsForm,
     backToHealthDock,
+    markNotificationsSeen,
+    refreshNotificationsBadge,
   };
 
   return (

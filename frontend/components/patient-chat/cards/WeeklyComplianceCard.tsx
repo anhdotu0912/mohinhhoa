@@ -13,11 +13,20 @@ import {
   ReferenceLine,
 } from "recharts";
 import { usePatientPanel } from "../PatientPanelProvider";
-import {
-  MOCK_COMPLIANCE_DATA,
-  calculateAverageCompliance,
-  type DailyComplianceDetail,
-} from "@/lib/patient-chat-mock-data";
+import type { WeeklyComplianceOut } from "@/lib/types";
+
+interface DailyComplianceDetail {
+  day: string;
+  pct: number;
+  onPlan: number;
+  offPlan: number;
+  skipped: number;
+  target: number;
+}
+
+interface WeeklyComplianceCardProps {
+  data: WeeklyComplianceOut;
+}
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -30,41 +39,69 @@ interface CustomTooltipProps {
   viewMode: "trend" | "breakdown";
 }
 
+const DAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+const DAY_NAMES: Record<string, string> = {
+  T2: "Thứ Hai",
+  T3: "Thứ Ba",
+  T4: "Thứ Tư",
+  T5: "Thứ Năm",
+  T6: "Thứ Sáu",
+  T7: "Thứ Bảy",
+  CN: "Chủ Nhật",
+};
+
+function mapComplianceToChart(data: WeeklyComplianceOut): DailyComplianceDetail[] {
+  const series = data.daily_series ?? [];
+  return series.slice(0, 7).map((point, index) => {
+    const pct = point.adherence_pct ?? 0;
+    const hasData = point.adherence_pct != null;
+    const onPlan = hasData ? Math.max(0, Math.min(3, Math.round((pct / 100) * 3))) : 0;
+    let dayLabel = `D${index + 1}`;
+    if (point.date) {
+      const [year, month, day] = point.date.split("-").map(Number);
+      if (year && month && day) {
+        const d = new Date(year, month - 1, day);
+        const dayOfWeekIndex = (d.getDay() + 6) % 7;
+        dayLabel = DAY_LABELS[dayOfWeekIndex] ?? dayLabel;
+      }
+    }
+    return {
+      day: dayLabel,
+      pct: hasData ? pct : 0,
+      onPlan,
+      offPlan: 0,
+      skipped: hasData ? Math.max(0, 3 - onPlan) : 3,
+      target: 85,
+    };
+  });
+}
+
 function CustomTooltip({ active, payload, viewMode }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
 
-  const data = payload[0].payload;
-  const dayNames: Record<string, string> = {
-    T2: "Thứ Hai",
-    T3: "Thứ Ba",
-    T4: "Thứ Tư",
-    T5: "Thứ Năm",
-    T6: "Thứ Sáu",
-    T7: "Thứ Bảy",
-    CN: "Chủ Nhật",
-  };
+  const row = payload[0].payload;
 
   return (
     <div className="bg-slate-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs flex flex-col gap-1 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
       <div className="flex items-center justify-between gap-3 border-b border-slate-700/80 pb-1 font-semibold text-slate-200">
-        <span>{dayNames[data.day] || data.day}</span>
-        <span className="text-emerald-400 font-bold">{data.pct}% tuân thủ</span>
+        <span>{DAY_NAMES[row.day] || row.day}</span>
+        <span className="text-emerald-400 font-bold">{row.pct}% tuân thủ</span>
       </div>
 
       {viewMode === "trend" ? (
         <div className="flex flex-col gap-0.5 pt-0.5 text-[11px] text-slate-300">
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Mục tiêu:</span>
-            <span className="font-medium text-slate-200">{data.target}%</span>
+            <span className="font-medium text-slate-200">{row.target}%</span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Đánh giá:</span>
             <span
               className={`font-semibold ${
-                data.pct >= data.target ? "text-emerald-400" : "text-amber-400"
+                row.pct >= row.target ? "text-emerald-400" : "text-amber-400"
               }`}
             >
-              {data.pct >= data.target ? "Đạt chuẩn y khoa" : "Dưới ngưỡng"}
+              {row.pct >= row.target ? "Đạt chuẩn y khoa" : "Dưới ngưỡng"}
             </span>
           </div>
         </div>
@@ -75,24 +112,24 @@ function CustomTooltip({ active, payload, viewMode }: CustomTooltipProps) {
               <span className="w-2 h-2 rounded-full bg-[#006857]" />
               Đúng thực đơn:
             </span>
-            <span className="font-semibold text-white">{data.onPlan} bữa</span>
+            <span className="font-semibold text-white">{row.onPlan} bữa</span>
           </div>
-          {data.offPlan > 0 && (
+          {row.offPlan > 0 && (
             <div className="flex items-center justify-between gap-4">
               <span className="flex items-center gap-1.5 text-slate-300">
                 <span className="w-2 h-2 rounded-full bg-blue-400" />
                 Món ngoài:
               </span>
-              <span className="font-semibold text-blue-300">{data.offPlan} món</span>
+              <span className="font-semibold text-blue-300">{row.offPlan} món</span>
             </div>
           )}
-          {data.skipped > 0 && (
+          {row.skipped > 0 && (
             <div className="flex items-center justify-between gap-4">
               <span className="flex items-center gap-1.5 text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-slate-400" />
                 Chưa ghi:
               </span>
-              <span className="font-semibold text-slate-300">{data.skipped} bữa</span>
+              <span className="font-semibold text-slate-300">{row.skipped} bữa</span>
             </div>
           )}
         </div>
@@ -101,35 +138,24 @@ function CustomTooltip({ active, payload, viewMode }: CustomTooltipProps) {
   );
 }
 
-// Custom Top Dot with Percentage Label directly above
 interface CustomDotProps {
   cx?: number;
   cy?: number;
   value?: number;
   index?: number;
-  stroke?: string;
+  dataLength: number;
 }
 
-function CustomizedDot(props: CustomDotProps) {
-  const { cx, cy, value, index } = props;
+function CustomizedDot({ cx, cy, value, index, dataLength }: CustomDotProps) {
   if (cx === undefined || cy === undefined) return null;
 
-  const isLatest = index === MOCK_COMPLIANCE_DATA.details.length - 1;
+  const isLatest = index === dataLength - 1;
 
   return (
     <g>
-      {/* Halo for latest dot */}
       {isLatest && (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={9}
-          fill="#006857"
-          opacity={0.18}
-          className="animate-pulse"
-        />
+        <circle cx={cx} cy={cy} r={9} fill="#006857" opacity={0.18} className="animate-pulse" />
       )}
-      {/* Outer shadow dot */}
       <circle
         cx={cx}
         cy={cy}
@@ -139,7 +165,6 @@ function CustomizedDot(props: CustomDotProps) {
         strokeWidth={2}
         className="drop-shadow-xs"
       />
-      {/* Number Label strictly centered above dot */}
       <text
         x={cx}
         y={cy - 10}
@@ -157,19 +182,22 @@ function CustomizedDot(props: CustomDotProps) {
 
 const emptySubscribe = () => () => {};
 
-export function WeeklyComplianceCard() {
+export function WeeklyComplianceCard({ data }: WeeklyComplianceCardProps) {
   const { openPanel } = usePatientPanel();
   const mounted = React.useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [viewMode, setViewMode] = useState<"trend" | "breakdown">("trend");
 
-  const chartData = useMemo(() => MOCK_COMPLIANCE_DATA.details, []);
+  const chartData = useMemo(() => mapComplianceToChart(data), [data]);
 
-  // Calculate dynamic weekly average
   const overallPct = useMemo(() => {
-    return calculateAverageCompliance(MOCK_COMPLIANCE_DATA);
-  }, []);
+    if (data.overall_adherence_pct != null) return data.overall_adherence_pct;
+    const scored = (data.daily_series ?? [])
+      .map((row) => row.adherence_pct)
+      .filter((pct): pct is number => pct != null);
+    if (scored.length === 0) return 0;
+    return Math.round(scored.reduce((sum, pct) => sum + pct, 0) / scored.length);
+  }, [data]);
 
-  // Performance status badge
   const statusBadge = useMemo(() => {
     if (overallPct >= 90) {
       return {
@@ -194,7 +222,6 @@ export function WeeklyComplianceCard() {
 
   return (
     <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-4.5 sm:p-5 shadow-xs flex flex-col gap-4 mt-1">
-      {/* Card Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-baseline gap-2.5">
@@ -217,18 +244,14 @@ export function WeeklyComplianceCard() {
           </p>
         </div>
 
-        {/* Status Badge & View Mode Toggle */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <div
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${statusBadge.style}`}
           >
-            <span className="material-symbols-outlined text-[16px]">
-              {statusBadge.icon}
-            </span>
+            <span className="material-symbols-outlined text-[16px]">{statusBadge.icon}</span>
             <span>{statusBadge.label}</span>
           </div>
 
-          {/* Mode Switcher */}
           <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200/80 text-[11px] font-semibold text-slate-600">
             <button
               type="button"
@@ -256,34 +279,24 @@ export function WeeklyComplianceCard() {
         </div>
       </div>
 
-      {/* Chart Canvas Area */}
       <div className="w-full h-44 sm:h-48 pt-3 pb-1 relative">
-        {!mounted ? (
+        {!mounted || chartData.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center bg-slate-50/60 rounded-xl animate-pulse text-xs text-slate-400">
-            Đang chuẩn bị biểu đồ...
+            {chartData.length === 0
+              ? "Chưa có dữ liệu tuân thủ tuần này."
+              : "Đang chuẩn bị biểu đồ..."}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {viewMode === "trend" ? (
-              <AreaChart
-                data={chartData}
-                margin={{ top: 22, right: 20, left: 20, bottom: 4 }}
-              >
+              <AreaChart data={chartData} margin={{ top: 22, right: 20, left: 20, bottom: 4 }}>
                 <defs>
                   <linearGradient id="patientComplianceGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#006857" stopOpacity={0.25} />
                     <stop offset="100%" stopColor="#006857" stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
-
-                {/* Target Baseline (85% Standard Goal) */}
-                <ReferenceLine
-                  y={85}
-                  stroke="#10b981"
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.4}
-                />
-
+                <ReferenceLine y={85} stroke="#10b981" strokeDasharray="3 3" strokeOpacity={0.4} />
                 <XAxis
                   dataKey="day"
                   axisLine={false}
@@ -292,26 +305,29 @@ export function WeeklyComplianceCard() {
                   dy={8}
                 />
                 <YAxis hide domain={[60, 105]} />
-
                 <Tooltip
                   content={<CustomTooltip viewMode="trend" />}
-                  cursor={{ stroke: "#006857", strokeWidth: 1, strokeDasharray: "3 3", strokeOpacity: 0.3 }}
+                  cursor={{
+                    stroke: "#006857",
+                    strokeWidth: 1,
+                    strokeDasharray: "3 3",
+                    strokeOpacity: 0.3,
+                  }}
                 />
-
                 <Area
                   type="monotone"
                   dataKey="pct"
                   stroke="#006857"
                   strokeWidth={2.75}
                   fill="url(#patientComplianceGrad)"
-                  dot={<CustomizedDot />}
+                  dot={<CustomizedDot dataLength={chartData.length} />}
                   activeDot={{
                     r: 6,
                     fill: "#006857",
                     stroke: "#ffffff",
                     strokeWidth: 2,
                   }}
-                  isAnimationActive={true}
+                  isAnimationActive
                   animationDuration={800}
                 />
               </AreaChart>
@@ -329,26 +345,12 @@ export function WeeklyComplianceCard() {
                   dy={8}
                 />
                 <YAxis hide domain={[0, 3]} />
-
                 <Tooltip
                   content={<CustomTooltip viewMode="breakdown" />}
                   cursor={{ fill: "#f1f5f9", opacity: 0.6 }}
                 />
-
-                {/* Stacked Bars representing meal slots */}
-                <Bar
-                  dataKey="onPlan"
-                  name="Đúng thực đơn"
-                  stackId="meals"
-                  fill="#006857"
-                  radius={[0, 0, 4, 4]}
-                />
-                <Bar
-                  dataKey="offPlan"
-                  name="Món ngoài thực đơn"
-                  stackId="meals"
-                  fill="#3b82f6"
-                />
+                <Bar dataKey="onPlan" name="Đúng thực đơn" stackId="meals" fill="#006857" radius={[0, 0, 4, 4]} />
+                <Bar dataKey="offPlan" name="Món ngoài thực đơn" stackId="meals" fill="#3b82f6" />
                 <Bar
                   dataKey="skipped"
                   name="Chưa ghi nhận"
@@ -362,9 +364,7 @@ export function WeeklyComplianceCard() {
         )}
       </div>
 
-      {/* Synchronized Legend and Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3.5 border-t border-slate-100">
-        {/* Synchronized Legend depending on View Mode */}
         {viewMode === "trend" ? (
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-2">

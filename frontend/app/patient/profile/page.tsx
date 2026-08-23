@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { isPlaceholderAvatar, resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { AVATAR_PRESETS } from "@/lib/avatar-presets";
-import { PATIENT_AVATAR_SRC } from "@/lib/nav-config";
 import {
   COMMON_ALLERGIES,
   DISEASE_OPTIONS,
@@ -186,9 +186,14 @@ export default function PatientProfilePage() {
       setUser(userData);
       setCatalog(catalogData);
 
-      // Sync avatar from user or profile if auth store is empty
-      if (!authAvatar && userData.avatar) {
-        setUserProfile({ avatar: userData.avatar, displayName: userData.full_name });
+      // Prefer backend avatar; drop stale Stitch/dicebear placeholders from persist
+      if (isPlaceholderAvatar(authAvatar)) {
+        setUserProfile({
+          avatar: userData.avatar ?? null,
+          displayName: userData.full_name?.trim() || userData.email,
+        });
+      } else if (userData.full_name) {
+        setUserProfile({ displayName: userData.full_name });
       }
     } catch (err) {
       setError(
@@ -219,10 +224,12 @@ export default function PatientProfilePage() {
     void loadData();
   }, [hydrated, token, role, loadData]);
 
-  // Current display avatar
   const currentAvatar = useMemo(() => {
-    return authAvatar || user?.avatar || PATIENT_AVATAR_SRC;
+    return resolveUserAvatar(authAvatar || user?.avatar);
   }, [authAvatar, user?.avatar]);
+
+  const profileName = user?.full_name || displayName || email || "BN";
+  const profileInitials = userInitials(profileName);
 
   // Diagnoses list from catalog & fallback
   const diagnosisOptions = useMemo(() => {
@@ -388,7 +395,7 @@ export default function PatientProfilePage() {
   };
 
   const handleResetAvatar = () => {
-    setUserProfile({ avatar: PATIENT_AVATAR_SRC });
+    setUserProfile({ avatar: null });
     setAvatarModalOpen(false);
     setSaveNotice("Đã đặt lại avatar mặc định.");
   };
@@ -683,15 +690,23 @@ export default function PatientProfilePage() {
                 <div className="flex flex-col items-center text-center">
                   {/* Avatar with Upload & Glow */}
                   <div className="relative group mb-4">
-                    <div className="w-28 h-28 rounded-full ring-4 ring-primary/20 p-1 bg-white shadow-md overflow-hidden flex items-center justify-center">
-                      <img
-                        src={currentAvatar}
-                        alt="Avatar bệnh nhân"
-                        className="w-full h-full rounded-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = PATIENT_AVATAR_SRC;
-                        }}
-                      />
+                    <div className="relative w-28 h-28 rounded-full ring-4 ring-primary/20 p-1 bg-white shadow-md overflow-hidden">
+                      <div
+                        translate="no"
+                        className="absolute inset-1 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold"
+                      >
+                        {profileInitials}
+                      </div>
+                      {currentAvatar ? (
+                        <img
+                          src={currentAvatar}
+                          alt="Avatar bệnh nhân"
+                          className="relative z-10 w-full h-full rounded-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
                     </div>
 
                     {/* Change Avatar Button */}

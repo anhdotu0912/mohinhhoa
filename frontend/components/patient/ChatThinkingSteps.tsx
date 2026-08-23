@@ -8,26 +8,29 @@ export interface ThinkingStep {
   status: "pending" | "active" | "done";
 }
 
-/** Three bouncing dots — shown while waiting for first streamed token. */
+/** Three pulsing dots — shown while waiting for first streamed token. */
 export function ChatTypingDots() {
   return (
     <div
-      className="inline-flex items-center gap-2 py-1 text-[#006857]"
+      className="inline-flex items-center gap-2 py-1 text-[#006857] animate-in fade-in duration-200"
       aria-label="Trợ lý đang suy nghĩ"
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <span
-          className="w-1.5 h-1.5 rounded-full bg-[#006857] animate-bounce"
-          style={{ animationDelay: "-0.32s" }}
+          className="w-2 h-2 rounded-full bg-[#006857] animate-pulse"
+          style={{ animationDuration: "1s", animationDelay: "0ms" }}
         />
         <span
-          className="w-1.5 h-1.5 rounded-full bg-[#006857] animate-bounce"
-          style={{ animationDelay: "-0.16s" }}
+          className="w-2 h-2 rounded-full bg-[#006857] animate-pulse"
+          style={{ animationDuration: "1s", animationDelay: "200ms" }}
         />
-        <span className="w-1.5 h-1.5 rounded-full bg-[#006857] animate-bounce" />
+        <span
+          className="w-2 h-2 rounded-full bg-[#006857] animate-pulse"
+          style={{ animationDuration: "1s", animationDelay: "400ms" }}
+        />
       </div>
-      <span className="text-xs text-slate-400 font-medium italic">
-        Đang suy nghĩ &amp; tra cứu y văn...
+      <span className="text-xs text-slate-500 font-medium italic">
+        Đang phân tích dữ liệu lâm sàng &amp; tra cứu y văn...
       </span>
     </div>
   );
@@ -52,7 +55,7 @@ export function ChatThinkingSteps({
   const activeStep = steps.find((s) => s.status === "active");
 
   return (
-    <div className="w-full my-0.5 text-slate-700">
+    <div className="w-full my-0.5 text-slate-700 animate-in fade-in duration-200">
       {/* Minimalist Gemini-style Trigger */}
       <button
         type="button"
@@ -79,11 +82,11 @@ export function ChatThinkingSteps({
 
       {/* Indented subtle bullet list (Gemini style) */}
       {isOpen && (
-        <div className="border-l-2 border-slate-200 pl-3.5 my-1.5 space-y-1.5 animate-in fade-in duration-200">
+        <div className="border-l-2 border-slate-200 pl-3.5 my-1.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
           {steps.map((step, idx) => (
             <div
               key={`${step.node}-${step.message}-${idx}`}
-              className="flex items-center gap-2 text-xs"
+              className="flex items-center gap-2 text-xs transition-colors duration-150"
             >
               {step.status === "done" ? (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />

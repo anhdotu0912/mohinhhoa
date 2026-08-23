@@ -1,10 +1,17 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { MealPreviewOut } from "@/lib/types";
+import { api } from "@/lib/api";
+import type {
+  ChatMessageOut,
+  ChatSessionOut,
+  ChatSessionSummaryOut,
+  MealPlanOutput,
+  MealPreviewOut,
+  WeeklyComplianceOut,
+  DoctorNoteOut,
+} from "@/lib/types";
 import type { ThinkingStep } from "@/components/patient/ChatThinkingSteps";
-import type { MockCardIntent } from "@/lib/patient-chat-mock-intents";
 
 export interface ChatMessage {
   id: string;
@@ -16,7 +23,10 @@ export interface ChatMessage {
   guardrailTriggered?: boolean;
   mealPlanId?: string | null;
   mealPreview?: MealPreviewOut | null;
-  mockCard?: MockCardIntent;
+  weeklyCompliance?: WeeklyComplianceOut | null;
+  doctorNote?: DoctorNoteOut | null;
+  mealPlanWeek?: MealPlanOutput | null;
+  showWeeklyPlan?: boolean;
   isStreaming?: boolean;
   thinkingSteps?: ThinkingStep[];
   corrected?: boolean;
@@ -27,311 +37,300 @@ export interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
-  createdAt: number; // timestamp ms
-  updatedAt: number; // timestamp ms
+  createdAt: number;
+  updatedAt: number;
   pinned?: boolean;
   appliedPlans?: Record<string, boolean>;
+  messageCount?: number;
 }
 
-// Initial Mock Sessions for Demo / First-time user experience
-const INITIAL_DEMO_SESSIONS: ChatSession[] = [
-  {
-    id: "session-demo-today-1",
-    title: "Tư vấn thực đơn kiểm soát đường huyết",
-    createdAt: Date.now() - 1000 * 60 * 45, // 45 phút trước
-    updatedAt: Date.now() - 1000 * 60 * 45,
-    pinned: false,
+function isoToMs(iso: string): number {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? Date.now() : ms;
+}
+
+function apiMessageToLocal(message: ChatMessageOut): ChatMessage {
+  return {
+    id: message.id,
+    sender: message.sender,
+    text: message.text ?? "",
+    intent: message.intent ?? undefined,
+    secondaryIntents: message.secondary_intents ?? [],
+    citations: message.citations ?? [],
+    guardrailTriggered: message.guardrail_triggered ?? false,
+    mealPlanId: message.meal_plan_id ?? null,
+    mealPreview: message.meal_preview ?? null,
+    weeklyCompliance: message.weekly_compliance ?? null,
+    doctorNote: message.doctor_note ?? null,
+    mealPlanWeek: message.meal_plan_week ?? null,
+    showWeeklyPlan: message.show_weekly_plan ?? false,
+    thinkingSteps: (message.thinking_steps ?? []) as ThinkingStep[],
+    corrected: message.corrected ?? false,
+    correctionReason: message.correction_reason ?? undefined,
+  };
+}
+
+function localMessageToApi(message: ChatMessage): ChatMessageOut {
+  return {
+    id: message.id,
+    sender: message.sender,
+    text: message.text ?? "",
+    intent: message.intent ?? null,
+    secondary_intents: message.secondaryIntents ?? [],
+    citations: message.citations ?? [],
+    guardrail_triggered: message.guardrailTriggered ?? false,
+    meal_plan_id: message.mealPlanId ?? null,
+    meal_preview: message.mealPreview ?? null,
+    weekly_compliance: message.weeklyCompliance ?? null,
+    doctor_note: message.doctorNote ?? null,
+    meal_plan_week: message.mealPlanWeek ?? null,
+    show_weekly_plan: message.showWeeklyPlan ?? false,
+    thinking_steps: message.thinkingSteps ?? [],
+    corrected: message.corrected ?? false,
+    correction_reason: message.correctionReason ?? null,
+  };
+}
+
+function summaryToSession(summary: ChatSessionSummaryOut): ChatSession {
+  return {
+    id: summary.id,
+    title: summary.title,
+    messages: [],
+    createdAt: isoToMs(summary.created_at),
+    updatedAt: isoToMs(summary.updated_at),
+    pinned: summary.pinned,
     appliedPlans: {},
-    messages: [
-      {
-        id: "user-1",
-        sender: "user",
-        text: "Hôm nay tôi nên ăn gì để kiểm soát đường huyết và hạn chế muối?",
-      },
-      {
-        id: "ai-1",
-        sender: "ai",
-        text: "Dựa trên tiền sử Đái tháo đường Type 2 và Tăng huyết áp của bạn, tôi đã thiết kế thực đơn cân đối chỉ số đường huyết (GI thấp) và kiểm soát lượng muối nghiêm ngặt (< 2g/ngày):",
-        intent: "meal_plan",
-        thinkingSteps: [
-          { node: "patient_profile", message: "Phân tích hồ sơ bệnh nhân (Tiểu đường Type 2, Tăng huyết áp)", status: "done" },
-          { node: "safety_guardrail", message: "Kiểm tra giới hạn natri (< 2000mg/ngày) & chỉ số GI thực phẩm", status: "done" },
-          { node: "rag_guideline", message: "Tổng hợp thực đơn cá nhân hóa từ cơ sở dữ liệu y văn", status: "done" },
-        ],
-        citations: ["dinh_duong_dai_thao_duong.md", "kiem_soat_natri_tang_huyet_ap.md"],
-        mealPreview: {
-          meal_plan_id: "demo-plan-today",
-          date: new Date().toISOString().split("T")[0],
-          day_index: 0,
-          plan_status: "approved",
-          meals: [
-            {
-              slot: "breakfast",
-              label: "Bữa sáng",
-              items: [
-                {
-                  name: "Yến mạch nấu sữa hạt hạnh nhân & dâu tây",
-                  portion: "1 bát vừa (250g)",
-                  kcal: 380,
-                  macros: { carb_g: 45, protein_g: 14, fat_g: 12, sodium_mg: 80 },
-                  citations: ["dinh_duong_dai_thao_duong.md"],
-                },
-              ],
-            },
-            {
-              slot: "lunch",
-              label: "Bữa trưa",
-              items: [
-                {
-                  name: "Ức gà áp chảo dầu ô liu, cơm gạo lứt & bông cải xanh",
-                  portion: "1 suất (350g)",
-                  kcal: 620,
-                  macros: { carb_g: 65, protein_g: 42, fat_g: 18, sodium_mg: 350 },
-                  citations: ["dinh_duong_dai_thao_duong.md", "kiem_soat_natri_tang_huyet_ap.md"],
-                },
-              ],
-            },
-            {
-              slot: "dinner",
-              label: "Bữa tối",
-              items: [
-                {
-                  name: "Canh cá hồi nấu ngót & đậu phụ non ít muối",
-                  portion: "1 tô canh (300g)",
-                  kcal: 550,
-                  macros: { carb_g: 40, protein_g: 36, fat_g: 22, sodium_mg: 280 },
-                  citations: ["kiem_soat_natri_tang_huyet_ap.md"],
-                },
-              ],
-            },
-          ],
-        },
-      },
-    ],
-  },
-  {
-    id: "session-demo-today-2",
-    title: "Kiểm tra mức độ tuân thủ dinh dưỡng tuần này",
-    createdAt: Date.now() - 1000 * 60 * 180, // 3 tiếng trước
-    updatedAt: Date.now() - 1000 * 60 * 180,
-    pinned: true,
-    appliedPlans: {},
-    messages: [
-      {
-        id: "user-2",
-        sender: "user",
-        text: "Tuân thủ của tôi tuần này thế nào?",
-      },
-      {
-        id: "ai-2",
-        sender: "ai",
-        text: "Bạn đang duy trì phong độ rất tốt với tỉ lệ tuân thủ đạt 92% tuần này.",
-        mockCard: "weekly_compliance",
-      },
-    ],
-  },
-  {
-    id: "session-demo-yesterday-1",
-    title: "Tra cứu tương tác Metformin và bưởi da xanh",
-    createdAt: Date.now() - 1000 * 60 * 60 * 28, // Hôm qua (~28h trước)
-    updatedAt: Date.now() - 1000 * 60 * 60 * 28,
-    pinned: false,
-    appliedPlans: {},
-    messages: [
-      {
-        id: "user-3",
-        sender: "user",
-        text: "Tôi đang uống Metformin 500mg, ăn bưởi tráng miệng có sao không?",
-      },
-      {
-        id: "ai-3",
-        sender: "ai",
-        text: "Bưởi chứa furanocoumarin có thể ức chế enzyme chuyển hóa ở ruột. Với Metformin, tương tác không nguy hiểm như nhóm Statin (hạ mỡ máu), nhưng uống nước ép bưởi đậm đặc quá nhiều có thể làm tăng nhẹ nguy cơ tích tụ axit lactic.\n\nLời khuyên: Bạn có thể ăn 2-3 múi bưởi tươi cách giờ uống thuốc khoảng 2 tiếng, tránh uống nước ép bưởi cô đặc số lượng lớn.",
-        intent: "interaction_check",
-        citations: ["tuong_tac_thuoc_va_thuc_pham_y_van.md", "metformin_clinical_guidelines.md"],
-      },
-    ],
-  },
-  {
-    id: "session-demo-older-1",
-    title: "Địa điểm mua nguyên liệu tươi sạch Q3",
-    createdAt: Date.now() - 1000 * 60 * 60 * 72, // 3 ngày trước
-    updatedAt: Date.now() - 1000 * 60 * 60 * 72,
-    pinned: false,
-    appliedPlans: {},
-    messages: [
-      {
-        id: "user-4",
-        sender: "user",
-        text: "Tìm chỗ mua nguyên liệu tươi sạch gần Quận 3",
-      },
-      {
-        id: "ai-4",
-        sender: "ai",
-        text: "Dưới đây là các địa điểm mua sắm nguyên liệu tươi sạch gần vị trí của bạn tại Quận 3:",
-        mockCard: "grocery_list",
-      },
-    ],
-  },
-  {
-    id: "session-demo-older-2",
-    title: "Lời dặn của Bác sĩ Minh Nguyễn",
-    createdAt: Date.now() - 1000 * 60 * 60 * 120, // 5 ngày trước
-    updatedAt: Date.now() - 1000 * 60 * 60 * 120,
-    pinned: false,
-    appliedPlans: {},
-    messages: [
-      {
-        id: "user-5",
-        sender: "user",
-        text: "Bác sĩ có dặn gì tôi không?",
-      },
-      {
-        id: "ai-5",
-        sender: "ai",
-        text: "Bác sĩ Minh Nguyễn đã để lại một lời nhắc quan trọng dành cho bạn:",
-        mockCard: "doctor_note",
-      },
-    ],
-  },
-];
+    messageCount: summary.message_count,
+  };
+}
+
+function sessionOutToLocal(session: ChatSessionOut): ChatSession {
+  return {
+    id: session.id,
+    title: session.title,
+    messages: session.messages.map(apiMessageToLocal),
+    createdAt: isoToMs(session.created_at),
+    updatedAt: isoToMs(session.updated_at),
+    pinned: session.pinned,
+    appliedPlans: session.applied_plans ?? {},
+    messageCount: session.messages.length,
+  };
+}
 
 export interface PatientChatHistoryState {
   sessions: ChatSession[];
   activeSessionId: string | null;
-  isSidebarOpen: boolean; // Desktop & Mobile collapse state
+  isSidebarOpen: boolean;
+  isHydrated: boolean;
+  isLoading: boolean;
 
-  // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
-  createNewSession: () => string;
-  selectSession: (id: string) => void;
-  renameSession: (id: string, newTitle: string) => void;
-  deleteSession: (id: string) => void;
-  togglePinSession: (id: string) => void;
-  saveActiveSessionMessages: (messages: ChatMessage[], appliedPlans?: Record<string, boolean>) => void;
-  autoUpdateTitleIfFirstMessage: (sessionId: string, firstQuery: string) => void;
-  clearAllSessions: () => void;
+  hydrateSessions: () => Promise<void>;
+  createNewSession: () => Promise<string>;
+  selectSession: (id: string) => Promise<void>;
+  renameSession: (id: string, newTitle: string) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
+  togglePinSession: (id: string) => Promise<void>;
+  saveActiveSessionMessages: (
+    messages: ChatMessage[],
+    appliedPlans?: Record<string, boolean>
+  ) => Promise<void>;
+  autoUpdateTitleIfFirstMessage: (sessionId: string, firstQuery: string) => Promise<void>;
+  clearAllSessions: () => Promise<void>;
 }
 
-export const usePatientChatHistoryStore = create<PatientChatHistoryState>()(
-  persist(
-    (set, get) => ({
-      sessions: INITIAL_DEMO_SESSIONS,
-      activeSessionId: "session-demo-today-1",
-      isSidebarOpen: true,
+export const usePatientChatHistoryStore = create<PatientChatHistoryState>()((set, get) => ({
+  sessions: [],
+  activeSessionId: null,
+  isSidebarOpen: true,
+  isHydrated: false,
+  isLoading: false,
 
-      toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
-      setSidebarOpen: (open: boolean) => set({ isSidebarOpen: open }),
+  toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
+  setSidebarOpen: (open: boolean) => set({ isSidebarOpen: open }),
 
-      createNewSession: () => {
-        const newId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        const newSession: ChatSession = {
-          id: newId,
-          title: "Cuộc trò chuyện mới",
-          messages: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          pinned: false,
-          appliedPlans: {},
-        };
+  hydrateSessions: async () => {
+    set({ isLoading: true });
+    try {
+      const summaries = await api.listChatSessions();
+      const activeSessionId =
+        summaries.length > 0 ? summaries[0].id : null;
+      let sessions = summaries.map(summaryToSession);
 
-        set((state) => ({
-          sessions: [newSession, ...state.sessions],
-          activeSessionId: newId,
-        }));
+      if (activeSessionId) {
+        try {
+          const remote = await api.getChatSession(activeSessionId);
+          const local = sessionOutToLocal(remote);
+          sessions = sessions.map((s) => (s.id === activeSessionId ? local : s));
+        } catch {
+          /* keep summary-only row */
+        }
+      }
 
-        return newId;
-      },
-
-      selectSession: (id: string) => {
-        set({ activeSessionId: id });
-      },
-
-      renameSession: (id: string, newTitle: string) => {
-        const trimmed = newTitle.trim();
-        if (!trimmed) return;
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === id ? { ...s, title: trimmed, updatedAt: Date.now() } : s
-          ),
-        }));
-      },
-
-      deleteSession: (id: string) => {
-        set((state) => {
-          const nextSessions = state.sessions.filter((s) => s.id !== id);
-          let nextActiveId = state.activeSessionId;
-
-          // If deleting the currently active session, switch to the first available or null
-          if (state.activeSessionId === id) {
-            nextActiveId = nextSessions.length > 0 ? nextSessions[0].id : null;
-          }
-
-          return {
-            sessions: nextSessions,
-            activeSessionId: nextActiveId,
-          };
-        });
-      },
-
-      togglePinSession: (id: string) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === id ? { ...s, pinned: !s.pinned, updatedAt: Date.now() } : s
-          ),
-        }));
-      },
-
-      saveActiveSessionMessages: (messages: ChatMessage[], appliedPlans?: Record<string, boolean>) => {
-        const { activeSessionId, sessions } = get();
-        if (!activeSessionId) return;
-
-        set({
-          sessions: sessions.map((s) =>
-            s.id === activeSessionId
-              ? {
-                  ...s,
-                  messages,
-                  appliedPlans: appliedPlans ?? s.appliedPlans,
-                  updatedAt: Date.now(),
-                }
-              : s
-          ),
-        });
-      },
-
-      autoUpdateTitleIfFirstMessage: (sessionId: string, firstQuery: string) => {
-        const cleanQuery = firstQuery.trim();
-        if (!cleanQuery) return;
-        const truncatedTitle =
-          cleanQuery.length > 38 ? `${cleanQuery.slice(0, 38)}...` : cleanQuery;
-
-        set((state) => ({
-          sessions: state.sessions.map((s) => {
-            if (s.id === sessionId && (s.title === "Cuộc trò chuyện mới" || !s.title)) {
-              return { ...s, title: truncatedTitle, updatedAt: Date.now() };
-            }
-            return s;
-          }),
-        }));
-      },
-
-      clearAllSessions: () => {
-        set({
-          sessions: [],
-          activeSessionId: null,
-        });
-      },
-    }),
-    {
-      name: "vmec-patient-chat-history-v2",
-      version: 2,
+      set({
+        sessions,
+        isHydrated: true,
+        isLoading: false,
+        activeSessionId,
+      });
+    } catch {
+      set({ isHydrated: true, isLoading: false });
     }
-  )
-);
+  },
 
-// Helper for grouping chat sessions by date
+  createNewSession: async () => {
+    const created = await api.createChatSession();
+    const local = sessionOutToLocal(created);
+    set((state) => ({
+      sessions: [local, ...state.sessions],
+      activeSessionId: local.id,
+    }));
+    return local.id;
+  },
+
+  selectSession: async (id: string) => {
+    set({ activeSessionId: id });
+    const existing = get().sessions.find((s) => s.id === id);
+    if (existing && existing.messages.length > 0) {
+      return;
+    }
+    try {
+      const remote = await api.getChatSession(id);
+      const local = sessionOutToLocal(remote);
+      set((state) => ({
+        sessions: state.sessions.map((s) => (s.id === id ? local : s)),
+      }));
+    } catch {
+      /* keep cached metadata */
+    }
+  },
+
+  renameSession: async (id: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    const updated = await api.patchChatSession(id, { title: trimmed });
+    const local = sessionOutToLocal(updated);
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === id
+          ? {
+              ...local,
+              messages: s.messages.length > 0 ? s.messages : local.messages,
+            }
+          : s
+      ),
+    }));
+  },
+
+  deleteSession: async (id: string) => {
+    await api.deleteChatSession(id);
+    set((state) => {
+      const nextSessions = state.sessions.filter((s) => s.id !== id);
+      let nextActiveId = state.activeSessionId;
+      if (state.activeSessionId === id) {
+        nextActiveId = nextSessions.length > 0 ? nextSessions[0].id : null;
+      }
+      return {
+        sessions: nextSessions,
+        activeSessionId: nextActiveId,
+      };
+    });
+  },
+
+  togglePinSession: async (id: string) => {
+    const session = get().sessions.find((s) => s.id === id);
+    if (!session) return;
+    const updated = await api.patchChatSession(id, { pinned: !session.pinned });
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              pinned: updated.pinned,
+              updatedAt: isoToMs(updated.updated_at),
+            }
+          : s
+      ),
+    }));
+  },
+
+  saveActiveSessionMessages: async (messages: ChatMessage[], appliedPlans?: Record<string, boolean>) => {
+    const { activeSessionId, sessions } = get();
+    if (!activeSessionId) return;
+
+    const persistMessages = messages
+      .filter((m) => !m.isStreaming)
+      .map(localMessageToApi);
+
+    set({
+      sessions: sessions.map((s) =>
+        s.id === activeSessionId
+          ? {
+              ...s,
+              messages,
+              appliedPlans: appliedPlans ?? s.appliedPlans,
+              messageCount: persistMessages.length,
+              updatedAt: Date.now(),
+            }
+          : s
+      ),
+    });
+
+    try {
+      const updated = await api.replaceChatSessionMessages(activeSessionId, persistMessages);
+      if (appliedPlans) {
+        await api.patchChatSession(activeSessionId, { applied_plans: appliedPlans });
+      }
+      const local = sessionOutToLocal(updated);
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === activeSessionId
+            ? {
+                ...local,
+                appliedPlans: appliedPlans ?? local.appliedPlans,
+              }
+            : s
+        ),
+      }));
+    } catch {
+      /* optimistic UI retained */
+    }
+  },
+
+  autoUpdateTitleIfFirstMessage: async (sessionId: string, firstQuery: string) => {
+    const cleanQuery = firstQuery.trim();
+    if (!cleanQuery) return;
+    const truncatedTitle =
+      cleanQuery.length > 38 ? `${cleanQuery.slice(0, 38)}...` : cleanQuery;
+
+    const session = get().sessions.find((s) => s.id === sessionId);
+    if (!session || (session.title !== "Cuộc trò chuyện mới" && session.title)) {
+      return;
+    }
+
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, title: truncatedTitle, updatedAt: Date.now() } : s
+      ),
+    }));
+
+    try {
+      await api.patchChatSession(sessionId, { title: truncatedTitle });
+    } catch {
+      /* local title retained */
+    }
+  },
+
+  clearAllSessions: async () => {
+    await api.deleteAllChatSessions();
+    set({
+      sessions: [],
+      activeSessionId: null,
+    });
+  },
+}));
+
 export interface GroupedSessions {
   pinned: ChatSession[];
   today: ChatSession[];
@@ -354,7 +353,6 @@ export function groupSessionsByRecency(sessions: ChatSession[]): GroupedSessions
     older: [],
   };
 
-  // Sort sessions with latest updated first
   const sorted = [...sessions].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
 
   for (const session of sorted) {

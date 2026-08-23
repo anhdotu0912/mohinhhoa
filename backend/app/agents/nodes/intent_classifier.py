@@ -20,6 +20,8 @@ VALID_INTENTS = {
     "rag_qa",
     "refuse",
     "unknown",
+    "weekly_compliance",
+    "doctor_note",
 }
 
 # Keyword patterns for rule-based fallback (refuse patterns shared with guardrails.rules)
@@ -33,6 +35,9 @@ _INTENT_PATTERNS = {
         r"ăn gì", r"nên ăn gì", r"lập thực đơn", r"tạo thực đơn", r"chế độ ăn",
         r"hôm nay", r"sáng nay", r"trưa nay", r"tối nay",
         r"bữa sáng", r"bữa trưa", r"bữa tối", r"xem thực đơn",
+        r"thực đơn.*(tuần|7 ngày|cả tuần|này)",
+        r"(xem|cho tôi xem|lịch ăn|kế hoạch ăn|xem lại).*thực đơn",
+        r"thực đơn của tôi|thực đơn tuần này|tuần này ăn gì",
     ],
     "interaction_check": [
         r"tương tác.*thuốc", r"thuốc.*thực phẩm", r"drug.*food",
@@ -43,7 +48,33 @@ _INTENT_PATTERNS = {
         r"ghi lại", r"log", r"vừa ăn", r"đã ăn", r"hôm nay ăn rồi",
         r"sáng nay ăn rồi", r"tối qua ăn", r"bữa.*ăn.*xong",
     ],
+    "weekly_compliance": [
+        r"tuân thủ.*(tuần|gần đây|này)",
+        r"tuần này.*tuân thủ",
+        r"báo cáo tuân thủ",
+        r"tỉ lệ tuân thủ",
+        r"tỷ lệ tuân thủ",
+        r"tuân thủ của tôi",
+    ],
+    "doctor_note": [
+        r"bác sĩ dặn",
+        r"lời nhắc bác sĩ",
+        r"ghi chú bác sĩ",
+        r"bác sĩ có dặn",
+        r"bác sĩ nhắc",
+        r"lời dặn.*bác sĩ",
+        r"lời khuyên.*bác sĩ",
+    ],
 }
+
+# Shopping/grocery queries — FE-only mock card; not a backend intent.
+_GROCERY_PATTERNS = [
+    r"đi chợ",
+    r"siêu thị",
+    r"mua nguyên liệu",
+    r"danh sách đi chợ",
+    r"nguyên liệu cần mua",
+]
 
 
 def _classify_by_keywords(message: str) -> str:
@@ -55,6 +86,11 @@ def _classify_by_keywords(message: str) -> str:
 def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
     """Detect primary and secondary intents using keyword patterns."""
     message_lower = message.lower()
+
+    for pattern in _GROCERY_PATTERNS:
+        if re.search(pattern, message_lower):
+            return "rag_qa", []
+
     matched: list[str] = []
 
     for intent, patterns in _INTENT_PATTERNS.items():
@@ -83,11 +119,14 @@ def _classify_by_llm(message: str) -> str:
             return _classify_by_keywords(message)
 
         prompt = f"""Phân loại intent của tin nhắn bệnh nhân sau vào ĐÚNG MỘT trong các loại:
-- meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng
+- meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng, xem thực đơn tuần
 - interaction_check: hỏi về tương tác thuốc-thực phẩm
 - food_log: ghi lại bữa ăn đã ăn
-- rag_qa: câu hỏi chung về dinh dưỡng, sức khỏe
+- weekly_compliance: hỏi tỉ lệ/báo cáo tuân thủ tuần, tuân thủ gần đây
+- doctor_note: hỏi lời dặn/lời nhắc/ghi chú từ bác sĩ
+- rag_qa: câu hỏi chung về dinh dưỡng, sức khỏe, đi chợ mua gì
 - refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
+- unknown: không rõ ý định
 
 Tin nhắn: "{message}"
 

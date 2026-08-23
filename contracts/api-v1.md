@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.4 (2026-08-22 — dọn tag `[Planned]` còn sót cho các endpoint/field đã as-built từ lâu (`409 PLAN_ALREADY_REVIEWED`, `secondary_intents[]`, `constraints_status`). Xem changelog ở mục Versioning cuối file)
+**Version:** 1.6 (2026-08-23 — thêm Chat Sessions (persist lịch sử hội thoại patient trên Postgres). Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -466,6 +466,32 @@ On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `
 
 **Ngưỡng "tuân thủ thấp":** cấu hình `COMPLIANCE_LOW_THRESHOLD_PCT` trong `backend/app/core/config.py` (default `50`).
 
+### `GET /compliance/me` (as-built 2026-08-23)
+**Role:** `patient`. Tổng hợp tuân thủ của chính mình — tái dùng `ComplianceService.get_patient_compliance` và schema `PatientComplianceOut` giống `GET /doctor/patients/{patient_id}/compliance` (§10 phía trên). Dùng cho `HealthMetricsPanel` — tránh gọi chat ngầm chỉ để lấy số liệu tuân thủ.
+
+Query optional `days` (default `7`, min `1`, max `90`). `patient_id` trong response luôn = `current_user.id` — patient **không** xem được compliance của người khác.
+
+```json
+// Response 200 → PatientComplianceOut (cùng shape § GET /doctor/patients/{patient_id}/compliance)
+{
+  "patient_id": "user_uuid",
+  "days": 7,
+  "low_threshold_pct": 50,
+  "overall_adherence_pct": 92,
+  "checkins_done": 5,
+  "checkins_as_planned": 4,
+  "daily_series": [
+    { "date": "2026-08-17", "adherence_pct": 100 },
+    { "date": "2026-08-18", "adherence_pct": 80 }
+  ],
+  "events": [
+    { "type": "checkin", "severity": "", "title": "Check-in tuân thủ", "at": "2026-08-18T20:00:00+07:00" }
+  ]
+}
+```
+
+**Quan hệ với chat intent `weekly_compliance`:** cả endpoint REST và node agent đều gọi cùng `ComplianceService.get_patient_compliance(patient_id, days)` — agent trả subset qua `AgentRunOutput.weekly_compliance` (`overall_adherence_pct` + `daily_series`); REST trả full `PatientComplianceOut` (kèm `events`, `checkins_*`, v.v.).
+
 ---
 
 ## 11. Chat
@@ -475,7 +501,7 @@ On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `
 ```json
 // Request
 { "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
-// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] as-built)
+// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] as-built và field optional weekly_compliance / doctor_note as-built)
 // Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
 ```
 **Multi-intent (as-built):** `intent_classifier` phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) qua keyword pattern — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
@@ -495,11 +521,11 @@ Các sự kiện SSE emit theo định dạng `data: <JSON>\n\n`:
 | `type` | Payload | Mô tả |
 |---|---|---|
 | `status` | `{ "node": "profile_loader \| intent_classifier \| rag_qa \| meal_plan \| …", "message": "Đang tải hồ sơ..." }` | Bước xử lý đang chạy (hiển thị luồng suy nghĩ trên UI) |
-| `intent` | `{ "intent": "rag_qa \| meal_plan \| interaction_check \| refuse \| unknown" }` | Intent đã phân loại |
+| `intent` | `{ "intent": "rag_qa \| meal_plan \| interaction_check \| food_log \| weekly_compliance \| doctor_note \| refuse \| unknown" }` | Intent đã phân loại |
 | `token` | `{ "content": "..." }` | Một đoạn text câu trả lời (stream token thật cho `rag_qa`; chunk mô phỏng cho intent khác) |
 | `status` | `{ "node": "apply_guardrails", "message": "Đang kiểm tra an toàn & nguồn trích dẫn..." }` | Guardrail hậu kiểm |
 | `correction` | `{ "message": "<câu trả lời an toàn cuối>", "reason": "missing_citations \| unsafe_recommendation" }` | Chỉ emit khi guardrail thay đổi nội dung đã stream — client **thay thế** toàn bộ text đã hiển thị |
-| `done` | `{ "data": AgentRunOutput }` | Kết thúc stream; `data` cùng schema với `POST /chat` |
+| `done` | `{ "data": AgentRunOutput }` | Kết thúc stream; `data` cùng schema với `POST /chat` — khi intent `weekly_compliance`/`doctor_note`, `data.weekly_compliance` / `data.doctor_note` populated (xem `contracts/agent-io-schema.md` §5.2) |
 | `error` | `{ "message": "..." }` | Lỗi trong generator (response HTTP vẫn 200) |
 
 Ví dụ chuỗi sự kiện:
@@ -516,6 +542,108 @@ data: {"type": "done", "data": { ...AgentRunOutput }}
 
 **As-built:** `POST /chat` (sync JSON) vẫn giữ nguyên để tương thích; FE assistant ưu tiên `/chat/stream`.
 
+### Chat Sessions (persist lịch sử UI — as-built 2026-08-23)
+
+Lưu session + transcript hiển thị trên sidebar patient chat. **Không** đưa transcript vào `run_agent` — mỗi lượt `/chat` vẫn stateless.
+
+**Role:** `patient` only (doctor `403`).
+
+#### `GET /chat/sessions`
+```json
+// Response 200 → list[ChatSessionSummary]
+[
+  {
+    "id": "session_uuid",
+    "title": "Hôm nay tôi nên ăn gì?",
+    "pinned": false,
+    "message_count": 4,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T10:05:00Z"
+  }
+]
+```
+
+#### `POST /chat/sessions`
+```json
+// Request (optional)
+{ "title": "Cuộc trò chuyện mới" }
+// Response 201 → ChatSessionOut (messages=[], applied_plans={})
+```
+
+#### `GET /chat/sessions/{id}`
+```json
+// Response 200 → ChatSessionOut
+{
+  "id": "session_uuid",
+  "title": "Hôm nay tôi nên ăn gì?",
+  "pinned": false,
+  "applied_plans": { "plan_uuid": true },
+  "messages": [ /* ChatMessageOut[] */ ],
+  "created_at": "2026-08-23T10:00:00Z",
+  "updated_at": "2026-08-23T10:05:00Z"
+}
+// Error 404 { "code": "SESSION_NOT_FOUND", "detail": "Không tìm thấy cuộc trò chuyện." }
+```
+
+#### `PATCH /chat/sessions/{id}`
+```json
+// Request — ít nhất một field
+{ "title": "Tư vấn thực đơn", "pinned": true, "applied_plans": { "plan_uuid": true } }
+// Response 200 → ChatSessionOut (metadata + messages hiện tại)
+```
+
+#### `DELETE /chat/sessions/{id}`
+```json
+// Response 204 (no body)
+// Error 404 SESSION_NOT_FOUND
+```
+
+#### `DELETE /chat/sessions`
+Xóa toàn bộ session của user hiện tại.
+```json
+// Response 204 (no body)
+```
+
+#### `PUT /chat/sessions/{id}/messages`
+Thay toàn bộ mảng tin nhắn (snapshot sau khi stream `done`/`error`).
+```json
+// Request
+{
+  "messages": [
+    {
+      "id": "msg_uuid",
+      "sender": "user",
+      "text": "Hôm nay tôi nên ăn gì?"
+    },
+    {
+      "id": "msg_uuid_2",
+      "sender": "ai",
+      "text": "Dựa trên hồ sơ của bạn...",
+      "intent": "meal_plan",
+      "secondary_intents": [],
+      "citations": ["dinh_duong_dai_thao_duong.md"],
+      "guardrail_triggered": false,
+      "meal_plan_id": "plan_uuid",
+      "meal_preview": { /* MealPreviewOut */ },
+      "weekly_compliance": null,
+      "doctor_note": null,
+      "meal_plan_week": null,
+      "show_weekly_plan": false,
+      "thinking_steps": [{ "node": "profile_loader", "message": "...", "status": "done" }],
+      "corrected": false,
+      "correction_reason": null
+    }
+  ]
+}
+// Response 200 → ChatSessionOut
+```
+
+**ChatMessageOut** — field optional (snake_case):
+- `id`, `sender` ∈ `user|ai`, `text`
+- `intent`, `secondary_intents[]`, `citations[]`, `guardrail_triggered`, `meal_plan_id`
+- `meal_preview` (MealPreviewOut), `weekly_compliance` (WeeklyComplianceOut), `doctor_note` (DoctorNoteOut)
+- `meal_plan_week` (MealPlanOutput), `show_weekly_plan`, `thinking_steps[]`, `corrected`, `correction_reason`
+- **Không persist** `is_streaming` (ephemeral lúc SSE)
 
 ---
 
@@ -546,7 +674,11 @@ Theo `adrs/009-food-log-scope-strategy.md`, `specs/09-food-log-adherence.md`.
 Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracking.md`.
 
 ### `POST /metrics`
-**Role:** `patient`. Ghi entry mới + cập nhật snapshot `profiles`.
+**Role:** `patient`. Upsert entry theo ngày lịch **Asia/Ho_Chi_Minh** + cập nhật snapshot `profiles`.
+- Mỗi user tối đa **1** entry `recorded_by=patient` trong cùng ngày VN.
+- Lần ghi đầu trong ngày → insert row mới.
+- Lần ghi sau trong ngày → **cập nhật cùng row** (giữ `id`); field có trong request được ghi đè, field không gửi giữ nguyên giá trị entry hiện tại; `recorded_at` cập nhật thời điểm ghi cuối.
+- Endpoint doctor `PUT /doctor/patients/{id}/metrics` vẫn insert entry riêng mỗi lần gọi.
 ```json
 // Request (ít nhất 1 trong weight/blood_pressure/blood_glucose)
 { "weight": 71.5, "blood_pressure": "128/78 mmHg", "blood_glucose": "130 mg/dL", "note": "" }
@@ -601,7 +733,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `DoctorPatientSummary.status_key` | `attention` \| `stable` \| `warning` \| `pending` | `schemas/doctor.py` |
 | `PlanExpiryDemoRequest.mode` / `DoctorPatientSummary.plan_expiry` | `expiring` \| `expired` (request) — `expiring` \| `expired` \| `ok` \| `none` (summary field) | `schemas/doctor.py`, `services/plan_expiry.py` |
 | Meal slot (`Meal.slot`, `Swap.slot`) | `breakfast` \| `lunch` \| `dinner` \| `snack` | `schemas/meal_plan.py` — **khác** `FoodLogEntry.slot` (xem dòng dưới) |
-| Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` | `agents/nodes/intent_classifier.py::VALID_INTENTS` |
+| Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` \| `weekly_compliance` \| `doctor_note` | `agents/nodes/intent_classifier.py::VALID_INTENTS` — 2 intent cuối as-built Phase 2 |
 | `AgentRunOutput.secondary_intents[]` | cùng enum intent phía trên, dạng mảng | As-built, đáp ứng multi-intent (`intent_classifier.py`) |
 | `FoodLogEntry.type` | `as_planned` \| `custom` | `schemas/food_log.py` |
 | `FoodLogEntry.status` | `logged` \| `adjusted` | `adrs/009-food-log-scope-strategy.md` |
@@ -613,7 +745,10 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.4**.
+- Version hiện tại: **1.7**.
+- **Changelog 1.6 → 1.7 (2026-08-23):** `POST /metrics` đổi từ insert-only sang upsert 1 entry patient/ngày (Asia/Ho_Chi_Minh); lần ghi sau merge field vào cùng `id`. Không đổi request/response shape — behavior change có chủ đích cho UI ghi chỉ số hàng ngày.
+- **Changelog 1.5 → 1.6 (2026-08-23):** thêm Chat Sessions (`GET|POST /chat/sessions`, `GET|PATCH|DELETE /chat/sessions/{id}`, `DELETE /chat/sessions`, `PUT /chat/sessions/{id}/messages`) — role `patient` only; persist transcript UI + card payload trên Postgres; agent `/chat` vẫn stateless. Không breaking change cho client cũ (endpoint mới).
+- **Changelog 1.4 → 1.5 (2026-08-23):** thêm as-built `GET /compliance/me?days=7` (role `patient`, response `PatientComplianceOut`) cho patient tự xem tuân thủ — tái dùng `ComplianceService` doctor; mở rộng enum intent chat/SSE với `weekly_compliance` | `doctor_note`; tham chiếu field `AgentRunOutput.weekly_compliance` / `.doctor_note` trong §11 Chat. Đồng bộ với `contracts/agent-io-schema.md` v1.5. Không breaking change.
 - **Changelog 1.3 → 1.4 (2026-08-22):** dọn tag `[Planned]` còn sót trong body cho các mục đã as-built từ các đợt trước — `409 PLAN_ALREADY_REVIEWED` (optimistic lock review), `AgentRunOutput.secondary_intents[]`, `PatientProfile.constraints_status` (bảng Enum tham chiếu). Không đổi shape/behavior nào, chỉ sửa mô tả trạng thái cho khớp code.
 - **Changelog 1.2 → 1.3 (2026-08-17):** thêm `DELETE /metrics/{id}` (patient xóa bản ghi chỉ số của mình); response 204, lỗi 404 `METRICS_NOT_FOUND`.
 - **2026-08-18 (auth):** `POST /auth/forgot-password` gửi mật khẩu mới qua SMTP; `503 EMAIL_NOT_CONFIGURED` / `500 EMAIL_SEND_FAILED`. Rate-limit login as-built.

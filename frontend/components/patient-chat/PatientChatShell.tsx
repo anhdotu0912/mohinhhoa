@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type ReactNode } from "react";
+import React, { type ReactNode, useEffect } from "react";
 import { PatientPanelProvider, usePatientPanel, type PatientPanelKey } from "./PatientPanelProvider";
 
 // Side Panels
@@ -9,11 +9,30 @@ import { NotificationsPanel } from "./panels/NotificationsPanel";
 import { HealthMetricsPanel } from "./panels/HealthMetricsPanel";
 import { PatientChatSidebar } from "./PatientChatSidebar";
 import { usePatientChatHistoryStore } from "@/lib/patient-chat-history-store";
+import { useAuthStore } from "@/lib/auth-store";
 
 function ShellInner({ children }: { children: ReactNode }) {
-  const { activePanel, openPanel, closePanel } = usePatientPanel();
+  const { activePanel, openPanel, closePanel, hasUnseenBadge } = usePatientPanel();
+  const token = useAuthStore((s) => s.token);
   const toggleSidebar = usePatientChatHistoryStore((s) => s.toggleSidebar);
   const isSidebarOpen = usePatientChatHistoryStore((s) => s.isSidebarOpen);
+  const hydrateSessions = usePatientChatHistoryStore((s) => s.hydrateSessions);
+  const isHydrated = usePatientChatHistoryStore((s) => s.isHydrated);
+
+  useEffect(() => {
+    if (!token) {
+      usePatientChatHistoryStore.setState({
+        sessions: [],
+        activeSessionId: null,
+        isHydrated: false,
+        isLoading: false,
+      });
+      return;
+    }
+    if (!isHydrated) {
+      void hydrateSessions();
+    }
+  }, [token, isHydrated, hydrateSessions]);
 
   const handleDockClick = (key: Exclude<PatientPanelKey, null>) => {
     if (activePanel === key) {
@@ -69,8 +88,17 @@ function ShellInner({ children }: { children: ReactNode }) {
               : "text-emerald-900 hover:text-emerald-950 hover:bg-emerald-100/70 hover:scale-110 active:scale-95"
           }`}
           title="Thông báo & Cảnh báo y tế"
+          aria-label={
+            hasUnseenBadge ? "Thông báo y tế — có thông báo mới" : "Thông báo y tế"
+          }
         >
           <span className="material-symbols-outlined text-[22px]">notifications</span>
+          {hasUnseenBadge && (
+            <span
+              className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 border border-white shadow-xs pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
           <span className="absolute right-full mr-3.5 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-1 group-hover:translate-x-0 whitespace-nowrap pointer-events-none shadow-lg font-medium">
             Thông báo y tế
           </span>
@@ -113,11 +141,20 @@ function ShellInner({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => handleDockClick("notifications")}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-lg transition-colors ${
+          className={`relative flex-1 py-1.5 flex flex-col items-center justify-center rounded-lg transition-colors ${
             activePanel === "notifications" ? "text-emerald-950 font-bold bg-emerald-100/80" : "text-emerald-800 hover:bg-emerald-50"
           }`}
+          aria-label={
+            hasUnseenBadge ? "Thông báo — có thông báo mới" : "Thông báo"
+          }
         >
           <span className="material-symbols-outlined text-[22px]">notifications</span>
+          {hasUnseenBadge && (
+            <span
+              className="absolute top-1 right-[calc(50%-18px)] w-2 h-2 rounded-full bg-rose-500 border border-white shadow-xs pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
           <span className="text-[11px] mt-0.5">Thông báo</span>
         </button>
 

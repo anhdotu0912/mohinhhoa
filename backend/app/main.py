@@ -15,6 +15,7 @@ from app.api.v1 import (
     routes_alerts,
     routes_auth,
     routes_chat,
+    routes_compliance,
     routes_doctor,
     routes_food_log,
     routes_interactions,
@@ -134,6 +135,7 @@ for router in (
     routes_notifications.router,
     routes_food_log.router,
     routes_metrics.router,
+    routes_compliance.router,
     routes_doctor.router,
 ):
     app.include_router(router, prefix="/api/v1")

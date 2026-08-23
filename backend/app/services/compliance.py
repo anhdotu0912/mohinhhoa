@@ -132,6 +132,8 @@ def _food_log_calendar_date(
     plan_cache: dict[str, MealPlan | None],
     db: Session,
 ) -> date | None:
+    if log.logged_at:
+        return log.logged_at.date()
     if log.meal_plan_id and log.day_index:
         plan = plan_cache.get(log.meal_plan_id)
         if log.meal_plan_id not in plan_cache:
@@ -139,8 +141,6 @@ def _food_log_calendar_date(
             plan_cache[log.meal_plan_id] = plan
         if plan and plan.starts_on:
             return plan.starts_on + timedelta(days=log.day_index - 1)
-    if log.logged_at:
-        return log.logged_at.date()
     return None
 
 

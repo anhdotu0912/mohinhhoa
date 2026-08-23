@@ -61,6 +61,9 @@ export function RecordMetricsFormPanel({
           <div>
             <h2 className="font-bold text-lg text-slate-900">Ghi nhận chỉ số</h2>
             <p className="text-xs text-slate-500 font-medium">Nhập thông số lâm sàng mới</p>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+              Hôm nay đã ghi thì lần sau sẽ cập nhật bản ghi hiện có.
+            </p>
           </div>
         </div>
 

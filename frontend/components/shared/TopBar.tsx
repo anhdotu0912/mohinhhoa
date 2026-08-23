@@ -3,12 +3,9 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  DOCTOR_AVATAR_SRC,
-  TOPBAR_PATIENT_AVATAR_SRC,
-} from "@/lib/nav-config";
+import { DOCTOR_AVATAR_SRC } from "@/lib/nav-config";
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
-
+import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { useQueueStore } from "@/lib/queue-store";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -28,11 +25,14 @@ export function TopBar({
   const { openMobileMenu, role } = useMobileMenu();
   const { jobs, openDrawer } = useQueueStore();
   const authAvatar = useAuthStore((s) => s.avatar);
+  const displayName = useAuthStore((s) => s.displayName);
+  const email = useAuthStore((s) => s.email);
 
   const notificationsHref =
     role === "patient" ? "/patient/notifications" : "/doctor";
   const avatarSrc =
-    role === "doctor" ? DOCTOR_AVATAR_SRC : (authAvatar || TOPBAR_PATIENT_AVATAR_SRC);
+    role === "doctor" ? DOCTOR_AVATAR_SRC : resolveUserAvatar(authAvatar);
+  const avatarInitials = userInitials(displayName || email || "BN");
 
   const activeJobsCount = jobs.filter(
     (j) => j.status === "queued" || j.status === "processing"
@@ -43,13 +43,15 @@ export function TopBar({
     <header className="bg-white dark:bg-surface-container-lowest text-primary font-h2 text-h2 flex justify-between items-center h-16 px-lg w-full border-b border-outline-variant z-30 sticky top-0 shrink-0">
       <div className="flex items-center justify-between w-full gap-md">
         <div className="flex items-center gap-md min-w-0">
-          <button
-            type="button"
-            onClick={openMobileMenu}
-            className="md:hidden text-on-surface-variant hover:text-primary transition-colors mr-1 p-1 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[24px]">menu</span>
-          </button>
+          {role === "doctor" && (
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="md:hidden text-on-surface-variant hover:text-primary transition-colors mr-1 p-1 shrink-0"
+            >
+              <span className="material-symbols-outlined text-[24px]">menu</span>
+            </button>
+          )}
 
           {leftSlot ?? (
             <div className="font-bold text-primary text-base md:text-lg truncate">
@@ -112,11 +114,24 @@ export function TopBar({
                 <span className="material-symbols-outlined">settings</span>
               </button>
             )}
-            <img
-              alt="User Avatar"
-              className="w-[32px] h-[32px] rounded-full object-cover md:hidden border border-outline-variant"
-              src={avatarSrc}
-            />
+            <div className="relative w-[32px] h-[32px] rounded-full md:hidden border border-outline-variant overflow-hidden bg-primary/15 shrink-0">
+              <div
+                translate="no"
+                className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary"
+              >
+                {avatarInitials}
+              </div>
+              {avatarSrc ? (
+                <img
+                  alt="User Avatar"
+                  className="relative z-10 w-full h-full object-cover"
+                  src={avatarSrc}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>

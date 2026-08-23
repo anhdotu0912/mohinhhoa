@@ -36,10 +36,12 @@ Toàn bộ `frontend/**`.
 ### Done — Notifications (→ `specs/11`)
 - [x] `/patient/notifications` đã nối `api.listNotifications()` + mark read/dismiss/done thật (không còn 3 card tĩnh mock).
 
-### P2 (Could) — Patient home & mock cleanup
-- [ ] Nối `/patient` dashboard (`frontend/app/patient/page.tsx`) với API thật — hiện 100% static/mock, không gọi API nào.
+### Done — Patient chat-home redesign (→ `tasks/patient-chat-redesign/`)
+- [x] `/patient` là chat-home nối `api.chatStream` (Phase 1–2); mock đi chợ xoá (Phase 3).
+- [x] Dock panels + generative cards (compliance, doctor note, weekly plan) dùng API thật.
+
+### P2 (Could) — Doctor dashboard mock cleanup
 - [ ] Nối phần còn mock của `/doctor` dashboard (`frontend/app/doctor/page.tsx`) — hiện pha trộn API thật + `MOCK_PATIENTS` cho vài phần.
-- [ ] Dọn file dead code: `frontend/lib/plans-store.ts` (không còn nơi nào import).
 
 ### P3 (Could) — Auth: quên mật khẩu (→ `specs/01`)
 - [ ] Thêm màn "Quên mật khẩu" gọi `POST /auth/forgot-password` + `POST /auth/reset-password` (**backend đã Done**, cần xác nhận FE đã có UI hay chưa trước khi mở khảo sát người dùng thật).
@@ -54,7 +56,7 @@ Toàn bộ `frontend/**`.
 ### P3 (Could) — Lint debt (phát hiện 2026-08-22, xem `tasks/roadmap-mvp.md` B10)
 `npm run lint` (`"lint": "next lint"`) không chạy được kể từ khi lên Next 16 (`next lint` đã bị gỡ khỏi Next CLI) — đã sửa script sang `"lint": "eslint ."` (2026-08-22) để lint chạy được trở lại lần đầu. Kết quả: 47 lỗi + 15 warning, cần dọn dần khi có dịp sửa các trang liên quan (không bulk-fix trong 1 lần vì đụng nhiều trang đã thiết kế):
 - [ ] 47 lỗi `react-hooks/set-state-in-effect` — pattern `useEffect(() => setHydrated(true), [])` (hydration guard) lặp lại ở nhiều trang `doctor/history/*`, `doctor/patients/*`, `(auth)/reset-password`, v.v. Cách sửa khuyến nghị theo React docs: dùng `useState(() => ...)` lazy init hoặc đưa logic vào event handler thay vì effect, tuỳ từng trường hợp — cần xem từng trang, không áp dụng máy móc.
-- [ ] 15 warning `no-unused-vars`/`exhaustive-deps` rải rác (bao gồm `lib/plans-store.ts`, `lib/plan-expiry.ts`, `components/shared/RightFloatingBar.tsx`) — dọn kèm khi làm B6 (dead code cleanup).
+- [ ] 15 warning `no-unused-vars`/`exhaustive-deps` rải rác (bao gồm `lib/plan-expiry.ts`) — dọn kèm khi làm B6 (dead code cleanup). `RightFloatingBar.tsx` đã xoá Phase 3.
 
 ## Definition of Done
 - [ ] Không có request nào gọi field/endpoint không có trong `contracts/api-v1.md`.

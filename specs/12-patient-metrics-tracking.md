@@ -11,12 +11,12 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
 - Là **bác sĩ**, tôi muốn nhập hộ chỉ số cơ thể đo được tại phòng khám và để hệ thống tự tính BMI, để đảm bảo tính chính xác không phụ thuộc bệnh nhân tự tính tay.
 
 ## 3. Business rules
-1. **Lưu snapshot mới nhất trên `profiles`** — mỗi lần cập nhật cũng ghi thêm 1 row vào `body_metrics_history` (ADR-013).
+1. **Lưu snapshot mới nhất trên `profiles`** — mỗi lần cập nhật cũng ghi vào `body_metrics_history` (ADR-013). Patient `POST /metrics`: tối đa 1 row/ngày (Asia/Ho_Chi_Minh); lần ghi sau cập nhật row đó. Doctor metrics: mỗi lần gọi vẫn insert row mới.
 2. **2 cơ chế tính BMI khác nhau, có chủ đích:**
    - Patient tự nhập qua `POST /profile` → `bmi` là **giá trị patient tự khai tay**, BE **không tự tính lại**, không có validation chéo với `weight`/`height` đã nhập (patient có thể nhập bmi không khớp).
    - Doctor nhập qua `PUT /doctor/patients/{id}/metrics` → BE **tự tính lại `bmi`** từ `weight`/`height` gửi lên, kèm tự gán `bmi_category` (`Thiếu cân | Bình thường | Thừa cân nhẹ | Béo phì`, theo ngưỡng BMI **châu Á** 18.5/23/25 — không phải ngưỡng WHO chuẩn quốc tế 18.5/25/30, cần lưu ý khi so sánh với tài liệu y khoa quốc tế khác).
 3. Không có validation chặn giá trị bất thường (ví dụ `weight=0` hoặc `height=300`) ở cả 2 endpoint — trách nhiệm nhập đúng thuộc về người dùng (patient/doctor), hệ thống hiện không tự phát hiện outlier.
-4. **`POST /metrics` (patient self-tracking):** ghi entry mới vào `body_metrics_history`; ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có; `bmi` tự tính từ `weight` + `height` (height từ payload hoặc snapshot cũ).
+4. **`POST /metrics` (patient self-tracking):** upsert 1 entry/ngày VN vào `body_metrics_history` — lần đầu insert, lần sau merge field vào cùng row (field không gửi giữ nguyên); ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có; `bmi` tự tính từ `weight` + `height` (height từ payload, entry hiện tại, hoặc snapshot cũ).
 5. **`PUT /doctor/patients/{id}/metrics` (as-built):** phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 request (không cho cập nhật riêng lẻ 1 trong 2, tránh tính BMI sai do dùng giá trị cũ/thiếu ngữ cảnh) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
 
 ## 4. Luồng chính (happy path)
@@ -30,7 +30,7 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
 
 **Patient tự ghi nhận chỉ số theo thời gian:**
 1. Patient mở `/patient/history` → bấm "Ghi nhận chỉ số" → `POST /metrics`.
-2. BE tạo `BodyMetricsEntry`, cập nhật snapshot `profiles`, trả entry vừa tạo.
+2. BE upsert `BodyMetricsEntry` của ngày hôm nay (VN), cập nhật snapshot `profiles`, trả entry vừa ghi.
 3. Patient xem biểu đồ qua `GET /metrics/history?days=90`.
 
 **Xem lại (patient/doctor):**

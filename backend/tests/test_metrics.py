@@ -32,15 +32,65 @@ def test_record_metrics_requires_at_least_one_field(client):
 
 def test_metrics_history_ordered_asc(client):
     headers = _login(client, PATIENT)
-    client.post("/api/v1/metrics", json={"weight": 72.0}, headers=headers)
-    client.post("/api/v1/metrics", json={"weight": 71.5}, headers=headers)
+    first = client.post("/api/v1/metrics", json={"weight": 72.0}, headers=headers)
+    assert first.status_code == 200, first.text
+    second = client.post("/api/v1/metrics", json={"weight": 71.5}, headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["weight"] == 71.5
 
     response = client.get("/api/v1/metrics/history?days=30", headers=headers)
     assert response.status_code == 200
     points = response.json()
-    assert len(points) >= 2
+    patient_points = [p for p in points if p["recorded_by"] == "patient"]
+    assert len(patient_points) >= 1
     times = [p["recorded_at"] for p in points]
     assert times == sorted(times)
+
+
+def test_record_metrics_same_day_overwrites_entry(client):
+    headers = _login(client, PATIENT)
+    first = client.post(
+        "/api/v1/metrics",
+        json={"weight": 72.0, "blood_pressure": "120/80"},
+        headers=headers,
+    )
+    assert first.status_code == 200, first.text
+    first_id = first.json()["id"]
+
+    second = client.post(
+        "/api/v1/metrics",
+        json={"weight": 71.0},
+        headers=headers,
+    )
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["id"] == first_id
+    assert body["weight"] == 71.0
+    assert body["blood_pressure"] == "120/80"
+
+
+def test_record_metrics_same_day_merges_partial_fields(client):
+    headers = _login(client, PATIENT)
+    first = client.post(
+        "/api/v1/metrics",
+        json={"weight": 70.0, "blood_pressure": "118/76"},
+        headers=headers,
+    )
+    assert first.status_code == 200, first.text
+    first_id = first.json()["id"]
+
+    second = client.post(
+        "/api/v1/metrics",
+        json={"blood_glucose": "5.8"},
+        headers=headers,
+    )
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["id"] == first_id
+    assert body["weight"] == 70.0
+    assert body["blood_pressure"] == "118/76"
+    assert body["blood_glucose"] == "5.8"
 
 
 def test_doctor_metrics_creates_history_entry(client):

@@ -5,9 +5,9 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import { ApiError, type AgentRunOutput, type MealPreviewOut } from "@/lib/types";
+import { ApiError, type AgentRunOutput, type MealPlanOutput } from "@/lib/types";
 import { ChatThinkingSteps, ChatTypingDots, type ThinkingStep } from "@/components/patient/ChatThinkingSteps";
-import { detectMockCardIntent, type MockCardIntent } from "@/lib/patient-chat-mock-intents";
+import { isWeeklyPlanQuery } from "@/lib/patient-chat-mock-intents";
 import { usePatientPanel } from "@/components/patient-chat/PatientPanelProvider";
 import {
   usePatientChatHistoryStore,
@@ -16,20 +16,27 @@ import {
 
 // Generative-UI Cards
 import { MealSuggestionCard } from "@/components/patient-chat/cards/MealSuggestionCard";
-import { IngredientMapCard } from "@/components/patient-chat/cards/IngredientMapCard";
 import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComplianceCard";
 import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
-import { calculateAverageCompliance, MOCK_COMPLIANCE_DATA } from "@/lib/patient-chat-mock-data";
+import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
 
 export type { Message };
 
 const SAMPLE_CHIPS = [
   {
+    id: "weekly_meal",
+    title: "Thực đơn tuần này",
+    subtitle: "Xem kế hoạch dinh dưỡng 7 ngày",
+    icon: "calendar_month",
+    colorClass: "bg-emerald-50 text-[#006857]",
+    prompt: "Xem thực đơn tuần này của tôi",
+  },
+  {
     id: "meal",
     title: "Hôm nay ăn gì?",
     subtitle: "Gợi ý thực đơn cá nhân hóa",
     icon: "restaurant",
-    colorClass: "bg-emerald-50 text-[#006857]",
+    colorClass: "bg-teal-50 text-teal-700",
     prompt: "Hôm nay tôi nên ăn gì?",
   },
   {
@@ -113,6 +120,7 @@ export default function PatientChatHomePage() {
 
   const sessions = usePatientChatHistoryStore((s) => s.sessions);
   const activeSessionId = usePatientChatHistoryStore((s) => s.activeSessionId);
+  const isHydrated = usePatientChatHistoryStore((s) => s.isHydrated);
   const createNewSession = usePatientChatHistoryStore((s) => s.createNewSession);
   const saveActiveSessionMessages = usePatientChatHistoryStore((s) => s.saveActiveSessionMessages);
   const autoUpdateTitleIfFirstMessage = usePatientChatHistoryStore((s) => s.autoUpdateTitleIfFirstMessage);
@@ -122,27 +130,29 @@ export default function PatientChatHomePage() {
   const [inputQuery, setInputQuery] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [appliedPlans, setAppliedPlans] = useState<Record<string, boolean>>({});
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const messageIdCounter = useRef(0);
   const getNextMessageId = useCallback((prefix: string) => {
-    messageIdCounter.current += 1;
-    return `${prefix}-${messageIdCounter.current}`;
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }, []);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
+  const rafScrollIdRef = useRef<number | null>(null);
+  const prevActiveSessionIdRef = useRef<string | null>(null);
 
-  // Synchronize active session messages into local component state
+  // Synchronize active session messages into local component state ONLY when user changes session
   useEffect(() => {
     if (!hydrated) return;
-    const currentSession = sessions.find((s) => s.id === activeSessionId);
-    if (currentSession) {
-      setMessages(currentSession.messages || []);
-      setAppliedPlans(currentSession.appliedPlans || {});
-    } else if (!activeSessionId) {
-      setMessages([]);
-      setAppliedPlans({});
+    if (activeSessionId !== prevActiveSessionIdRef.current) {
+      prevActiveSessionIdRef.current = activeSessionId;
+      const currentSession = sessions.find((s) => s.id === activeSessionId);
+      if (currentSession) {
+        setMessages(currentSession.messages || []);
+        setAppliedPlans(currentSession.appliedPlans || {});
+      } else if (!activeSessionId) {
+        setMessages([]);
+        setAppliedPlans({});
+      }
     }
   }, [activeSessionId, hydrated, sessions]);
 
@@ -172,23 +182,41 @@ export default function PatientChatHomePage() {
     isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 150;
   }, []);
 
+  // Jitter-Free Auto-Scroll:
+  // During high-frequency SSE token streaming, use requestAnimationFrame instant pinning (0 jitter).
+  // When streaming ends or a new turn begins, use smooth scroll to settle naturally.
   useEffect(() => {
-    if (isNearBottomRef.current) {
+    if (!isNearBottomRef.current || !chatScrollRef.current) return;
+
+    if (isSending) {
+      if (rafScrollIdRef.current) cancelAnimationFrame(rafScrollIdRef.current);
+      rafScrollIdRef.current = requestAnimationFrame(() => {
+        if (chatScrollRef.current && isNearBottomRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      });
+    } else {
       scrollToBottom("smooth");
     }
-  }, [messages, scrollToBottom]);
+
+    return () => {
+      if (rafScrollIdRef.current) cancelAnimationFrame(rafScrollIdRef.current);
+    };
+  }, [messages, isSending, scrollToBottom]);
 
   const handleApplyMealPlan = useCallback((planId: string) => {
-    setAppliedPlans((prev) => {
-      const updated = { ...prev, [planId]: true };
-      saveActiveSessionMessages(messages, updated);
-      return updated;
-    });
-    setToastMessage("Đã lưu và áp dụng thực đơn!");
-    setTimeout(() => setToastMessage(null), 4000);
-  }, [messages, saveActiveSessionMessages]);
+    const updated = { ...appliedPlans, [planId]: true };
+    setAppliedPlans(updated);
+    void saveActiveSessionMessages(messages, updated);
+  }, [appliedPlans, messages, saveActiveSessionMessages]);
 
-  const mapAgentResponse = (response: AgentRunOutput): Omit<Message, "id" | "sender"> => ({
+  const mapAgentResponse = (
+    response: AgentRunOutput,
+    extras?: {
+      showWeeklyPlan?: boolean;
+      mealPlanWeek?: MealPlanOutput | null;
+    }
+  ): Omit<Message, "id" | "sender"> => ({
     text: response.message,
     intent: response.intent,
     secondaryIntents: response.secondary_intents ?? [],
@@ -196,6 +224,10 @@ export default function PatientChatHomePage() {
     guardrailTriggered: response.guardrail_triggered,
     mealPlanId: response.meal_plan_id,
     mealPreview: response.meal_preview ?? null,
+    weeklyCompliance: response.weekly_compliance ?? null,
+    doctorNote: response.doctor_note ?? null,
+    showWeeklyPlan: extras?.showWeeklyPlan ?? false,
+    mealPlanWeek: extras?.mealPlanWeek ?? null,
     isStreaming: false,
   });
 
@@ -219,13 +251,8 @@ export default function PatientChatHomePage() {
     const query = (textToSend ?? inputQuery).trim();
     if (!query || isSending) return;
 
-    let curSessionId = activeSessionId;
-    if (!curSessionId) {
-      curSessionId = createNewSession();
-    }
-    autoUpdateTitleIfFirstMessage(curSessionId, query);
-
     setInputQuery("");
+    isNearBottomRef.current = true;
 
     const userMsg: Message = {
       id: getNextMessageId("user"),
@@ -234,55 +261,8 @@ export default function PatientChatHomePage() {
     };
 
     const aiMsgId = getNextMessageId("ai");
-    const mockIntent = detectMockCardIntent(query);
 
-    // Xử lý mock card intent (Giai đoạn 1)
-    if (mockIntent) {
-      const initialMessages: Message[] = [
-        ...messages,
-        userMsg,
-        {
-          id: aiMsgId,
-          sender: "ai",
-          text: "",
-          isStreaming: true,
-          thinkingSteps: [],
-        },
-      ];
-      setMessages(initialMessages);
-      saveActiveSessionMessages(initialMessages);
-      setIsSending(true);
-
-      setTimeout(() => {
-        let aiText = "";
-        if (mockIntent === "grocery_list") {
-          aiText = "Dưới đây là các địa điểm mua sắm nguyên liệu tươi sạch gần vị trí của bạn tại Quận 3:";
-        } else if (mockIntent === "weekly_compliance") {
-          const avg = calculateAverageCompliance(MOCK_COMPLIANCE_DATA);
-          aiText = `Bạn đang duy trì phong độ rất tốt với tỉ lệ tuân thủ đạt ${avg}% tuần này.`;
-        } else if (mockIntent === "doctor_note") {
-          aiText = "Bác sĩ Minh Nguyễn đã để lại một lời nhắc quan trọng dành cho bạn:";
-        }
-
-        const finalMessages: Message[] = initialMessages.map((m) =>
-          m.id === aiMsgId
-            ? {
-                ...m,
-                text: aiText,
-                isStreaming: false,
-                mockCard: mockIntent,
-              }
-            : m
-        );
-        setMessages(finalMessages);
-        saveActiveSessionMessages(finalMessages);
-        setIsSending(false);
-      }, 400);
-
-      return;
-    }
-
-    // Luồng stream thật từ Backend (meal_plan, interaction_check, food_log, rag_qa)
+    // Hiển thị bong bóng chat và trạng thái suy nghĩ tức thì 0ms
     const initialMessages: Message[] = [
       ...messages,
       userMsg,
@@ -291,30 +271,53 @@ export default function PatientChatHomePage() {
         sender: "ai",
         text: "",
         isStreaming: true,
-        thinkingSteps: [],
+        thinkingSteps: [
+          {
+            node: "profile_loader",
+            message: "Đang tải hồ sơ bệnh nhân...",
+            status: "active",
+          },
+        ],
       },
     ];
     setMessages(initialMessages);
-    saveActiveSessionMessages(initialMessages);
     setIsSending(true);
 
+    // Đảm bảo session tồn tại mà không block render UI ban đầu
+    let curSessionId = activeSessionId;
+    if (!curSessionId) {
+      try {
+        curSessionId = await createNewSession();
+        prevActiveSessionIdRef.current = curSessionId;
+      } catch {
+        /* fallback */
+      }
+    }
+    if (curSessionId) {
+      void autoUpdateTitleIfFirstMessage(curSessionId, query);
+    }
+
     let streamingText = "";
-    let thinkingSteps: ThinkingStep[] = [];
+    let thinkingSteps: ThinkingStep[] = [
+      {
+        node: "profile_loader",
+        message: "Đang tải hồ sơ bệnh nhân...",
+        status: "active",
+      },
+    ];
 
     try {
       for await (const event of api.chatStream(query)) {
         if (event.type === "status") {
           thinkingSteps = upsertThinkingStep(thinkingSteps, event.node, event.message);
-          setMessages((prev) => {
-            const next = prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
               m.id === aiMsgId ? { ...m, thinkingSteps: [...thinkingSteps] } : m
-            );
-            saveActiveSessionMessages(next);
-            return next;
-          });
+            )
+          );
         } else if (event.type === "intent") {
-          setMessages((prev) => {
-            const next = prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
               m.id === aiMsgId
                 ? {
                     ...m,
@@ -322,22 +325,19 @@ export default function PatientChatHomePage() {
                     secondaryIntents: event.secondary_intents ?? [],
                   }
                 : m
-            );
-            saveActiveSessionMessages(next);
-            return next;
-          });
+            )
+          );
         } else if (event.type === "token") {
           streamingText += event.content;
-          setMessages((prev) => {
-            const next = prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
               m.id === aiMsgId ? { ...m, text: streamingText } : m
-            );
-            return next;
-          });
+            )
+          );
         } else if (event.type === "correction") {
           streamingText = event.message;
-          setMessages((prev) => {
-            const next = prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
               m.id === aiMsgId
                 ? {
                     ...m,
@@ -346,46 +346,53 @@ export default function PatientChatHomePage() {
                     correctionReason: event.reason,
                   }
                 : m
-            );
-            saveActiveSessionMessages(next);
-            return next;
-          });
+            )
+          );
         } else if (event.type === "done") {
-          const finalized = mapAgentResponse(event.data);
+          const isMealPlanIntent = event.data.intent === "meal_plan";
+          const showWeeklyPlan = isMealPlanIntent && isWeeklyPlanQuery(query);
+          let mealPlanWeek: MealPlanOutput | null = null;
+          if (showWeeklyPlan) {
+            try {
+              mealPlanWeek = await api.getMyMealPlan();
+            } catch {
+              mealPlanWeek = null;
+            }
+          }
+
+          const finalized = mapAgentResponse(event.data, {
+            showWeeklyPlan,
+            mealPlanWeek,
+          });
           const completedSteps = thinkingSteps.map((s) => ({
             ...s,
             status: "done" as const,
           }));
-          setMessages((prev) => {
-            const next = prev.map((m) =>
-              m.id === aiMsgId
-                ? {
-                    ...m,
-                    ...finalized,
-                    text: event.data.message,
-                    thinkingSteps: completedSteps,
-                    corrected: m.corrected,
-                    correctionReason: m.correctionReason,
-                  }
-                : m
-            );
-            saveActiveSessionMessages(next);
-            return next;
-          });
+          const finalMessages: Message[] = initialMessages.map((m) =>
+            m.id === aiMsgId
+              ? {
+                  ...m,
+                  ...finalized,
+                  text: event.data.message,
+                  thinkingSteps: completedSteps,
+                  isStreaming: false,
+                }
+              : m
+          );
+          setMessages(finalMessages);
+          void saveActiveSessionMessages(finalMessages);
         } else if (event.type === "error") {
-          setMessages((prev) => {
-            const next = prev.map((m) =>
-              m.id === aiMsgId
-                ? {
-                    ...m,
-                    text: event.message || "Đã xảy ra lỗi khi xử lý câu hỏi.",
-                    isStreaming: false,
-                  }
-                : m
-            );
-            saveActiveSessionMessages(next);
-            return next;
-          });
+          const finalMessages: Message[] = initialMessages.map((m) =>
+            m.id === aiMsgId
+              ? {
+                  ...m,
+                  text: event.message || "Đã xảy ra lỗi khi xử lý câu hỏi.",
+                  isStreaming: false,
+                }
+              : m
+          );
+          setMessages(finalMessages);
+          void saveActiveSessionMessages(finalMessages);
         }
       }
     } catch (err) {
@@ -393,13 +400,17 @@ export default function PatientChatHomePage() {
         err instanceof ApiError
           ? err.message
           : "Không thể kết nối trợ lý AI. Vui lòng thử lại sau.";
-      setMessages((prev) => {
-        const next = prev.map((m) =>
-          m.id === aiMsgId ? { ...m, text: errorMsg, isStreaming: false } : m
-        );
-        saveActiveSessionMessages(next);
-        return next;
-      });
+      const finalMessages: Message[] = initialMessages.map((m) =>
+        m.id === aiMsgId
+          ? {
+              ...m,
+              text: errorMsg,
+              isStreaming: false,
+            }
+          : m
+      );
+      setMessages(finalMessages);
+      void saveActiveSessionMessages(finalMessages);
     } finally {
       setIsSending(false);
     }
@@ -425,18 +436,10 @@ export default function PatientChatHomePage() {
     return `Chào buổi tối, ${name}`;
   };
 
-  if (!hydrated) return null;
+  if (!hydrated || !isHydrated) return null;
 
   return (
     <div className="flex-1 w-full h-full min-h-0 flex flex-col relative overflow-hidden bg-[#f8fafc]">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 bg-[#006857] text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 border border-emerald-400/40">
-          <span className="material-symbols-outlined text-[18px] text-emerald-300">check_circle</span>
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Messages Scroll Area - Full width scroll container so scrollbar is at the natural right edge */}
       <div
         ref={chatScrollRef}
@@ -447,7 +450,7 @@ export default function PatientChatHomePage() {
         <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pt-4 pb-36 flex flex-col gap-6">
           {/* Welcome State when no messages */}
           {!hasConversation && (
-            <div className="flex flex-col items-center text-center space-y-6 w-full my-auto animate-in fade-in duration-500 max-w-2xl mx-auto pt-6">
+            <div className="flex flex-col items-center text-center space-y-6 w-full my-auto animate-in fade-in duration-300 max-w-2xl mx-auto pt-6">
               {/* Robot Avatar with Glow */}
               <div className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full blur-md opacity-30 group-hover:opacity-50 transition-opacity" />
@@ -484,7 +487,7 @@ export default function PatientChatHomePage() {
                     key={chip.id}
                     type="button"
                     onClick={() => handleChipClick(chip)}
-                    className="bg-white/90 backdrop-blur-md p-3.5 rounded-xl flex items-center gap-3 hover:bg-white hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group text-left border border-slate-200/80 shadow-2xs cursor-pointer active:scale-[0.99]"
+                    className="bg-white/90 backdrop-blur-md p-3.5 rounded-xl flex items-center gap-3 hover:bg-white hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 group text-left border border-slate-200/80 shadow-2xs cursor-pointer"
                   >
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${chip.colorClass} group-hover:scale-105 transition-transform shadow-2xs`}
@@ -510,84 +513,93 @@ export default function PatientChatHomePage() {
             </div>
           )}
 
-          {/* Messages List */}
-          {hasConversation &&
-            messages.map((msg) =>
-              msg.sender === "user" ? (
-                <div key={msg.id} className="flex justify-end w-full animate-in fade-in duration-200">
-                  <div className="max-w-[80%] sm:max-w-[68%] md:max-w-[62%] ml-auto bg-[#006857] text-white rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-2xs break-words">
-                    <p className="text-sm md:text-[15px] whitespace-pre-wrap leading-relaxed break-words">
-                      {msg.text}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div key={msg.id} className="flex items-start gap-3 md:gap-3.5 w-full animate-in fade-in duration-200">
-                  {/* Bot Video Avatar */}
-                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden border border-emerald-500/30 shrink-0 mt-0.5 bg-slate-900 shadow-2xs">
-                    <video
-                      src={BOT_VIDEO_SRC}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* Bot Content (Flat, clean, content-first Gemini style) */}
-                  <div className="flex-1 min-w-0 flex flex-col gap-2">
-                    {/* Thinking Steps (Gemini Minimalist Reasoning Trigger) */}
-                    {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
-                      <ChatThinkingSteps steps={msg.thinkingSteps} />
-                    )}
-
-                    {/* Typing indicator */}
-                    {msg.isStreaming && !msg.text && (
-                      <div className="py-0.5">
-                        <ChatTypingDots />
-                      </div>
-                    )}
-
-                    {/* AI Message Text */}
-                    {msg.text && (
-                      <div className="text-[15px] leading-relaxed text-slate-800 break-words font-normal">
+          {/* Messages List with smooth transition */}
+          {hasConversation && (
+            <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {messages.map((msg) =>
+                msg.sender === "user" ? (
+                  <div key={msg.id} className="flex justify-end w-full animate-in fade-in slide-in-from-bottom-1 duration-200">
+                    <div className="max-w-[80%] sm:max-w-[68%] md:max-w-[62%] ml-auto bg-[#006857] text-white rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-2xs break-words">
+                      <p className="text-sm md:text-[15px] whitespace-pre-wrap leading-relaxed break-words">
                         {msg.text}
-                        {msg.isStreaming && (
-                          <span className="inline-block w-1.5 h-4 bg-[#006857] ml-1 animate-pulse rounded-xs align-middle" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Safety Correction Badge */}
-                    {msg.corrected && (
-                      <div className="inline-flex items-center gap-1.5 text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1 w-fit shadow-2xs mt-1">
-                        <span className="material-symbols-outlined text-[15px] text-amber-600 shrink-0">shield</span>
-                        <span>Đã điều chỉnh theo hướng dẫn an toàn y khoa (HITL)</span>
-                      </div>
-                    )}
-
-                    {/* Sub-Cards (Clean, independent with generous breathing room) */}
-                    {msg.mealPreview && msg.mealPreview.meals.length > 0 && (
-                      <MealSuggestionCard
-                        preview={msg.mealPreview}
-                        onApplyPlan={handleApplyMealPlan}
-                        isApplied={Boolean(appliedPlans[msg.mealPreview.meal_plan_id])}
-                      />
-                    )}
-
-                    {msg.mockCard === "grocery_list" && <IngredientMapCard />}
-                    {msg.mockCard === "weekly_compliance" && <WeeklyComplianceCard />}
-                    {msg.mockCard === "doctor_note" && <DoctorNoteCard />}
-
-                    {/* Citations (Gemini Dropdown Accordion) */}
-                    {msg.citations && msg.citations.length > 0 && (
-                      <CitationsAccordion citations={msg.citations} />
-                    )}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )
-            )}
+                ) : (
+                  <div key={msg.id} className="flex items-start gap-3 md:gap-3.5 w-full animate-in fade-in duration-200">
+                    {/* Bot Video Avatar */}
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden border border-emerald-500/30 shrink-0 mt-0.5 bg-slate-900 shadow-2xs">
+                      <video
+                        src={BOT_VIDEO_SRC}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {/* Bot Content (Flat, clean, content-first Gemini style) */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-2">
+                      {/* Thinking Steps (Gemini Minimalist Reasoning Trigger) */}
+                      {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                        <ChatThinkingSteps steps={msg.thinkingSteps} />
+                      )}
+
+                      {/* Typing indicator */}
+                      {msg.isStreaming && !msg.text && (
+                        <div className="py-0.5">
+                          <ChatTypingDots />
+                        </div>
+                      )}
+
+                      {/* AI Message Text */}
+                      {msg.text && (
+                        <div className="text-[15px] leading-relaxed text-slate-800 break-words font-normal">
+                          {msg.text}
+                          {msg.isStreaming && (
+                            <span className="inline-block w-1.5 h-4 bg-[#006857] ml-1 animate-pulse rounded-xs align-middle" />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Safety Correction Badge */}
+                      {msg.corrected && (
+                        <div className="inline-flex items-center gap-1.5 text-xs text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-lg px-2.5 py-1 w-fit shadow-2xs mt-1 animate-in fade-in duration-200">
+                          <span className="material-symbols-outlined text-[15px] text-amber-600 shrink-0">shield</span>
+                          <span>Đã điều chỉnh theo hướng dẫn an toàn y khoa (HITL)</span>
+                        </div>
+                      )}
+
+                      {/* Sub-Cards & Citations: CHỈ hiển thị sau khi text AI đã chạy xong hoàn toàn, từ từ trượt lên êm ái */}
+                      {!msg.isStreaming && (
+                        <div className="flex flex-col gap-3 animate-card-reveal">
+                          {msg.intent === "meal_plan" && !msg.showWeeklyPlan && (
+                            <MealSuggestionCard preview={msg.mealPreview ?? null} />
+                          )}
+
+                          {msg.showWeeklyPlan && (
+                            <WeeklyMealPlanCard plan={msg.mealPlanWeek} />
+                          )}
+                          {msg.weeklyCompliance && (
+                            <WeeklyComplianceCard data={msg.weeklyCompliance} />
+                          )}
+                          {msg.doctorNote && (
+                            <DoctorNoteCard data={msg.doctorNote} />
+                          )}
+
+                          {/* Citations (Gemini Dropdown Accordion) */}
+                          {msg.citations && msg.citations.length > 0 && (
+                            <CitationsAccordion citations={msg.citations} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
           {/* Bottom clearance cushion */}
           <div className="h-4 shrink-0" />
         </div>

@@ -1,11 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { isPlaceholderAvatar, resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { useAuthStore } from "@/lib/auth-store";
-import { TOPBAR_PATIENT_AVATAR_SRC } from "@/lib/nav-config";
 import {
   usePatientChatHistoryStore,
   groupSessionsByRecency,
@@ -22,10 +23,15 @@ export function PatientChatSidebar({
   onNewChat,
 }: PatientChatSidebarProps) {
   const router = useRouter();
+  const token = useAuthStore((s) => s.token);
   const displayName = useAuthStore((s) => s.displayName);
   const email = useAuthStore((s) => s.email);
   const avatar = useAuthStore((s) => s.avatar);
   const logout = useAuthStore((s) => s.logout);
+  const setUserProfile = useAuthStore((s) => s.setUserProfile);
+
+  const avatarSrc = resolveUserAvatar(avatar);
+  const initials = userInitials(displayName || email || "BN");
 
   const sessions = usePatientChatHistoryStore((s) => s.sessions);
   const activeSessionId = usePatientChatHistoryStore((s) => s.activeSessionId);
@@ -54,6 +60,29 @@ export function PatientChatSidebar({
   // Delete Confirm Modal State
   const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    api
+      .getCurrentUser(token)
+      .then((user) => {
+        if (cancelled) return;
+        const storedAvatar = useAuthStore.getState().avatar;
+        setUserProfile({
+          displayName: user.full_name?.trim() || user.email,
+          ...(isPlaceholderAvatar(storedAvatar)
+            ? { avatar: user.avatar ?? null }
+            : {}),
+        });
+      })
+      .catch(() => {
+        /* giữ avatar đã persist nếu API không sẵn */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, setUserProfile]);
 
   // Close context menu on outside click or escape
   useEffect(() => {
@@ -99,19 +128,21 @@ export function PatientChatSidebar({
   }, [filteredSessions]);
 
   const handleStartNewChat = () => {
-    const newId = createNewSession();
-    onNewChat?.();
-    if (window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
+    void createNewSession().then(() => {
+      onNewChat?.();
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      }
+    });
   };
 
   const handleSelectSession = (id: string) => {
-    selectSession(id);
-    onSelectSession?.(id);
-    if (window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
+    void selectSession(id).then(() => {
+      onSelectSession?.(id);
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      }
+    });
   };
 
   const handleOpenContextMenu = (e: React.MouseEvent, session: ChatSession) => {
@@ -132,20 +163,20 @@ export function PatientChatSidebar({
 
   const handleSaveRename = (id: string) => {
     if (editTitle.trim()) {
-      renameSession(id, editTitle.trim());
+      void renameSession(id, editTitle.trim());
     }
     setEditingSessionId(null);
   };
 
   const handleDeleteConfirm = () => {
     if (sessionToDelete) {
-      deleteSession(sessionToDelete.id);
+      void deleteSession(sessionToDelete.id);
       setSessionToDelete(null);
     }
   };
 
   const handleClearAllConfirm = () => {
-    clearAllSessions();
+    void clearAllSessions();
     setShowClearConfirm(false);
   };
 
@@ -361,12 +392,23 @@ export function PatientChatSidebar({
           className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/90 border border-transparent hover:border-slate-200/80 hover:shadow-2xs transition-all group cursor-pointer text-left"
           title="Xem hồ sơ sức khỏe cá nhân"
         >
-          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 group-hover:border-emerald-600 transition-colors shadow-2xs shrink-0">
-            <img
-              src={avatar || TOPBAR_PATIENT_AVATAR_SRC}
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 group-hover:border-emerald-600 transition-colors shadow-2xs shrink-0 bg-emerald-50">
+            <div
+              translate="no"
+              className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[#006857]"
+            >
+              {initials}
+            </div>
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt="Avatar"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : null}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="font-bold text-xs sm:text-[13px] text-slate-900 truncate group-hover:text-[#006857] transition-colors">
@@ -448,7 +490,7 @@ export function PatientChatSidebar({
                 <button
                   type="button"
                   onClick={() => {
-                    togglePinSession(currentSession.id);
+                    void togglePinSession(currentSession.id);
                     setMenuSessionId(null);
                   }}
                   className="w-full px-3 py-2 text-left hover:bg-slate-100 flex items-center gap-2.5 transition-colors cursor-pointer font-medium"

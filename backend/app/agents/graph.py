@@ -27,7 +27,10 @@ from app.guardrails.source_check import enforce_citation_guardrail
 from app.schemas.meal_plan import (
     AgentRunInput,
     AgentRunOutput,
+    DoctorNoteOut,
     InteractionCheckInput,
+    MealPreviewOut,
+    WeeklyComplianceOut,
 )
 from app.schemas.profile import PatientProfile
 
@@ -217,6 +220,109 @@ def food_log_node(state: AgentState) -> AgentState:
     }
 
 
+def weekly_compliance_node(state: AgentState) -> AgentState:
+    """Summarize patient weekly adherence from ComplianceService."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Không thể tải dữ liệu tuân thủ lúc này. Vui lòng thử lại sau.",
+            "weekly_compliance": None,
+        }
+
+    from app.services.compliance import ComplianceService
+
+    compliance = ComplianceService(db).get_patient_compliance(user_id, days=7)
+    weekly = WeeklyComplianceOut(
+        overall_adherence_pct=compliance.overall_adherence_pct,
+        daily_series=[
+            {"date": point.date, "adherence_pct": point.adherence_pct}
+            for point in compliance.daily_series
+        ],
+    )
+    pct = compliance.overall_adherence_pct
+    if pct is not None:
+        answer = f"Tuân thủ tuần này của bạn đạt {pct}%."
+    else:
+        answer = (
+            "Bạn chưa có dữ liệu tuân thủ tuần này. "
+            "Hãy ghi nhận bữa ăn hoặc phản hồi check-in để theo dõi tiến độ."
+        )
+
+    return {
+        **state,
+        "answer": answer,
+        "weekly_compliance": weekly.model_dump(mode="json"),
+    }
+
+
+def doctor_note_node(state: AgentState) -> AgentState:
+    """Load latest doctor reminder or meal-plan adjustment note for the patient."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Không thể tải ghi chú bác sĩ lúc này. Vui lòng thử lại sau.",
+            "doctor_note": None,
+        }
+
+    from app.models.notification import Notification
+    from app.services.meal_plan_service import resolve_patient_plan_row
+
+    reminder = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == user_id,
+            Notification.type == "manual_reminder",
+        )
+        .order_by(Notification.created_at.desc())
+        .first()
+    )
+
+    doctor_note: DoctorNoteOut | None = None
+    if reminder is not None:
+        note_text = (reminder.body or reminder.title or "").strip()
+        if note_text:
+            tags_raw = (reminder.payload or {}).get("tags", [])
+            tags = tags_raw if isinstance(tags_raw, list) else []
+            created_at = reminder.scheduled_at or reminder.created_at
+            doctor_note = DoctorNoteOut(
+                doctor_name="Bác sĩ điều trị",
+                note=note_text,
+                created_at=created_at,
+                tags=tags,
+            )
+
+    if doctor_note is None:
+        plan_row = resolve_patient_plan_row(db, user_id)
+        if plan_row is not None and plan_row.adjustment_note and plan_row.adjustment_note.strip():
+            created_at = plan_row.updated_at or plan_row.created_at
+            doctor_note = DoctorNoteOut(
+                doctor_name="Bác sĩ điều trị",
+                note=plan_row.adjustment_note.strip(),
+                created_at=created_at,
+                tags=[],
+            )
+
+    if doctor_note is None:
+        return {
+            **state,
+            "answer": "Bạn chưa có ghi chú nào từ bác sĩ gần đây.",
+            "doctor_note": None,
+        }
+
+    answer = f"{doctor_note.doctor_name} nhắc: {doctor_note.note}"
+    return {
+        **state,
+        "answer": answer,
+        "doctor_note": doctor_note.model_dump(mode="json"),
+    }
+
+
 def refuse_node(state: AgentState) -> AgentState:
     """Handle requests outside scope (e.g. change medication, prescribe)."""
     return {
@@ -267,12 +373,27 @@ def apply_guardrails(state: AgentState) -> AgentState:
 # --- Router ---
 
 def route_intent(state: AgentState) -> Literal[
-    "rag_qa", "meal_plan", "interaction_check", "food_log", "refuse", "unknown"
+    "rag_qa",
+    "meal_plan",
+    "interaction_check",
+    "food_log",
+    "weekly_compliance",
+    "doctor_note",
+    "refuse",
+    "unknown",
 ]:
     """Route to the appropriate node based on classified intent."""
     intent = state.get("intent", "unknown")
 
-    if intent in ("rag_qa", "meal_plan", "interaction_check", "food_log", "refuse"):
+    if intent in (
+        "rag_qa",
+        "meal_plan",
+        "interaction_check",
+        "food_log",
+        "weekly_compliance",
+        "doctor_note",
+        "refuse",
+    ):
         return intent
 
     return "unknown"
@@ -290,6 +411,8 @@ def build_graph() -> StateGraph:
     graph.add_node("meal_plan", meal_plan_node)
     graph.add_node("interaction_check", interaction_check_node)
     graph.add_node("food_log", food_log_node)
+    graph.add_node("weekly_compliance", weekly_compliance_node)
+    graph.add_node("doctor_note", doctor_note_node)
     graph.add_node("refuse", refuse_node)
     graph.add_node("unknown", unknown_node)
     graph.add_node("apply_guardrails", apply_guardrails)
@@ -305,6 +428,8 @@ def build_graph() -> StateGraph:
             "meal_plan": "meal_plan",
             "interaction_check": "interaction_check",
             "food_log": "food_log",
+            "weekly_compliance": "weekly_compliance",
+            "doctor_note": "doctor_note",
             "refuse": "refuse",
             "unknown": "unknown",
         },
@@ -314,6 +439,8 @@ def build_graph() -> StateGraph:
     graph.add_edge("meal_plan", "apply_guardrails")
     graph.add_edge("interaction_check", "apply_guardrails")
     graph.add_edge("food_log", "apply_guardrails")
+    graph.add_edge("weekly_compliance", "apply_guardrails")
+    graph.add_edge("doctor_note", "apply_guardrails")
     graph.add_edge("refuse", "apply_guardrails")
     graph.add_edge("unknown", "apply_guardrails")
     graph.add_edge("apply_guardrails", END)
@@ -343,6 +470,42 @@ def reset_compiled_graph() -> None:
 
 # --- Facade ---
 
+def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
+    """Map final graph state to AgentRunOutput (shared by sync and streaming paths)."""
+    meal_plan_obj = final_state.get("meal_plan")
+    meal_plan_id = final_state.get("meal_plan_id") or (
+        meal_plan_obj.id if meal_plan_obj else None
+    )
+    meal_preview_raw = final_state.get("meal_preview")
+    meal_preview = None
+    if meal_preview_raw:
+        meal_preview = MealPreviewOut(**meal_preview_raw)
+
+    weekly_compliance_raw = final_state.get("weekly_compliance")
+    weekly_compliance = None
+    if weekly_compliance_raw:
+        weekly_compliance = WeeklyComplianceOut(**weekly_compliance_raw)
+
+    doctor_note_raw = final_state.get("doctor_note")
+    doctor_note = None
+    if doctor_note_raw:
+        doctor_note = DoctorNoteOut(**doctor_note_raw)
+
+    return AgentRunOutput(
+        intent=final_state.get("intent", "unknown"),
+        secondary_intents=final_state.get("secondary_intents", []),
+        message=final_state.get("answer", ""),
+        meal_plan_id=meal_plan_id,
+        meal_preview=meal_preview,
+        food_log_id=None,
+        alert_ids=[],
+        citations=final_state.get("citations", []),
+        guardrail_triggered=bool(final_state.get("guardrail_flags")),
+        weekly_compliance=weekly_compliance,
+        doctor_note=doctor_note,
+    )
+
+
 def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
     """Run the agent graph with the given input.
 
@@ -370,6 +533,8 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         "meal_plan_id": None,
         "food_log": None,
         "interactions": None,
+        "weekly_compliance": None,
+        "doctor_note": None,
         "answer": None,
         "citations": [],
         "guardrail_flags": [],
@@ -387,25 +552,4 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
             guardrail_triggered=False,
         )
 
-    meal_plan_obj = final_state.get("meal_plan")
-    meal_plan_id = final_state.get("meal_plan_id") or (
-        meal_plan_obj.id if meal_plan_obj else None
-    )
-    meal_preview_raw = final_state.get("meal_preview")
-    meal_preview = None
-    if meal_preview_raw:
-        from app.schemas.meal_plan import MealPreviewOut
-
-        meal_preview = MealPreviewOut(**meal_preview_raw)
-
-    return AgentRunOutput(
-        intent=final_state.get("intent", "unknown"),
-        secondary_intents=final_state.get("secondary_intents", []),
-        message=final_state.get("answer", ""),
-        meal_plan_id=meal_plan_id,
-        meal_preview=meal_preview,
-        food_log_id=None,
-        alert_ids=[],
-        citations=final_state.get("citations", []),
-        guardrail_triggered=bool(final_state.get("guardrail_flags")),
-    )
+    return build_agent_run_output(final_state)
