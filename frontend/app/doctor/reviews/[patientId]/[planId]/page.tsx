@@ -966,88 +966,90 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      <main className="p-lg max-w-[1400px] pb-28">
-        <div className="mb-md flex items-center justify-between">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 pb-28">
+        <div className="flex items-center justify-between">
           <Link
             href={`/doctor/reviews/${patientId}`}
-            className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Quay lại danh sách thực đơn của {patient.name}
           </Link>
         </div>
 
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg mb-md shadow-xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-md pb-md border-b border-outline-variant">
-            <div className="flex items-center gap-md min-w-0">
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/40">
+            <div className="flex items-center gap-4 min-w-0">
               {avatarSrc ? (
                 <img
                   src={avatarSrc}
                   alt={patient.name}
-                  className="w-12 h-12 rounded-full object-cover border border-outline-variant shrink-0"
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-outline-variant/40 shrink-0"
                 />
               ) : (
                 <div
-                  className="w-12 h-12 rounded-full border border-outline-variant shrink-0 bg-primary-container/30 text-primary flex items-center justify-center text-sm font-bold"
+                  className="w-12 h-12 rounded-full ring-2 ring-primary/20 shrink-0 bg-primary/10 text-primary flex items-center justify-center text-sm font-bold"
                   aria-hidden
                 >
                   {initials(patient.name)}
                 </div>
               )}
               <div className="min-w-0">
-                <div className="flex items-center gap-xs flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-h1 text-h1 text-on-surface font-bold text-lg truncate">
                     {patient.name}
                   </h2>
-                  <span className="font-mono text-xs text-on-surface-variant">({patient.id})</span>
+                  <span className="font-mono text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">
+                    {patient.id}
+                  </span>
                 </div>
-                <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
+                <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5 font-medium">
                   Chẩn đoán: {plan.condition || "—"}
                   {plan.createdAt ? ` • Đợt tạo: ${plan.createdAt}` : ""}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-sm flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               {status === "pending" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   Chờ duyệt
                 </span>
               )}
               {status === "approved" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <span className="material-symbols-outlined text-[14px]">check_circle</span>
                   Đã duyệt
                 </span>
               )}
               {status === "edited" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200">
                   <span className="material-symbols-outlined text-[14px]">edit_note</span>
                   Đã chỉnh sửa
                 </span>
               )}
               {status === "rejected" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-800 border border-red-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200">
                   <span className="material-symbols-outlined text-[14px]">cancel</span>
                   Đã từ chối
                 </span>
               )}
               {hardWarningCount > 0 && isReviewable && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-900 border border-red-300">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-900 border border-rose-300">
                   {hardWarningCount} vi phạm lâm sàng
                 </span>
               )}
             </div>
           </div>
 
-          <div className="pt-md flex flex-col md:flex-row md:items-center justify-between gap-md">
+          <div className="pt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="font-h2 text-h2 text-on-surface font-bold text-base mb-xs">
+              <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
                 {plan.planTitle}
               </h3>
-              <p className="font-caption text-caption text-on-surface-variant text-xs">
-                Mã thực đơn: <span className="font-mono">{plan.id}</span> • Tổng số ngày:{" "}
+              <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
+                Mã thực đơn: <span className="font-mono font-semibold text-primary">{plan.id}</span> • Tổng số ngày:{" "}
                 <strong className="text-on-surface">{daysList.length} ngày</strong>
               </p>
             </div>
@@ -1055,26 +1057,28 @@ export default function PlanReviewDetailPage() {
         </div>
 
         {slotIntent && isReviewable && (
-          <div className="mb-lg p-md rounded-xl border border-primary/30 bg-primary/5 text-sm text-on-surface">
+          <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 text-sm text-on-surface shadow-2xs font-medium">
             Sau khi duyệt, thực đơn sẽ được gán vào{" "}
-            {slotIntent.slotKey === "next"
-              ? "tuần sau"
-              : slotIntent.slotKey === "current"
-                ? "tuần hiện tại"
-                : "tuần trống"}{" "}
+            <strong>
+              {slotIntent.slotKey === "next"
+                ? "tuần sau"
+                : slotIntent.slotKey === "current"
+                  ? "tuần hiện tại"
+                  : "tuần trống"}
+            </strong>{" "}
             ({slotIntent.startsOn}, 7 ngày).
           </div>
         )}
 
         {showApplyPrompt && (
-          <div className="mb-lg p-md rounded-xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-end gap-md">
+          <div className="p-5 rounded-2xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-end gap-4 shadow-2xs">
             <div className="flex-1">
-              <p className="text-sm font-semibold text-on-surface">
+              <p className="text-sm font-bold text-on-surface">
                 {slotIntent
                   ? "Áp dụng thực đơn vào lịch tuần?"
                   : "Áp dụng thực đơn từ ngày nào?"}
               </p>
-              <p className="text-xs text-on-surface-variant mt-0.5 mb-sm">
+              <p className="text-xs text-on-surface-variant mt-1 mb-3">
                 {slotIntent
                   ? `Thực đơn đã duyệt — sẽ gán từ ${applyStartDate} (7 ngày) hoặc bỏ qua để xếp lịch sau trên trang lịch sử.`
                   : suggestedSlotKey
@@ -1086,16 +1090,16 @@ export default function PlanReviewDetailPage() {
                   type="date"
                   value={applyStartDate}
                   onChange={(e) => setApplyStartDate(e.target.value)}
-                  className="rounded-lg border border-outline-variant px-sm py-xs text-sm bg-surface"
+                  className="rounded-xl border border-outline-variant/60 px-3 py-1.5 text-sm bg-surface font-mono"
                 />
               )}
             </div>
-            <div className="flex gap-xs shrink-0">
+            <div className="flex gap-2 shrink-0">
               <button
                 type="button"
                 disabled={applyingPlan}
                 onClick={() => void handleApplyAfterApprove()}
-                className="px-md py-sm rounded-lg bg-primary text-on-primary text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
               >
                 {applyingPlan ? "Đang áp dụng..." : "Áp dụng luôn"}
               </button>
@@ -1109,7 +1113,7 @@ export default function PlanReviewDetailPage() {
                       : "/doctor/reviews"
                   );
                 }}
-                className="px-md py-sm rounded-lg border border-outline-variant text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-outline-variant/60 text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Bỏ qua
               </button>
@@ -1118,9 +1122,9 @@ export default function PlanReviewDetailPage() {
         )}
 
         {daysList.length > 0 && (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-sm mb-lg shadow-2xs overflow-x-auto">
-            <div className="flex items-center gap-xs min-w-max">
-              <span className="text-xs font-bold text-on-surface-variant px-sm flex items-center gap-xs">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-3 shadow-2xs overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max">
+              <span className="text-xs font-bold text-on-surface-variant px-2 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[18px] text-primary">
                   calendar_month
                 </span>
@@ -1146,17 +1150,17 @@ export default function PlanReviewDetailPage() {
                     key={d.dayIndex}
                     type="button"
                     onClick={() => handleSelectDay(d.dayIndex)}
-                    className={`px-md py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-xs ${
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                       isDayActive
-                        ? "bg-primary text-on-primary shadow-xs font-bold"
-                        : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-variant"
+                        ? "bg-primary text-on-primary shadow-2xs font-bold"
+                        : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
                     }`}
                   >
                     <span>{d.dayName}</span>
-                    <span className="text-[10px] opacity-80">({kcalLabel} kcal)</span>
+                    <span className="text-[10px] opacity-80 tabular-nums">({kcalLabel} kcal)</span>
                     {!!dayWarnCount && (
                       <span
-                        className={`text-[10px] ${
+                        className={`text-[10px] font-bold ${
                           isDayActive ? "text-amber-100" : "text-amber-700"
                         }`}
                       >
@@ -1185,13 +1189,13 @@ export default function PlanReviewDetailPage() {
           kcalUpper={dayBand.upper}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-          <div className="lg:col-span-2 space-y-md">
-            <div className="flex items-center justify-between pb-xs border-b border-outline-variant">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/40">
               <h3 className="font-h2 text-h2 font-bold text-on-surface text-base">
                 Chi tiết khẩu phần: {currentDayData?.dayName || `Ngày ${activeDayIndex}`}
               </h3>
-              <span className="text-xs text-on-surface-variant">
+              <span className="text-xs text-on-surface-variant font-medium">
                 {breakfast.length + lunch.length + dinner.length} món ăn
               </span>
             </div>
@@ -1201,9 +1205,9 @@ export default function PlanReviewDetailPage() {
             {renderMealSection("dinner", dinner)}
           </div>
 
-          <div className="space-y-md">
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md shadow-xs">
-              <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-sm flex items-center gap-xs">
+          <div className="space-y-4">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle">
+              <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-3 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-[18px]">
                   menu_book
                 </span>
@@ -1214,16 +1218,16 @@ export default function PlanReviewDetailPage() {
                   Thực đơn này chưa có citation từ RAG.
                 </p>
               ) : (
-                <ul className="space-y-xs text-xs text-on-surface-variant">
+                <ul className="space-y-2 text-xs text-on-surface-variant">
                   {plan.citations.map((cite, idx) => (
                     <li
                       key={idx}
-                      className="flex items-start gap-xs bg-surface-container-low/40 p-2 rounded-lg border border-outline-variant/40"
+                      className="flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-xl border border-outline-variant/40 font-medium"
                     >
-                      <span className="material-symbols-outlined text-[14px] text-primary shrink-0 mt-0.5">
+                      <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
                         verified
                       </span>
-                      <span className="break-words">{cite}</span>
+                      <span className="break-words leading-relaxed">{cite}</span>
                     </li>
                   ))}
                 </ul>
@@ -1234,33 +1238,33 @@ export default function PlanReviewDetailPage() {
       </main>
 
       {isReviewable && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-surface-container-lowest/95 backdrop-blur-md border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.05)] py-2.5 px-lg">
-          <div className="max-w-[1400px] w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-sm">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] py-3 px-6 md:px-8">
+          <div className="max-w-7xl w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-3">
             {editingSlot ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto">
+              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
                 Đang chỉnh sửa bữa — bấm «Xong» hoặc «Lưu» trên bữa đó rồi mới duyệt /
                 từ chối.
               </p>
             ) : hardWarningCount > 0 ? (
-              <p className="text-xs text-red-800 sm:mr-auto">
+              <p className="text-xs text-rose-800 sm:mr-auto font-semibold">
                 Còn {hardWarningCount} vi phạm ràng buộc lâm sàng trên toàn bộ thực đơn —
                 chỉnh món đến khi hết vi phạm rồi mới duyệt được.
               </p>
             ) : dirty ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto">
+              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
                 Có thay đổi chưa lưu — sẽ được lưu khi bạn duyệt.
               </p>
             ) : status === "edited" ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto">
+              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
                 Thực đơn đã chỉnh sửa — sẵn sàng duyệt nếu không còn vi phạm lâm sàng.
               </p>
             ) : null}
-            <div className="flex items-center justify-end gap-sm">
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(true)}
                 disabled={saving || !!editingSlot}
-                className="px-md py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-xs shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[18px]">cancel</span>
                 <span>Từ chối thực đơn này</span>
@@ -1269,7 +1273,7 @@ export default function PlanReviewDetailPage() {
                 type="button"
                 onClick={() => void handleApprove()}
                 disabled={saving || !canApprove}
-                className="px-lg py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95 flex items-center gap-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-on-primary rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
                 <span>{saving ? "Đang xử lý…" : "Duyệt thực đơn này"}</span>
@@ -1280,9 +1284,9 @@ export default function PlanReviewDetailPage() {
       )}
 
       {addingToSlot && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-md">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg max-w-lg w-full shadow-2xl space-y-md max-h-[85vh] flex flex-col">
-            <div className="flex items-start justify-between gap-sm">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
+            <div className="flex items-start justify-between gap-3">
               <h4 className="font-h2 text-h2 font-bold text-on-surface text-base">
                 Thêm món vào{" "}
                 {addingToSlot === "breakfast"
@@ -1294,7 +1298,7 @@ export default function PlanReviewDetailPage() {
               <button
                 type="button"
                 onClick={closeAddDish}
-                className="text-on-surface-variant hover:text-on-surface cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
                 aria-label="Đóng"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -1302,7 +1306,7 @@ export default function PlanReviewDetailPage() {
             </div>
 
             <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
                 search
               </span>
               <input
@@ -1311,11 +1315,11 @@ export default function PlanReviewDetailPage() {
                 onChange={(e) => setFoodQuery(e.target.value)}
                 placeholder="Tìm món trong catalog (vd: ức gà, cơm lứt…)"
                 autoFocus
-                className="w-full pl-9 pr-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs focus:outline-none focus:border-primary"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
               />
             </div>
 
-            <p className="text-[11px] text-on-surface-variant">
+            <p className="text-[11px] text-on-surface-variant font-medium">
               {foodLoading
                 ? "Đang tải danh sách món…"
                 : foodError
@@ -1323,9 +1327,9 @@ export default function PlanReviewDetailPage() {
                   : `Hiển thị ${foodResults.length}/${foodTotal} món từ database`}
             </p>
 
-            <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant rounded-xl divide-y divide-outline-variant/60 max-h-[50vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/60 rounded-2xl divide-y divide-outline-variant/40 max-h-[50vh]">
               {!foodLoading && foodResults.length === 0 ? (
-                <p className="text-xs text-on-surface-variant italic p-md">
+                <p className="text-xs text-on-surface-variant italic p-6 text-center">
                   Không tìm thấy món phù hợp.
                 </p>
               ) : (
@@ -1337,11 +1341,11 @@ export default function PlanReviewDetailPage() {
                       key={food.id}
                       type="button"
                       onClick={() => handlePickFood(food)}
-                      className="w-full text-left px-md py-sm hover:bg-surface-container-low transition-colors cursor-pointer"
+                      className="w-full text-left px-4 py-3 hover:bg-surface-container-low/60 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-start justify-between gap-sm">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-on-surface break-words">
+                          <p className="text-xs font-bold text-on-surface break-words">
                             {food.name}
                           </p>
                           <p className="text-[11px] text-on-surface-variant mt-0.5">
@@ -1349,7 +1353,7 @@ export default function PlanReviewDetailPage() {
                             {food.category ? ` · ${food.category}` : ""}
                           </p>
                         </div>
-                        <div className="text-right shrink-0 text-[11px] text-on-surface-variant">
+                        <div className="text-right shrink-0 text-[11px] text-on-surface-variant font-medium tabular-nums">
                           <p className="font-bold text-on-surface">
                             {Math.round(food.kcal)} kcal
                           </p>
@@ -1362,11 +1366,11 @@ export default function PlanReviewDetailPage() {
               )}
             </div>
 
-            <div className="flex justify-end pt-xs border-t border-outline-variant">
+            <div className="flex justify-end pt-3 border-t border-outline-variant/40">
               <button
                 type="button"
                 onClick={closeAddDish}
-                className="px-md py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-low cursor-pointer"
+                className="px-4 py-2 border border-outline-variant/60 rounded-xl text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -1376,8 +1380,8 @@ export default function PlanReviewDetailPage() {
       )}
 
       {rejectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-md">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg max-w-md w-full shadow-2xl space-y-md">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-4 animate-scaleUp overflow-hidden">
             <h4 className="font-h2 text-h2 font-bold text-on-surface text-base">
               Lý do từ chối thực đơn
             </h4>
@@ -1385,13 +1389,13 @@ export default function PlanReviewDetailPage() {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Nhập lý do hoặc chỉ dẫn điều chỉnh…"
-              className="w-full p-md bg-surface-container-low border border-outline-variant rounded-xl text-xs h-28 focus:outline-none focus:border-primary"
+              className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs h-28 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
             />
-            <div className="flex justify-end gap-sm pt-xs border-t border-outline-variant">
+            <div className="flex justify-end gap-3 pt-3 border-t border-outline-variant/40">
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(false)}
-                className="px-md py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-low cursor-pointer"
+                className="px-4 py-2 border border-outline-variant/60 rounded-xl text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -1399,7 +1403,7 @@ export default function PlanReviewDetailPage() {
                 type="button"
                 onClick={() => void handleRejectConfirm()}
                 disabled={!rejectReason.trim() || saving}
-                className="px-md py-2 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
               >
                 {saving ? "Đang gửi…" : "Xác nhận từ chối"}
               </button>
@@ -1424,19 +1428,19 @@ function DishRow({
 }) {
   const alts = item.alternatives || [];
   return (
-    <div className="p-sm bg-surface-container-low/50 rounded-xl text-xs space-y-xs">
-      <div className="flex items-center justify-between gap-sm">
-        <span className="font-medium text-on-surface font-body break-words min-w-0">
+    <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-xs space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-bold text-on-surface font-body break-words min-w-0 text-xs">
           {item.name}
         </span>
-        <div className="flex items-center gap-md text-on-surface-variant shrink-0">
-          <span className="tabular-nums font-semibold text-on-surface">{item.calories} kcal</span>
-          <span>Muối: {item.salt}g</span>
+        <div className="flex items-center gap-3 text-on-surface-variant shrink-0 font-medium">
+          <span className="tabular-nums font-bold text-on-surface">{item.calories} kcal</span>
+          <span className="tabular-nums">Muối: {item.salt}g</span>
           {isEditing && (
             <button
               type="button"
               onClick={onRemove}
-              className="text-red-500 hover:text-red-700 ml-xs p-1"
+              className="text-rose-500 hover:text-rose-700 ml-1 p-1 rounded-lg hover:bg-rose-50 transition-colors"
               aria-label={`Xóa ${item.name}`}
             >
               <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1445,7 +1449,7 @@ function DishRow({
         </div>
       </div>
       {alts.length > 0 && (
-        <div className="flex flex-wrap items-center gap-xs pl-1">
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-outline-variant/30">
           <span className="text-[10px] uppercase font-bold text-on-surface-variant">
             Thay thế:
           </span>
@@ -1455,7 +1459,7 @@ function DishRow({
               type="button"
               onClick={() => onSwap(alt)}
               disabled={!isEditing}
-              className="px-2 py-0.5 rounded-full border border-outline-variant text-[11px] text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-60 disabled:cursor-default"
+              className="px-2.5 py-0.5 rounded-full border border-outline-variant/60 text-[11px] font-medium text-on-surface-variant hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default shadow-2xs"
               title={`${alt.calories} kcal`}
             >
               {alt.name}

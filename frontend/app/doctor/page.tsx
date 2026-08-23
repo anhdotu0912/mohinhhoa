@@ -271,27 +271,27 @@ export default function DoctorDashboardPage() {
         </div>
       )}
 
-      <main className="p-lg w-full">
+      <main className="p-6 md:p-8 w-full max-w-7xl mx-auto space-y-8">
         {/* Summary Cards (3 columns) */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-lg mb-section-gap">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Card 1 */}
           <Link
             href="/doctor/patients"
-            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs flex items-center gap-md transition-all hover:shadow-md hover:border-primary/50 group cursor-pointer"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-secondary group-hover:bg-primary-container group-hover:text-primary transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
               <span
-                className="material-symbols-outlined"
+                className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 group
               </span>
             </div>
             <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-xs">
+              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
                 Tổng bệnh nhân
               </p>
-              <p className="font-h1 text-h1 text-on-surface group-hover:text-primary transition-colors">
+              <p className="font-h1 text-h1 text-on-surface text-2xl font-bold group-hover:text-primary transition-colors tabular-nums">
                 {patientSummaries.length}
               </p>
             </div>
@@ -300,68 +300,71 @@ export default function DoctorDashboardPage() {
           {/* Card 2 */}
           <Link
             href="/doctor/reviews"
-            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs flex items-center gap-md transition-all hover:shadow-md hover:border-tertiary/50 group cursor-pointer relative overflow-hidden"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-amber-500/40 group cursor-pointer relative overflow-hidden"
           >
-            <div className="w-12 h-12 rounded-lg bg-tertiary-fixed flex items-center justify-center text-tertiary group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
               <span
-                className="material-symbols-outlined"
+                className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 pending_actions
               </span>
             </div>
             <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-xs">
+              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
                 Cần duyệt kế hoạch
               </p>
-              <p className="font-h1 text-h1 text-on-surface font-bold">
+              <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
                 {pendingPlans.length}
               </p>
             </div>
-            <div className="absolute top-0 right-0 w-1.5 h-full bg-tertiary-fixed-dim"></div>
+            <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>
           </Link>
 
           {/* Card 3 */}
           <Link
             href="/doctor/patients?status=attention"
-            className="bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs flex items-center gap-md transition-all hover:shadow-md hover:border-error/50 group cursor-pointer relative overflow-hidden"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-rose-500/40 group cursor-pointer relative overflow-hidden"
           >
-            <div className="w-12 h-12 rounded-lg bg-error-container flex items-center justify-center text-error group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0">
               <span
-                className="material-symbols-outlined"
+                className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 warning
               </span>
             </div>
             <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-xs">
+              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
                 Cảnh báo lâm sàng
               </p>
-              <p className="font-h1 text-h1 text-error font-bold">
+              <p className="font-h1 text-h1 text-rose-600 text-2xl font-bold tabular-nums">
                 {attentionSummaries.length}
               </p>
             </div>
-            <div className="absolute top-0 right-0 w-1.5 h-full bg-error"></div>
+            <div className="absolute top-0 right-0 w-1.5 h-full bg-rose-500"></div>
           </Link>
         </section>
 
         {/* Main Section (1:1 ratio) */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-lg mb-section-gap">
-          {/* Left Col (1/2 width) - Bệnh nhân cần chú ý */}
-          <div className="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden flex flex-col">
-            <div className="p-card-padding border-b border-outline-variant bg-surface flex justify-between items-center">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Col - Bệnh nhân cần chú ý */}
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
-                <h3 className="font-h2 text-h2 text-on-surface font-semibold">
+                <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-rose-600 text-[20px]">
+                    error_outline
+                  </span>
                   Danh sách bệnh nhân cần chú ý
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Các bệnh nhân có chỉ số bất thường hoặc biến động gần đây
+                  Các bệnh nhân có chỉ số bất thường hoặc cảnh báo gần đây
                 </p>
               </div>
               <Link
                 href="/doctor/patients"
-                className="text-primary font-body-bold hover:underline text-sm cursor-pointer flex items-center gap-0.5"
+                className="text-primary font-body-bold hover:underline text-xs cursor-pointer flex items-center gap-0.5 font-semibold"
               >
                 <span>Xem tất cả</span>
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
@@ -370,33 +373,33 @@ export default function DoctorDashboardPage() {
             <div className="flex-1 overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[550px]">
                 <thead>
-                  <tr className="bg-surface-container-low border-b border-outline-variant">
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                  <tr className="bg-surface-container-low/50 border-b border-outline-variant/40">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Bệnh nhân
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Chỉ số biến động
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Trạng thái
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-right">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-right">
                       Hành động
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant font-body text-body">
+                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
                   {attentionPatients.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-lg text-center text-on-surface-variant">
-                        <span className="material-symbols-outlined text-[32px] text-emerald-500 mb-xs">
+                      <td colSpan={4} className="p-8 text-center text-on-surface-variant">
+                        <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
                           check_circle
                         </span>
-                        <p className="font-body-bold text-sm">
+                        <p className="font-body-bold text-sm font-bold">
                           Không có bệnh nhân nào cần chú ý
                         </p>
                         <p className="text-xs text-on-surface-variant mt-0.5">
-                          Mọi bệnh nhân hiện đều ổn định.
+                          Mọi bệnh nhân hiện đều ở trạng thái ổn định.
                         </p>
                       </td>
                     </tr>
@@ -407,18 +410,18 @@ export default function DoctorDashboardPage() {
                           ? assetUrl(patient.avatar)
                           : "";
                       return (
-                        <tr key={patient.id} className="hover:bg-surface-bright transition-colors">
-                          <td className="p-md">
-                            <div className="flex items-center gap-sm">
+                        <tr key={patient.id} className="hover:bg-surface-container-low/40 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
                               <div className="relative w-9 h-9 shrink-0">
-                                <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                                <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
                                   <span translate="no" className="notranslate">{initials(patient.name)}</span>
                                 </div>
                                 {avatar && (
                                   <img
                                     src={avatar}
                                     alt={patient.name}
-                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                     onError={(e) => {
                                       e.currentTarget.style.display = "none";
                                     }}
@@ -426,7 +429,7 @@ export default function DoctorDashboardPage() {
                                 )}
                               </div>
                               <div>
-                                <span className="font-body-bold text-on-surface block text-sm font-semibold">
+                                <span className="font-body-bold text-on-surface block text-sm font-bold">
                                   {patient.name}
                                 </span>
                                 <span className="text-xs text-on-surface-variant font-mono">
@@ -435,22 +438,22 @@ export default function DoctorDashboardPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-md text-on-surface-variant text-sm">
+                          <td className="px-5 py-3.5 text-on-surface-variant text-xs font-medium">
                             {patient.bloodSugar ? `Đường huyết (${patient.bloodSugar})` : patient.condition}
                           </td>
-                          <td className="p-md">
+                          <td className="px-5 py-3.5">
                             <span
-                              className={`inline-flex items-center px-2.5 py-1 rounded-full font-caption text-xs font-semibold ${patient.statusColor}`}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${patient.statusColor}`}
                             >
                               {patient.status}
                             </span>
                           </td>
-                          <td className="p-md text-right">
+                          <td className="px-5 py-3.5 text-right">
                             <Link
                               href={`/doctor/patients/${patient.id}`}
-                              className="inline-flex items-center gap-1 h-8 px-md bg-surface-container-lowest border border-primary text-primary font-body-bold rounded-lg hover:bg-primary hover:text-on-primary transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold"
+                              className="inline-flex items-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-xl hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold"
                             >
-                              <span>Xem chi tiết</span>
+                              <span>Chi tiết</span>
                               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                             </Link>
                           </td>
@@ -463,32 +466,32 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
 
-          {/* Right Col (1/2 width) - Biểu đồ tuân thủ dinh dưỡng */}
-          <div className="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs p-card-padding flex flex-col justify-between">
+          {/* Right Col - Biểu đồ tuân thủ dinh dưỡng */}
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle p-5 flex flex-col justify-between">
             <div>
               {/* Header & Controls */}
-              <div className="border-b border-outline-variant pb-sm mb-md flex items-start justify-between">
+              <div className="border-b border-outline-variant/40 pb-3 mb-4 flex items-start justify-between">
                 <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-semibold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-emerald-600 text-[20px]">
+                  <h3 className="font-h2 text-h2 text-on-surface font-bold flex items-center gap-2 text-base">
+                    <span className="material-symbols-outlined text-primary text-[22px]">
                       monitoring
                     </span>
                     Tuân thủ dinh dưỡng
                   </h3>
                   <p className="font-caption text-caption text-on-surface-variant mt-0.5 text-xs">
-                    Tỷ lệ tuân thủ thực đơn trung bình
+                    Tỷ lệ tuân thủ thực đơn trung bình của bệnh nhân
                   </p>
                 </div>
                 {/* Timeframe Selector */}
-                <div className="flex bg-surface-container-low rounded-lg p-0.5 border border-outline-variant">
+                <div className="flex bg-surface-container-low rounded-full p-1 border border-outline-variant/40">
                   <button
                     onClick={() => {
                       setTimeframe("this_week");
                       setHoveredDay(null);
                     }}
-                    className={`px-2 py-1 text-[11px] rounded-md transition-all font-semibold cursor-pointer ${
+                    className={`px-3 py-1 text-xs rounded-full transition-all font-semibold cursor-pointer ${
                       timeframe === "this_week"
-                        ? "bg-surface-container-lowest text-primary shadow-2xs"
+                        ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                         : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
@@ -499,9 +502,9 @@ export default function DoctorDashboardPage() {
                       setTimeframe("last_week");
                       setHoveredDay(null);
                     }}
-                    className={`px-2 py-1 text-[11px] rounded-md transition-all font-semibold cursor-pointer ${
+                    className={`px-3 py-1 text-xs rounded-full transition-all font-semibold cursor-pointer ${
                       timeframe === "last_week"
-                        ? "bg-surface-container-lowest text-primary shadow-2xs"
+                        ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                         : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
@@ -511,16 +514,16 @@ export default function DoctorDashboardPage() {
               </div>
 
               {/* Stat Summary Box */}
-              <div className="mb-md p-sm bg-emerald-50/60 border border-emerald-200/80 rounded-lg flex items-center justify-between">
+              <div className="mb-4 p-3.5 bg-primary/5 border border-primary/20 rounded-2xl flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-emerald-800 font-medium block">Trung bình tuần</span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold text-emerald-900">
+                  <span className="text-xs text-primary font-semibold block">Trung bình tuần</span>
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
+                    <span className="text-2xl font-bold text-on-surface tabular-nums">
                       {avgCompliance !== null ? `${avgCompliance}%` : "—"}
                     </span>
                     {trendDelta !== null && (
                       <span
-                        className={`text-[11px] font-semibold flex items-center ${
+                        className={`text-xs font-bold flex items-center tabular-nums ${
                           trendDelta >= 0 ? "text-emerald-700" : "text-rose-700"
                         }`}
                       >
@@ -534,10 +537,12 @@ export default function DoctorDashboardPage() {
                   </div>
                 </div>
                 <span
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold shadow-2xs ${
+                  className={`px-3 py-1 rounded-full text-xs font-bold shadow-2xs ${
                     avgCompliance === null
                       ? "bg-surface-container text-on-surface-variant"
-                      : "bg-emerald-600 text-white"
+                      : avgCompliance >= 75
+                        ? "bg-emerald-600 text-white"
+                        : "bg-amber-500 text-white"
                   }`}
                 >
                   {avgCompliance === null
@@ -551,113 +556,113 @@ export default function DoctorDashboardPage() {
               {/* Interactive Bar Chart */}
               <div className="relative pt-6 pb-2 min-h-[220px] flex flex-col justify-end">
                 {!hasChartData ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-on-surface-variant py-lg">
-                    <span className="material-symbols-outlined text-[32px] text-on-surface-variant/60 mb-xs">
+                  <div className="flex-1 flex flex-col items-center justify-center text-on-surface-variant py-8">
+                    <span className="material-symbols-outlined text-[36px] text-outline/40 mb-1">
                       bar_chart
                     </span>
-                    <p className="text-sm font-body-bold">Chưa có dữ liệu tuân thủ</p>
+                    <p className="text-sm font-bold">Chưa có dữ liệu tuân thủ</p>
                     <p className="text-xs mt-0.5 text-center max-w-[220px]">
                       Cần bệnh nhân ghi nhận Food Log để hiển thị biểu đồ.
                     </p>
                   </div>
                 ) : (
                   <>
-                {/* Benchmark Target Line (80%) */}
-                <div
-                  className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-end pr-1 pointer-events-none"
-                  style={{ bottom: "calc(26px + 120px * 0.8)" }}
-                >
-                  <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-300">
-                    Chỉ tiêu 80%
-                  </span>
-                </div>
+                    {/* Benchmark Target Line (80%) */}
+                    <div
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-end pr-1 pointer-events-none"
+                      style={{ bottom: "calc(26px + 120px * 0.8)" }}
+                    >
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                        Chỉ tiêu 80%
+                      </span>
+                    </div>
 
-                {/* Y-axis grid line 50% */}
-                <div
-                  className="absolute left-0 right-0 border-b border-gray-200/70 z-0 pointer-events-none"
-                  style={{ bottom: "calc(26px + 120px * 0.5)" }}
-                ></div>
+                    {/* Y-axis grid line 50% */}
+                    <div
+                      className="absolute left-0 right-0 border-b border-outline-variant/30 z-0 pointer-events-none"
+                      style={{ bottom: "calc(26px + 120px * 0.5)" }}
+                    ></div>
 
-                {/* Bars Container */}
-                <div className="w-full flex items-end justify-between px-1 z-10 gap-1.5">
-                  {chartData.map((item) => {
-                    const isHigh = item.rate >= 80;
-                    const isMedium = item.rate >= 60 && item.rate < 80;
+                    {/* Bars Container */}
+                    <div className="w-full flex items-end justify-between px-2 z-10 gap-2">
+                      {chartData.map((item) => {
+                        const isHigh = item.rate >= 80;
+                        const isMedium = item.rate >= 60 && item.rate < 80;
 
-                    let barBg = "bg-rose-500 hover:bg-rose-600";
-                    let textBg = "text-rose-700";
-                    if (isHigh) {
-                      barBg = "bg-emerald-500 hover:bg-emerald-600";
-                      textBg = "text-emerald-700";
-                    } else if (isMedium) {
-                      barBg = "bg-amber-500 hover:bg-amber-600";
-                      textBg = "text-amber-700";
-                    }
+                        let barBg = "bg-rose-500 hover:bg-rose-600";
+                        let textBg = "text-rose-700";
+                        if (isHigh) {
+                          barBg = "bg-primary hover:bg-primary/90";
+                          textBg = "text-primary";
+                        } else if (isMedium) {
+                          barBg = "bg-amber-500 hover:bg-amber-600";
+                          textBg = "text-amber-700";
+                        }
 
-                    return (
-                      <div
-                        key={item.day}
-                        className="flex-1 flex flex-col items-center group relative cursor-pointer"
-                        onMouseEnter={() => setHoveredDay(item)}
-                        onMouseLeave={() => setHoveredDay(null)}
-                      >
-                        {/* Hover Tooltip Popup */}
-                        {hoveredDay?.day === item.day && (
-                          <div className="absolute bottom-full mb-2 z-30 w-44 bg-gray-900 text-white text-xs p-2.5 rounded-xl shadow-xl border border-gray-700 backdrop-blur-md animate-fadeIn pointer-events-none">
-                            <div className="flex justify-between items-center border-b border-gray-700 pb-1 mb-1 font-semibold">
-                              <span>Thứ ({item.day}) - {item.date}</span>
-                              <span className={item.rate >= 80 ? "text-emerald-400" : "text-amber-400"}>
-                                {item.rate}%
-                              </span>
-                            </div>
-                            <div className="space-y-0.5 text-[11px] text-gray-300">
-                              <p>Bữa ăn: <strong className="text-white">{item.meals}</strong></p>
-                              <p>Calo đạt: <strong className="text-white">{item.calories}</strong></p>
-                              <p>Muối đạt: <strong className="text-white">{item.salt}</strong></p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Value Text Above Bar */}
-                        <span className={`text-[10px] font-bold mb-1 ${textBg}`}>
-                          {item.rate}%
-                        </span>
-
-                        {/* Bar Track (Explicit height 120px to allow percentage heights) */}
-                        <div className="w-full h-[120px] flex items-end justify-center">
+                        return (
                           <div
-                            className={`w-full max-w-[28px] rounded-t-md transition-all duration-300 ${barBg} ${
-                              hoveredDay?.day === item.day ? "scale-105 shadow-md" : ""
-                            }`}
-                            style={{ height: `${item.rate}%` }}
-                          ></div>
-                        </div>
+                            key={item.day}
+                            className="flex-1 flex flex-col items-center group relative cursor-pointer"
+                            onMouseEnter={() => setHoveredDay(item)}
+                            onMouseLeave={() => setHoveredDay(null)}
+                          >
+                            {/* Hover Tooltip Popup */}
+                            {hoveredDay?.day === item.day && (
+                              <div className="absolute bottom-full mb-2 z-30 w-44 bg-surface-container-lowest text-on-surface text-xs p-3 rounded-2xl shadow-xl border border-outline-variant/60 backdrop-blur-md animate-fadeIn pointer-events-none">
+                                <div className="flex justify-between items-center border-b border-outline-variant/40 pb-1 mb-1 font-bold">
+                                  <span>Thứ ({item.day}) - {item.date}</span>
+                                  <span className={item.rate >= 80 ? "text-primary" : "text-amber-700"}>
+                                    {item.rate}%
+                                  </span>
+                                </div>
+                                <div className="space-y-0.5 text-[11px] text-on-surface-variant">
+                                  <p>Bữa ăn: <strong className="text-on-surface">{item.meals}</strong></p>
+                                  <p>Calo đạt: <strong className="text-on-surface">{item.calories}</strong></p>
+                                  <p>Muối đạt: <strong className="text-on-surface">{item.salt}</strong></p>
+                                </div>
+                              </div>
+                            )}
 
-                        {/* X-axis Day Label */}
-                        <span className="mt-1.5 text-[11px] font-semibold text-on-surface-variant">
-                          {item.day}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                            {/* Value Text Above Bar */}
+                            <span className={`text-[10px] font-bold mb-1 tabular-nums ${textBg}`}>
+                              {item.rate}%
+                            </span>
+
+                            {/* Bar Track */}
+                            <div className="w-full h-[120px] flex items-end justify-center">
+                              <div
+                                className={`w-full max-w-[28px] rounded-t-lg transition-all duration-300 ${barBg} ${
+                                  hoveredDay?.day === item.day ? "scale-105 shadow-md" : ""
+                                }`}
+                                style={{ height: `${item.rate}%` }}
+                              ></div>
+                            </div>
+
+                            {/* X-axis Day Label */}
+                            <span className="mt-1.5 text-xs font-semibold text-on-surface-variant">
+                              {item.day}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </>
                 )}
               </div>
             </div>
 
             {/* Legend & Link */}
-            <div className="pt-sm border-t border-outline-variant mt-sm">
-              <div className="flex items-center justify-between text-[11px] text-on-surface-variant mb-2">
-                <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <div className="pt-3 border-t border-outline-variant/40 mt-3">
+              <div className="flex items-center justify-between text-xs text-on-surface-variant mb-3 font-medium">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
                   Đạt (≥80%)
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                   TB (60-79%)
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
                   Kém (&lt;60%)
                 </span>
@@ -665,7 +670,7 @@ export default function DoctorDashboardPage() {
 
               <Link
                 href="/doctor/patients/compliance"
-                className="w-full py-1.5 bg-surface-container-low hover:bg-surface-container border border-outline-variant text-on-surface font-body-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1 font-semibold"
+                className="w-full py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-on-surface font-body-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 font-semibold"
               >
                 <span>Xem báo cáo tuân thủ chi tiết</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -676,11 +681,11 @@ export default function DoctorDashboardPage() {
 
         {/* Bottom Section - Kế hoạch chờ duyệt mới nhất */}
         <section>
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs">
-            <div className="p-card-padding border-b border-outline-variant bg-surface flex justify-between items-center rounded-t-xl">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
+            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
-                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-sm font-semibold">
-                  <span className="material-symbols-outlined text-tertiary">
+                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
+                  <span className="material-symbols-outlined text-amber-600 text-[20px]">
                     assignment
                   </span>
                   Kế hoạch chờ duyệt mới nhất
@@ -692,20 +697,20 @@ export default function DoctorDashboardPage() {
 
               <Link
                 href="/doctor/reviews"
-                className="text-primary text-xs font-semibold hover:underline flex items-center gap-0.5"
+                className="text-primary text-xs font-bold hover:underline flex items-center gap-0.5"
               >
                 <span>Xem tất cả ({pendingPlans.length})</span>
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
               </Link>
             </div>
 
-            <div className="p-md space-y-sm">
+            <div className="p-5 space-y-3">
               {pendingPlans.length === 0 ? (
-                <div className="p-lg text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-xs">
+                <div className="p-8 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
                     check_circle
                   </span>
-                  <p className="font-body-bold text-sm">Hiện không có kế hoạch nào chờ duyệt</p>
+                  <p className="font-body-bold text-sm font-bold">Hiện không có kế hoạch nào chờ duyệt</p>
                   <p className="text-xs text-on-surface-variant mt-0.5">
                     Tất cả các thực đơn đã được xem xét hoặc phê duyệt.
                   </p>
@@ -714,32 +719,32 @@ export default function DoctorDashboardPage() {
                 visiblePendingPlans.map((plan) => (
                   <div
                     key={plan.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md border border-outline-variant rounded-xl bg-surface hover:bg-surface-bright transition-colors gap-md"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
                   >
-                    <div className="flex items-center gap-md">
-                      <div className="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary font-body-bold shrink-0 font-bold">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-sm shrink-0">
                         <span translate="no" className="notranslate">{plan.patientName.charAt(0)}</span>
                       </div>
                       <div>
-                        <div className="flex items-center gap-xs">
-                          <p className="font-body-bold text-on-surface font-semibold text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-body-bold text-on-surface font-bold text-sm">
                             {plan.patientName}
                           </p>
                           <span className="font-mono text-xs text-on-surface-variant">
                             ({plan.patientCode})
                           </span>
                         </div>
-                        <p className="text-xs text-on-surface font-medium text-primary mt-0.5 line-clamp-1">
+                        <p className="text-xs font-semibold text-primary mt-0.5 line-clamp-1">
                           {plan.planTitle}
                         </p>
-                        <div className="flex items-center gap-md font-caption text-on-surface-variant mt-xs text-xs">
-                          <span className="flex items-center gap-[2px]">
+                        <div className="flex items-center gap-3 font-caption text-on-surface-variant mt-1 text-xs">
+                          <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-[14px]">
                               restaurant_menu
                             </span>{" "}
                             {plan.condition}
                           </span>
-                          <span className="flex items-center gap-[2px]">
+                          <span className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-[14px]">
                               calendar_today
                             </span>{" "}
@@ -749,10 +754,10 @@ export default function DoctorDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-sm shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-sm sm:pt-0 border-outline-variant/50">
+                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-outline-variant/30">
                       <Link
                         href={`/doctor/reviews/${plan.patientId}/${plan.id}`}
-                        className="h-8 px-md bg-surface-container-lowest border border-outline-variant text-on-surface-variant font-body-bold rounded-lg hover:bg-surface-container-low hover:text-primary transition-colors text-xs flex items-center gap-1 cursor-pointer font-semibold"
+                        className="h-8 px-3.5 bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant font-body-bold rounded-xl hover:bg-surface-container-low hover:text-primary transition-all text-xs flex items-center gap-1 cursor-pointer font-semibold"
                       >
                         <span className="material-symbols-outlined text-[16px]">visibility</span>
                         <span>Xem trước</span>
@@ -762,7 +767,7 @@ export default function DoctorDashboardPage() {
                         onClick={() =>
                           handleQuickApprove(plan.id, plan.planTitle)
                         }
-                        className="h-8 px-md bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary-container hover:text-on-primary-container transition-all text-xs shadow-xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
+                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-xl hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
                       >
                         <span className="material-symbols-outlined text-[16px]">check</span>
                         <span>Duyệt nhanh</span>
@@ -776,12 +781,12 @@ export default function DoctorDashboardPage() {
         </section>
 
         {/* Cảnh báo thực đơn hết hạn */}
-        <section className="mt-section-gap">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs">
-            <div className="p-card-padding border-b border-outline-variant bg-surface flex justify-between items-center rounded-t-xl">
+        <section>
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
+            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
-                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-sm font-semibold">
-                  <span className="material-symbols-outlined text-tertiary">
+                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
+                  <span className="material-symbols-outlined text-amber-600 text-[20px]">
                     event_busy
                   </span>
                   Cảnh báo thực đơn hết hạn
@@ -792,12 +797,12 @@ export default function DoctorDashboardPage() {
               </div>
 
               {!isProduction && (
-                <div className="flex items-center gap-sm shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => void handleDemoExpiry("expiring")}
                     disabled={demoBusy}
-                    className="px-md py-1.5 border border-outline-variant rounded-lg text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                    className="px-3 py-1.5 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
                     title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
                   >
                     <span className="material-symbols-outlined text-[16px]">schedule</span>
@@ -807,7 +812,7 @@ export default function DoctorDashboardPage() {
                     type="button"
                     onClick={() => void handleDemoExpiry("expired")}
                     disabled={demoBusy}
-                    className="px-md py-1.5 border border-outline-variant rounded-lg text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                    className="px-3 py-1.5 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
                     title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
                   >
                     <span className="material-symbols-outlined text-[16px]">event_busy</span>
@@ -818,14 +823,14 @@ export default function DoctorDashboardPage() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center gap-md px-md border-b border-outline-variant/60">
+            <div className="flex items-center gap-3 px-5 border-b border-outline-variant/30 pt-2">
               <button
                 type="button"
                 onClick={() => setExpiryTab("expiring")}
-                className={`font-label text-label pb-sm pt-sm px-sm border-b-2 transition-all cursor-pointer ${
+                className={`font-label text-label pb-2.5 pt-1 px-3 border-b-2 transition-all cursor-pointer text-xs ${
                   expiryTab === "expiring"
                     ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface font-medium"
                 }`}
               >
                 Sắp ăn xong ({expiringPatients.length})
@@ -833,23 +838,23 @@ export default function DoctorDashboardPage() {
               <button
                 type="button"
                 onClick={() => setExpiryTab("expired")}
-                className={`font-label text-label pb-sm pt-sm px-sm border-b-2 transition-all cursor-pointer ${
+                className={`font-label text-label pb-2.5 pt-1 px-3 border-b-2 transition-all cursor-pointer text-xs ${
                   expiryTab === "expired"
                     ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface font-medium"
                 }`}
               >
                 Đã ăn xong ({expiredPatients.length})
               </button>
             </div>
 
-            <div className="p-md space-y-sm">
+            <div className="p-5 space-y-3">
               {expiryList.length === 0 ? (
-                <div className="p-lg text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-xs">
+                <div className="p-8 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
                     {expiryTab === "expiring" ? "upcoming" : "check_circle"}
                   </span>
-                  <p className="font-body-bold text-sm">
+                  <p className="font-body-bold text-sm font-bold">
                     {expiryTab === "expiring"
                       ? "Không có bệnh nhân nào sắp ăn xong thực đơn"
                       : "Không có bệnh nhân nào hết hạn thực đơn"}
@@ -864,18 +869,17 @@ export default function DoctorDashboardPage() {
                 expiryList.map((p) => (
                   <div
                     key={p.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md border border-outline-variant rounded-xl bg-surface hover:bg-surface-bright transition-colors gap-md"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
                   >
-                    <div className="flex items-center gap-md">
-                      {/* Avatar — chuẩn theo trang /doctor/patients */}
-                      <div className="relative w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-xs shrink-0">
                         <span translate="no" className="notranslate">{initials(p.name)}</span>
                         {p.avatar &&
                           !p.avatar.startsWith("https://api.dicebear.com") && (
                           <img
                             src={assetUrl(p.avatar)}
                             alt={p.name}
-                            className="absolute inset-0 w-10 h-10 rounded-full object-cover border border-outline-variant bg-surface-container"
+                            className="absolute inset-0 w-10 h-10 rounded-full object-cover ring-2 ring-outline-variant/40"
                             onError={(e) => {
                               e.currentTarget.style.display = "none";
                             }}
@@ -883,8 +887,8 @@ export default function DoctorDashboardPage() {
                         )}
                       </div>
                       <div>
-                        <div className="flex items-center gap-xs">
-                          <p className="font-body-bold text-on-surface font-semibold text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-body-bold text-on-surface font-bold text-sm">
                             {p.name}
                           </p>
                           <span className="font-mono text-xs text-on-surface-variant">
@@ -897,14 +901,14 @@ export default function DoctorDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-sm shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+                    <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                       {p.plan_expiry === "expiring" ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                           Còn {p.plan_days_left ?? "?"} ngày (đến {p.plan_end_date ?? "—"})
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                           <span className="material-symbols-outlined text-[14px]">
                             event_busy
                           </span>
@@ -914,7 +918,7 @@ export default function DoctorDashboardPage() {
 
                       <Link
                         href={`/doctor/patients/${encodeURIComponent(p.id)}/generate`}
-                        className="h-8 px-md bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary-container transition-all text-xs shadow-xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
+                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-xl hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
                       >
                         <span className="material-symbols-outlined text-[16px]">
                           auto_awesome

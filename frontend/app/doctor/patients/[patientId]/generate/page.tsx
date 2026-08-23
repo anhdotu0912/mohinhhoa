@@ -265,23 +265,23 @@ export default function DoctorGenerateMealPlanPage() {
     <>
       <TopBar title="Tạo thực đơn mới bằng AI" />
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {slotIntentLabel && (
-          <div className="mb-md p-md rounded-xl border border-primary/30 bg-primary/5 text-sm text-on-surface">
-            <span className="material-symbols-outlined text-primary text-[18px] align-middle mr-xs">
+          <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 text-sm text-on-surface font-medium shadow-2xs">
+            <span className="material-symbols-outlined text-primary text-[18px] align-middle mr-1.5">
               event_available
             </span>
             {slotIntentLabel}
           </div>
         )}
-        <div className="mb-md flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <Link
             href={
               slotIntent
                 ? `/doctor/history/${patient.id}`
                 : `/doctor/patients/${patient.id}`
             }
-            className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             {slotIntent ? "Quay lại Lịch sử tuần" : "Quay lại Hồ sơ bệnh nhân"}
@@ -289,16 +289,16 @@ export default function DoctorGenerateMealPlanPage() {
         </div>
 
         {activeJob && (
-          <div className="mb-md flex flex-col sm:flex-row sm:items-center justify-between gap-sm p-md rounded-xl border border-primary/30 bg-primary/5">
-            <div className="flex items-start gap-sm min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border border-primary/30 bg-primary/5 shadow-2xs">
+            <div className="flex items-start gap-3 min-w-0">
               <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">
                 hourglass_top
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-on-surface">
+                <p className="text-sm font-bold text-on-surface">
                   Đang có job trong hàng đợi tạo thực đơn AI
                 </p>
-                <p className="text-xs text-on-surface-variant mt-0.5">
+                <p className="text-xs text-on-surface-variant mt-0.5 font-medium">
                   Trạng thái:{" "}
                   {activeJob.status === "processing" ? "Đang xử lý" : "Đang chờ"} — có thể
                   theo dõi tiến trình trên trang hàng đợi.
@@ -307,7 +307,7 @@ export default function DoctorGenerateMealPlanPage() {
             </div>
             <Link
               href="/doctor/patients/queue"
-              className="shrink-0 inline-flex items-center justify-center gap-xs px-md py-sm rounded-lg bg-primary text-on-primary text-xs font-semibold hover:opacity-90"
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer active:scale-95"
             >
               Mở hàng đợi
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -315,49 +315,51 @@ export default function DoctorGenerateMealPlanPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
-          <div className="lg:col-span-7 bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs flex flex-col justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle flex flex-col justify-between space-y-6">
             <div>
-              <div className="flex items-center gap-sm pb-md border-b border-outline-variant mb-lg">
-                <span className="material-symbols-outlined text-primary text-2xl">
-                  auto_awesome
-                </span>
+              <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/40 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-[24px]">
+                    auto_awesome
+                  </span>
+                </div>
                 <div>
-                  <h2 className="font-h2 text-h2 text-on-surface font-semibold text-base">
+                  <h2 className="font-h2 text-h2 text-on-surface font-bold text-base">
                     Thiết lập yêu cầu cho AI Agent
                   </h2>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
                     AI sinh 1 thực đơn 7 ngày, mỗi món kèm lựa chọn thay thế cho {patient.name}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-lg">
+              <div className="space-y-6">
                 <div>
-                  <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
+                  <label className="font-label text-label text-on-surface block mb-1.5 font-bold text-xs uppercase tracking-wider">
                     Số ngày mỗi thực đơn bao phủ
                   </label>
-                  <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant rounded-xl gap-1">
+                  <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant/60 rounded-xl gap-1">
                     <button
                       type="button"
-                      className="px-md py-sm rounded-lg text-xs font-semibold bg-primary text-on-primary shadow-xs"
+                      className="px-4 py-1.5 rounded-lg text-xs font-bold bg-primary text-on-primary shadow-2xs"
                     >
                       7 ngày (Khuyến nghị)
                     </button>
-                    <span className="px-md py-sm rounded-lg text-xs text-on-surface-variant/50">
+                    <span className="px-4 py-1.5 rounded-lg text-xs text-on-surface-variant/50 font-medium">
                       3 ngày
                     </span>
-                    <span className="px-md py-sm rounded-lg text-xs text-on-surface-variant/50">
+                    <span className="px-4 py-1.5 rounded-lg text-xs text-on-surface-variant/50 font-medium">
                       14 ngày
                     </span>
                   </div>
-                  <p className="text-[11px] text-on-surface-variant mt-xs">
+                  <p className="text-[11px] text-on-surface-variant mt-1.5 font-medium">
                     MVP cố định 7 ngày theo contract.
                   </p>
                 </div>
 
                 <div>
-                  <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
+                  <label className="font-label text-label text-on-surface block mb-1 font-bold text-xs uppercase tracking-wider">
                     Món thay thế
                   </label>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
@@ -367,10 +369,10 @@ export default function DoctorGenerateMealPlanPage() {
                 </div>
 
                 <div>
-                  <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
+                  <label className="font-label text-label text-on-surface block mb-2 font-bold text-xs uppercase tracking-wider">
                     Ưu tiên đặc biệt
                   </label>
-                  <div className="flex flex-wrap gap-xs">
+                  <div className="flex flex-wrap gap-2">
                     {PRIORITY_OPTIONS.map((item) => {
                       const isSelected = selectedPriorities.includes(item);
                       return (
@@ -378,10 +380,10 @@ export default function DoctorGenerateMealPlanPage() {
                           key={item}
                           type="button"
                           onClick={() => togglePriority(item)}
-                          className={`px-md py-sm rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-xs ${
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${
                             isSelected
-                              ? "bg-primary/10 border-primary text-primary"
-                              : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:border-primary/50"
+                              ? "bg-primary text-on-primary border-primary"
+                              : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
                           }`}
                         >
                           {isSelected && (
@@ -394,10 +396,10 @@ export default function DoctorGenerateMealPlanPage() {
                     <button
                       type="button"
                       onClick={() => setIsCustomPriorityActive(!isCustomPriorityActive)}
-                      className={`px-md py-sm rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-xs ${
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${
                         isCustomPriorityActive
-                          ? "bg-primary/10 border-primary text-primary"
-                          : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:border-primary/50"
+                          ? "bg-primary text-on-primary border-primary"
+                          : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
                       }`}
                     >
                       {isCustomPriorityActive && (
@@ -407,20 +409,20 @@ export default function DoctorGenerateMealPlanPage() {
                     </button>
                   </div>
                   {isCustomPriorityActive && (
-                    <div className="mt-xs">
+                    <div className="mt-2">
                       <input
                         type="text"
                         value={customPriorityText}
                         onChange={(e) => setCustomPriorityText(e.target.value)}
                         placeholder="Nhập ưu tiên đặc biệt khác..."
-                        className="w-full p-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-body text-on-surface focus:outline-none focus:border-primary transition-all shadow-xs"
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
+                  <label className="font-label text-label text-on-surface block mb-1.5 font-bold text-xs uppercase tracking-wider">
                     Ghi chú bổ sung cho AI Agent
                   </label>
                   <textarea
@@ -428,17 +430,17 @@ export default function DoctorGenerateMealPlanPage() {
                     onChange={(e) => setAiNotes(e.target.value)}
                     rows={3}
                     placeholder="Ví dụ: ưu tiên món hấp luộc miền Bắc, hạn chế đồ chiên xào..."
-                    className="w-full p-md bg-surface-container-lowest border border-outline-variant rounded-lg font-body text-body text-on-surface focus:outline-none focus:border-primary text-sm transition-shadow"
+                    className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-xl font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="pt-lg border-t border-outline-variant mt-lg">
+            <div className="pt-6 border-t border-outline-variant/40 mt-6">
               <button
                 onClick={handleStartGeneration}
                 disabled={enqueueing}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-body-bold py-md px-lg rounded-lg transition-colors shadow-xs active:scale-[0.99] flex items-center justify-center gap-sm text-sm font-bold cursor-pointer"
+                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-on-primary font-bold py-3 px-6 rounded-xl transition-all shadow-2xs active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">
                   {activeJob ? "queue" : "playlist_add"}
@@ -449,40 +451,40 @@ export default function DoctorGenerateMealPlanPage() {
                     : "Thêm vào hàng đợi tạo thực đơn AI"}
                 </span>
               </button>
-              <p className="text-[11px] text-on-surface-variant text-center mt-xs">
+              <p className="text-[11px] text-on-surface-variant text-center mt-2 font-medium">
                 Vì thời gian sinh thực đơn khá lâu, job sẽ chạy trong hàng đợi — bạn có thể
                 chuyển tab / làm việc khác.
               </p>
             </div>
           </div>
 
-          <div className="lg:col-span-5 space-y-md">
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs">
-              <div className="flex justify-between items-center pb-sm border-b border-outline-variant mb-md">
-                <h3 className="font-h2 text-h2 text-on-surface font-semibold text-sm flex items-center gap-xs">
+          <div className="lg:col-span-5 space-y-6">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+              <div className="flex justify-between items-center pb-3 border-b border-outline-variant/40 mb-4">
+                <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">person</span>
                   Tóm tắt bệnh nhân
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsSelectModalOpen(true)}
-                  className="px-sm py-1 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-lg text-xs font-semibold text-primary flex items-center gap-xs transition-colors cursor-pointer active:scale-95"
+                  className="px-3 py-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-xl text-xs font-bold text-primary flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                   Thay đổi
                 </button>
               </div>
-              <div className="space-y-sm text-xs">
-                <div className="flex items-center gap-sm min-w-0">
+              <div className="space-y-3 text-xs">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="relative w-10 h-10 shrink-0">
-                    <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                    <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
                       {initials(patient.name)}
                     </div>
                     {patient.avatar && (
                       <img
                         src={patient.avatar}
                         alt={patient.name}
-                        className="absolute inset-0 w-10 h-10 rounded-full object-cover border border-outline-variant bg-surface-container"
+                        className="absolute inset-0 w-10 h-10 rounded-full object-cover ring-2 ring-outline-variant/40 bg-surface-container"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                         }}
@@ -491,41 +493,41 @@ export default function DoctorGenerateMealPlanPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-on-surface truncate">{patient.name}</p>
-                    <p className="text-on-surface-variant text-[11px] truncate" title={patient.id}>
-                      {patient.age} tuổi • {patient.gender} • ID: {truncatePatientId(patient.id)}
+                    <p className="text-on-surface-variant text-[11px] truncate font-medium" title={patient.id}>
+                      {patient.age} tuổi • {patient.gender} • ID: <span className="font-mono text-primary font-semibold">{truncatePatientId(patient.id)}</span>
                     </p>
                   </div>
                 </div>
                 <div>
-                  <span className="text-on-surface-variant block mb-1">Chẩn đoán:</span>
-                  <span className="px-sm py-1 bg-tertiary-container/30 text-tertiary font-semibold rounded-full text-[11px] inline-block border border-tertiary/20">
+                  <span className="text-on-surface-variant block mb-1 font-semibold text-[11px] uppercase tracking-wider">Chẩn đoán:</span>
+                  <span className="px-3 py-1 bg-primary/10 text-primary font-bold rounded-full text-xs inline-block border border-primary/20">
                     {patient.condition}
                   </span>
                 </div>
                 {summary && (
-                  <>
-                    <p className="text-on-surface-variant">
-                      Mục tiêu: <strong className="text-on-surface">{summary.target_kcal} kcal</strong>
+                  <div className="space-y-1.5 pt-2 border-t border-outline-variant/30 text-on-surface-variant">
+                    <p>
+                      Mục tiêu: <strong className="text-on-surface tabular-nums">{summary.target_kcal} kcal</strong>
                     </p>
-                    <p className="text-on-surface-variant">
+                    <p>
                       Dị ứng: {summary.allergies.length ? summary.allergies.join(", ") : "—"}
                     </p>
-                    <p className="text-on-surface-variant">
+                    <p>
                       Thuốc: {summary.medications.length ? summary.medications.join(", ") : "—"}
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-card-padding shadow-xs">
-              <div className="flex justify-between items-center pb-sm border-b border-outline-variant mb-md">
-                <h3 className="font-h2 text-h2 text-on-surface font-semibold text-sm flex items-center gap-xs">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+              <div className="flex justify-between items-center pb-3 border-b border-outline-variant/40 mb-3">
+                <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">gavel</span>
                   Quy tắc sinh thực đơn
                 </h3>
               </div>
-              <div className="space-y-xs text-xs text-on-surface-variant leading-relaxed">
+              <div className="space-y-2 text-xs text-on-surface-variant leading-relaxed font-medium">
                 <p>• 1 thực đơn 7 ngày, status chờ duyệt.</p>
                 <p>• Mỗi món kèm 1–2 món thay thế cùng nhóm.</p>
                 <p>• Job chạy tuần tự trong hàng đợi (FIFO).</p>
@@ -537,33 +539,33 @@ export default function DoctorGenerateMealPlanPage() {
       </main>
 
       {isSelectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-outline-variant shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden animate-scaleUp">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-outline-variant/40 shrink-0">
               <div>
-                <h3 className="text-sm font-bold text-on-surface">Chọn bệnh nhân để tạo thực đơn AI</h3>
+                <h3 className="text-base font-bold text-on-surface">Chọn bệnh nhân để tạo thực đơn AI</h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   {filteredPatients.length} bệnh nhân
                 </p>
               </div>
               <button
                 onClick={() => setIsSelectModalOpen(false)}
-                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-lg"
+                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-xl hover:bg-surface-container-low transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="px-5 py-3 shrink-0">
+            <div className="px-6 py-3 shrink-0">
               <input
                 type="text"
                 value={patientSearch}
                 onChange={(e) => setPatientSearch(e.target.value)}
                 placeholder="Tìm theo tên, mã, hoặc bệnh lý..."
-                className="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs"
+                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                 autoFocus
               />
             </div>
-            <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-2">
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-3">
               {filteredPatients.map((p) => (
                 <PatientCard
                   key={p.id}
