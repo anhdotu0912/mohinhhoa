@@ -106,6 +106,8 @@ export default function DoctorPatientHistoryPage() {
   const [compliance, setCompliance] = useState<PatientComplianceOut | null>(null);
   const [selectedStartsOn, setSelectedStartsOn] = useState<string | null>(null);
   const [previewPlanId, setPreviewPlanId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "day">("grid");
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(1);
 
   useEffect(() => {
     setHydrated(true);
@@ -208,6 +210,11 @@ export default function DoctorPatientHistoryPage() {
     return map;
   }, [compliance]);
 
+  const todayIso = useMemo(
+    () => schedule?.today ?? formatDateIso(new Date()),
+    [schedule?.today]
+  );
+
   const weekStart = useMemo(() => {
     const fromSlot = parseFlexibleDate(selectedSlot?.starts_on);
     if (fromSlot) return fromSlot;
@@ -219,14 +226,23 @@ export default function DoctorPatientHistoryPage() {
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = shiftDays(weekStart, i);
+      const isoDate = formatDateIso(d);
       return {
         dayIndex: i + 1,
         fullDayName: WEEKDAY_FULL[d.getDay()],
-        isoDate: formatDateIso(d),
+        isoDate,
         shortDate: formatDateShort(d),
+        isToday: isoDate === todayIso,
       };
     });
-  }, [weekStart]);
+  }, [weekStart, todayIso]);
+
+  useEffect(() => {
+    const todayEntry = weekDays.find((d) => d.isToday);
+    if (todayEntry) {
+      setSelectedDayIdx(todayEntry.dayIndex);
+    }
+  }, [weekDays]);
 
   const weekEnd = useMemo(() => shiftDays(weekStart, 6), [weekStart]);
 
@@ -304,24 +320,17 @@ export default function DoctorPatientHistoryPage() {
   const handleResetCurrentWeek = () => {
     const current = displaySlots.find((slot) => slot.slot_key === "current");
     if (current) setSelectedStartsOn(current.starts_on);
+    const todayDay = weekDays.find((d) => d.isToday);
+    if (todayDay) setSelectedDayIdx(todayDay.dayIndex);
   };
 
   const handleSelectSlot = (slot: MealPlanScheduleSlot) => {
     setSelectedStartsOn(slot.starts_on);
-    requestAnimationFrame(() => {
-      document.getElementById("meal-week-grid")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
   };
 
-  const handleHeaderClick = () => {
-    if (selectedEntry && patientId) {
-      router.push(
-        `/doctor/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(selectedEntry.plan.id)}`
-      );
-    }
+  const handleDaySelect = (dayIndex: number) => {
+    setSelectedDayIdx(dayIndex);
+    setViewMode("day");
   };
 
   if (!hydrated || !token || role !== "doctor") {
@@ -332,7 +341,7 @@ export default function DoctorPatientHistoryPage() {
     return (
       <>
         <TopBar title="Lịch sử thực đơn" />
-        <main className="p-lg text-sm text-on-surface-variant">
+        <main className="p-6 text-sm text-on-surface-variant max-w-[1440px] mx-auto">
           Đang tải lịch sử thực đơn…
         </main>
       </>
@@ -343,15 +352,15 @@ export default function DoctorPatientHistoryPage() {
     return (
       <>
         <TopBar title="Lịch sử thực đơn" />
-        <main className="p-lg max-w-[1440px]">
+        <main className="p-6 max-w-[1440px] mx-auto">
           <Link
             href="/doctor/history"
-            className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline mb-md"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline mb-4"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Quay lại danh sách
           </Link>
-          <div className="bg-red-50 border border-red-200 rounded-xl p-lg text-red-800 text-sm">
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-rose-800 text-sm">
             {loadError || "Không tìm thấy bệnh nhân."}
           </div>
         </main>
@@ -367,15 +376,19 @@ export default function DoctorPatientHistoryPage() {
       }
     : null;
 
+  const currentDayData = selectedEntry ? getDayMealByIndex(selectedEntry.plan, selectedDayIdx) : null;
+  const currentWeekDayMeta = weekDays[selectedDayIdx - 1];
+
   return (
     <>
       <TopBar title={`Lịch sử thực đơn — ${patient.name}`} />
 
-      <main className="p-lg max-w-[1440px]">
-        <div className="mb-md flex items-center justify-between flex-wrap gap-sm">
+      <main className="p-6 max-w-[1440px] mx-auto">
+        {/* Top bar back link */}
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
           <Link
             href="/doctor/history"
-            className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Quay lại danh sách bệnh nhân
@@ -383,18 +396,18 @@ export default function DoctorPatientHistoryPage() {
           <PlanExpiryBadge expiry={selectedExpiryFields} />
         </div>
 
-        {/* Patient header */}
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg mb-md flex flex-col md:flex-row md:items-center justify-between gap-md shadow-xs">
-          <div className="flex items-center gap-md">
+        {/* Patient Profile Header Card */}
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-4">
             <div className="relative w-14 h-14 shrink-0">
-              <div className="w-14 h-14 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-lg">
+              <div className="w-14 h-14 rounded-2xl bg-primary/15 text-primary flex items-center justify-center font-bold text-xl ring-2 ring-primary/20">
                 {patient.name.charAt(0)}
               </div>
               {patient.avatar && (
                 <img
                   src={patient.avatar}
                   alt={patient.name}
-                  className="absolute inset-0 w-14 h-14 rounded-full object-cover border border-outline-variant"
+                  className="absolute inset-0 w-14 h-14 rounded-2xl object-cover border border-outline-variant"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                   }}
@@ -402,19 +415,19 @@ export default function DoctorPatientHistoryPage() {
               )}
             </div>
             <div>
-              <div className="flex items-center gap-sm flex-wrap">
-                <h2 className="font-h1 text-h1 text-on-surface font-bold text-xl">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-h1 text-xl font-bold text-on-surface">
                   {patient.name}
                 </h2>
-                <span className="font-mono bg-surface-container-high px-2 py-0.5 rounded-md text-xs font-semibold text-on-surface-variant">
+                <span className="font-mono bg-surface-container-high px-2.5 py-0.5 rounded-full text-xs font-semibold text-on-surface-variant">
                   {patient.id}
                 </span>
                 {selectedEntry && (
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-caption text-xs font-semibold border ${
+                    className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold border ${
                       selectedEntry.plan.status === "pending"
-                        ? "bg-amber-50 text-amber-900 border-amber-200"
-                        : "bg-primary-container/20 text-primary border-primary-container/30"
+                        ? "bg-amber-500/10 text-amber-900 border-amber-500/20"
+                        : "bg-emerald-500/15 text-emerald-900 border-emerald-500/30"
                     }`}
                   >
                     {selectedEntry.plan.status === "pending"
@@ -427,11 +440,12 @@ export default function DoctorPatientHistoryPage() {
                 )}
               </div>
               <p className="text-xs text-on-surface-variant mt-1">
-                {patient.age} tuổi • {patient.gender} • {patient.condition}
+                {patient.age} tuổi • {patient.gender} • <span className="font-medium text-on-surface">{patient.condition}</span>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-sm flex-wrap">
+
+          <div className="flex items-center gap-2 flex-wrap">
             {selectedEntry?.plan.status === "pending" && patientId && selectedSlot && (
               <Link
                 href={buildReviewHref(
@@ -442,7 +456,7 @@ export default function DoctorPatientHistoryPage() {
                 onClick={() =>
                   saveSlotIntent(intentFromSlot(patientId, selectedSlot, "add"))
                 }
-                className="bg-amber-600 hover:bg-amber-700 text-white font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-2xs transition-all cursor-pointer"
+                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">assignment_turned_in</span>
                 Duyệt thực đơn
@@ -450,7 +464,7 @@ export default function DoctorPatientHistoryPage() {
             )}
             <Link
               href={buildHistoryGenerateHref(patientId!, schedule)}
-              className="bg-primary hover:bg-primary-container text-on-primary font-body-bold px-md py-2 rounded-lg text-xs font-semibold flex items-center gap-xs shadow-2xs transition-all cursor-pointer"
+              className="bg-primary hover:bg-primary/90 text-on-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
               Tạo thực đơn AI mới
@@ -458,6 +472,7 @@ export default function DoctorPatientHistoryPage() {
           </div>
         </div>
 
+        {/* 3-Week Schedule Section */}
         {schedule && (
           <MealPlanScheduleTable
             patientId={patientId!}
@@ -471,263 +486,497 @@ export default function DoctorPatientHistoryPage() {
           />
         )}
 
+        {/* Weekly Content & View Controller */}
         {selectedSlot && (
-          <div id="meal-week-grid">
-            {/* Stats bar */}
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md mb-section-gap shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
-              <div className="px-sm py-xs flex items-center gap-md">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-on-surface-variant block">
-                    Tuân thủ check-in tuần
-                  </span>
-                  <span className="font-h1 text-xl font-bold text-emerald-900">
-                    {weeklyStats.adherencePct != null
-                      ? `${weeklyStats.adherencePct}%`
-                      : "Chưa có dữ liệu"}
-                  </span>
-                </div>
-              </div>
-              <div className="px-sm py-xs flex items-center gap-md">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">grain</span>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-on-surface-variant block">
-                    Natri kế hoạch TB
-                  </span>
-                  <span className="font-h1 text-xl font-bold text-on-surface">
-                    {weeklyStats.avgSalt}g
-                  </span>
-                  {summary.salt_daily_g != null && (
-                    <span className="text-[11px] text-on-surface-variant ml-1">
-                      / mục tiêu {summary.salt_daily_g}g
+          <div id="meal-week-grid" className="space-y-6">
+            {/* Unified Weekly Toolbar & KPI Summary */}
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 shadow-xs">
+              {/* Controls row */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-4 border-b border-outline-variant/50">
+                {/* Week selector buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handlePrevWeek}
+                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                    Tuần trước
+                  </button>
+                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary/10 border border-primary/25 rounded-xl text-primary font-bold text-xs">
+                    <span className="material-symbols-outlined text-primary text-[18px]">
+                      calendar_month
                     </span>
-                  )}
+                    <span>Tuần: {weekRangeLabel}</span>
+                  </div>
+                  <button
+                    onClick={handleNextWeek}
+                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  >
+                    Tuần sau
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </button>
+                  <button
+                    onClick={handleResetCurrentWeek}
+                    className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-900 border border-emerald-500/25 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                    Về hôm nay
+                  </button>
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-2xl border border-outline-variant/50 self-start lg:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      viewMode === "grid"
+                        ? "bg-primary text-on-primary shadow-2xs"
+                        : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">grid_view</span>
+                    <span>Lưới 7 ngày</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("day")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      viewMode === "day"
+                        ? "bg-primary text-on-primary shadow-2xs"
+                        : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">view_day</span>
+                    <span>Trọng tâm ngày</span>
+                  </button>
                 </div>
               </div>
-              <div className="px-sm py-xs flex items-center gap-md">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">local_fire_department</span>
+
+              {/* 4 KPI Metric Chips */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4">
+                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-on-surface-variant block">
+                      Tuân thủ tuần
+                    </span>
+                    <span className="text-base font-bold text-emerald-900 font-mono tabular-nums">
+                      {weeklyStats.adherencePct != null ? `${weeklyStats.adherencePct}%` : "Chưa có"}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-xs font-medium text-on-surface-variant block">
-                    Năng lượng kế hoạch TB
-                  </span>
-                  <span className="font-h1 text-xl font-bold text-on-surface">
-                    {weeklyStats.avgKcal.toLocaleString()} kcal
-                  </span>
-                  <span className="text-[11px] text-on-surface-variant ml-1">
-                    / {summary.target_kcal} mục tiêu
-                  </span>
+
+                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">grain</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-on-surface-variant block">
+                      Natri TB / ngày
+                    </span>
+                    <span className="text-base font-bold text-on-surface font-mono tabular-nums">
+                      {weeklyStats.avgSalt}g
+                    </span>
+                    {summary.salt_daily_g != null && (
+                      <span className="text-[10px] text-on-surface-variant ml-1">
+                        / {summary.salt_daily_g}g
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="px-sm py-xs flex items-center gap-md">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">event</span>
+
+                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">local_fire_department</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-on-surface-variant block">
+                      Năng lượng TB / ngày
+                    </span>
+                    <span className="text-base font-bold text-on-surface font-mono tabular-nums">
+                      {weeklyStats.avgKcal.toLocaleString("vi-VN")} kcal
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-xs font-medium text-on-surface-variant block">
-                    Hạn thực đơn
-                  </span>
-                  <PlanExpiryBadge expiry={selectedExpiryFields} />
-                </div>
-              </div>
-            </div>
 
-            {/* Week nav */}
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md mb-lg shadow-xs flex flex-col md:flex-row items-center justify-between gap-md">
-              <div className="flex items-center gap-sm flex-wrap">
-                <button
-                  onClick={handlePrevWeek}
-                  className="px-md py-2 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant rounded-xl text-xs font-semibold flex items-center gap-xs cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                  Tuần trước
-                </button>
-                <div className="flex items-center gap-xs px-md py-2 bg-emerald-50/60 border border-emerald-200 rounded-xl text-emerald-900 font-bold text-xs">
-                  <span className="material-symbols-outlined text-emerald-700 text-[18px]">
-                    calendar_month
-                  </span>
-                  Tuần: {weekRangeLabel}
-                </div>
-                <button
-                  onClick={handleNextWeek}
-                  className="px-md py-2 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant rounded-xl text-xs font-semibold flex items-center gap-xs cursor-pointer"
-                >
-                  Tuần sau
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </button>
-                <button
-                  onClick={handleResetCurrentWeek}
-                  className="px-sm py-2 text-xs font-semibold text-primary hover:underline cursor-pointer"
-                >
-                  Về tuần thực đơn
-                </button>
-              </div>
-              <div className="text-xs text-on-surface-variant">
-                {selectedEntry?.validity
-                  ? `Kế hoạch: ${selectedEntry.validity.startDateLabel} – ${selectedEntry.validity.endDateLabel}`
-                  : selectedEntry
-                    ? "Thực đơn chưa gán vào tuần này"
-                    : "Chưa có thực đơn cho tuần đang xem"}
-              </div>
-            </div>
-
-            {/* Week grid */}
-            {!weekInPlan ? (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl text-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-[40px] text-outline mb-sm">
-                  calendar_today
-                </span>
-                <p className="font-semibold">Chưa có thực đơn tuần này</p>
-                <p className="text-xs mt-xs">
-                  Tuần {weekRangeLabel} chưa được gán thực đơn. Bấm “Thêm thực đơn” trên cột tương ứng ở bảng lịch trình.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[1050px] grid grid-cols-[100px_repeat(7,1fr)] divide-x divide-y divide-outline-variant/60">
-                    <div className="sticky left-0 z-20 bg-surface-container-low p-md flex items-center justify-center font-bold text-xs text-on-surface-variant border-r border-outline-variant">
-                      Bữa \ Ngày
-                    </div>
-
-                    {weekDays.map((day) => {
-                      const dayMeal = selectedEntry
-                        ? getDayMealByIndex(selectedEntry.plan, day.dayIndex)
-                        : null;
-                      const adherence = adherenceByDate.get(day.isoDate);
-                      const dayKcal = dayMeal?.totalCalories ?? 0;
-                      const daySalt = dayMeal?.totalSalt ?? 0;
-                      const inPlan = dayMeal != null;
-
-                      return (
-                        <div
-                          key={day.isoDate}
-                          onClick={inPlan ? handleHeaderClick : undefined}
-                          className={`p-sm md:p-md flex flex-col justify-between min-h-[95px] transition-all ${
-                            inPlan
-                              ? "bg-emerald-100/90 border-emerald-300 text-emerald-900 cursor-pointer hover:brightness-95"
-                              : "bg-surface-container-low text-on-surface-variant"
-                          }`}
-                          title={
-                            inPlan
-                              ? "Bấm để xem chi tiết thực đơn"
-                              : undefined
-                          }
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-bold text-sm block">
-                                {day.fullDayName}
-                              </span>
-                              <span className="font-mono text-xs opacity-85">
-                                {day.shortDate}
-                              </span>
-                            </div>
-                            {adherence != null && (
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  adherence >= 80
-                                    ? "bg-emerald-600 text-white"
-                                    : adherence >= 50
-                                      ? "bg-amber-500 text-white"
-                                      : "bg-red-500 text-white"
-                                }`}
-                              >
-                                {adherence}%
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-2 pt-1 border-t border-black/10 flex items-center justify-between text-[11px] font-mono">
-                            <span>{dayKcal > 0 ? `${dayKcal} kcal` : "—"}</span>
-                            <span
-                              className={
-                                daySalt > (summary.salt_daily_g ?? 2)
-                                  ? "text-red-700 font-bold"
-                                  : "text-emerald-800 font-bold"
-                              }
-                            >
-                              {daySalt > 0 ? `Na: ${daySalt}g` : "—"}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {MEAL_ROWS.map((row) => (
-                      <React.Fragment key={row.slot}>
-                        <div className="sticky left-0 z-20 bg-surface-container-low p-md flex flex-col items-center justify-center border-r border-outline-variant font-bold text-sm text-on-surface">
-                          <span className="material-symbols-outlined text-primary text-[20px] mb-0.5">
-                            {row.icon}
-                          </span>
-                          <span>{row.label}</span>
-                        </div>
-
-                        {weekDays.map((day) => {
-                          const dayMeal = selectedEntry
-                            ? getDayMealByIndex(selectedEntry.plan, day.dayIndex)
-                            : null;
-                          const dishes =
-                            row.slot === "breakfast"
-                              ? dayMeal?.breakfast
-                              : row.slot === "lunch"
-                                ? dayMeal?.lunch
-                                : dayMeal?.dinner;
-
-                          return (
-                            <div
-                              key={`${day.isoDate}-${row.slot}`}
-                              className="p-sm md:p-md min-h-[125px] bg-white flex flex-col hover:bg-surface-bright transition-colors"
-                            >
-                              {dishes && dishes.length > 0 ? (
-                                <div className="space-y-1 font-body text-xs text-on-surface leading-snug">
-                                  {dishes.map((food, fIdx) => (
-                                    <div
-                                      key={fIdx}
-                                      className="flex justify-between items-start border-b border-gray-100 pb-0.5"
-                                    >
-                                      <span className="font-medium pr-1">
-                                        • {food.name}
-                                      </span>
-                                      <span className="font-mono text-[10px] text-on-surface-variant shrink-0 font-semibold">
-                                        {food.calories ? `${food.calories}k` : ""}
-                                        {food.salt !== undefined
-                                          ? ` | ${food.salt}g`
-                                          : ""}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="flex-1 flex items-center justify-center text-center">
-                                  <span className="text-outline text-xs italic">
-                                    {dayMeal ? "—" : "Ngoài kế hoạch"}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))}
+                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-800 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">event</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-on-surface-variant block">
+                      Hạn thực đơn
+                    </span>
+                    <PlanExpiryBadge expiry={selectedExpiryFields} />
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Main Menu Display Area */}
+            {!weekInPlan ? (
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-10 text-center text-on-surface-variant shadow-xs">
+                <span className="material-symbols-outlined text-[48px] text-outline mb-2">
+                  calendar_today
+                </span>
+                <p className="font-bold text-sm text-on-surface">Chưa có thực đơn cho tuần này</p>
+                <p className="text-xs mt-1 max-w-[40ch] mx-auto text-on-surface-variant">
+                  Tuần {weekRangeLabel} chưa được gán kế hoạch. Bạn có thể bấm “Thêm thực đơn” ở thẻ tuần tương ứng bên trên.
+                </p>
+              </div>
+            ) : viewMode === "grid" ? (
+              /* Mode 1: 7-Column Day Cards (Weekly Kanban Layout) */
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3.5">
+                {weekDays.map((day) => {
+                  const dayMeal = selectedEntry ? getDayMealByIndex(selectedEntry.plan, day.dayIndex) : null;
+                  const adherence = adherenceByDate.get(day.isoDate);
+                  const dayKcal = dayMeal?.totalCalories ?? 0;
+                  const daySalt = dayMeal?.totalSalt ?? 0;
+
+                  return (
+                    <div
+                      key={day.isoDate}
+                      className={`rounded-3xl p-3.5 flex flex-col justify-between transition-all group relative overflow-hidden ${
+                        day.isToday
+                          ? "bg-gradient-to-b from-primary/[0.08] via-emerald-50/30 to-white border-2 border-primary shadow-lg ring-4 ring-primary/15"
+                          : "bg-white border border-outline-variant/60 shadow-xs hover:border-primary/40 hover:shadow-md"
+                      }`}
+                    >
+                      {/* Today Ribbon / Badge */}
+                      {day.isToday && (
+                        <div className="absolute top-0 right-0">
+                          <div className="bg-primary text-on-primary text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-bl-xl shadow-xs flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                            Hôm nay
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Day Header */}
+                      <div className={`pb-2.5 border-b mb-3 ${day.isToday ? "border-primary/25 pt-2" : "border-outline-variant/40"}`}>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className={`text-xs transition-colors flex items-center gap-1.5 ${
+                            day.isToday ? "font-black text-primary text-sm" : "font-bold text-on-surface group-hover:text-primary"
+                          }`}>
+                            {day.fullDayName}
+                            {day.isToday && (
+                              <span className="inline-block w-2 h-2 rounded-full bg-primary" />
+                            )}
+                          </span>
+                          {adherence != null && (
+                            <span
+                              className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                adherence >= 80
+                                  ? "bg-emerald-500/15 text-emerald-900 border border-emerald-500/20"
+                                  : adherence >= 50
+                                    ? "bg-amber-500/15 text-amber-900 border border-amber-500/20"
+                                    : "bg-rose-500/15 text-rose-900 border border-rose-500/20"
+                              }`}
+                            >
+                              {adherence}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant">
+                          <span className={day.isToday ? "font-bold text-primary" : ""}>{day.shortDate}</span>
+                          <span className={`font-semibold ${day.isToday ? "text-primary font-bold" : "text-emerald-900"}`}>
+                            {dayKcal > 0 ? `${dayKcal} kcal` : "—"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 3 Meals Mini Cards */}
+                      <div className="space-y-2 flex-1 mb-3">
+                        {/* Breakfast */}
+                        <div className={`rounded-xl p-2 transition-all ${
+                          day.isToday
+                            ? "bg-amber-500/[0.12] border-2 border-amber-500/30 shadow-2xs"
+                            : "bg-amber-500/[0.06] border border-amber-500/15"
+                        }`}>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-amber-900 mb-1">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">wb_twilight</span>
+                              Sáng
+                            </span>
+                          </div>
+                          {dayMeal?.breakfast && dayMeal.breakfast.length > 0 ? (
+                            <div className="space-y-1 text-[11px] text-on-surface">
+                              {dayMeal.breakfast.map((food, fIdx) => (
+                                <div key={fIdx} className="flex justify-between items-start leading-tight">
+                                  <span className="truncate pr-1 font-medium">• {food.name}</span>
+                                  <span className="text-[10px] font-mono text-on-surface-variant shrink-0">
+                                    {food.calories}k
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-outline italic">—</span>
+                          )}
+                        </div>
+
+                        {/* Lunch */}
+                        <div className={`rounded-xl p-2 transition-all ${
+                          day.isToday
+                            ? "bg-emerald-500/[0.12] border-2 border-emerald-500/30 shadow-2xs"
+                            : "bg-emerald-500/[0.06] border border-emerald-500/15"
+                        }`}>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-emerald-900 mb-1">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">wb_sunny</span>
+                              Trưa
+                            </span>
+                          </div>
+                          {dayMeal?.lunch && dayMeal.lunch.length > 0 ? (
+                            <div className="space-y-1 text-[11px] text-on-surface">
+                              {dayMeal.lunch.map((food, fIdx) => (
+                                <div key={fIdx} className="flex justify-between items-start leading-tight">
+                                  <span className="truncate pr-1 font-medium">• {food.name}</span>
+                                  <span className="text-[10px] font-mono text-on-surface-variant shrink-0">
+                                    {food.calories}k
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-outline italic">—</span>
+                          )}
+                        </div>
+
+                        {/* Dinner */}
+                        <div className={`rounded-xl p-2 transition-all ${
+                          day.isToday
+                            ? "bg-sky-500/[0.12] border-2 border-sky-500/30 shadow-2xs"
+                            : "bg-sky-500/[0.06] border border-sky-500/15"
+                        }`}>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-sky-900 mb-1">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">bedtime</span>
+                              Tối
+                            </span>
+                          </div>
+                          {dayMeal?.dinner && dayMeal.dinner.length > 0 ? (
+                            <div className="space-y-1 text-[11px] text-on-surface">
+                              {dayMeal.dinner.map((food, fIdx) => (
+                                <div key={fIdx} className="flex justify-between items-start leading-tight">
+                                  <span className="truncate pr-1 font-medium">• {food.name}</span>
+                                  <span className="text-[10px] font-mono text-on-surface-variant shrink-0">
+                                    {food.calories}k
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-outline italic">—</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* View Day Details CTA */}
+                      <button
+                        type="button"
+                        onClick={() => handleDaySelect(day.dayIndex)}
+                        className={`w-full py-1.5 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                          day.isToday
+                            ? "bg-primary text-on-primary hover:bg-primary/90 shadow-2xs ring-2 ring-primary/20"
+                            : "text-primary hover:bg-primary/10 border border-primary/20"
+                        }`}
+                      >
+                        <span>{day.isToday ? "Xem thực đơn hôm nay" : "Chi tiết ngày"}</span>
+                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Mode 2: Daily Focus Inspector */
+              <div className="space-y-4">
+                {/* 7 Day Tabs Horizontal Bar */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {weekDays.map((day) => {
+                    const isActive = day.dayIndex === selectedDayIdx;
+                    return (
+                      <button
+                        key={day.isoDate}
+                        type="button"
+                        onClick={() => setSelectedDayIdx(day.dayIndex)}
+                        className={`px-4 py-2 rounded-2xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-2 ${
+                          isActive
+                            ? "bg-primary text-on-primary shadow-xs ring-2 ring-primary/30"
+                            : day.isToday
+                              ? "bg-primary/10 border-2 border-primary/40 text-primary font-black hover:bg-primary/15"
+                              : "bg-surface-container-lowest border border-outline-variant/60 text-on-surface hover:bg-surface-container-low"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1">
+                          {day.isToday && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+                          {day.fullDayName}
+                        </span>
+                        {day.isToday && (
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
+                              isActive ? "bg-white/20 text-white" : "bg-primary text-white"
+                            }`}
+                          >
+                            Hôm nay
+                          </span>
+                        )}
+                        <span className={`font-mono text-[11px] ${isActive ? "text-on-primary/80" : "text-on-surface-variant"}`}>
+                          {day.shortDate}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Day Overview Summary */}
+                {currentDayData ? (
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-outline-variant/40 mb-5">
+                      <div>
+                        <h4 className="font-h2 text-base font-bold text-on-surface flex items-center gap-2">
+                          <span>
+                            {currentWeekDayMeta?.fullDayName} ({currentWeekDayMeta?.shortDate})
+                            {currentWeekDayMeta?.isToday && (
+                              <span className="ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-primary text-on-primary">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                                Hôm nay
+                              </span>
+                            )}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-900 border border-emerald-500/20 font-mono">
+                            Tổng: {currentDayData.totalCalories} kcal
+                          </span>
+                        </h4>
+                      </div>
+                      {patientId && selectedEntry && (
+                        <Link
+                          href={`/doctor/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(selectedEntry.plan.id)}`}
+                          className="px-3 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1 shadow-2xs"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                          <span>Chỉnh sửa thực đơn này</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    {/* 3 Spacious Meal Cards */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Breakfast Large Card */}
+                      <div className="bg-surface-container-low/30 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-amber-500/15">
+                            <span className="font-bold text-sm text-amber-950 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-amber-700 text-[18px]">wb_twilight</span>
+                              Bữa sáng
+                            </span>
+                            <span className="font-mono font-bold text-xs text-amber-900 bg-amber-500/15 px-2 py-0.5 rounded-full">
+                              {currentDayData.breakfast?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {currentDayData.breakfast?.map((food, idx) => (
+                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-bold text-xs text-on-surface">{food.name}</span>
+                                  <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-1">
+                                  {food.salt !== undefined && <span>Muối: {food.salt}g</span>}
+                                  {food.carbG !== undefined && <span>• Carb: {food.carbG}g</span>}
+                                  {food.fat !== undefined && <span>• Chất béo: {food.fat}g</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lunch Large Card */}
+                      <div className="bg-surface-container-low/30 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-emerald-500/15">
+                            <span className="font-bold text-sm text-emerald-950 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-emerald-700 text-[18px]">wb_sunny</span>
+                              Bữa trưa
+                            </span>
+                            <span className="font-mono font-bold text-xs text-emerald-900 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                              {currentDayData.lunch?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {currentDayData.lunch?.map((food, idx) => (
+                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-bold text-xs text-on-surface">{food.name}</span>
+                                  <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-1">
+                                  {food.salt !== undefined && <span>Muối: {food.salt}g</span>}
+                                  {food.carbG !== undefined && <span>• Carb: {food.carbG}g</span>}
+                                  {food.fat !== undefined && <span>• Chất béo: {food.fat}g</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dinner Large Card */}
+                      <div className="bg-surface-container-low/30 border border-sky-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-sky-500/15">
+                            <span className="font-bold text-sm text-sky-950 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-sky-700 text-[18px]">bedtime</span>
+                              Bữa tối
+                            </span>
+                            <span className="font-mono font-bold text-xs text-sky-900 bg-sky-500/15 px-2 py-0.5 rounded-full">
+                              {currentDayData.dinner?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {currentDayData.dinner?.map((food, idx) => (
+                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-bold text-xs text-on-surface">{food.name}</span>
+                                  <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-1">
+                                  {food.salt !== undefined && <span>Muối: {food.salt}g</span>}
+                                  {food.carbG !== undefined && <span>• Carb: {food.carbG}g</span>}
+                                  {food.fat !== undefined && <span>• Chất béo: {food.fat}g</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-8 text-center text-on-surface-variant">
+                    <p className="text-xs italic">Không có dữ liệu chi tiết cho ngày được chọn.</p>
+                  </div>
+                )}
+              </div>
             )}
 
-            <div className="mt-md p-md bg-surface-container-low/50 border border-outline-variant/60 rounded-xl text-xs text-on-surface-variant flex items-center justify-between gap-md flex-wrap">
-              <span>
-                Ô hiển thị món trong thực đơn kế hoạch đã duyệt. Tuân thủ theo ngày lấy từ check-in notification.
+            {/* Bottom footnote */}
+            <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl text-xs text-on-surface-variant flex items-center justify-between gap-4 flex-wrap shadow-xs">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-primary text-[18px]">info</span>
+                Dữ liệu thực đơn đã qua cổng kiểm soát lâm sàng tự động và đối soát tương tác thuốc.
               </span>
               <Link
                 href={`/doctor/patients/${encodeURIComponent(patientId!)}`}
-                className="text-primary font-bold hover:underline text-xs"
+                className="text-primary font-bold hover:underline flex items-center gap-1 text-xs"
               >
-                Quản lý hồ sơ →
+                <span>Hồ sơ chi tiết bệnh nhân</span>
+                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
               </Link>
             </div>
           </div>

@@ -404,6 +404,12 @@ _MEAL_KCAL_SHARE = {
     "dinner": 0.30,
     "snack": 0.10,
 }
+_MAX_ITEMS_PER_SLOT = {
+    "breakfast": 3,
+    "lunch": 4,
+    "dinner": 4,
+    "snack": 1,
+}
 _STARCH_CATEGORIES = frozenset({"tinh_bot"})
 _SCALABLE_CATEGORIES = frozenset({"tinh_bot", "thit", "hai_san", "dau", "trung_sua"})
 
@@ -1158,79 +1164,185 @@ def _repair_day_kcal(
     catalog: _Catalog,
 ) -> None:
     totals = calculate_day_totals(day)
-    lower = target_kcal * 0.9
-    upper = target_kcal * 1.1
+    lower = target_kcal * 0.90
+    upper = target_kcal * 1.10
 
+    # 1. Over total target kcal (> 110%) -> scale down meals proportionally
     if totals.kcal > upper and totals.kcal > 0:
         factor = max(_SCALE_MIN, upper / totals.kcal)
         for meal in day.meals:
             meal.items = [_scale_food_item(i, factor) for i in meal.items]
-        return
 
-    if totals.kcal >= lower:
-        return
-
-    # Under target: boost protein items, then add extra protein/dairy if needed.
-    deficit = lower - totals.kcal
+    # Cap individual meals at 1.15 * their slot target share to avoid overshooting
     for meal in day.meals:
-        if deficit <= 5:
-            break
-        boosted: list[FoodItem] = []
-        for item in meal.items:
-            cat = _category_of_item(item, catalog)
-            if cat not in _SCALABLE_CATEGORIES or cat in _STARCH_CATEGORIES:
-                boosted.append(item)
-                continue
-            # How much can we grow this item?
-            room = _SCALE_MAX  # relative to current portion already scaled; cap gently
-            growth = min(1.35, room)
-            trial = _scale_food_item(item, growth)
-            # Guard meal carb.
-            if carb_limit is not None:
-                meal_carb = sum(i.macros.carb_g for i in meal.items) - item.macros.carb_g + trial.macros.carb_g
-                if meal_carb > carb_limit + 0.05:
-                    boosted.append(item)
-                    continue
-            gained = trial.kcal - item.kcal
-            if gained > 0:
-                deficit -= gained
-            boosted.append(trial)
-        meal.items = boosted
+        slot_share = _MEAL_KCAL_SHARE.get(meal.slot, 0.25)
+        slot_target = target_kcal * slot_share
+        slot_cap = slot_target * 1.15
+        m_kcal = sum(i.kcal for i in meal.items)
+        if m_kcal > slot_cap and m_kcal > 0:
+            scale_down = max(_SCALE_MIN, slot_cap / m_kcal)
+            meal.items = [_scale_food_item(i, scale_down) for i in meal.items]
 
     totals = calculate_day_totals(day)
     if totals.kcal >= lower:
         return
 
-    # Add an extra low-carb protein or dairy to the lowest-kcal main meal.
-    extra_pool = pools.get("proteins") or pools.get("dairy") or []
-    if not extra_pool:
-        return
-    main_meals = [m for m in day.meals if m.slot in ("breakfast", "lunch", "dinner")]
-    if not main_meals:
-        return
-    target_meal = min(main_meals, key=lambda m: sum(i.kcal for i in m.items))
-    # Pick lowest-carb protein that fits.
-    ranked = _sort_pool(extra_pool, prefer_low_carb=True, prefer_low_sodium=sodium_daily is not None)
-    for food in ranked[:8]:
-        factor = 1.0
-        if carb_limit is not None:
-            meal_carb = sum(i.macros.carb_g for i in target_meal.items)
-            room = carb_limit - meal_carb
-            factor = _carb_factor(food, room)
-            if factor < _SCALE_MIN + 0.01 and _macro(food, "carb_g") > room:
-                continue
-        if sodium_daily is not None:
-            day_na = calculate_day_totals(day).sodium_mg
-            room_na = sodium_daily - day_na
-            na = _macro(food, "sodium_mg")
-            if na > 0 and na * factor > room_na:
-                factor = min(factor, max(_SCALE_MIN, room_na / na))
-        item = _scaled_item(food, factor, citation, catalog)
-        if item is None:
+    # 2. Under target kcal (< 90%)
+    # Phase 1: Boost scalable protein/dairy/side items in meals that have a deficit relative to their slot target.
+    for meal in day.meals:
+        slot_share = _MEAL_KCAL_SHARE.get(meal.slot, 0.25)
+        slot_target = target_kcal * slot_share
+        m_kcal = sum(i.kcal for i in meal.items)
+
+        if m_kcal >= slot_target:
             continue
-        target_meal.items.append(item)
-        if calculate_day_totals(day).kcal >= lower:
+
+        for item in list(meal.items):
+            cat = _category_of_item(item, catalog)
+            if cat in _STARCH_CATEGORIES:
+                continue
+
+            current_m_kcal = sum(i.kcal for i in meal.items)
+            if current_m_kcal >= slot_target:
+                break
+
+            boost_needed = slot_target / max(current_m_kcal, 1.0)
+            if boost_needed <= 1.02:
+                break
+            boost_factor = min(_SCALE_MAX, boost_needed)
+            trial = _scale_food_item(item, boost_factor)
+            carb_diff = trial.macros.carb_g - item.macros.carb_g
+            meal_carb = sum(i.macros.carb_g for i in meal.items) + carb_diff
+
+            if carb_limit is not None and meal_carb > carb_limit + 0.05:
+                # Check if we can trim starch item slightly to accommodate protein boost without breaking carb limit
+                over_carb = meal_carb - carb_limit
+                starch_idx = next(
+                    (idx for idx, i in enumerate(meal.items) if _category_of_item(i, catalog) in _STARCH_CATEGORIES),
+                    None,
+                )
+                if starch_idx is not None:
+                    s_item = meal.items[starch_idx]
+                    if s_item.macros.carb_g - over_carb >= s_item.macros.carb_g * _SCALE_MIN:
+                        s_factor = (s_item.macros.carb_g - over_carb) / max(s_item.macros.carb_g, 1.0)
+                        scaled_starch = _scale_food_item(s_item, s_factor)
+                        item_idx = meal.items.index(item)
+                        meal.items[starch_idx] = scaled_starch
+                        meal.items[item_idx] = trial
+                        continue
+                continue
+
+            # Guard sodium
+            if sodium_daily is not None:
+                meal_na = sum(i.macros.sodium_mg for i in meal.items) - item.macros.sodium_mg + trial.macros.sodium_mg
+                if meal_na > sodium_daily * (slot_share + 0.05):
+                    continue
+
+            item_idx = meal.items.index(item)
+            meal.items[item_idx] = trial
+
+    totals = calculate_day_totals(day)
+    if totals.kcal >= lower:
+        return
+
+    # Phase 2: If still under 90%, add at most ONE appropriate extra dish to the meal with largest relative deficit.
+    for _ in range(2):
+        totals = calculate_day_totals(day)
+        if totals.kcal >= lower:
             break
+
+        candidates = []
+        for meal in day.meals:
+            slot_share = _MEAL_KCAL_SHARE.get(meal.slot, 0.25)
+            slot_target = target_kcal * slot_share
+            m_kcal = sum(i.kcal for i in meal.items)
+            max_items = _MAX_ITEMS_PER_SLOT.get(meal.slot, 4)
+
+            if len(meal.items) < max_items and m_kcal < slot_target * 1.05:
+                rel_deficit = (slot_target - m_kcal) / slot_target
+                candidates.append((rel_deficit, meal, max(0.0, slot_target - m_kcal)))
+
+        if not candidates:
+            break
+
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        _, target_meal, slot_deficit = candidates[0]
+        existing_ids = {i.food_id for i in target_meal.items if i.food_id}
+        existing_names = {i.name for i in target_meal.items}
+
+        # Select candidate pool strictly appropriate for each slot:
+        if target_meal.slot == "breakfast":
+            # Breakfast: dairy (sữa/sữa chua), drinks, fruit, or eggs. NO heavy fish/meat dishes!
+            raw_pool = (
+                pools.get("dairy") or pools.get("drinks") or pools.get("fruit") or []
+            )
+            candidate_pool = [
+                f for f in raw_pool
+                if f.get("category") in ("trung_sua", "do_uong", "trai_cay")
+            ]
+        elif target_meal.slot in ("lunch", "dinner"):
+            # Lunch/Dinner: proteins (thịt/cá/đậu), soups, or veggies
+            candidate_pool = (
+                pools.get("proteins") or pools.get("soups") or pools.get("veggies") or []
+            )
+        else:  # snack
+            candidate_pool = pools.get("fruit") or pools.get("dairy") or []
+
+        if not candidate_pool:
+            continue
+
+        ranked = _sort_pool(
+            candidate_pool,
+            prefer_low_carb=carb_limit is not None,
+            prefer_low_sodium=sodium_daily is not None,
+        )
+        added = False
+        for food in ranked:
+            if food.get("id") in existing_ids or food.get("name") in existing_names:
+                continue
+
+            food_kcal = _food_kcal(food)
+            if food_kcal <= 0:
+                continue
+
+            factor = min(1.0, max(_SCALE_MIN, slot_deficit / max(food_kcal, 1.0)))
+
+            if carb_limit is not None:
+                meal_carb = sum(i.macros.carb_g for i in target_meal.items)
+                room = carb_limit - meal_carb
+                factor = min(factor, _carb_factor(food, room))
+                if factor < _SCALE_MIN and _macro(food, "carb_g") > room:
+                    continue
+
+            if sodium_daily is not None:
+                day_na = calculate_day_totals(day).sodium_mg
+                room_na = sodium_daily - day_na
+                na = _macro(food, "sodium_mg")
+                if na > 0 and na * factor > room_na:
+                    factor = min(factor, max(_SCALE_MIN, room_na / na))
+
+            item = _scaled_item(food, factor, citation, catalog)
+            if item is None:
+                continue
+
+            target_meal.items.append(item)
+            added = True
+            break
+
+        if not added:
+            break
+
+    # Final Safety Clamp: Ensure no meal exceeds 1.15 * slot_target
+    for meal in day.meals:
+        slot_share = _MEAL_KCAL_SHARE.get(meal.slot, 0.25)
+        slot_target = target_kcal * slot_share
+        slot_cap = slot_target * 1.15
+        m_kcal = sum(i.kcal for i in meal.items)
+        if m_kcal > slot_cap and m_kcal > 0:
+            scale_down = max(_SCALE_MIN, slot_cap / m_kcal)
+            meal.items = [_scale_food_item(i, scale_down) for i in meal.items]
+
+    day.totals = calculate_day_totals(day)
 
 
 def _enforce_clinical_constraints(
