@@ -11,13 +11,25 @@ from app.schemas.meal_plan import AgentRunInput
 class TestRefuseRules:
     def test_message_triggers_refuse(self):
         assert message_triggers_refuse("Giúp tôi tăng liều metformin")
+        assert message_triggers_refuse("Kê cho tôi đơn thuốc")
         assert not message_triggers_refuse("Hôm nay nên ăn gì?")
+        assert not message_triggers_refuse("Tôi cần làm xét nghiệm gì định kỳ?")
+        assert not message_triggers_refuse("Tiêu chuẩn chẩn đoán tiểu đường là gì?")
+        assert not message_triggers_refuse("hello")
+        assert not message_triggers_refuse("xin chào")
 
     def test_enforce_output_safety_blocks_unsafe_text(self):
         answer, flags, force_refuse = enforce_output_safety("Bạn nên giảm liều metformin ngay.")
         assert force_refuse is True
         assert "unsafe_recommendation" in flags
         assert "bác sĩ" in answer.lower()
+
+    def test_enforce_output_safety_allows_safe_educational_text(self):
+        safe_text = "Tiêu chuẩn chẩn đoán đái tháo đường gồm xét nghiệm HbA1c và đường huyết lúc đói."
+        answer, flags, force_refuse = enforce_output_safety(safe_text)
+        assert force_refuse is False
+        assert flags == []
+        assert answer == safe_text
 
 
 class TestCitationGuardrail:

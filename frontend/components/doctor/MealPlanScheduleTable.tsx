@@ -34,7 +34,7 @@ function occupancyLabel(
   }
   switch (occupancy) {
     case "active":
-      return "ĐANG ÁP DỤNG";
+      return "Đang áp dụng";
     case "upcoming":
       return "Đã lên lịch";
     case "past":
@@ -113,6 +113,7 @@ export function MealPlanScheduleTable({
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showUnassigned, setShowUnassigned] = useState(false);
 
   const showToast = (message: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -232,18 +233,12 @@ export function MealPlanScheduleTable({
   const pickerPlans =
     picker?.mode === "replace" ? replacePlans : unassignedPlans;
 
-  const columnClass = (slot: MealPlanScheduleSlot) => {
-    if (slot.starts_on === selectedStartsOn) return "bg-primary/10";
-    if (slot.occupancy === "active") return "bg-primary/5";
-    return "";
-  };
-
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md mb-md shadow-xs">
+    <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 mb-6 shadow-xs">
       {toastMessage && (
         <div
           role="status"
-          className="fixed top-20 right-6 z-[60] bg-emerald-800 text-white px-md py-sm rounded-xl shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm"
+          className="fixed top-20 right-6 z-[60] bg-emerald-800 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-emerald-600 flex items-center gap-2 font-body text-sm animate-in fade-in slide-in-from-top-2 duration-200"
         >
           <span className="material-symbols-outlined text-[20px] text-emerald-300">
             check_circle
@@ -252,182 +247,189 @@ export function MealPlanScheduleTable({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-sm mb-md">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h3 className="font-h2 text-base font-bold text-on-surface flex items-center gap-xs">
+          <h3 className="font-h2 text-sm font-bold text-on-surface flex items-center gap-1.5">
             <span className="material-symbols-outlined text-primary text-[20px]">
               calendar_view_week
             </span>
-            Lịch trình thực đơn theo tuần
+            Lịch trình thực đơn 3 tuần
           </h3>
           {schedule.active_plan && (
-            <p className="text-xs text-on-surface-variant mt-1">
-              Đang áp dụng: Plan{" "}
-              <span className="font-mono">
-                …{schedule.active_plan_id?.slice(-6)}
-              </span>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Đang áp dụng: Plan <span className="font-mono font-medium">…{schedule.active_plan_id?.slice(-6)}</span>
               {schedule.active_plan.starts_on && schedule.active_plan.ends_on
-                ? ` · ${schedule.active_plan.starts_on} – ${schedule.active_plan.ends_on}`
+                ? ` (${schedule.active_plan.starts_on} – ${schedule.active_plan.ends_on})`
                 : ""}
             </p>
           )}
         </div>
+
+        {unassignedPlans.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowUnassigned(!showUnassigned)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-900 border border-amber-500/20 hover:bg-amber-500/15 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-amber-700">
+              pending_actions
+            </span>
+            <span>{unassignedPlans.length} thực đơn chưa xếp lịch</span>
+            <span className="material-symbols-outlined text-[14px]">
+              {showUnassigned ? "expand_less" : "expand_more"}
+            </span>
+          </button>
+        )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-outline-variant">
-              <th className="p-sm text-left text-on-surface-variant font-semibold w-[120px]">
-                {" "}
-              </th>
-              {displaySlots.map((slot, index) => (
-                <th
-                  key={`${slot.slot_key}-${slot.starts_on}-${index}`}
-                  className={`p-sm text-left font-semibold cursor-pointer ${
-                    slot.starts_on === selectedStartsOn || slot.occupancy === "active"
-                      ? "text-primary border-t-2 border-primary"
-                      : "text-on-surface"
-                  } ${columnClass(slot)}`}
-                  onClick={() => onSelectSlot?.(slot)}
-                >
-                  <div>{displaySlotTitle(index)}</div>
-                  <div className="font-normal text-on-surface-variant mt-0.5">
-                    {slotRangeLabel(slot)}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant">
-            <tr>
-              <td className="p-sm font-semibold text-on-surface-variant">Thực đơn</td>
-              {displaySlots.map((slot, index) => (
-                <td
-                  key={`plan-${slot.starts_on}-${index}`}
-                  className={`p-sm cursor-pointer ${columnClass(slot)}`}
-                  onClick={() => onSelectSlot?.(slot)}
-                >
-                  {slot.plan ? (
-                    <span className="font-semibold text-on-surface text-left hover:text-primary">
-                      {planTitle(slot.plan)}
-                    </span>
-                  ) : (
-                    <span className="text-on-surface-variant italic">(trống)</span>
-                  )}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className="p-sm font-semibold text-on-surface-variant">Trạng thái</td>
-              {displaySlots.map((slot, index) => (
-                <td
-                  key={`status-${slot.starts_on}-${index}`}
-                  className={`p-sm cursor-pointer ${columnClass(slot)}`}
-                  onClick={() => onSelectSlot?.(slot)}
-                >
+      {/* 3 Week Interactive Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {displaySlots.map((slot, index) => {
+          const isSelected = slot.starts_on === selectedStartsOn;
+          const isActive = slot.occupancy === "active";
+          const isUpcoming = slot.occupancy === "upcoming";
+          const isPast = slot.occupancy === "past";
+
+          return (
+            <div
+              key={`${slot.slot_key}-${slot.starts_on}-${index}`}
+              onClick={() => onSelectSlot?.(slot)}
+              className={`rounded-2xl p-4 border transition-all cursor-pointer flex flex-col justify-between ${
+                isSelected
+                  ? "bg-primary/[0.03] border-primary ring-2 ring-primary/25 shadow-xs"
+                  : "bg-surface-container-low/40 border-outline-variant/60 hover:border-primary/40 hover:bg-white"
+              }`}
+            >
+              {/* Card Top */}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-xs font-bold text-on-surface">
+                    {displaySlotTitle(index)}
+                  </span>
                   <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                       slot.plan?.status === "pending_review"
-                        ? "bg-amber-50 text-amber-900 border-amber-200"
-                        : slot.occupancy === "active"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                          : slot.occupancy === "upcoming"
-                            ? "bg-sky-50 text-sky-800 border-sky-200"
-                            : slot.occupancy === "past"
-                              ? "bg-surface-container-high text-on-surface-variant border-outline-variant"
-                              : slot.plan
-                                ? "bg-amber-50 text-amber-900 border-amber-200"
-                                : "bg-surface-container-high text-on-surface-variant border-outline-variant"
+                        ? "bg-amber-500/10 text-amber-900 border-amber-500/20"
+                        : isActive
+                          ? "bg-emerald-500/15 text-emerald-900 border-emerald-500/30"
+                          : isUpcoming
+                            ? "bg-sky-500/15 text-sky-900 border-sky-500/25"
+                            : isPast
+                              ? "bg-gray-100 text-gray-700 border-gray-200"
+                              : "bg-gray-100 text-gray-600 border-gray-200"
                     }`}
                   >
                     {occupancyLabel(slot.occupancy, slot.plan)}
                   </span>
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className="p-sm font-semibold text-on-surface-variant">Hành động</td>
-              {displaySlots.map((slot, index) => (
-                <td
-                  key={`actions-${slot.starts_on}-${index}`}
-                  className={`p-sm ${columnClass(slot)}`}
-                >
-                  <div className="flex flex-wrap gap-xs">
-                    {slot.actions.includes("replace") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAssignError(null);
-                          setPicker({ slot, index, mode: "replace" });
-                        }}
-                        className="px-sm py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 hover:border-amber-400 transition-colors cursor-pointer"
-                      >
-                        Thay thế
-                      </button>
-                    )}
-                    {slotAllowsAdd(slot, schedule.today) && !slot.plan && (
-                      <Link
-                        href={buildGenerateLink(slot, "add")}
-                        onClick={() => persistSlotIntent(slot, "add")}
-                        className="px-sm py-1 rounded-lg bg-primary text-on-primary font-semibold hover:bg-primary-container transition-colors"
-                      >
-                        Thêm thực đơn
-                      </Link>
-                    )}
+                </div>
+
+                <p className="text-xs text-on-surface-variant font-mono mb-3">
+                  {slotRangeLabel(slot)}
+                </p>
+
+                {/* Plan Info or Empty State */}
+                {slot.plan ? (
+                  <div className="bg-white rounded-xl p-2.5 border border-outline-variant/40 mb-3">
+                    <p className="text-xs font-bold text-on-surface truncate">
+                      {planTitle(slot.plan)}
+                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-on-surface-variant mt-1">
+                      <span>{planStatusLabel(String(slot.plan.status))}</span>
+                      {avgDailyKcal(slot.plan) && (
+                        <span className="font-mono font-medium text-emerald-800">
+                          ~{avgDailyKcal(slot.plan)?.toLocaleString("vi-VN")} kcal/ngày
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+                ) : (
+                  <div className="bg-white/60 rounded-xl p-3 border border-dashed border-outline-variant text-center mb-3">
+                    <p className="text-xs text-on-surface-variant italic">Chưa có thực đơn gán tuần này</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Card Actions */}
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/30 mt-auto">
+                <span className={`text-[11px] font-semibold ${isSelected ? "text-primary font-bold" : "text-on-surface-variant"}`}>
+                  {isSelected ? "● Đang xem tuần này" : "Nhấp để xem tuần"}
+                </span>
+
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {slot.actions.includes("replace") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignError(null);
+                        setPicker({ slot, index, mode: "replace" });
+                      }}
+                      className="px-2.5 py-1 rounded-lg border border-outline-variant hover:border-amber-300 bg-white hover:bg-amber-50 text-on-surface hover:text-amber-900 text-[11px] font-semibold transition-all cursor-pointer"
+                    >
+                      Đổi thực đơn
+                    </button>
+                  )}
+                  {slotAllowsAdd(slot, schedule.today) && !slot.plan && (
+                    <Link
+                      href={buildGenerateLink(slot, "add")}
+                      onClick={() => persistSlotIntent(slot, "add")}
+                      className="px-2.5 py-1 rounded-lg bg-primary text-on-primary text-[11px] font-bold hover:bg-primary/90 transition-all flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                      Tạo AI
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {unassignedPlans.length > 0 && (
-        <div className="mt-md pt-md border-t border-outline-variant">
-          <p className="text-xs font-semibold text-on-surface mb-sm flex items-center gap-xs">
+      {/* Collapsible Unassigned Plans */}
+      {showUnassigned && unassignedPlans.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-outline-variant/60 animate-in fade-in duration-200">
+          <p className="text-xs font-bold text-on-surface mb-2.5 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-[16px] text-amber-700">
               pending_actions
             </span>
-            Thực đơn chưa xếp tuần ({unassignedPlans.length})
+            Danh sách thực đơn đã tạo chưa xếp lịch ({unassignedPlans.length})
           </p>
-          <ul className="space-y-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {unassignedPlans.map((plan) => (
-              <li
+              <div
                 key={plan.id}
-                className="flex flex-wrap items-center justify-between gap-sm rounded-xl border border-outline-variant bg-surface-container-low/40 px-md py-sm"
+                className="bg-surface-container-low/50 border border-outline-variant/60 rounded-xl p-3 flex flex-col justify-between gap-2"
               >
-                <button
-                  type="button"
-                  className="min-w-0 text-left cursor-pointer"
-                  onClick={() => previewUnassigned(plan)}
-                >
-                  <p className="text-sm font-semibold text-on-surface">
-                    {planTitle(plan)}
-                  </p>
-                  <p className="text-[11px] text-on-surface-variant">
-                    {planStatusLabel(String(plan.status))}
-                    {formatCreatedAt(plan.created_at)
-                      ? ` · tạo ${formatCreatedAt(plan.created_at)}`
-                      : ""}
-                  </p>
-                </button>
-                <div className="flex flex-wrap items-center gap-xs">
+                <div>
+                  <button
+                    type="button"
+                    className="w-full text-left cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => previewUnassigned(plan)}
+                  >
+                    <p className="text-xs font-bold text-on-surface">
+                      {planTitle(plan)}
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant mt-0.5">
+                      {planStatusLabel(String(plan.status))}
+                      {formatCreatedAt(plan.created_at) ? ` · ${formatCreatedAt(plan.created_at)}` : ""}
+                    </p>
+                  </button>
+                </div>
+                <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-outline-variant/30">
                   {plan.status === "pending_review" ? (
                     <Link
                       href={buildReviewHref(
                         patientId,
                         plan.id,
-                        currentSlot
-                          ? intentFromSlot(patientId, currentSlot, "add")
-                          : null
+                        currentSlot ? intentFromSlot(patientId, currentSlot, "add") : null
                       )}
                       onClick={() => {
                         if (currentSlot) persistSlotIntent(currentSlot, "add");
                       }}
-                      className="px-sm py-1 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:bg-amber-700"
+                      className="px-2.5 py-1 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 transition-all"
                     >
-                      Duyệt
+                      Duyệt ngay
                     </Link>
                   ) : currentSlot ? (
                     <button
@@ -440,33 +442,34 @@ export function MealPlanScheduleTable({
                           mode: "add",
                         });
                       }}
-                      className="px-sm py-1 rounded-lg bg-primary text-on-primary text-[11px] font-semibold hover:bg-primary-container cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-primary text-on-primary text-[11px] font-bold hover:bg-primary/90 transition-all cursor-pointer"
                     >
                       Gán vào tuần này
                     </button>
                   ) : null}
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
+      {/* Assign / Replace Modal */}
       {picker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
             type="button"
             aria-label="Đóng danh sách thực đơn"
-            className="absolute inset-0 bg-on-surface/40 backdrop-blur-sm cursor-pointer"
+            className="absolute inset-0 bg-on-surface/40 backdrop-blur-xs cursor-pointer"
             onClick={closePicker}
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={dialogTitleId}
-            className="relative bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden"
+            className="relative bg-surface-container-lowest border border-outline-variant rounded-3xl shadow-2xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
           >
-            <div className="flex items-start justify-between gap-sm px-5 pt-5 pb-4 border-b border-outline-variant shrink-0">
+            <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 border-b border-outline-variant/50 shrink-0">
               <div className="min-w-0">
                 <h3
                   id={dialogTitleId}
@@ -477,9 +480,7 @@ export function MealPlanScheduleTable({
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   {slotRangeLabel(picker.slot)}
-                  {pickerPlans.length > 0
-                    ? ` · ${pickerPlans.length} thực đơn đã tạo`
-                    : ""}
+                  {pickerPlans.length > 0 ? ` · ${pickerPlans.length} thực đơn khả dụng` : ""}
                 </p>
               </div>
               <button
@@ -487,31 +488,31 @@ export function MealPlanScheduleTable({
                 type="button"
                 onClick={closePicker}
                 disabled={Boolean(assigningId)}
-                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
                 aria-label="Đóng"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-4">
               {assignError && (
-                <p className="mx-5 mt-4 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-sm py-xs">
+                <p className="mb-3 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
                   {assignError}
                 </p>
               )}
 
               {pickerPlans.length === 0 ? (
-                <div className="px-5 py-10 text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[40px] text-outline mb-sm">
+                <div className="py-8 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] text-outline mb-2">
                     menu_book
                   </span>
-                  <p className="font-semibold text-sm text-on-surface">
+                  <p className="font-bold text-sm text-on-surface">
                     Chưa có thực đơn khác để chọn
                   </p>
-                  <p className="text-xs mt-xs max-w-[36ch] mx-auto">
+                  <p className="text-xs mt-1 max-w-[36ch] mx-auto text-on-surface-variant">
                     {picker.mode === "replace"
-                      ? "Chưa có thực đơn đã tạo nào khác. Tạo thực đơn AI mới rồi quay lại thay thế."
+                      ? "Chưa có thực đơn đã tạo nào khác. Bạn có thể tạo thực đơn AI mới cho tuần này."
                       : "Chỉ thực đơn đã duyệt và chưa xếp lịch mới gán được vào tuần này."}
                   </p>
                   <Link
@@ -525,7 +526,7 @@ export function MealPlanScheduleTable({
                         picker.mode === "replace" ? "replace" : "add"
                       )
                     }
-                    className="inline-flex items-center gap-xs mt-md px-md py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container transition-colors"
+                    className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs"
                   >
                     <span className="material-symbols-outlined text-[16px]">
                       auto_awesome
@@ -534,7 +535,7 @@ export function MealPlanScheduleTable({
                   </Link>
                 </div>
               ) : (
-                <ul className="divide-y divide-outline-variant/70">
+                <div className="space-y-2">
                   {pickerPlans.map((plan) => {
                     const kcal = avgDailyKcal(plan);
                     const created = formatCreatedAt(plan.created_at);
@@ -543,70 +544,69 @@ export function MealPlanScheduleTable({
                       (slot) => slot.plan?.id === plan.id
                     );
                     return (
-                      <li key={plan.id} className="px-5 py-3.5">
-                        <div className="flex items-start justify-between gap-md">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-on-surface">
-                              {planTitle(plan)}
+                      <div
+                        key={plan.id}
+                        className="p-3.5 rounded-2xl border border-outline-variant/50 bg-white hover:border-primary/40 hover:bg-primary/[0.01] transition-all flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-on-surface">
+                            {planTitle(plan)}
+                          </p>
+                          <p className="text-[11px] text-on-surface-variant mt-0.5">
+                            {planStatusLabel(String(plan.status))}
+                            {kcal != null ? ` · ~${kcal.toLocaleString("vi-VN")} kcal/ngày` : ""}
+                            {created ? ` · ${created}` : ""}
+                          </p>
+                          {alreadyScheduled && (
+                            <p className="text-[10px] text-amber-800 mt-0.5">
+                              Đang xếp ở {slotTitle(alreadyScheduled)}
                             </p>
-                            <p className="text-[11px] text-on-surface-variant mt-0.5">
-                              {planStatusLabel(String(plan.status))}
-                              {kcal != null
-                                ? ` · ${kcal.toLocaleString("vi-VN")} kcal/ngày`
-                                : ""}
-                              {created ? ` · ${created}` : ""}
-                            </p>
-                            {alreadyScheduled ? (
-                              <p className="text-[11px] text-amber-800 mt-1">
-                                Đang xếp ở {slotTitle(alreadyScheduled)}
-                              </p>
-                            ) : null}
-                          </div>
-                          {isAssignable(plan) ? (
-                            <button
-                              type="button"
-                              disabled={Boolean(assigningId)}
-                              onClick={() =>
-                                void assignPlanToSlot(
-                                  plan,
-                                  picker.slot,
-                                  picker.index,
-                                  picker.mode
-                                )
-                              }
-                              className="shrink-0 px-sm py-1.5 rounded-lg bg-primary text-on-primary text-[11px] font-semibold hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {busy
-                                ? picker.mode === "replace"
-                                  ? "Đang thay…"
-                                  : "Đang gán…"
-                                : picker.mode === "replace"
-                                  ? "Chọn thay thế"
-                                  : "Gán vào tuần này"}
-                            </button>
-                          ) : (
-                            <Link
-                              href={buildReviewHref(
-                                patientId,
-                                plan.id,
-                                intentFromSlot(patientId, picker.slot, picker.mode)
-                              )}
-                              onClick={() => persistSlotIntent(picker.slot, picker.mode)}
-                              className="shrink-0 px-sm py-1.5 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:bg-amber-700"
-                            >
-                              Duyệt trước
-                            </Link>
                           )}
                         </div>
-                      </li>
+                        {isAssignable(plan) ? (
+                          <button
+                            type="button"
+                            disabled={Boolean(assigningId)}
+                            onClick={() =>
+                              void assignPlanToSlot(
+                                plan,
+                                picker.slot,
+                                picker.index,
+                                picker.mode
+                              )
+                            }
+                            className="shrink-0 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {busy
+                              ? picker.mode === "replace"
+                                ? "Đang thay…"
+                                : "Đang gán…"
+                              : picker.mode === "replace"
+                                ? "Chọn thay thế"
+                                : "Gán vào tuần này"}
+                          </button>
+                        ) : (
+                          <Link
+                            href={buildReviewHref(
+                              patientId,
+                              plan.id,
+                              intentFromSlot(patientId, picker.slot, picker.mode)
+                            )}
+                            onClick={() => persistSlotIntent(picker.slot, picker.mode)}
+                            className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700"
+                          >
+                            Duyệt trước
+                          </Link>
+                        )}
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               )}
             </div>
 
             {pickerPlans.length > 0 && (
-              <div className="px-5 py-3 border-t border-outline-variant shrink-0 bg-surface-container-low/40">
+              <div className="px-6 py-3 border-t border-outline-variant/40 shrink-0 bg-surface-container-low/30">
                 <Link
                   href={buildGenerateLink(
                     picker.slot,
@@ -618,7 +618,7 @@ export function MealPlanScheduleTable({
                       picker.mode === "replace" ? "replace" : "add"
                     )
                   }
-                  className="inline-flex items-center gap-xs text-xs font-semibold text-primary hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
                 >
                   <span className="material-symbols-outlined text-[16px]">
                     auto_awesome
