@@ -1,8 +1,6 @@
 "use client";
 
 import React, { type ReactNode } from "react";
-import Link from "next/link";
-import { TOPBAR_PATIENT_AVATAR_SRC } from "@/lib/nav-config";
 import { PatientPanelProvider, usePatientPanel, type PatientPanelKey } from "./PatientPanelProvider";
 
 // Side Panels
@@ -27,64 +25,17 @@ function ShellInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="bg-[#f8fafc] text-slate-900 h-screen h-[100dvh] w-full overflow-hidden flex flex-col font-body antialiased relative">
-      {/* Top Glass App Bar */}
-      <header className="shrink-0 z-40 w-full flex justify-between items-center px-3 sm:px-6 md:px-8 py-2 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-xs transition-all">
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Sidebar Toggle Hamburger (Gemini style) */}
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className={`p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer flex items-center justify-center ${
-              isSidebarOpen ? "md:hidden" : "flex"
-            }`}
-            title={isSidebarOpen ? "Đóng lịch sử chat" : "Mở lịch sử chat"}
-          >
-            <span className="material-symbols-outlined text-[22px]">menu</span>
-          </button>
-
-          <Link
-            href="/patient"
-            className="flex items-center gap-2.5 group hover:opacity-95 transition-opacity"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#006857] to-emerald-500 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">ecg_heart</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-base sm:text-lg text-[#006857] tracking-tight leading-tight flex items-center gap-1.5">
-                VMEC-10
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  AI Patient
-                </span>
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium leading-none hidden sm:inline">
-                Clinical Nutrition Care
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50/80 border border-emerald-200/60 text-emerald-800 text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>HITL Guardrails Active</span>
-          </div>
-
-          <Link
-            href="/patient/profile"
-            className="relative flex items-center gap-2 p-1 pl-1.5 rounded-full hover:bg-slate-100/80 border border-transparent hover:border-slate-200 transition-all group"
-            title="Hồ sơ sức khỏe cá nhân"
-          >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-emerald-500/40 group-hover:border-emerald-600 transition-colors shadow-xs">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={TOPBAR_PATIENT_AVATAR_SRC}
-                alt="Avatar"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </Link>
-        </div>
-      </header>
+      {/* Floating Hamburger to open sidebar when closed (Gemini Style) */}
+      {!isSidebarOpen && (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="fixed top-3.5 left-3.5 z-40 p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-slate-950 shadow-md border border-slate-200/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          title="Mở lịch sử trò chuyện"
+        >
+          <span className="material-symbols-outlined text-[22px]">menu</span>
+        </button>
+      )}
 
       {/* Right Floating Dock (Desktop) */}
       <nav

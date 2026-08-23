@@ -10,6 +10,7 @@ import {
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
 
 import { useQueueStore } from "@/lib/queue-store";
+import { useAuthStore } from "@/lib/auth-store";
 
 type TopBarProps = {
   title: string;
@@ -26,11 +27,12 @@ export function TopBar({
 }: TopBarProps) {
   const { openMobileMenu, role } = useMobileMenu();
   const { jobs, openDrawer } = useQueueStore();
+  const authAvatar = useAuthStore((s) => s.avatar);
 
   const notificationsHref =
     role === "patient" ? "/patient/notifications" : "/doctor";
   const avatarSrc =
-    role === "doctor" ? DOCTOR_AVATAR_SRC : TOPBAR_PATIENT_AVATAR_SRC;
+    role === "doctor" ? DOCTOR_AVATAR_SRC : (authAvatar || TOPBAR_PATIENT_AVATAR_SRC);
 
   const activeJobsCount = jobs.filter(
     (j) => j.status === "queued" || j.status === "processing"

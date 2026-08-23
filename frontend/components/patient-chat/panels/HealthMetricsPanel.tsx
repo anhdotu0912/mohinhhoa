@@ -132,58 +132,93 @@ export function HealthMetricsPanel() {
                     </div>
 
                     {/* Chart Container */}
-                    <div className="w-full h-44 bg-slate-50/90 rounded-xl border border-slate-200/80 relative flex items-end p-3 pt-6 shadow-2xs">
-                      {/* Grid Lines */}
-                      <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none opacity-30">
-                        <div className="border-t border-slate-300 w-full" />
-                        <div className="border-t border-slate-300 w-full" />
-                        <div className="border-t border-slate-300 w-full" />
+                    <div className="w-full bg-slate-50/80 rounded-xl border border-slate-200/80 relative flex flex-col p-4 pt-5 pb-3 shadow-2xs">
+                      {/* Grid Lines (Subtle faint dashed lines with opacity ~0.05) */}
+                      <div className="absolute inset-x-4 top-5 bottom-8 flex flex-col justify-between pointer-events-none">
+                        <div className="border-t border-dashed border-slate-900/[0.05] w-full" />
+                        <div className="border-t border-dashed border-slate-900/[0.05] w-full" />
+                        <div className="border-t border-dashed border-slate-900/[0.05] w-full" />
                       </div>
 
-                      {/* SVG Line Graph */}
-                      <div className="w-full h-full relative z-10 flex items-end">
+                      {/* SVG Line Graph & Area Fill */}
+                      <div className="w-full h-32 relative">
                         <svg
                           className="w-full h-full overflow-visible"
                           preserveAspectRatio="none"
                           viewBox="0 0 100 100"
                         >
                           <defs>
+                            {/* Area Gradient with top opacity 0.15 fading to 0.0 at bottom */}
                             <linearGradient id="panelLineGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#006857" stopOpacity="0.25" />
-                              <stop offset="100%" stopColor="#006857" stopOpacity="0.0" />
+                              <stop offset="0%" stopColor="#005F56" stopOpacity="0.15" />
+                              <stop offset="100%" stopColor="#005F56" stopOpacity="0.0" />
                             </linearGradient>
                           </defs>
+
+                          {/* Smooth Area Gradient */}
                           <path
-                            d="M0,70 L16.6,55 L33.3,65 L50,40 L66.6,48 L83.3,30 L100,20 L100,100 L0,100 Z"
+                            d="M 0.00,70.00 C 5.56,66.00 11.11,55.67 16.67,55.00 C 22.22,54.33 27.78,67.00 33.33,65.00 C 38.89,63.00 44.44,42.27 50.00,40.00 C 55.56,37.73 61.11,49.33 66.67,48.00 C 72.22,46.67 77.78,33.73 83.33,30.00 C 88.89,26.27 94.44,22.67 100.00,20.00 L 100,100 L 0,100 Z"
                             fill="url(#panelLineGrad)"
                           />
+
+                          {/* Smooth Hairline Curve (tension ~0.4, stroke-width 1.75px, teal #005F56) */}
                           <path
-                            d="M0,70 L16.6,55 L33.3,65 L50,40 L66.6,48 L83.3,30 L100,20"
+                            d="M 0.00,70.00 C 5.56,66.00 11.11,55.67 16.67,55.00 C 22.22,54.33 27.78,67.00 33.33,65.00 C 38.89,63.00 44.44,42.27 50.00,40.00 C 55.56,37.73 61.11,49.33 66.67,48.00 C 72.22,46.67 77.78,33.73 83.33,30.00 C 88.89,26.27 94.44,22.67 100.00,20.00"
                             fill="none"
-                            stroke="#006857"
-                            strokeWidth="3"
+                            stroke="#005F56"
+                            strokeWidth="1.75"
                             strokeLinecap="round"
                             strokeLinejoin="round"
+                            vectorEffect="non-scaling-stroke"
                           />
-                          <circle cx="0" cy="70" r="2.5" fill="#006857" />
-                          <circle cx="16.6" cy="55" r="2.5" fill="#006857" />
-                          <circle cx="33.3" cy="65" r="2.5" fill="#006857" />
-                          <circle cx="50" cy="40" r="2.5" fill="#006857" />
-                          <circle cx="66.6" cy="48" r="2.5" fill="#006857" />
-                          <circle cx="83.3" cy="30" r="2.5" fill="#006857" />
-                          <circle cx="100" cy="20" r="3.5" fill="#006857" stroke="#fff" strokeWidth="1.5" />
                         </svg>
+
+                        {/* Crisp Data Points / Markers Overlay (r ~ 3.5px, white border, subtle hover glow & tooltip) */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          {[
+                            { day: "T2", x: 0, y: 70, val: "5.9" },
+                            { day: "T3", x: 16.67, y: 55, val: "5.7" },
+                            { day: "T4", x: 33.33, y: 65, val: "5.8" },
+                            { day: "T5", x: 50, y: 40, val: "5.5" },
+                            { day: "T6", x: 66.67, y: 48, val: "5.6" },
+                            { day: "T7", x: 83.33, y: 30, val: "5.4" },
+                            { day: "CN", x: 100, y: 20, val: latestGlucose },
+                          ].map((pt) => (
+                            <div
+                              key={pt.day}
+                              className="absolute -translate-x-1/2 -translate-y-1/2 group/dot flex flex-col items-center pointer-events-auto cursor-pointer"
+                              style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+                            >
+                              {/* Hover Tooltip */}
+                              <div className="absolute bottom-full mb-2 opacity-0 group-hover/dot:opacity-100 transition-all duration-150 pointer-events-none scale-90 group-hover/dot:scale-100 z-30 whitespace-nowrap bg-slate-900/90 backdrop-blur-xs text-white text-[11px] font-medium px-2 py-0.5 rounded shadow-lg">
+                                {pt.day}: {pt.val} mmol/L
+                              </div>
+
+                              {/* Subtle Highlight Glow for Latest Point (CN) */}
+                              {pt.day === "CN" && (
+                                <span className="absolute w-4.5 h-4.5 rounded-full bg-[#005F56]/20 animate-ping pointer-events-none" />
+                              )}
+
+                              {/* Dot Node */}
+                              <div
+                                className={`rounded-full bg-[#005F56] border-[1.5px] border-white shadow-[0_1px_3px_rgba(0,95,86,0.35)] transition-all duration-150 group-hover/dot:scale-135 group-hover/dot:ring-3 group-hover/dot:ring-[#005F56]/25 ${
+                                  pt.day === "CN" ? "w-2 h-2 ring-2 ring-[#005F56]/30" : "w-[7px] h-[7px]"
+                                }`}
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
-                      {/* X-axis */}
-                      <div className="absolute bottom-1 left-0 w-full flex justify-between px-3 text-[10px] font-bold text-slate-400">
+                      {/* X-axis Day Labels */}
+                      <div className="w-full flex justify-between pt-3 text-[11px] font-semibold text-slate-400">
                         <span>T2</span>
                         <span>T3</span>
                         <span>T4</span>
                         <span>T5</span>
                         <span>T6</span>
                         <span>T7</span>
-                        <span className="text-[#006857]">CN</span>
+                        <span className="text-[#005F56] font-bold">CN</span>
                       </div>
                     </div>
                   </section>

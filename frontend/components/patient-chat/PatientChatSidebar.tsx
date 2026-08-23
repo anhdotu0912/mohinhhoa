@@ -2,6 +2,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/lib/auth-store";
+import { TOPBAR_PATIENT_AVATAR_SRC } from "@/lib/nav-config";
 import {
   usePatientChatHistoryStore,
   groupSessionsByRecency,
@@ -17,6 +21,12 @@ export function PatientChatSidebar({
   onSelectSession,
   onNewChat,
 }: PatientChatSidebarProps) {
+  const router = useRouter();
+  const displayName = useAuthStore((s) => s.displayName);
+  const email = useAuthStore((s) => s.email);
+  const avatar = useAuthStore((s) => s.avatar);
+  const logout = useAuthStore((s) => s.logout);
+
   const sessions = usePatientChatHistoryStore((s) => s.sessions);
   const activeSessionId = usePatientChatHistoryStore((s) => s.activeSessionId);
   const isSidebarOpen = usePatientChatHistoryStore((s) => s.isSidebarOpen);
@@ -238,21 +248,41 @@ export function PatientChatSidebar({
 
   const sidebarContent = (
     <div className="w-[260px] h-full flex flex-col bg-[#f0f4f9]/90 backdrop-blur-xl border-r border-slate-200/80 select-none">
-      {/* Top Header: Hamburger & New Chat Button */}
-      <div className="p-3 pb-2 flex flex-col gap-2.5 border-b border-slate-200/50">
+      {/* Top Header: Hamburger, Brand, Clear All & New Chat Button */}
+      <div className="p-3 pb-2.5 flex flex-col gap-2.5 border-b border-slate-200/60">
         <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
-            title="Đóng thanh bên"
-          >
-            <span className="material-symbols-outlined text-[22px]">menu</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer flex items-center justify-center"
+              title="Đóng thanh bên"
+            >
+              <span className="material-symbols-outlined text-[20px]">menu</span>
+            </button>
+            <Link
+              href="/patient"
+              className="flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+            >
+              <span className="font-extrabold text-sm text-[#006857] tracking-tight">
+                VMEC-10
+              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200/60">
+                AI
+              </span>
+            </Link>
+          </div>
 
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Lịch sử trò chuyện
-          </span>
+          {sessions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-200/70 transition-colors cursor-pointer"
+              title="Xóa tất cả lịch sử chat"
+            >
+              <span className="material-symbols-outlined text-[17px]">delete_sweep</span>
+            </button>
+          )}
         </div>
 
         {/* Gemini Style "+ New Chat" Button */}
@@ -269,7 +299,7 @@ export function PatientChatSidebar({
 
         {/* Quick Search */}
         {sessions.length > 5 && (
-          <div className="relative mt-1">
+          <div className="relative mt-0.5">
             <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2">
               search
             </span>
@@ -320,24 +350,49 @@ export function PatientChatSidebar({
         )}
       </div>
 
-      {/* Bottom Footer Info */}
-      <div className="p-3 border-t border-slate-200/60 bg-[#f0f4f9]/70 flex items-center justify-between text-xs text-slate-500">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="text-[11px] font-medium">VMEC-10 AI</span>
-        </div>
+      {/* Bottom User Account Section */}
+      <div className="p-2.5 border-t border-slate-200/70 bg-[#f0f4f9] flex flex-col gap-1.5">
+        {/* Clickable Profile Card -> Directly opens /patient/profile */}
+        <Link
+          href="/patient/profile"
+          onClick={() => {
+            if (window.innerWidth < 768) setSidebarOpen(false);
+          }}
+          className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/90 border border-transparent hover:border-slate-200/80 hover:shadow-2xs transition-all group cursor-pointer text-left"
+          title="Xem hồ sơ sức khỏe cá nhân"
+        >
+          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 group-hover:border-emerald-600 transition-colors shadow-2xs shrink-0">
+            <img
+              src={avatar || TOPBAR_PATIENT_AVATAR_SRC}
+              alt="Avatar"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="font-bold text-xs sm:text-[13px] text-slate-900 truncate group-hover:text-[#006857] transition-colors">
+              {displayName?.trim() || "Bệnh nhân"}
+            </span>
+            <span className="text-[10.5px] text-slate-500 truncate">
+              {email || "Hồ sơ sức khỏe"}
+            </span>
+          </div>
+        </Link>
 
-        {sessions.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowClearConfirm(true)}
-            className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors font-medium flex items-center gap-1 cursor-pointer"
-            title="Xóa tất cả lịch sử chat"
-          >
-            <span className="material-symbols-outlined text-[13px]">delete_sweep</span>
-            <span>Xóa hết</span>
-          </button>
-        )}
+        {/* Logout Button directly underneath */}
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            router.replace("/login");
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-rose-600 hover:bg-slate-200/60 transition-all cursor-pointer group"
+          title="Đăng xuất khỏi hệ thống"
+        >
+          <span className="material-symbols-outlined text-[17px] text-slate-500 group-hover:text-rose-600 transition-colors">
+            logout
+          </span>
+          <span>Đăng xuất</span>
+        </button>
       </div>
     </div>
   );

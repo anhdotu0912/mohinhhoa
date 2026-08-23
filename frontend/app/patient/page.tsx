@@ -19,6 +19,7 @@ import { MealSuggestionCard } from "@/components/patient-chat/cards/MealSuggesti
 import { IngredientMapCard } from "@/components/patient-chat/cards/IngredientMapCard";
 import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComplianceCard";
 import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
+import { calculateAverageCompliance, MOCK_COMPLIANCE_DATA } from "@/lib/patient-chat-mock-data";
 
 export type { Message };
 
@@ -257,7 +258,8 @@ export default function PatientChatHomePage() {
         if (mockIntent === "grocery_list") {
           aiText = "Dưới đây là các địa điểm mua sắm nguyên liệu tươi sạch gần vị trí của bạn tại Quận 3:";
         } else if (mockIntent === "weekly_compliance") {
-          aiText = "Bạn đang duy trì phong độ rất tốt với tỉ lệ tuân thủ đạt 92% tuần này.";
+          const avg = calculateAverageCompliance(MOCK_COMPLIANCE_DATA);
+          aiText = `Bạn đang duy trì phong độ rất tốt với tỉ lệ tuân thủ đạt ${avg}% tuần này.`;
         } else if (mockIntent === "doctor_note") {
           aiText = "Bác sĩ Minh Nguyễn đã để lại một lời nhắc quan trọng dành cho bạn:";
         }
