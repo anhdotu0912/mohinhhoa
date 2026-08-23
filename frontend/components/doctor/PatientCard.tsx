@@ -77,16 +77,16 @@ export function PatientCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`p-3.5 bg-white rounded-xl transition-all duration-150 flex items-center gap-3 group cursor-pointer overflow-hidden min-w-0 w-full ${
+      className={`p-4 bg-surface-container-lowest rounded-2xl transition-all duration-200 flex items-center gap-3.5 group cursor-pointer overflow-hidden min-w-0 w-full ${
         isSelected
-          ? "border-2 border-emerald-500 bg-emerald-50/40 shadow-xs"
-          : "border border-gray-100 hover:border-gray-200 hover:bg-gray-50/80 shadow-2xs"
+          ? "border-2 border-primary bg-primary/5 shadow-xs"
+          : "border border-outline-variant/60 hover:border-primary/50 hover:bg-surface-container-low/50 hover:shadow-subtle"
       }`}
     >
       {/* 1. Avatar (+ fallback chữ cái đầu) */}
       {avatarFailed || !patient.avatar ? (
         <div
-          className="w-10 h-10 rounded-full shrink-0 ring-2 ring-white shadow-sm border border-gray-100 bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-bold"
+          className="w-11 h-11 rounded-full shrink-0 ring-2 ring-primary/20 bg-primary/10 text-primary flex items-center justify-center text-sm font-bold tracking-tight"
           aria-hidden
         >
           {initial}
@@ -96,47 +96,47 @@ export function PatientCard({
           src={patient.avatar}
           alt={patient.name}
           onError={() => setAvatarFailed(true)}
-          className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-white shadow-sm border border-gray-100"
+          className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-outline-variant/40 shadow-xs"
         />
       )}
 
       {/* 2. Info */}
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col justify-center gap-1">
         <div className="flex items-center gap-1.5 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors truncate">
+          <h4 className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors truncate">
             {patient.name}
           </h4>
           <span
-            className="bg-gray-100 text-gray-400 rounded-full px-2 py-0.5 text-[10px] font-mono border border-gray-200/40 shrink-0"
+            className="bg-surface-container-low text-on-surface-variant/80 rounded-full px-2 py-0.5 text-[10px] font-mono border border-outline-variant/40 shrink-0"
             title={patient.id}
           >
             {truncatePatientId(patient.id)}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 text-xs text-gray-400">
-          <span className="shrink-0">{patient.age} tuổi</span>
+        <div className="flex items-center gap-1.5 min-w-0 text-xs text-on-surface-variant">
+          <span className="shrink-0 font-medium">{patient.age} tuổi</span>
           {patient.gender && (
             <>
-              <span className="text-gray-300 text-[10px] shrink-0">•</span>
+              <span className="text-outline-variant text-[10px] shrink-0">•</span>
               <span className="shrink-0">{patient.gender}</span>
             </>
           )}
           {patient.bmi != null && (
             <>
-              <span className="text-gray-300 text-[10px] shrink-0">•</span>
-              <span className="shrink-0">BMI: {patient.bmi}</span>
+              <span className="text-outline-variant text-[10px] shrink-0">•</span>
+              <span className="shrink-0 tabular-nums">BMI: {patient.bmi}</span>
             </>
           )}
         </div>
 
         {/* Tag bệnh lý: tối đa 2 dòng trực quan (2 tag + +N) */}
         {conditions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 min-w-0 max-h-[2.75rem] overflow-hidden">
+          <div className="flex flex-wrap items-center gap-1 min-w-0 max-h-[2.75rem] overflow-hidden mt-0.5">
             {visibleConditions.map((cond, idx) => (
               <span
                 key={`${cond}-${idx}`}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-medium border truncate max-w-full ${
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border truncate max-w-full ${
                   badgeColorClass || getConditionTagStyle(cond)
                 }`}
               >
@@ -144,7 +144,7 @@ export function PatientCard({
               </span>
             ))}
             {hiddenConditionCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-gray-100 text-gray-600 border-gray-200 shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-surface-container text-on-surface-variant border-outline-variant/60 shrink-0">
                 +{hiddenConditionCount}
               </span>
             )}
@@ -152,7 +152,7 @@ export function PatientCard({
         )}
       </div>
 
-      {/* 3. Action Button — luôn hiện, không bị cắt bởi overflow-x */}
+      {/* 3. Action Button */}
       <div className="flex items-center shrink-0 self-center">
         <button
           type="button"
@@ -160,7 +160,7 @@ export function PatientCard({
             e.stopPropagation();
             handleCardClick();
           }}
-          className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow-xs whitespace-nowrap"
+          className="bg-primary hover:bg-primary/90 text-on-primary text-xs font-semibold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap"
         >
           <span>{actionText}</span>
           <span className="material-symbols-outlined text-[15px] leading-none group-hover:translate-x-0.5 transition-transform duration-200">

@@ -345,32 +345,32 @@ export default function PatientConstraintsPage() {
         </div>
       )}
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {loadError && (
-          <div className="mb-md p-md bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center justify-between">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs flex items-center justify-between shadow-2xs">
             <span>{loadError}</span>
             <button
               onClick={() => void loadPatients()}
-              className="text-primary font-semibold hover:underline cursor-pointer"
+              className="text-primary font-bold hover:underline cursor-pointer"
             >
               Thử lại
             </button>
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h2 className="font-h1 text-h1 text-on-surface font-bold">
+            <h2 className="font-h1 text-h1 text-on-surface font-bold text-2xl">
               Thiết lập ràng buộc lâm sàng
             </h2>
-            <p className="font-caption text-caption text-on-surface-variant mt-xs">
+            <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs">
               Quản lý và điều chỉnh các giới hạn vi chất dinh dưỡng (Calo, Muối, Đường) y khoa cho từng bệnh nhân
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-sm">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[240px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                 search
               </span>
               <input
@@ -378,18 +378,18 @@ export default function PatientConstraintsPage() {
                 placeholder="Tìm mã BN, tên bệnh nhân, bệnh lý..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
               />
             </div>
 
             <div className="relative min-w-[180px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                 filter_alt
               </span>
               <select
                 value={diagnosisFilter}
                 onChange={(e) => setDiagnosisFilter(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                className="w-full pl-10 pr-8 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer shadow-2xs font-medium"
               >
                 <option value="all">Tất cả bệnh lý</option>
                 <option value="tiểu đường">Tiểu đường</option>
@@ -406,76 +406,76 @@ export default function PatientConstraintsPage() {
         </div>
 
         {filteredPatients.length === 0 ? (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-12 text-center text-on-surface-variant shadow-subtle">
+            <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
               rule
             </span>
-            <p className="font-body-bold text-body-bold">
+            <p className="font-body-bold text-body-bold text-sm font-bold">
               Không tìm thấy bệnh nhân phù hợp
             </p>
-            <p className="font-caption text-caption text-xs mt-xs">
+            <p className="font-caption text-caption text-xs mt-1">
               Thử thay đổi từ khóa tìm kiếm hoặc chọn lại nhóm bệnh lý.
             </p>
           </div>
         ) : (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[980px]">
                 <thead>
-                  <tr className="bg-surface-container-low border-b border-outline-variant">
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                  <tr className="bg-surface-container-low/50 border-b border-outline-variant/40">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Mã BN
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Bệnh nhân
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Chẩn đoán bệnh lý
                     </th>
-                    <th className="px-sm py-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center whitespace-nowrap">
+                    <th className="px-3 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
                       Calo/ngày
                     </th>
-                    <th className="px-sm py-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center whitespace-nowrap">
+                    <th className="px-3 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
                       Muối (Na)
                     </th>
-                    <th className="px-sm py-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center whitespace-nowrap">
+                    <th className="px-3 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
                       Đường
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs min-w-[200px] max-w-[320px]">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold min-w-[200px] max-w-[320px]">
                       Ghi chú lâm sàng
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-right">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-right">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant font-body text-body">
+                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
                   {pagedPatients.map((patient) => {
                     const c = getPatientConstraint(patient);
                     return (
                       <tr
                         key={patient.id}
-                        className="transition-colors hover:bg-surface-bright"
+                        className="transition-colors hover:bg-surface-container-low/40"
                       >
-                        <td className="p-md">
+                        <td className="px-5 py-3.5">
                           <span
                             title={patient.id}
-                            className="font-mono text-xs font-medium text-on-surface-variant"
+                            className="font-mono text-xs font-semibold text-on-surface-variant"
                           >
                             {truncateId(patient.id)}
                           </span>
                         </td>
 
-                        <td className="p-md">
-                          <div className="flex items-center gap-sm min-w-0">
-                            <div className="relative w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20 shrink-0">
                               {initials(patient.name)}
                               {patient.avatar &&
                                 !patient.avatar.startsWith("https://api.dicebear.com") && (
                                   <img
                                     src={patient.avatar}
                                     alt={patient.name}
-                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                     onError={(e) => {
                                       e.currentTarget.style.display = "none";
                                     }}
@@ -483,12 +483,12 @@ export default function PatientConstraintsPage() {
                                 )}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-body-bold text-on-surface font-semibold text-sm whitespace-nowrap">
+                              <p className="font-body-bold text-on-surface font-bold text-sm whitespace-nowrap">
                                 {patient.name}
                               </p>
                               {patient.constraintsStatus === "pending_doctor_review" && (
-                                <span className="inline-flex mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                                  Chờ bác sĩ xác nhận
+                                <span className="inline-flex mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  Chờ xác nhận
                                 </span>
                               )}
                               <p className="text-xs text-on-surface-variant">
@@ -499,68 +499,68 @@ export default function PatientConstraintsPage() {
                           </div>
                         </td>
 
-                        <td className="p-md text-on-surface-variant">
+                        <td className="px-5 py-3.5 text-on-surface-variant">
                           <span
-                            className="bg-tertiary-container/20 text-tertiary px-sm py-xs rounded-full font-caption text-caption border border-tertiary-container/30 text-xs font-medium inline-block max-w-[180px] truncate"
+                            className="bg-primary/10 text-primary px-3 py-1 rounded-full font-caption text-xs font-semibold border border-primary/20 inline-block max-w-[180px] truncate"
                             title={patient.condition}
                           >
                             {shortCondition(patient.condition, 2)}
                           </span>
                         </td>
 
-                        <td className="px-sm py-md text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-900 border border-violet-200">
-                            <span className="material-symbols-outlined text-[13px] text-violet-600">
+                        <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-900 border border-violet-200 tabular-nums">
+                            <span className="material-symbols-outlined text-[14px] text-violet-600">
                               local_fire_department
                             </span>
                             {c.targetKcal}
                           </span>
                         </td>
 
-                        <td className="px-sm py-md text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-                            <span className="material-symbols-outlined text-[13px] text-amber-600">
+                        <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 tabular-nums">
+                            <span className="material-symbols-outlined text-[14px] text-amber-600">
                               water_drop
                             </span>
                             &le; {c.salt}g
                           </span>
                         </td>
 
-                        <td className="px-sm py-md text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-900 border border-sky-200">
-                            <span className="material-symbols-outlined text-[13px] text-sky-600">
+                        <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-900 border border-sky-200 tabular-nums">
+                            <span className="material-symbols-outlined text-[14px] text-sky-600">
                               spa
                             </span>
                             &le; {c.sugar}g
                           </span>
                         </td>
 
-                        <td className="p-md text-on-surface-variant min-w-[200px] max-w-[320px]">
+                        <td className="px-5 py-3.5 text-on-surface-variant min-w-[200px] max-w-[320px]">
                           <p
-                            className="text-xs italic text-on-surface-variant line-clamp-3 leading-relaxed whitespace-normal break-words"
+                            className="text-xs italic text-on-surface-variant line-clamp-2 leading-relaxed whitespace-normal break-words font-medium"
                             title={c.notes || "Không có ghi chú"}
                           >
                             {c.notes || "—"}
                           </p>
                         </td>
 
-                        <td className="p-md text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-xs">
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => handleOpenDetail(patient)}
                               title="Xem chi tiết ràng buộc lâm sàng"
-                              className="inline-flex items-center gap-1.5 px-md py-1.5 bg-surface-container-lowest border border-outline-variant text-on-surface hover:border-primary hover:text-primary font-body-bold text-xs rounded-lg hover:bg-surface-container-low transition-all cursor-pointer active:scale-95 shadow-xs"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant hover:border-primary text-on-surface hover:text-primary font-body-bold text-xs rounded-xl hover:bg-surface-container-low transition-all cursor-pointer active:scale-95 shadow-2xs font-semibold"
                             >
                               <span className="material-symbols-outlined text-[16px]">visibility</span>
-                              <span>Xem chi tiết</span>
+                              <span>Chi tiết</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={() => handleOpenEdit(patient)}
                               title="Điều chỉnh ràng buộc dinh dưỡng"
-                              className="inline-flex items-center gap-1.5 px-md py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs font-semibold"
+                              className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-xl hover:bg-primary/90 transition-all cursor-pointer active:scale-95 shadow-2xs font-bold"
                             >
                               <span className="material-symbols-outlined text-[16px]">tune</span>
                               <span>Điều chỉnh</span>
@@ -586,18 +586,18 @@ export default function PatientConstraintsPage() {
 
       {/* ADJUST CONSTRAINTS MODAL */}
       {editingPatient && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-xl w-full max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col animate-scaleUp overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <span className="material-symbols-outlined text-[22px]">tune</span>
                 </div>
                 <div>
                   <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
                     Điều chỉnh ràng buộc lâm sàng
                   </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
                     {editingPatient.name} ({editingPatient.id}) •{" "}
                     {editingPatient.age ? `${editingPatient.age} tuổi` : ""}
                   </p>
@@ -606,46 +606,46 @@ export default function PatientConstraintsPage() {
               <button
                 onClick={handleCloseEdit}
                 disabled={saving}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+                className="text-on-surface-variant hover:text-primary p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="mb-md p-sm bg-surface-container-low rounded-xl border border-outline-variant/60 flex items-start gap-2 text-xs text-on-surface-variant">
+            <div className="mb-4 p-3 bg-surface-container-low/60 rounded-2xl border border-outline-variant/60 flex items-start gap-2 text-xs text-on-surface-variant">
               <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">
                 medical_information
               </span>
               <div>
-                <span className="font-semibold text-on-surface">Chẩn đoán y khoa: </span>
+                <span className="font-bold text-on-surface">Chẩn đoán y khoa: </span>
                 <span>{editingPatient.condition || "Chưa có chẩn đoán chi tiết"}</span>
               </div>
             </div>
 
-            <p className="mb-md text-[11px] text-on-surface-variant italic px-1">
+            <p className="mb-4 text-[11px] text-on-surface-variant italic px-1">
               Áp dụng ngay cho lần tạo thực đơn AI kế tiếp — thực đơn đã tạo trước đó không tự tính lại.
             </p>
 
             {saveError && (
-              <div className="mb-md p-sm bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2">
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-800 text-xs flex items-start gap-2">
                 <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">error</span>
                 <span>{saveError}</span>
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto space-y-md pr-xs py-xs">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {/* Calo */}
-              <div className="p-3 bg-surface-container-lowest border border-outline-variant/80 rounded-xl space-y-2">
+              <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl space-y-2 shadow-2xs">
                 <div className="flex justify-between items-center">
                   <div>
-                    <label className="font-label text-xs font-semibold text-on-surface block">
+                    <label className="font-label text-xs font-bold text-on-surface block">
                       Mục tiêu Calo (năng lượng)
                     </label>
                     <span className="text-[11px] text-on-surface-variant">
                       Khuyến nghị 1500–2000 kcal/ngày tùy BMI &amp; mục tiêu điều trị
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-violet-50 text-violet-900 border border-violet-200 px-2 py-1 rounded-md">
+                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-violet-50 text-violet-900 border border-violet-200 px-2.5 py-1 rounded-full">
                     <span>{editingForm.targetKcal}</span>
                     <span className="text-[10px] font-normal">kcal/ngày</span>
                   </div>
@@ -663,22 +663,22 @@ export default function PatientConstraintsPage() {
                       targetKcal: parseInt(e.target.value, 10) || 1800,
                     }))
                   }
-                  className="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50"
+                  className="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary disabled:opacity-50"
                 />
               </div>
 
               {/* Muối */}
-              <div className="p-3 bg-surface-container-lowest border border-outline-variant/80 rounded-xl space-y-2">
+              <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl space-y-2 shadow-2xs">
                 <div className="flex justify-between items-center">
                   <div>
-                    <label className="font-label text-xs font-semibold text-on-surface block">
+                    <label className="font-label text-xs font-bold text-on-surface block">
                       Giới hạn Muối (Natri)
                     </label>
                     <span className="text-[11px] text-on-surface-variant">
                       Khuyến nghị &le; 5.0g/ngày (DASH &le; 3.0g)
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2 py-1 rounded-md">
+                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-full">
                     <span>{editingForm.salt}</span>
                     <span className="text-[10px] font-normal">g/ngày</span>
                   </div>
@@ -696,22 +696,22 @@ export default function PatientConstraintsPage() {
                       salt: parseFloat(e.target.value) || 0,
                     }))
                   }
-                  className="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50"
+                  className="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary disabled:opacity-50"
                 />
               </div>
 
               {/* Đường */}
-              <div className="p-3 bg-surface-container-lowest border border-outline-variant/80 rounded-xl space-y-2">
+              <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl space-y-2 shadow-2xs">
                 <div className="flex justify-between items-center">
                   <div>
-                    <label className="font-label text-xs font-semibold text-on-surface block">
+                    <label className="font-label text-xs font-bold text-on-surface block">
                       Giới hạn Đường tự do
                     </label>
                     <span className="text-[11px] text-on-surface-variant">
                       Khuyến nghị &le; 25g/ngày cho kiểm soát đường huyết
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-sky-50 text-sky-900 border border-sky-200 px-2 py-1 rounded-md">
+                  <div className="flex items-center gap-1 font-mono text-xs font-bold bg-sky-50 text-sky-900 border border-sky-200 px-2.5 py-1 rounded-full">
                     <span>{editingForm.sugar}</span>
                     <span className="text-[10px] font-normal">g/ngày</span>
                   </div>
@@ -729,13 +729,13 @@ export default function PatientConstraintsPage() {
                       sugar: parseFloat(e.target.value) || 0,
                     }))
                   }
-                  className="w-full h-2 bg-surface-variant rounded-lg appearance-none cursor-pointer accent-primary disabled:opacity-50"
+                  className="w-full h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary disabled:opacity-50"
                 />
               </div>
 
-              {/* Ghi chú (local-only) */}
+              {/* Ghi chú */}
               <div>
-                <label className="font-label text-xs font-semibold text-on-surface block mb-1">
+                <label className="font-label text-xs font-bold text-on-surface block mb-1">
                   Ghi chú lâm sàng & Dị ứng / Lưu ý đặc biệt
                 </label>
                 <span className="text-[10px] text-on-surface-variant italic block mb-1">
@@ -749,17 +749,17 @@ export default function PatientConstraintsPage() {
                   }
                   rows={3}
                   placeholder="Nhập ghi chú về thực phẩm dị ứng, kiêng cữ bệnh lý, phác đồ điều trị..."
-                  className="w-full p-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl font-body text-xs text-on-surface focus:outline-none focus:border-primary disabled:opacity-50"
+                  className="w-full p-3 bg-surface-container-lowest border border-outline-variant/60 rounded-xl font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                 />
               </div>
             </div>
 
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-end gap-sm">
+            <div className="pt-4 border-t border-outline-variant/40 mt-4 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={handleCloseEdit}
                 disabled={saving}
-                className="px-md py-2 border border-outline-variant rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
               >
                 Hủy
               </button>
@@ -767,7 +767,7 @@ export default function PatientConstraintsPage() {
                 type="button"
                 onClick={() => void handleSaveEdit()}
                 disabled={saving}
-                className="px-md py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-xs active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-60"
+                className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-60"
               >
                 {saving ? (
                   <>
@@ -820,17 +820,17 @@ export default function PatientConstraintsPage() {
           const displaySugar = detail?.sugar_daily_g ?? viewingPatient.sugarDailyG ?? c.sugar;
 
           return (
-            <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-                <div className="flex items-start justify-between pb-md border-b border-outline-variant mb-md shrink-0 gap-md">
-                  <div className="flex items-start gap-md min-w-0">
-                    <div className="relative w-14 h-14 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-lg font-semibold shrink-0">
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col animate-scaleUp overflow-hidden">
+                <div className="flex items-start justify-between pb-4 border-b border-outline-variant/40 mb-4 shrink-0 gap-4">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="relative w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-lg font-bold ring-2 ring-primary/20 shrink-0">
                       {initials(displayName)}
                       {avatarSrc && (
                         <img
                           src={avatarSrc}
                           alt={displayName}
-                          className="absolute inset-0 w-14 h-14 rounded-full object-cover border-2 border-primary-fixed-dim bg-surface-container"
+                          className="absolute inset-0 w-14 h-14 rounded-full object-cover ring-2 ring-outline-variant/40"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
                           }}
@@ -846,11 +846,11 @@ export default function PatientConstraintsPage() {
                         {truncateId(viewingPatient.id)}
                       </p>
                       {diagnoses.length > 0 && (
-                        <div className="flex flex-wrap gap-xs mt-sm">
+                        <div className="flex flex-wrap gap-1.5 mt-2">
                           {diagnoses.map((diag, index) => (
                             <span
                               key={index}
-                              className="bg-tertiary-container/20 text-tertiary px-sm py-xs rounded-full font-caption text-caption border border-tertiary-container/30 text-xs font-medium"
+                              className="bg-primary/10 text-primary px-3 py-0.5 rounded-full font-caption text-caption border border-primary/20 text-xs font-semibold"
                             >
                               {diag}
                             </span>
@@ -859,30 +859,30 @@ export default function PatientConstraintsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-sm shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {(detail?.constraints_status ?? viewingPatient.constraintsStatus) ===
                       "pending_doctor_review" && (
                       <button
                         type="button"
                         disabled={approveBusy}
                         onClick={() => void handleApproveConstraints(viewingPatient.id)}
-                        className="px-md py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-60"
+                        className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 disabled:opacity-60 shadow-2xs"
                       >
                         {approveBusy ? "Đang xác nhận…" : "Xác nhận"}
                       </button>
                     )}
                     <button
                     onClick={handleCloseDetail}
-                    className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer shrink-0"
+                    className="text-on-surface-variant hover:text-primary p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[20px]">close</span>
                   </button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-md pr-xs py-xs">
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                   {detailLoading && (
-                    <div className="flex items-center gap-sm p-sm bg-surface-container-low rounded-xl border border-outline-variant/60 text-xs text-on-surface-variant">
+                    <div className="flex items-center gap-2 p-3 bg-surface-container-low rounded-2xl border border-outline-variant/60 text-xs text-on-surface-variant">
                       <span className="material-symbols-outlined text-[18px] animate-spin text-primary">
                         progress_activity
                       </span>
@@ -891,7 +891,7 @@ export default function PatientConstraintsPage() {
                   )}
 
                   {detailError && (
-                    <div className="p-sm bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs flex items-start gap-2">
                       <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">
                         info
                       </span>
@@ -899,25 +899,25 @@ export default function PatientConstraintsPage() {
                     </div>
                   )}
 
-                  <div className="p-md bg-surface rounded-xl border border-outline-variant">
-                    <h4 className="font-body-bold text-xs font-semibold text-on-surface mb-sm flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-outline">badge</span>
+                  <div className="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-2xs">
+                    <h4 className="font-body-bold text-xs font-bold text-on-surface mb-3 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-primary">badge</span>
                       Thông tin liên hệ
                     </h4>
-                    <ul className="grid grid-cols-1 sm:grid-cols-3 gap-sm text-xs text-on-surface-variant">
-                      <li className="flex items-center gap-xs min-w-0">
+                    <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-on-surface-variant">
+                      <li className="flex items-center gap-1.5 min-w-0">
                         <span className="material-symbols-outlined text-outline text-[16px] shrink-0">
                           phone
                         </span>
                         <span className="truncate">{displayPhone || "—"}</span>
                       </li>
-                      <li className="flex items-center gap-xs min-w-0">
+                      <li className="flex items-center gap-1.5 min-w-0">
                         <span className="material-symbols-outlined text-outline text-[16px] shrink-0">
                           mail
                         </span>
                         <span className="truncate">{displayEmail || "—"}</span>
                       </li>
-                      <li className="flex items-center gap-xs min-w-0">
+                      <li className="flex items-center gap-1.5 min-w-0">
                         <span className="material-symbols-outlined text-outline text-[16px] shrink-0">
                           home
                         </span>
@@ -926,71 +926,71 @@ export default function PatientConstraintsPage() {
                     </ul>
                   </div>
 
-                  <div className="p-md bg-surface rounded-xl border border-outline-variant">
-                    <h4 className="font-body-bold text-xs font-semibold text-on-surface mb-sm flex items-center gap-1">
+                  <div className="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-2xs">
+                    <h4 className="font-body-bold text-xs font-bold text-on-surface mb-3 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-primary">
                         monitor_heart
                       </span>
                       Chỉ số cơ thể
                     </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-sm">
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           Cân nặng
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-on-surface mt-0.5 tabular-nums">
                           {displayWeight ? `${displayWeight} kg` : "—"}
                         </p>
                       </div>
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           Chiều cao
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-on-surface mt-0.5 tabular-nums">
                           {displayHeight ? `${displayHeight} cm` : "—"}
                         </p>
                       </div>
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           BMI
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-primary mt-0.5 tabular-nums">
                           {displayBmi != null ? displayBmi.toFixed(1) : "—"}
                         </p>
-                        <p className="text-[10px] text-on-surface-variant">
+                        <p className="text-[10px] text-on-surface-variant font-medium">
                           {bmiCategoryOf(displayBmi)}
                         </p>
                       </div>
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           Huyết áp
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-on-surface mt-0.5 tabular-nums">
                           {displayBp || "—"}
                         </p>
                       </div>
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           Đường huyết
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-on-surface mt-0.5 tabular-nums">
                           {displayGlucose || "—"}
                         </p>
                       </div>
-                      <div className="p-2 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-center">
-                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-center">
+                        <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
                           Mục tiêu kcal
                         </p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">
+                        <p className="text-sm font-bold text-on-surface mt-0.5 tabular-nums">
                           {displayTargetKcal ? `${displayTargetKcal} kcal` : "—"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-                    <div className="p-md bg-surface rounded-xl border border-outline-variant">
-                      <h4 className="font-body-bold text-xs font-semibold text-on-surface mb-sm flex items-center gap-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-2xs">
+                      <h4 className="font-body-bold text-xs font-bold text-on-surface mb-3 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[16px] text-primary">
                           medication
                         </span>

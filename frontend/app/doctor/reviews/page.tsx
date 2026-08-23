@@ -562,16 +562,16 @@ export default function DoctorReviewsPage() {
         </div>
       )}
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {loadError ? (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-12 text-center text-on-surface-variant shadow-subtle">
+            <span className="material-symbols-outlined text-[48px] text-error mb-2">
               error
             </span>
-            <p className="font-body-bold text-body-bold">{loadError}</p>
+            <p className="font-body-bold text-body-bold text-sm font-bold">{loadError}</p>
             <button
               onClick={() => void load()}
-              className="mt-md px-md py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-xs cursor-pointer active:scale-95"
+              className="mt-4 px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer active:scale-95"
             >
               Thử lại
             </button>
@@ -579,20 +579,20 @@ export default function DoctorReviewsPage() {
         ) : (
           <>
             {/* Page Title & Subtitle + Action Button */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <h2 className="font-h1 text-h1 text-on-surface font-bold">
+                <h2 className="font-h1 text-h1 text-on-surface font-bold text-2xl">
                   Danh sách thực đơn
                 </h2>
-                <p className="font-caption text-caption text-on-surface-variant mt-xs">
-                  Xem và phê duyệt các thực đơn dinh dưỡng do AI khởi tạo
+                <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs">
+                  Xem và phê duyệt các thực đơn dinh dưỡng do AI khởi tạo cho bệnh nhân
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-sm">
+              <div className="flex flex-wrap items-center gap-3">
                 {/* Search Box */}
-                <div className="relative min-w-[220px]">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+                <div className="relative min-w-[240px]">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                     search
                   </span>
                   <input
@@ -600,25 +600,25 @@ export default function DoctorReviewsPage() {
                     placeholder="Tìm mã thực đơn, tên BN, bệnh lý..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                   />
                 </div>
 
                 {/* Time Filter Select */}
-                <div className="relative min-w-[160px]">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+                <div className="relative min-w-[170px]">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                     calendar_month
                   </span>
                   <select
                     value={timePreset}
                     onChange={(e) => setTimePreset(e.target.value as TimeFilterPreset)}
-                    className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                    className="w-full pl-10 pr-8 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer shadow-2xs font-medium"
                   >
-                    <option value="all">Tất cả</option>
+                    <option value="all">Tất cả thời gian</option>
                     <option value="today">Hôm nay</option>
                     <option value="week">Tuần này</option>
                     <option value="month">Tháng này</option>
-                    <option value="custom">Chọn theo khoảng thời gian</option>
+                    <option value="custom">Chọn theo khoảng ngày</option>
                   </select>
                   <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                     arrow_drop_down
@@ -627,7 +627,7 @@ export default function DoctorReviewsPage() {
 
                 <button
                   onClick={() => setIsSelectModalOpen(true)}
-                  className="bg-primary text-on-primary px-md py-2 rounded-lg font-body-bold text-sm hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold shrink-0"
+                  className="bg-primary text-on-primary px-4 py-2.5 rounded-xl font-body-bold text-sm hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold shrink-0"
                 >
                   <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                   <span>Tạo thực đơn mới bằng AI</span>
@@ -637,28 +637,28 @@ export default function DoctorReviewsPage() {
 
             {/* Custom Date Range Picker Bar */}
             {timePreset === "custom" && (
-              <div className="bg-surface-container-low/80 border border-outline-variant/80 rounded-xl px-md py-sm mb-md flex flex-wrap items-center justify-between gap-sm animate-fadeIn">
-                <div className="flex items-center gap-sm flex-wrap">
-                  <span className="text-xs font-semibold text-on-surface flex items-center gap-1">
+              <div className="bg-surface-container-low/80 border border-outline-variant/60 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-primary">date_range</span>
                     Lọc theo khoảng ngày tạo:
                   </span>
-                  <div className="flex items-center gap-xs">
-                    <label className="text-xs text-on-surface-variant">Từ:</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-on-surface-variant font-medium">Từ:</label>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                      className="px-2.5 py-1 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
                     />
                   </div>
-                  <div className="flex items-center gap-xs">
-                    <label className="text-xs text-on-surface-variant">Đến:</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-on-surface-variant font-medium">Đến:</label>
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="px-2 py-1 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
+                      className="px-2.5 py-1 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
@@ -670,7 +670,7 @@ export default function DoctorReviewsPage() {
                       setStartDate("");
                       setEndDate("");
                     }}
-                    className="text-xs text-red-600 hover:text-red-700 hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                    className="text-xs text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                   >
                     <span className="material-symbols-outlined text-[14px]">clear</span>
                     Xóa khoảng ngày
@@ -680,49 +680,54 @@ export default function DoctorReviewsPage() {
             )}
 
             {/* Filter Tabs */}
-            <div className="flex gap-md border-b border-outline-variant mb-lg pb-sm overflow-x-auto">
+            <div className="flex items-center gap-2 pb-1 overflow-x-auto">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "all"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-primary"
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === "all"
+                    ? "bg-primary text-on-primary shadow-2xs font-bold"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
               >
                 Tất cả ({plans.length})
               </button>
               <button
                 onClick={() => setActiveTab("pending")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "pending"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-primary"
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === "pending"
+                    ? "bg-primary text-on-primary shadow-2xs font-bold"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
               >
                 Chưa duyệt ({pendingCount})
               </button>
               <button
                 onClick={() => setActiveTab("approved")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "approved"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-primary"
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === "approved"
+                    ? "bg-primary text-on-primary shadow-2xs font-bold"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
               >
                 Đã duyệt ({approvedCount})
               </button>
               <button
                 onClick={() => setActiveTab("expiring")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "expiring"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-primary"
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === "expiring"
+                    ? "bg-primary text-on-primary shadow-2xs font-bold"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
               >
                 Sắp hết hạn ({expiringCount})
               </button>
               <button
                 onClick={() => setActiveTab("expired")}
-                className={`font-label text-label pb-sm px-sm transition-colors cursor-pointer border-b-2 whitespace-nowrap shrink-0 ${activeTab === "expired"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-primary"
-                  }`}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  activeTab === "expired"
+                    ? "bg-primary text-on-primary shadow-2xs font-bold"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                }`}
               >
                 Hết hạn ({expiredCount})
               </button>
@@ -730,84 +735,83 @@ export default function DoctorReviewsPage() {
 
             {/* Meal Plans Table */}
             {filteredPlans.length === 0 ? (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-12 text-center text-on-surface-variant shadow-subtle">
+                <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
                   menu_book
                 </span>
-                <p className="font-body-bold text-body-bold">
+                <p className="font-body-bold text-body-bold text-sm font-bold">
                   {plans.length === 0
                     ? "Chưa có thực đơn nào"
                     : "Không có thực đơn phù hợp"}
                 </p>
-                <p className="font-caption text-caption text-xs mt-xs">
+                <p className="font-caption text-caption text-xs mt-1">
                   {plans.length === 0
                     ? 'Bấm "Tạo thực đơn mới bằng AI" để tạo thực đơn đầu tiên cho bệnh nhân.'
                     : "Thử đổi từ khóa tìm kiếm, chọn lại bộ lọc thời gian hoặc chọn tab khác."}
                 </p>
               </div>
             ) : (
-              <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm min-w-[860px]">
                     <thead>
-                      <tr className="border-b border-outline-variant bg-surface-container-low/60 text-left">
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                      <tr className="border-b border-outline-variant/40 bg-surface-container-low/50 text-left">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Mã thực đơn
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Tên bệnh nhân
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Số ngày
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Lượng calo
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Trạng thái
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Hạn thực đơn
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px]">
                           Ngày tạo
                         </th>
-                        <th className="px-md py-3 font-body-bold text-xs font-semibold text-on-surface-variant uppercase tracking-wide text-right">
+                        <th className="px-5 py-3.5 font-label text-label text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-[11px] text-right">
                           Thao tác
                         </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-outline-variant/30 font-body">
                       {pagedPlans.map((plan) => {
                         const badge = STATUS_BADGE[plan.status] || STATUS_BADGE.pending;
                         const patient = patientById.get(plan.patientId);
                         return (
                           <tr
                             key={plan.id}
-                            className="border-b border-outline-variant/60 last:border-b-0 hover:bg-surface-container-low/40 transition-colors"
+                            className="hover:bg-surface-container-low/40 transition-colors"
                           >
                             {/* Mã thực đơn */}
-                            <td className="px-md py-3">
+                            <td className="px-5 py-3.5">
                               <span
                                 title={plan.id}
-                                className="font-mono text-xs font-semibold text-primary"
+                                className="font-mono text-xs font-bold text-primary"
                               >
                                 {truncateId(plan.id)}
                               </span>
                             </td>
 
                             {/* Tên bệnh nhân */}
-                            <td className="px-md py-3">
-                              <div className="flex items-center gap-sm min-w-0">
-                                {/* Avatar — chuẩn theo trang /doctor/patients */}
-                                <div className="relative w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20 shrink-0">
                                   {initials(plan.patientName)}
                                   {patient?.avatar &&
                                     !patient.avatar.startsWith("https://api.dicebear.com") && (
                                     <img
                                       src={patient.avatar}
                                       alt={plan.patientName}
-                                      className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                      className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                       onError={(e) => {
                                         e.currentTarget.style.display = "none";
                                       }}
@@ -815,10 +819,10 @@ export default function DoctorReviewsPage() {
                                   )}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-body-bold text-body font-semibold text-on-surface whitespace-nowrap">
+                                  <p className="font-body-bold text-body font-bold text-on-surface whitespace-nowrap">
                                     {plan.patientName}
                                   </p>
-                                  <p className="text-xs text-on-surface-variant">
+                                  <p className="text-xs text-on-surface-variant mt-0.5">
                                     {patient?.age
                                       ? `${patient.age} tuổi • `
                                       : ""}
@@ -829,14 +833,14 @@ export default function DoctorReviewsPage() {
                             </td>
 
                             {/* Số ngày */}
-                            <td className="px-md py-3 text-on-surface-variant whitespace-nowrap">
+                            <td className="px-5 py-3.5 text-on-surface-variant whitespace-nowrap font-medium text-xs">
                               {plan.daysCount || 7} ngày
                             </td>
 
                             {/* Lượng calo */}
-                            <td className="px-md py-3 text-on-surface whitespace-nowrap">
-                              <span className="inline-flex items-center gap-xs">
-                                <span className="material-symbols-outlined text-[16px] text-outline">
+                            <td className="px-5 py-3.5 text-on-surface whitespace-nowrap font-bold text-xs tabular-nums">
+                              <span className="inline-flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[16px] text-amber-500">
                                   local_fire_department
                                 </span>
                                 {plan.calories}
@@ -844,7 +848,7 @@ export default function DoctorReviewsPage() {
                             </td>
 
                             {/* Trạng thái */}
-                            <td className="px-md py-3">
+                            <td className="px-5 py-3.5">
                               <span
                                 className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${badge.className}`}
                               >
@@ -857,24 +861,24 @@ export default function DoctorReviewsPage() {
                               </span>
                             </td>
 
-                            {/* Hạn thực đơn — chỉ hiện với plan đang có hiệu lực (mới nhất đã duyệt/chỉnh) */}
-                            <td className="px-md py-3">
+                            {/* Hạn thực đơn */}
+                            <td className="px-5 py-3.5">
                               <PlanExpiryBadge expiry={expiryByPlanId.get(plan.id) ?? null} />
                             </td>
 
                             {/* Ngày tạo */}
-                            <td className="px-md py-3 text-on-surface-variant whitespace-nowrap">
+                            <td className="px-5 py-3.5 text-on-surface-variant whitespace-nowrap text-xs">
                               {plan.createdAt || "—"}
                             </td>
 
                             {/* Thao tác */}
-                            <td className="px-md py-3 text-right">
+                            <td className="px-5 py-3.5 text-right">
                               <Link
                                 href={`/doctor/reviews/${encodeURIComponent(plan.patientId)}/${encodeURIComponent(plan.id)}`}
-                                className="inline-flex items-center gap-xs bg-primary hover:bg-primary-container text-on-primary font-body-bold h-9 px-lg rounded-lg transition-all text-xs font-semibold shrink-0 cursor-pointer active:scale-95 shadow-xs whitespace-nowrap"
+                                className="inline-flex items-center gap-1 bg-primary hover:bg-primary/90 text-on-primary font-body-bold h-8 px-3.5 rounded-xl transition-all text-xs font-semibold shrink-0 cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap"
                               >
                                 <span>Xem chi tiết</span>
-                                <span className="material-symbols-outlined text-[16px]">
+                                <span className="material-symbols-outlined text-[15px]">
                                   arrow_forward
                                 </span>
                               </Link>
@@ -899,35 +903,35 @@ export default function DoctorReviewsPage() {
 
       {/* PATIENT SELECTION MODAL */}
       {isSelectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <span className="material-symbols-outlined text-[22px]">auto_awesome</span>
                 </div>
                 <div>
                   <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
                     Tạo thực đơn AI cho bệnh nhân
                   </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
-                    Chọn một hoặc nhiều bệnh nhân — hệ thống sẽ tạo thực đơn cho tất cả
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
+                    Chọn một hoặc nhiều bệnh nhân để tạo thực đơn tự động
                   </p>
                 </div>
               </div>
               <button
                 onClick={closePatientModal}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="text-on-surface-variant hover:text-primary p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
             {/* Search + Select All Toolbar */}
-            <div className="flex items-center gap-sm mb-md">
+            <div className="flex items-center gap-3 mb-4">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px]">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-outline text-[20px]">
                   search
                 </span>
                 <input
@@ -935,7 +939,7 @@ export default function DoctorReviewsPage() {
                   value={patientSearch}
                   onChange={(e) => setPatientSearch(e.target.value)}
                   placeholder="Tìm theo tên, mã bệnh nhân, hoặc bệnh lý..."
-                  className="w-full pl-xl pr-md py-sm bg-surface-container-low border border-outline-variant rounded-xl font-body text-body text-on-surface text-xs focus:outline-none focus:border-primary transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl font-body text-body text-on-surface text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                   autoFocus
                 />
               </div>
@@ -943,7 +947,7 @@ export default function DoctorReviewsPage() {
                 type="button"
                 onClick={toggleSelectAll}
                 disabled={visiblePatients.length === 0}
-                className="px-md py-sm border border-outline-variant rounded-xl text-xs font-semibold text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer disabled:opacity-40 shrink-0 flex items-center gap-1"
+                className="px-3.5 py-2.5 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer disabled:opacity-40 shrink-0 flex items-center gap-1 shadow-2xs"
               >
                 <span className="material-symbols-outlined text-[16px]">
                   {allVisibleSelected ? "deselect" : "select_all"}
@@ -953,9 +957,9 @@ export default function DoctorReviewsPage() {
             </div>
 
             {/* Patient List */}
-            <div className="flex-1 overflow-y-auto space-y-sm pr-xs">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {visiblePatients.length === 0 ? (
-                <div className="text-center py-xl text-on-surface-variant text-xs">
+                <div className="text-center py-12 text-on-surface-variant text-xs font-medium">
                   {allPatients.length === 0
                     ? "Danh sách bệnh nhân đang trống."
                     : `Không tìm thấy bệnh nhân phù hợp với từ khóa "${patientSearch}".`}
@@ -964,7 +968,7 @@ export default function DoctorReviewsPage() {
                 <>
                   {selectedPatientList.length > 0 &&
                     visiblePatients.length > selectedPatientList.length && (
-                    <div className="flex items-center gap-1.5 px-xs pt-xs pb-1">
+                    <div className="flex items-center gap-1.5 px-1 pt-1 pb-1">
                       <span className="text-[11px] font-bold uppercase tracking-wide text-primary">
                         Đã chọn ({selectedPatientList.length})
                       </span>
@@ -977,7 +981,6 @@ export default function DoctorReviewsPage() {
                   )}
                   {visiblePatients.map((patient) => {
                     const isSelected = selectedPatientIds.has(patient.id);
-                    // Avatar chuẩn như trang /doctor/patients: bỏ seed dicebear, resolve /static/ theo API_BASE
                     const avatar =
                       patient.avatar &&
                       !patient.avatar.startsWith("https://api.dicebear.com")
@@ -988,21 +991,21 @@ export default function DoctorReviewsPage() {
                     return (
                       <div
                         key={patient.id}
-                        className={`rounded-xl border transition-all ${isSelected
+                        className={`rounded-2xl border transition-all ${isSelected
                             ? "border-primary bg-primary/5 shadow-2xs"
-                            : "border-outline-variant bg-surface-container-lowest hover:border-primary/50 hover:bg-surface-container-low/50"
+                            : "border-outline-variant/60 bg-surface-container-lowest hover:border-primary/50 hover:bg-surface-container-low/50 shadow-2xs"
                           }`}
                       >
-                        {/* Hàng chọn bệnh nhân (click để chọn/bỏ chọn) */}
+                        {/* Hàng chọn bệnh nhân */}
                         <div
                           onClick={() => togglePatientSelection(patient.id)}
-                          className="flex items-center gap-sm p-sm cursor-pointer select-none"
+                          className="flex items-center gap-3 p-3.5 cursor-pointer select-none"
                         >
                           {/* Checkbox */}
                           <span
-                            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${isSelected
+                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${isSelected
                                 ? "bg-primary border-primary text-on-primary"
-                                : "border-outline bg-surface-container-lowest"
+                                : "border-outline-variant bg-surface-container-lowest"
                               }`}
                           >
                             {isSelected && (
@@ -1010,14 +1013,14 @@ export default function DoctorReviewsPage() {
                             )}
                           </span>
 
-                          {/* Avatar — chuẩn theo trang /doctor/patients */}
-                          <div className="relative w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                          {/* Avatar */}
+                          <div className="relative w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20 shrink-0">
                             {initials(patient.name)}
                             {avatar && (
                               <img
                                 src={avatar}
                                 alt={patient.name}
-                                className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                 }}
@@ -1028,11 +1031,11 @@ export default function DoctorReviewsPage() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="font-body-bold text-sm font-semibold text-on-surface truncate">
+                              <p className="font-body-bold text-sm font-bold text-on-surface truncate">
                                 {patient.name}
                               </p>
                               <span
-                                className="font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-1.5 py-0.5 rounded-md shrink-0"
+                                className="font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-1.5 py-0.5 rounded-full shrink-0"
                                 title={patient.id}
                               >
                                 {truncatePatientId(patient.id)}
@@ -1042,12 +1045,12 @@ export default function DoctorReviewsPage() {
                               {patient.age > 0 ? `${patient.age} tuổi` : "—"}
                               {patient.gender ? ` • ${patient.gender}` : ""}
                             </p>
-                            <p className="text-xs text-on-surface-variant truncate">
+                            <p className="text-xs text-on-surface-variant truncate font-medium">
                               Chẩn đoán: {shortCondition(patient.condition)}
                             </p>
                           </div>
 
-                          {/* Nút cài đặt — chỉ hiện khi bệnh nhân đã được chọn */}
+                          {/* Nút cài đặt */}
                           {isSelected && (
                             <button
                               type="button"
@@ -1056,7 +1059,7 @@ export default function DoctorReviewsPage() {
                                 setConfigTargetPatientId(patient.id);
                                 setIsConfigOpen(true);
                               }}
-                              className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors cursor-pointer"
+                              className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors cursor-pointer"
                               title={`Cài đặt thông số cho ${patient.name}`}
                             >
                               <span className="material-symbols-outlined text-[18px]">
@@ -1066,29 +1069,29 @@ export default function DoctorReviewsPage() {
                           )}
                         </div>
 
-                        {/* Summary inline các thông số đã cài đặt */}
+                        {/* Summary inline */}
                         {showSummary && (
-                          <div className="px-sm pb-sm space-y-1">
+                          <div className="px-3.5 pb-3 space-y-1 border-t border-outline-variant/30 pt-2">
                             {cfg.priorities.length > 0 && (
                               <div className="flex items-center gap-1 flex-wrap">
                                 {cfg.priorities.map((pr) => (
                                   <span
                                     key={pr}
-                                    className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20"
+                                    className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20"
                                   >
                                     {pr}
                                   </span>
                                 ))}
                                 {cfg.customActive && cfg.customPriority.trim() && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-container-high text-on-surface-variant border border-outline-variant/60">
                                     {cfg.customPriority.trim()}
                                   </span>
                                 )}
                               </div>
                             )}
                             {cfg.notes.trim() && (
-                              <p className="text-[11px] text-on-surface-variant truncate flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">notes</span>
+                              <p className="text-xs text-on-surface-variant truncate flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">notes</span>
                                 {cfg.notes.trim()}
                               </p>
                             )}
@@ -1102,21 +1105,21 @@ export default function DoctorReviewsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-between items-center text-xs text-on-surface-variant">
+            <div className="pt-4 border-t border-outline-variant/40 mt-4 flex justify-between items-center text-xs text-on-surface-variant font-medium">
               <span>
-                Đã chọn {selectedCount}/{visiblePatients.length} bệnh nhân
+                Đã chọn <strong className="text-primary">{selectedCount}</strong>/{visiblePatients.length} bệnh nhân
               </span>
-              <div className="flex items-center gap-sm">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={closePatientModal}
-                  className="px-md py-sm border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-outline-variant/60 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer font-semibold"
                 >
                   Đóng
                 </button>
                 <button
                   onClick={handleGenerateForSelected}
                   disabled={selectedCount === 0}
-                  className="bg-primary text-on-primary px-md py-sm rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-[16px]">
                     auto_awesome
@@ -1131,19 +1134,19 @@ export default function DoctorReviewsPage() {
 
       {/* GENERATION SETTINGS DIALOG */}
       {isConfigOpen && (
-        <div className="fixed inset-0 z-[60] bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
             {/* Dialog Header */}
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <span className="material-symbols-outlined text-[22px]">tune</span>
                 </div>
                 <div>
                   <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
                     Cài đặt thông số tạo thực đơn
                   </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
                     {configTargetPatient
                       ? `Điều chỉnh thông số cho bệnh nhân ${configTargetPatient.name}`
                       : `Điều chỉnh ưu tiên & ghi chú cho từng bệnh nhân đã chọn (${selectedPatients.length})`}
@@ -1152,16 +1155,16 @@ export default function DoctorReviewsPage() {
               </div>
               <button
                 onClick={() => setIsConfigOpen(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="text-on-surface-variant hover:text-primary p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            {/* Per-patient config list — đầy đủ thông số như trang gen bình thường */}
-            <div className="flex-1 overflow-y-auto space-y-md pr-xs">
+            {/* Per-patient config list */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {dialogPatients.length === 0 ? (
-                <div className="text-center py-xl text-on-surface-variant text-xs">
+                <div className="text-center py-12 text-on-surface-variant text-xs">
                   Chưa chọn bệnh nhân nào.
                 </div>
               ) : (
@@ -1170,50 +1173,50 @@ export default function DoctorReviewsPage() {
                   return (
                     <div
                       key={patient.id}
-                      className="border border-outline-variant rounded-xl p-md space-y-md bg-surface-container-lowest"
+                      className="border border-outline-variant/60 rounded-2xl p-4 space-y-4 bg-surface-container-lowest shadow-2xs"
                     >
                       <div className="flex items-center gap-1.5">
-                        <p className="font-body-bold text-sm font-semibold text-on-surface truncate">
+                        <p className="font-body-bold text-sm font-bold text-on-surface truncate">
                           {patient.name}
                         </p>
                         <span
-                          className="font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-1.5 py-0.5 rounded-md shrink-0"
+                          className="font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full shrink-0"
                           title={patient.id}
                         >
                           {truncatePatientId(patient.id)}
                         </span>
                       </div>
 
-                      {/* Số ngày (giống trang gen — MVP cố định 7 ngày theo contract) */}
+                      {/* Số ngày */}
                       <div>
-                        <label className="font-label text-label text-on-surface block mb-xs font-semibold text-xs">
+                        <label className="font-label text-label text-on-surface block mb-1 font-bold text-xs">
                           Số ngày
                         </label>
-                        <div className="flex items-center gap-xs">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            className="px-md py-sm rounded-lg text-xs font-semibold bg-primary text-on-primary shadow-xs"
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-on-primary shadow-2xs"
                           >
                             7 ngày (Khuyến nghị)
                           </button>
-                          <span className="px-md py-sm rounded-lg text-xs text-on-surface-variant/50">
+                          <span className="px-3 py-1.5 rounded-xl text-xs text-on-surface-variant/50 font-medium">
                             3 ngày
                           </span>
-                          <span className="px-md py-sm rounded-lg text-xs text-on-surface-variant/50">
+                          <span className="px-3 py-1.5 rounded-xl text-xs text-on-surface-variant/50 font-medium">
                             14 ngày
                           </span>
                         </div>
-                        <p className="text-[11px] text-on-surface-variant mt-xs">
-                          MVP cố định 7 ngày theo contract.
+                        <p className="text-[11px] text-on-surface-variant mt-1">
+                          MVP cố định 7 ngày theo tiêu chuẩn lâm sàng.
                         </p>
                       </div>
 
-                      {/* Ưu tiên đặc biệt (giống trang gen) */}
+                      {/* Ưu tiên đặc biệt */}
                       <div>
-                        <label className="font-label text-label text-on-surface block mb-xs font-semibold text-xs">
+                        <label className="font-label text-label text-on-surface block mb-1 font-bold text-xs">
                           Ưu tiên đặc biệt
                         </label>
-                        <div className="flex flex-wrap gap-xs">
+                        <div className="flex flex-wrap gap-1.5">
                           {PRIORITY_OPTIONS.map((opt) => {
                             const on = cfg.priorities.includes(opt);
                             return (
@@ -1221,9 +1224,9 @@ export default function DoctorReviewsPage() {
                                 key={opt}
                                 type="button"
                                 onClick={() => togglePriority(patient.id, opt)}
-                                className={`px-md py-sm rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-xs ${on
-                                    ? "bg-primary/10 border-primary text-primary"
-                                    : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:border-primary/50"
+                                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1 ${on
+                                    ? "bg-primary/10 border-primary text-primary shadow-2xs"
+                                    : "bg-surface-container-lowest border-outline-variant/60 text-on-surface-variant hover:border-primary/50"
                                   }`}
                               >
                                 {on && (
@@ -1236,9 +1239,9 @@ export default function DoctorReviewsPage() {
                           <button
                             type="button"
                             onClick={() => toggleCustomActive(patient.id)}
-                            className={`px-md py-sm rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-xs ${cfg.customActive
-                                ? "bg-primary/10 border-primary text-primary"
-                                : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:border-primary/50"
+                            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1 ${cfg.customActive
+                                ? "bg-primary/10 border-primary text-primary shadow-2xs"
+                                : "bg-surface-container-lowest border-outline-variant/60 text-on-surface-variant hover:border-primary/50"
                               }`}
                           >
                             {cfg.customActive && (
@@ -1248,21 +1251,21 @@ export default function DoctorReviewsPage() {
                           </button>
                         </div>
                         {cfg.customActive && (
-                          <div className="mt-xs">
+                          <div className="mt-2">
                             <input
                               type="text"
                               value={cfg.customPriority}
                               onChange={(e) => setCustomPriority(patient.id, e.target.value)}
                               placeholder="Nhập ưu tiên đặc biệt khác..."
-                              className="w-full p-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-body text-on-surface focus:outline-none focus:border-primary transition-all shadow-xs"
+                              className="w-full px-3.5 py-2 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                             />
                           </div>
                         )}
                       </div>
 
-                      {/* Ghi chú bổ sung cho AI Agent (giống trang gen) */}
+                      {/* Ghi chú bổ sung */}
                       <div>
-                        <label className="font-label text-label text-on-surface block mb-xs font-semibold text-xs">
+                        <label className="font-label text-label text-on-surface block mb-1 font-bold text-xs">
                           Ghi chú bổ sung cho AI Agent
                         </label>
                         <textarea
@@ -1270,7 +1273,7 @@ export default function DoctorReviewsPage() {
                           onChange={(e) => setNotes(patient.id, e.target.value)}
                           rows={3}
                           placeholder="Ví dụ: ưu tiên món hấp luộc miền Bắc, hạn chế đồ chiên xào..."
-                          className="w-full p-md bg-surface-container-lowest border border-outline-variant rounded-lg font-body text-body text-on-surface focus:outline-none focus:border-primary text-sm transition-shadow"
+                          className="w-full px-3.5 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-sm transition-all resize-y"
                         />
                       </div>
                     </div>
@@ -1280,10 +1283,10 @@ export default function DoctorReviewsPage() {
             </div>
 
             {/* Dialog Footer */}
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-end">
+            <div className="pt-4 border-t border-outline-variant/40 mt-4 flex justify-end">
               <button
                 onClick={() => setIsConfigOpen(false)}
-                className="bg-primary text-on-primary px-md py-sm rounded-lg text-xs font-semibold hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95"
+                className="bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95"
               >
                 <span className="material-symbols-outlined text-[16px]">check</span>
                 <span>Xong</span>

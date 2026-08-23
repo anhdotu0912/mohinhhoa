@@ -377,32 +377,32 @@ export default function PatientCompliancePage() {
     <>
       <TopBar title="Theo dõi tuân thủ" />
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {loadError && (
-          <div className="mb-md p-md bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center justify-between">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs flex items-center justify-between shadow-2xs">
             <span>{loadError}</span>
             <button
               onClick={() => void loadData()}
-              className="text-primary font-semibold hover:underline cursor-pointer"
+              className="text-primary font-bold hover:underline cursor-pointer"
             >
               Thử lại
             </button>
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h2 className="font-h1 text-h1 text-on-surface font-bold">
+            <h2 className="font-h1 text-h1 text-on-surface font-bold text-2xl">
               Theo dõi tuân thủ dinh dưỡng
             </h2>
-            <p className="font-caption text-caption text-on-surface-variant mt-xs">
+            <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs">
               Thống kê check-in tuân thủ và cảnh báo tương tác thuốc–thực phẩm
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-sm">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[240px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                 search
               </span>
               <input
@@ -410,12 +410,12 @@ export default function PatientCompliancePage() {
                 placeholder="Tìm mã BN, tên bệnh nhân, bệnh lý..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
               />
             </div>
 
-            <div className="relative min-w-[160px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+            <div className="relative min-w-[170px]">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                 donut_large
               </span>
               <select
@@ -425,7 +425,7 @@ export default function PatientCompliancePage() {
                     e.target.value as "all" | "high" | "medium" | "low"
                   )
                 }
-                className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                className="w-full pl-10 pr-8 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer shadow-2xs font-medium"
               >
                 <option value="all">Tất cả mức độ</option>
                 <option value="high">Cao (&ge; 85%)</option>
@@ -438,13 +438,13 @@ export default function PatientCompliancePage() {
             </div>
 
             <div className="relative min-w-[170px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
                 filter_alt
               </span>
               <select
                 value={diagnosisFilter}
                 onChange={(e) => setDiagnosisFilter(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                className="w-full pl-10 pr-8 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer shadow-2xs font-medium"
               >
                 <option value="all">Tất cả bệnh lý</option>
                 <option value="tiểu đường">Tiểu đường</option>
@@ -461,44 +461,44 @@ export default function PatientCompliancePage() {
         </div>
 
         {filteredPatients.length === 0 ? (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-12 text-center text-on-surface-variant shadow-subtle">
+            <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
               insights
             </span>
-            <p className="font-body-bold text-body-bold">
+            <p className="font-body-bold text-body-bold text-sm font-bold">
               Không tìm thấy bệnh nhân phù hợp
             </p>
-            <p className="font-caption text-caption text-xs mt-xs">
+            <p className="font-caption text-caption text-xs mt-1">
               Thử thay đổi từ khóa tìm kiếm hoặc chọn lại nhóm mức độ tuân thủ.
             </p>
           </div>
         ) : (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
-                  <tr className="bg-surface-container-low border-b border-outline-variant">
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                  <tr className="bg-surface-container-low/50 border-b border-outline-variant/40">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Mã BN
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Bệnh nhân
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Chẩn đoán bệnh lý
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-center">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center">
                       Mức độ tuân thủ (14 ngày)
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Sự kiện / Cảnh báo gần nhất
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-xs text-right">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-right">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant font-body text-body">
+                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
                   {pagedPatients.map((patient) => {
                     const stats = getStats(patient);
                     const hasRate = stats.rate !== null;
@@ -509,20 +509,20 @@ export default function PatientCompliancePage() {
                     return (
                       <tr
                         key={patient.id}
-                        className="transition-colors hover:bg-surface-bright"
+                        className="transition-colors hover:bg-surface-container-low/40"
                       >
-                        <td className="p-md">
+                        <td className="px-5 py-3.5">
                           <span
                             title={patient.id}
-                            className="font-mono text-xs font-medium text-on-surface-variant"
+                            className="font-mono text-xs font-semibold text-on-surface-variant"
                           >
                             {truncateId(patient.id)}
                           </span>
                         </td>
 
-                        <td className="p-md">
-                          <div className="flex items-center gap-sm min-w-0">
-                            <div className="relative w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold shrink-0">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20 shrink-0">
                               {initials(patient.name)}
                               {patient.avatar &&
                                 !patient.avatar.startsWith(
@@ -531,7 +531,7 @@ export default function PatientCompliancePage() {
                                   <img
                                     src={patient.avatar}
                                     alt={patient.name}
-                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                     onError={(e) => {
                                       e.currentTarget.style.display = "none";
                                     }}
@@ -539,7 +539,7 @@ export default function PatientCompliancePage() {
                                 )}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-body-bold text-on-surface font-semibold text-sm whitespace-nowrap">
+                              <p className="font-body-bold text-on-surface font-bold text-sm whitespace-nowrap">
                                 {patient.name}
                               </p>
                               <p className="text-xs text-on-surface-variant">
@@ -550,25 +550,25 @@ export default function PatientCompliancePage() {
                           </div>
                         </td>
 
-                        <td className="p-md text-on-surface-variant">
+                        <td className="px-5 py-3.5 text-on-surface-variant">
                           <span
-                            className="bg-tertiary-container/20 text-tertiary px-sm py-xs rounded-full font-caption text-caption border border-tertiary-container/30 text-xs font-medium inline-block max-w-[200px] truncate"
+                            className="bg-primary/10 text-primary px-3 py-1 rounded-full font-caption text-xs font-semibold border border-primary/20 inline-block max-w-[200px] truncate"
                             title={patient.condition}
                           >
                             {shortCondition(patient.condition, 2)}
                           </span>
                         </td>
 
-                        <td className="p-md text-center whitespace-nowrap">
+                        <td className="px-5 py-3.5 text-center whitespace-nowrap">
                           {hasRate ? (
-                            <div className="inline-flex flex-col items-center gap-1">
+                            <div className="inline-flex flex-col items-center gap-1.5">
                               <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold tabular-nums ${
                                   isHigh
                                     ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                                     : isMedium
                                     ? "bg-amber-50 text-amber-800 border border-amber-200"
-                                    : "bg-red-50 text-red-800 border border-red-200"
+                                    : "bg-rose-50 text-rose-800 border border-rose-200"
                                 }`}
                               >
                                 <span className="material-symbols-outlined text-[14px]">
@@ -582,32 +582,32 @@ export default function PatientCompliancePage() {
                               </span>
                               <div className="w-20 bg-surface-container-high h-1.5 rounded-full overflow-hidden">
                                 <div
-                                  className={`h-full rounded-full ${
+                                  className={`h-full rounded-full transition-all ${
                                     isHigh
-                                      ? "bg-emerald-600"
+                                      ? "bg-primary"
                                       : isMedium
                                       ? "bg-amber-500"
-                                      : "bg-red-500"
+                                      : "bg-rose-500"
                                   }`}
                                   style={{ width: `${rate}%` }}
                                 />
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs text-on-surface-variant">
+                            <span className="text-xs text-on-surface-variant font-medium">
                               Chưa có check-in
                             </span>
                           )}
                         </td>
 
-                        <td className="p-md text-on-surface-variant">
-                          <div className="flex items-start gap-1 max-w-[240px]">
+                        <td className="px-5 py-3.5 text-on-surface-variant">
+                          <div className="flex items-start gap-1.5 max-w-[240px]">
                             <span
-                              className={`material-symbols-outlined text-[15px] shrink-0 mt-0.5 ${
+                              className={`material-symbols-outlined text-[16px] shrink-0 mt-0.5 ${
                                 stats.lastAlert.type === "warning"
                                   ? "text-amber-600"
                                   : stats.lastAlert.type === "success"
-                                  ? "text-emerald-600"
+                                  ? "text-primary"
                                   : "text-on-surface-variant"
                               }`}
                             >
@@ -618,7 +618,7 @@ export default function PatientCompliancePage() {
                                 : "info"}
                             </span>
                             <span
-                              className="text-xs truncate"
+                              className="text-xs truncate font-medium"
                               title={`${stats.lastAlert.text} (${stats.lastAlert.time})`}
                             >
                               {stats.lastAlert.text}
@@ -626,12 +626,12 @@ export default function PatientCompliancePage() {
                           </div>
                         </td>
 
-                        <td className="p-md text-right whitespace-nowrap">
+                        <td className="px-5 py-3.5 text-right whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => handleOpenModal(patient)}
                             title="Xem biểu đồ tuân thủ & nhật ký sự kiện"
-                            className="inline-flex items-center gap-1.5 px-md py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-lg hover:bg-primary-container transition-all cursor-pointer active:scale-95 shadow-xs font-semibold"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-on-primary font-body-bold text-xs rounded-xl hover:bg-primary/90 transition-all cursor-pointer active:scale-95 shadow-2xs font-bold"
                           >
                             <span className="material-symbols-outlined text-[16px]">
                               insights
@@ -657,11 +657,11 @@ export default function PatientCompliancePage() {
       </main>
 
       {viewingPatient && viewingStats && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center p-md animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md shrink-0">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col animate-scaleUp overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <span className="material-symbols-outlined text-[22px]">
                     insights
                   </span>
@@ -670,7 +670,7 @@ export default function PatientCompliancePage() {
                   <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
                     Theo dõi tuân thủ: {viewingPatient.name}
                   </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
                     {viewingPatient.id} •{" "}
                     {viewingPatient.age ? `${viewingPatient.age} tuổi` : ""} •
                     Chẩn đoán: {viewingPatient.condition}
@@ -679,7 +679,7 @@ export default function PatientCompliancePage() {
               </div>
               <button
                 onClick={() => setViewingPatient(null)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="text-on-surface-variant hover:text-primary p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">
                   close
@@ -687,32 +687,32 @@ export default function PatientCompliancePage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-md pr-xs py-xs">
-              <div className="grid grid-cols-3 gap-sm">
-                <div className="p-3 bg-surface-container-low/60 rounded-xl border border-outline-variant/60 text-center">
-                  <p className="text-xs text-on-surface-variant">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl text-center shadow-2xs">
+                  <p className="text-xs text-on-surface-variant font-medium">
                     Tỷ lệ tuân thủ 14 ngày
                   </p>
-                  <p className="text-xl font-bold text-primary mt-0.5">
+                  <p className="text-2xl font-bold text-primary mt-1 tabular-nums">
                     {viewingStats.rate !== null ? `${viewingStats.rate}%` : "—"}
                   </p>
                 </div>
-                <div className="p-3 bg-surface-container-low/60 rounded-xl border border-outline-variant/60 text-center">
-                  <p className="text-xs text-on-surface-variant">
+                <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl text-center shadow-2xs">
+                  <p className="text-xs text-on-surface-variant font-medium">
                     Check-in đúng kế hoạch
                   </p>
-                  <p className="text-xl font-bold text-emerald-700 mt-0.5">
+                  <p className="text-2xl font-bold text-primary mt-1 tabular-nums">
                     {viewingStats.asPlannedMeals} / {viewingStats.totalMeals}
                   </p>
                 </div>
-                <div className="p-3 bg-surface-container-low/60 rounded-xl border border-outline-variant/60 text-center">
-                  <p className="text-xs text-on-surface-variant">
+                <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl text-center shadow-2xs">
+                  <p className="text-xs text-on-surface-variant font-medium">
                     Đánh giá chung
                   </p>
                   <p
-                    className={`text-sm font-bold mt-1 ${
+                    className={`text-sm font-bold mt-2 ${
                       viewingStats.rate !== null && viewingStats.rate >= 85
-                        ? "text-emerald-700"
+                        ? "text-primary"
                         : "text-amber-700"
                     }`}
                   >
@@ -727,12 +727,12 @@ export default function PatientCompliancePage() {
                 </div>
               </div>
 
-              <div className="bg-surface-container-lowest border border-outline-variant/80 rounded-xl p-md">
-                <div className="flex justify-between items-center mb-sm">
-                  <h4 className="font-body-bold text-sm font-semibold text-on-surface">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-2xs">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-body-bold text-sm font-bold text-on-surface">
                     Biểu đồ tỷ lệ tuân thủ (14 ngày gần nhất)
                   </h4>
-                  <span className="text-xs text-on-surface-variant font-medium">
+                  <span className="text-xs text-on-surface-variant font-semibold">
                     Mức độ tuân thủ (%)
                   </span>
                 </div>
@@ -955,8 +955,8 @@ export default function PatientCompliancePage() {
                 )}
               </div>
 
-              <div className="bg-surface-container-lowest border border-outline-variant/80 rounded-xl p-md">
-                <h4 className="font-body-bold text-xs font-semibold text-on-surface mb-sm">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-2xs">
+                <h4 className="font-body-bold text-xs font-bold text-on-surface mb-3">
                   Nhật ký sự kiện tuân thủ gần đây
                 </h4>
                 {viewingStats.logs.length === 0 ? (
@@ -965,21 +965,21 @@ export default function PatientCompliancePage() {
                     ăn, check-in, nhắc nhở hoặc cảnh báo tương tác).
                   </p>
                 ) : (
-                  <div className="space-y-xs">
+                  <div className="space-y-2">
                     {(showAllEventLogs
                       ? viewingStats.logs
                       : viewingStats.logs.slice(0, EVENT_LOG_PREVIEW)
                     ).map((log, idx) => (
                       <div
                         key={idx}
-                        className="p-sm bg-surface-container-low/40 border border-outline-variant/60 rounded-lg flex items-start gap-sm text-xs"
+                        className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl flex items-start gap-3 text-xs"
                       >
                         <span
                           className={`material-symbols-outlined text-[18px] shrink-0 mt-0.5 ${
                             log.type === "warning"
                               ? "text-amber-600"
                               : log.type === "success"
-                              ? "text-emerald-600"
+                              ? "text-primary"
                               : "text-on-surface-variant"
                           }`}
                         >
@@ -990,15 +990,15 @@ export default function PatientCompliancePage() {
                             : "info"}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex justify-between items-baseline gap-xs">
-                            <p className="font-semibold text-on-surface">
+                          <div className="flex justify-between items-baseline gap-2">
+                            <p className="font-bold text-on-surface">
                               {log.title}
                             </p>
                             <span className="text-[11px] text-on-surface-variant font-caption shrink-0">
                               {log.time}
                             </span>
                           </div>
-                          <p className="text-on-surface-variant text-[11px] mt-0.5 leading-relaxed">
+                          <p className="text-on-surface-variant text-xs mt-0.5 leading-relaxed">
                             {log.description}
                           </p>
                         </div>
@@ -1008,7 +1008,7 @@ export default function PatientCompliancePage() {
                       <button
                         type="button"
                         onClick={() => setShowAllEventLogs((prev) => !prev)}
-                        className="mt-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                        className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer"
                       >
                         {showAllEventLogs
                           ? "Thu gọn"
@@ -1019,23 +1019,23 @@ export default function PatientCompliancePage() {
                 )}
               </div>
 
-              <div className="bg-surface-container-low/40 border border-outline-variant/60 rounded-xl p-md space-y-sm">
-                <h4 className="font-body-bold text-xs font-semibold text-on-surface">
+              <div className="bg-surface-container-low/40 border border-outline-variant/60 rounded-2xl p-5 space-y-3 shadow-2xs">
+                <h4 className="font-body-bold text-xs font-bold text-on-surface">
                   Gửi nhắc nhở tuân thủ
                 </h4>
                 <textarea
                   value={remindMessage}
                   onChange={(e) => setRemindMessage(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:border-primary resize-none"
+                  className="w-full px-3.5 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
                   placeholder="Nội dung nhắc nhở gửi tới bệnh nhân..."
                 />
                 {remindFeedback && (
                   <p
-                    className={`text-xs ${
+                    className={`text-xs font-medium ${
                       remindFeedback.type === "success"
-                        ? "text-emerald-700"
-                        : "text-red-600"
+                        ? "text-primary"
+                        : "text-rose-600"
                     }`}
                   >
                     {remindFeedback.text}
@@ -1045,7 +1045,7 @@ export default function PatientCompliancePage() {
                   type="button"
                   onClick={() => void handleSendRemind()}
                   disabled={remindSending}
-                  className="inline-flex items-center gap-1.5 px-md py-2 bg-primary text-on-primary text-xs font-semibold rounded-lg hover:bg-primary-container transition-colors disabled:opacity-60 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl hover:bg-primary/90 transition-all shadow-2xs disabled:opacity-60 cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">
                     send
@@ -1055,10 +1055,10 @@ export default function PatientCompliancePage() {
               </div>
             </div>
 
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-between items-center shrink-0">
+            <div className="pt-4 border-t border-outline-variant/40 mt-4 flex justify-between items-center shrink-0">
               <Link
                 href={`/doctor/patients/${encodeURIComponent(viewingPatient.id)}`}
-                className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <span>Xem hồ sơ bệnh nhân</span>
                 <span className="material-symbols-outlined text-[14px]">
@@ -1068,7 +1068,7 @@ export default function PatientCompliancePage() {
               <button
                 type="button"
                 onClick={() => setViewingPatient(null)}
-                className="px-md py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="px-4 py-2 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Đóng
               </button>

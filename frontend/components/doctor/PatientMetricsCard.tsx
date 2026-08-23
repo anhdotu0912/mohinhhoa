@@ -72,14 +72,14 @@ export function PatientMetricsCard({
   };
 
   const inputClass =
-    "w-24 text-center px-2 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors disabled:opacity-60";
+    "w-24 text-center px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-60";
 
   return (
-    <div className="bg-surface rounded-xl border border-outline-variant shadow-subtle overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle overflow-hidden">
       {/* Header: title + updatedAt + actions */}
-      <div className="p-card-padding border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
-        <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-sm font-semibold text-base">
-          <span className="material-symbols-outlined text-primary">
+      <div className="p-card-padding border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/30">
+        <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-sm font-bold text-base">
+          <span className="material-symbols-outlined text-primary text-[20px]">
             monitor_weight
           </span>
           Chỉ số cơ thể
@@ -100,7 +100,7 @@ export function PatientMetricsCard({
               type="button"
               onClick={cancelEdit}
               disabled={saving}
-              className="px-md py-1.5 border border-outline-variant text-on-surface-variant rounded-lg text-xs font-body-bold hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-60"
+              className="px-md py-1.5 border border-outline-variant text-on-surface-variant rounded-xl text-xs font-body-bold hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-60"
             >
               Hủy
             </button>
@@ -108,7 +108,7 @@ export function PatientMetricsCard({
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="bg-primary text-on-primary px-md py-1.5 rounded-lg text-xs font-body-bold hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
+              className="bg-primary text-on-primary px-md py-1.5 rounded-xl text-xs font-body-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
             >
               <span
                 className={`material-symbols-outlined text-[16px] ${
@@ -128,7 +128,7 @@ export function PatientMetricsCard({
             <button
               type="button"
               onClick={startEdit}
-              className="text-primary hover:text-primary-container transition-colors text-xs font-body-bold flex items-center gap-xs cursor-pointer"
+              className="text-primary hover:text-primary/80 transition-colors text-xs font-body-bold flex items-center gap-xs cursor-pointer font-semibold"
             >
               <span className="material-symbols-outlined text-[16px]">
                 edit_note
@@ -140,10 +140,10 @@ export function PatientMetricsCard({
       </div>
 
       {/* Body: 4 ô chỉ số */}
-      <div className="p-card-padding grid grid-cols-2 md:grid-cols-4 gap-md justify-between items-center text-center divide-x-0 md:divide-x divide-outline-variant">
+      <div className="p-card-padding grid grid-cols-2 md:grid-cols-4 gap-md justify-between items-center text-center divide-x-0 md:divide-x divide-outline-variant/40">
         {/* Cân nặng */}
         <div className="px-sm py-xs">
-          <p className="font-label text-label text-outline mb-xs uppercase tracking-wider text-xs">
+          <p className="font-label text-label text-on-surface-variant mb-xs uppercase tracking-wider text-[11px] font-semibold">
             Cân nặng
           </p>
           {isEditing ? (
@@ -163,7 +163,7 @@ export function PatientMetricsCard({
               </span>
             </div>
           ) : (
-            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold">
+            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
               {metrics.weight ?? "—"}{" "}
               <span className="font-body text-body text-on-surface-variant text-sm font-normal">
                 kg
@@ -174,7 +174,7 @@ export function PatientMetricsCard({
 
         {/* Chiều cao */}
         <div className="px-sm py-xs">
-          <p className="font-label text-label text-outline mb-xs uppercase tracking-wider text-xs">
+          <p className="font-label text-label text-on-surface-variant mb-xs uppercase tracking-wider text-[11px] font-semibold">
             Chiều cao
           </p>
           {isEditing ? (
@@ -194,7 +194,7 @@ export function PatientMetricsCard({
               </span>
             </div>
           ) : (
-            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold">
+            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
               {metrics.height ?? "—"}{" "}
               <span className="font-body text-body text-on-surface-variant text-sm font-normal">
                 cm
@@ -203,15 +203,15 @@ export function PatientMetricsCard({
           )}
         </div>
 
-        {/* BMI — không bao giờ cho nhập tay */}
+        {/* BMI */}
         <div className="px-sm py-xs">
-          <p className="font-label text-label text-outline mb-xs uppercase tracking-wider text-xs">
+          <p className="font-label text-label text-on-surface-variant mb-xs uppercase tracking-wider text-[11px] font-semibold">
             BMI
           </p>
-          <p className="font-h1 text-h1 text-tertiary-container text-2xl font-bold">
+          <p className="font-h1 text-h1 text-primary text-2xl font-bold tabular-nums">
             {metrics.bmi ?? "—"}
           </p>
-          <p className="font-caption text-caption text-tertiary mt-xs text-xs font-medium">
+          <p className="font-caption text-caption text-primary/90 mt-xs text-xs font-semibold">
             {metrics.bmi_category}
           </p>
           {isEditing && (
@@ -221,15 +221,15 @@ export function PatientMetricsCard({
           )}
         </div>
 
-        {/* Huyết áp / Đường huyết — display-only */}
+        {/* Huyết áp / Đường huyết */}
         <div className="px-sm py-xs">
-          <p className="font-label text-label text-outline mb-xs uppercase tracking-wider text-xs">
+          <p className="font-label text-label text-on-surface-variant mb-xs uppercase tracking-wider text-[11px] font-semibold">
             Huyết áp / Đường huyết
           </p>
-          <p className="font-body-bold text-on-surface font-semibold text-sm">
+          <p className="font-body-bold text-on-surface font-bold text-sm tabular-nums">
             {bloodPressure}
           </p>
-          <p className="font-caption text-caption text-on-surface-variant text-xs mt-1">
+          <p className="font-caption text-caption text-on-surface-variant text-xs mt-1 tabular-nums">
             {bloodGlucose}
           </p>
         </div>

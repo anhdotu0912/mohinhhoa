@@ -273,19 +273,19 @@ export default function PatientsListPage() {
   };
 
   const chipClass = (active: boolean) =>
-    `px-md py-xs rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+    `px-3.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
       active
-        ? "bg-primary text-on-primary border-primary"
-        : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary"
+        ? "bg-primary text-on-primary border-primary shadow-2xs"
+        : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary hover:text-primary"
     }`;
 
-  // Clean medical input style (viền mảnh, bo nhẹ, placeholder mờ)
+  // Clean medical input style (Clinical Calm 2.0)
   const fieldClass =
-    "w-full px-md py-2 bg-surface-container-low/60 border border-outline-variant/70 rounded-md text-sm font-body text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
+    "w-full px-3.5 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all";
   const fieldLabelClass =
-    "font-label text-label text-on-surface-variant block mb-xs";
+    "text-xs font-bold text-on-surface-variant block mb-1";
   const sectionTitleClass =
-    "font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm";
+    "text-xs font-bold uppercase tracking-wider text-primary mb-3 flex items-center gap-1.5";
 
   const resetAddForm = () => {
     setAddForm({
@@ -462,20 +462,20 @@ export default function PatientsListPage() {
         </div>
       )}
 
-      <main className="p-lg max-w-[1400px] pb-24">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md mb-section-gap">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto pb-24 space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h2 className="font-h1 text-h1 text-on-surface font-bold">
+            <h2 className="font-h1 text-h1 text-on-surface font-bold text-2xl">
               Danh sách bệnh nhân
             </h2>
-            <p className="font-caption text-caption text-on-surface-variant mt-xs">
-              Dữ liệu thật từ API — hồ sơ, trạng thái thực đơn và cảnh báo tương tác
+            <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs">
+              Dữ liệu từ hệ thống — hồ sơ, trạng thái thực đơn và cảnh báo tương tác
             </p>
           </div>
 
-          <div className="flex items-center flex-wrap gap-sm">
-            <div className="relative min-w-[240px]">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+          <div className="flex items-center flex-wrap gap-3">
+            <div className="relative min-w-[260px]">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
                 search
               </span>
               <input
@@ -483,14 +483,14 @@ export default function PatientsListPage() {
                 placeholder="Tìm tên, email, Mã BN, bệnh lý..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
               />
             </div>
 
             <button
               type="button"
               onClick={() => setIsAddPatientOpen(true)}
-              className="px-md py-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-semibold hover:bg-surface-variant transition-colors cursor-pointer flex items-center gap-xs"
+              className="px-4 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">person_add</span>
               <span>Thêm bệnh nhân</span>
@@ -499,26 +499,27 @@ export default function PatientsListPage() {
         </div>
 
         {error && (
-          <div className="mb-md rounded-xl border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium flex items-center justify-between gap-sm">
+          <div className="rounded-2xl border border-error/30 bg-error-container/20 px-4 py-3 text-xs text-error font-medium flex items-center justify-between gap-sm">
             <span>{error}</span>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="underline cursor-pointer"
+              className="underline cursor-pointer font-bold"
             >
               Đóng
             </button>
           </div>
         )}
 
-        <div className="flex items-center gap-sm border-b border-outline-variant mb-lg pb-xs overflow-x-auto">
+        {/* Diagnosis Filter Pills */}
+        <div className="flex items-center gap-2 pb-1 overflow-x-auto">
           <button
             type="button"
             onClick={() => setDiagnosisFilter("all")}
-            className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               diagnosisFilter === "all"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
+                ? "bg-primary text-on-primary shadow-2xs"
+                : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
             }`}
           >
             Tất cả ({patients.length})
@@ -528,10 +529,10 @@ export default function PatientsListPage() {
               key={opt.code}
               type="button"
               onClick={() => setDiagnosisFilter(opt.code)}
-              className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 diagnosisFilter === opt.code
-                  ? "border-primary text-primary font-bold"
-                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+                  ? "bg-primary text-on-primary shadow-2xs"
+                  : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
               }`}
             >
               {opt.label} ({opt.count})
@@ -539,7 +540,8 @@ export default function PatientsListPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-sm border-b border-outline-variant mb-md pb-xs overflow-x-auto">
+        {/* Usage Status Filter Pills */}
+        <div className="flex items-center gap-2 pb-1 overflow-x-auto">
           {(
             [
               ["all", "Tất cả", usageTabCounts.all],
@@ -552,10 +554,10 @@ export default function PatientsListPage() {
               key={key}
               type="button"
               onClick={() => setUsageTab(key)}
-              className={`font-label text-label px-sm py-xs border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                 usageTab === key
-                  ? "border-primary text-primary font-bold"
-                  : "border-transparent text-on-surface-variant hover:text-on-surface"
+                  ? "bg-surface-container-high text-primary font-bold border border-primary/30"
+                  : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/50 hover:text-on-surface"
               }`}
             >
               {label} ({count})
@@ -563,22 +565,22 @@ export default function PatientsListPage() {
           ))}
         </div>
 
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xs overflow-hidden">
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
           {loading ? (
-            <div className="p-xl text-center text-on-surface-variant text-sm">
+            <div className="p-12 text-center text-on-surface-variant text-sm font-medium">
               Đang tải danh sách bệnh nhân...
             </div>
           ) : filteredPatients.length === 0 ? (
-            <div className="p-xl text-center text-on-surface-variant">
-              <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
+            <div className="p-12 text-center text-on-surface-variant">
+              <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
                 search_off
               </span>
-              <p className="font-body-bold text-body-bold">
+              <p className="font-body-bold text-body-bold text-sm font-bold">
                 {patients.length === 0
                   ? "Chưa có bệnh nhân nào trong hệ thống"
                   : "Không tìm thấy bệnh nhân phù hợp"}
               </p>
-              <p className="font-caption text-caption text-xs mt-xs">
+              <p className="font-caption text-caption text-xs mt-1">
                 {patients.length === 0
                   ? "Đăng ký tài khoản patient hoặc dùng demo_patient_1@example.com"
                   : "Thử đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái."}
@@ -589,117 +591,116 @@ export default function PatientsListPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[820px]">
                 <thead>
-                  <tr className="bg-surface-container-low border-b border-outline-variant">
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                  <tr className="bg-surface-container-low/50 border-b border-outline-variant/40">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Mã BN
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Bệnh nhân
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Chẩn đoán
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Thực đơn
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Trạng thái TD
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Cập nhật
                     </th>
-                    <th className="p-md font-label text-label text-on-surface-variant uppercase tracking-wider text-right">
+                    <th className="px-5 py-3.5 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-right">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant font-body text-body">
+                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
                   {pagedPatients.map((patient) => {
                     const planPending = patient.planPending ?? 0;
                     const planTotal = patient.planTotal ?? 0;
-                    // Bỏ avatar seed từ dicebear (thường lỗi do offline); resolve path /static/ theo API_BASE
                     const avatar =
                       patient.avatar &&
                       !patient.avatar.startsWith("https://api.dicebear.com")
                         ? assetUrl(patient.avatar)
                         : "";
                     return (
-                      <tr key={patient.id} className="transition-colors hover:bg-surface-bright">
-                        <td className="p-md">
+                      <tr key={patient.id} className="transition-colors hover:bg-surface-container-low/40">
+                        <td className="px-5 py-3.5">
                           <span
                             title={patient.id}
-                            className="font-mono text-xs font-medium text-on-surface-variant"
+                            className="font-mono text-xs font-semibold text-on-surface-variant"
                           >
                             {truncateId(patient.id)}
                           </span>
                         </td>
-                        <td className="p-md">
-                          <div className="flex items-center gap-sm">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
                             <div className="relative w-9 h-9 shrink-0">
-                              <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-xs font-semibold">
+                              <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
                                 {initials(patient.name)}
                               </div>
                               {avatar && (
                                 <img
                                   src={avatar}
                                   alt={patient.name}
-                                  className="absolute inset-0 w-9 h-9 rounded-full object-cover border border-outline-variant bg-surface-container"
+                                  className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
                                   onError={(e) => {
                                     e.currentTarget.style.display = "none";
                                   }}
                                 />
                               )}
                             </div>
-                            <p className="font-body-bold text-on-surface font-semibold text-sm">
+                            <p className="font-body-bold text-on-surface font-bold text-sm">
                               {patient.name}
                             </p>
                           </div>
                         </td>
-                        <td className="p-md">
+                        <td className="px-5 py-3.5">
                           <p
                             title={patient.condition}
-                            className="text-on-surface text-sm max-w-[260px] truncate"
+                            className="text-on-surface text-sm max-w-[260px] truncate font-medium"
                           >
                             {patient.condition}
                           </p>
                         </td>
-                        <td className="p-md text-xs">
+                        <td className="px-5 py-3.5 text-xs font-medium">
                           {planTotal === 0 ? (
                             <span className="text-on-surface-variant">Chưa có</span>
                           ) : (
                             <span className="inline-flex items-center gap-1">
                               {planPending > 0 ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
                                   {planPending}
                                 </span>
                               ) : (
-                                <span className="font-semibold text-on-surface">{planPending}</span>
+                                <span className="font-bold text-on-surface">{planPending}</span>
                               )}
                               <span className="text-on-surface-variant">/ {planTotal}</span>
                             </span>
                           )}
                         </td>
-                        <td className="p-md text-xs">
+                        <td className="px-5 py-3.5 text-xs">
                           <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                               patientUsageStatus(patient) === "active"
                                 ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                                 : patientUsageStatus(patient) === "finished"
-                                  ? "bg-surface-container-high text-on-surface-variant border-outline-variant"
-                                  : "bg-surface-container-low text-on-surface-variant border-outline-variant"
+                                  ? "bg-surface-container-high text-on-surface-variant border-outline-variant/60"
+                                  : "bg-surface-container-low text-on-surface-variant border-outline-variant/60"
                             }`}
                           >
                             {patientUsageLabel(patientUsageStatus(patient))}
                           </span>
                         </td>
-                        <td className="p-md text-on-surface-variant text-xs">
+                        <td className="px-5 py-3.5 text-on-surface-variant text-xs">
                           {patient.lastUpdate}
                         </td>
-                        <td className="p-md text-right">
+                        <td className="px-5 py-3.5 text-right">
                           <Link
                             href={`/doctor/patients/${patient.id}`}
                             title="Xem chi tiết"
-                            className="inline-flex items-center gap-1.5 px-md py-1.5 bg-surface-container-lowest border border-primary text-primary font-body-bold text-xs rounded-lg hover:bg-primary hover:text-on-primary transition-all cursor-pointer active:scale-95 shadow-xs"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold text-xs rounded-xl hover:bg-primary hover:text-white transition-all cursor-pointer active:scale-95 shadow-2xs font-semibold"
                           >
                             <span className="material-symbols-outlined text-[16px]">
                               visibility
@@ -725,11 +726,11 @@ export default function PatientsListPage() {
       </main>
 
       {isAddPatientOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/40 backdrop-blur-xs">
-          <div className="bg-surface-container-lowest border border-outline-variant/80 rounded-3xl p-xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between pb-lg border-b border-outline-variant mb-lg shrink-0">
-              <div className="flex items-center gap-md">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/40 mb-6 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   <span
                     className="material-symbols-outlined text-[22px]"
                     style={{ fontVariationSettings: "'FILL' 1" }}
@@ -738,11 +739,11 @@ export default function PatientsListPage() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-semibold text-lg leading-tight">
-                    Thêm bệnh nhân
+                  <h3 className="font-h2 text-h2 text-on-surface font-bold text-lg leading-tight">
+                    Thêm bệnh nhân mới
                   </h3>
-                  <p className="font-caption text-caption text-on-surface-variant/80 text-xs mt-0.5">
-                    Tạo tài khoản + hồ sơ đầy đủ (tham khảo onboarding)
+                  <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
+                    Tạo tài khoản & thiết lập hồ sơ lâm sàng ban đầu
                   </p>
                 </div>
               </div>
@@ -752,16 +753,16 @@ export default function PatientsListPage() {
                   setIsAddPatientOpen(false);
                   setStep(1);
                 }}
-                className="text-on-surface-variant/60 hover:text-on-surface transition-colors p-1 rounded-full hover:bg-surface-container-low cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 rounded-xl hover:bg-surface-container-low cursor-pointer"
                 title="Đóng"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-xs space-y-lg">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-6">
               {/* Stepper */}
-              <div className="flex items-center gap-2 mb-lg">
+              <div className="flex items-center gap-2 mb-6">
                 {ADD_STEP_LABELS.map((label, i) => {
                   const n = i + 1;
                   const isActive = step === n;
@@ -770,19 +771,19 @@ export default function PatientsListPage() {
                     <Fragment key={label}>
                       {i > 0 && (
                         <div
-                          className={`flex-1 h-px transition-colors ${
-                            isDone ? "bg-primary/40" : "bg-outline-variant/70"
+                          className={`flex-1 h-0.5 transition-colors ${
+                            isDone ? "bg-primary" : "bg-outline-variant/50"
                           }`}
                         />
                       )}
-                      <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex flex-col items-center gap-1">
                         <div
                           className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                             isActive
-                              ? "bg-primary text-on-primary shadow-[0_0_0_4px_rgba(13,148,136,0.15)] ring-1 ring-primary"
+                              ? "bg-primary text-on-primary shadow-xs ring-4 ring-primary/20"
                               : isDone
-                                ? "bg-primary/15 text-primary"
-                                : "bg-surface-container-low text-on-surface-variant/60 border border-outline-variant"
+                                ? "bg-primary/20 text-primary"
+                                : "bg-surface-container-low text-on-surface-variant/60 border border-outline-variant/60"
                           }`}
                         >
                           {isDone ? (
@@ -797,10 +798,10 @@ export default function PatientsListPage() {
                           )}
                         </div>
                         <p
-                          className={`font-caption text-caption whitespace-nowrap ${
+                          className={`font-caption text-caption whitespace-nowrap text-[11px] ${
                             isActive
-                              ? "text-primary font-semibold"
-                              : "text-on-surface-variant/60"
+                              ? "text-primary font-bold"
+                              : "text-on-surface-variant"
                           }`}
                         >
                           {label}
@@ -815,11 +816,12 @@ export default function PatientsListPage() {
                 <>
               {/* Tài khoản */}
               <section>
-                <div className="flex items-center justify-between mb-sm">
+                <div className="flex items-center justify-between mb-2">
                   <h5 className={sectionTitleClass}>
+                    <span className="material-symbols-outlined text-[16px]">lock</span>
                     Tài khoản đăng nhập
                   </h5>
-                  <label className="inline-flex items-center gap-1 font-caption text-caption font-semibold text-primary hover:text-primary-container cursor-pointer transition-colors">
+                  <label className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary/80 cursor-pointer transition-colors">
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp,image/gif"
@@ -844,22 +846,22 @@ export default function PatientsListPage() {
                   </label>
                 </div>
                 {pendingAvatar && (
-                  <div className="mb-sm flex items-center gap-xs bg-surface-container-low/60 border border-outline-variant/60 rounded-lg px-sm py-xs text-xs text-on-surface-variant">
+                  <div className="mb-3 flex items-center gap-2 bg-surface-container-low/60 border border-outline-variant/60 rounded-xl px-3 py-1.5 text-xs text-on-surface-variant">
                     <span className="material-symbols-outlined text-[16px] text-primary">
                       image
                     </span>
-                    <span className="truncate flex-1">{pendingAvatar.name}</span>
+                    <span className="truncate flex-1 font-medium">{pendingAvatar.name}</span>
                     <button
                       type="button"
                       onClick={() => setPendingAvatar(null)}
-                      className="text-error/70 hover:text-error transition-colors cursor-pointer"
+                      className="text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
                       title="Bỏ ảnh"
                     >
                       <span className="material-symbols-outlined text-[16px]">close</span>
                     </button>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-1">
                     <label className={fieldLabelClass}>
                       Email <span className="text-error">*</span>
@@ -911,9 +913,10 @@ export default function PatientsListPage() {
               {/* Thông tin chung */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">badge</span>
                   Thông tin chung
                 </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-md">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-1">
                     <label className={fieldLabelClass}>
                       Họ tên
@@ -953,14 +956,14 @@ export default function PatientsListPage() {
                         onChange={(e) =>
                           setAddForm((f) => ({ ...f, gender: e.target.value }))
                         }
-                        className={`${fieldClass} appearance-none pr-lg cursor-pointer`}
+                        className={`${fieldClass} appearance-none pr-8 cursor-pointer`}
                       >
-                          <option value="">—</option>
+                        <option value="">—</option>
                         <option value="Nam">Nam</option>
                         <option value="Nữ">Nữ</option>
                         <option value="Khác">Khác</option>
                       </select>
-                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60">
                         <span className="material-symbols-outlined text-[16px]">
                           arrow_drop_down
                         </span>
@@ -977,9 +980,10 @@ export default function PatientsListPage() {
               {/* Chỉ số cơ thể */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">monitor_weight</span>
                   Chỉ số cơ thể
                 </h5>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-md">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div>
                     <label className={fieldLabelClass}>
                       Cân nặng (kg)
@@ -1044,9 +1048,10 @@ export default function PatientsListPage() {
               {/* Liên hệ */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">call</span>
                   Thông tin liên hệ
                 </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={fieldLabelClass}>
                       Điện thoại
@@ -1061,7 +1066,7 @@ export default function PatientsListPage() {
                     />
                   </div>
                   <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
+                    <label className={fieldLabelClass}>
                       Địa chỉ
                     </label>
                     <input
@@ -1083,7 +1088,8 @@ export default function PatientsListPage() {
               {/* Chẩn đoán */}
               <section>
                 <h5 className={sectionTitleClass}>
-                  Chẩn đoán hiện tại
+                  <span className="material-symbols-outlined text-[16px]">medical_services</span>
+                  Chẩn đoán lâm sàng
                 </h5>
                 <input
                   type="text"
@@ -1092,7 +1098,7 @@ export default function PatientsListPage() {
                   placeholder="Tìm bệnh lý..."
                   className={fieldClass}
                 />
-                <div className="flex flex-wrap gap-xs mt-sm">
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {addForm.disease.map((code) => {
                     const label =
                       diagnosisOptions.find((o) => o.code === code)?.name ?? code;
@@ -1121,7 +1127,7 @@ export default function PatientsListPage() {
                 </div>
                 {diagnosisSearch.trim() &&
                   visibleDiagnoses(diagnosisSearch).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
+                    <p className="text-xs text-on-surface-variant italic mt-1">
                       Không tìm thấy bệnh lý phù hợp.
                     </p>
                   )}
@@ -1130,6 +1136,7 @@ export default function PatientsListPage() {
               {/* Thuốc */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">prescriptions</span>
                   Thuốc đang dùng
                 </h5>
                 <input
@@ -1139,7 +1146,7 @@ export default function PatientsListPage() {
                   placeholder="Tìm thuốc..."
                   className={fieldClass}
                 />
-                <div className="flex flex-wrap gap-xs mt-sm">
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {addForm.medications.map((v) => (
                     <button
                       key={v}
@@ -1172,7 +1179,7 @@ export default function PatientsListPage() {
                     medSearch,
                     addForm.medications
                   ).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
+                    <p className="text-xs text-on-surface-variant italic mt-1">
                       Không tìm thấy thuốc phù hợp.
                     </p>
                   )}
@@ -1181,6 +1188,7 @@ export default function PatientsListPage() {
               {/* Dị ứng */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">warning</span>
                   Dị ứng & Phản ứng phụ
                 </h5>
                 <input
@@ -1190,7 +1198,7 @@ export default function PatientsListPage() {
                   placeholder="Tìm dị ứng..."
                   className={fieldClass}
                 />
-                <div className="flex flex-wrap gap-xs mt-sm">
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {addForm.allergies.map((v) => (
                     <button
                       key={v}
@@ -1223,7 +1231,7 @@ export default function PatientsListPage() {
                     allergySearch,
                     addForm.allergies
                   ).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
+                    <p className="text-xs text-on-surface-variant italic mt-1">
                       Không tìm thấy dị ứng phù hợp.
                     </p>
                   )}
@@ -1236,9 +1244,10 @@ export default function PatientsListPage() {
               {/* Dinh dưỡng & Mục tiêu */}
               <section>
                 <h5 className={sectionTitleClass}>
+                  <span className="material-symbols-outlined text-[16px]">restaurant</span>
                   Dinh dưỡng & Mục tiêu điều trị
                 </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={fieldLabelClass}>
                       Dinh dưỡng / Sở thích (mỗi dòng 1 mục)
@@ -1273,13 +1282,13 @@ export default function PatientsListPage() {
               )}
 
               {error && (
-                <div className="rounded-xl border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
+                <div className="rounded-2xl border border-error/30 bg-error-container/20 px-4 py-3 text-xs text-error font-medium">
                   {error}
                 </div>
               )}
             </div>
 
-            <div className="pt-md border-t border-outline-variant/70 mt-md flex justify-between items-center gap-sm shrink-0">
+            <div className="pt-4 border-t border-outline-variant/40 mt-4 flex justify-between items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1287,17 +1296,17 @@ export default function PatientsListPage() {
                   setStep(1);
                 }}
                 disabled={addingPatient}
-                className="text-on-surface-variant hover:text-on-surface px-2 py-2 text-sm font-medium transition-colors disabled:opacity-60 cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-60 cursor-pointer"
               >
                 Hủy
               </button>
-              <div className="flex items-center gap-sm">
+              <div className="flex items-center gap-3">
                 {step > 1 && (
                   <button
                     type="button"
                     onClick={() => setStep((s) => Math.max(1, s - 1))}
                     disabled={addingPatient}
-                    className="px-md py-2 border border-outline-variant/70 text-on-surface-variant rounded-lg text-sm font-medium hover:bg-surface-container-low hover:text-on-surface transition-colors flex items-center gap-xs disabled:opacity-60 cursor-pointer"
+                    className="px-4 py-2.5 border border-outline-variant/60 text-on-surface-variant rounded-xl text-sm font-semibold hover:bg-surface-container-low hover:text-on-surface transition-colors flex items-center gap-1 disabled:opacity-60 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">
                       arrow_back
@@ -1309,7 +1318,7 @@ export default function PatientsListPage() {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className="bg-primary text-on-primary px-md py-2 rounded-lg text-sm font-semibold shadow-sm hover:bg-primary/90 hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    className="bg-primary text-on-primary px-4 py-2.5 rounded-xl text-sm font-bold shadow-2xs hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     Tiếp tục
                     <span className="material-symbols-outlined text-[16px]">
@@ -1321,7 +1330,7 @@ export default function PatientsListPage() {
                     type="button"
                     onClick={() => void handleAddPatient()}
                     disabled={addingPatient}
-                    className="bg-primary text-on-primary px-md py-2 rounded-lg text-sm font-semibold shadow-sm hover:bg-primary/90 hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60"
+                    className="bg-primary text-on-primary px-5 py-2.5 rounded-xl text-sm font-bold shadow-2xs hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-60"
                   >
                     <span className="material-symbols-outlined text-[16px]">
                       person_add
