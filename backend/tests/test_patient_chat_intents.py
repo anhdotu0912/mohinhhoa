@@ -176,3 +176,40 @@ def test_run_agent_doctor_note_force_intent(db_session):
     assert output.intent == "doctor_note"
     assert output.doctor_note is not None
     assert "Uống thuốc" in output.doctor_note.note
+
+
+def test_unknown_node_fatigue_and_symptom_empathy():
+    from app.agents.graph import unknown_node
+
+    state = {
+        "user_id": "demo_patient_1",
+        "message": "tôi mệt quá, giờ tôi phải làm sao",
+        "profile": {"disease": ["Đái tháo đường Type 2"], "medications": ["Metformin"]},
+        "intent": "unknown",
+    }
+    result = unknown_node(state)
+    answer = result.get("answer", "")
+
+    assert answer, "Answer must not be empty"
+    # Verify key safety elements are present
+    assert any(
+        kw in answer.lower()
+        for kw in ["nghỉ ngơi", "đường huyết", "an toàn", "dinh dưỡng", "trợ lý"]
+    )
+
+
+def test_unknown_node_generic_query():
+    from app.agents.graph import unknown_node
+
+    state = {
+        "user_id": "demo_patient_1",
+        "message": "thời tiết hôm nay đẹp không bạn ơi",
+        "profile": {},
+        "intent": "unknown",
+    }
+    result = unknown_node(state)
+    answer = result.get("answer", "")
+
+    assert answer, "Answer must not be empty"
+    assert "dinh dưỡng" in answer.lower()
+

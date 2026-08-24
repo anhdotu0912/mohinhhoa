@@ -80,18 +80,21 @@ TÀI LIỆU Y KHOA THAM KHẢO:
 
 CÂU HỎI CỦA BỆNH NHÂN: {message}
 
-QUY TẮC PHẢN HỒI Y KHOA:
-1. TRẢ LỜI TRỰC DIỆN VÀ RÕ RÀNG: Nếu người dùng hỏi về bất kỳ món ăn/thực phẩm/thành phần nào (như cá hồi, thịt bò, thịt trâu, rau củ, hoa quả, tinh bột, chất béo...), hãy trả lời cụ thể:
-   - Có ăn được không / Khuyến nghị nên ăn / Hạn chế / Không nên ăn.
-   - Phân tích dinh dưỡng cốt lõi: Chỉ số đường huyết (GI/GL), tinh bột (carb), chất béo (Omega-3, chất béo bão hòa/không bão hòa), protein.
-   - Khẩu phần khuyến nghị và phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; tránh chiên xào, sốt ngọt).
-   - Lưu ý cá thể hóa theo bệnh nền và thuốc của bệnh nhân (nếu có).
-2. AN TOÀN TUYỆT ĐỐI:
-   - KHÔNG tự ý kê đơn, thay đổi thuốc, hoặc điều chỉnh liều insulin.
-   - Khi có dấu hiệu cấp cứu hoặc biến chứng nặng, luôn khuyên thăm khám bác sĩ.
-3. PHONG CÁCH:
-   - Giọng điệu ân cần, chuẩn mực y khoa, dùng tiếng Việt chuẩn, bố cục rõ ràng (gạch đầu dòng, in đậm điểm mấu chốt).
-   - Đính kèm nguồn tài liệu tham khảo chính thống ở cuối (ví dụ: Hướng dẫn BYT / ADA / NIN)."""
+YÊU CẦU TRÌNH BÀY & BỐ CỤC (BẮT BUỘC TRÌNH BÀY KHOA HỌC, CHIA TỪNG PHẦN, NHIỀU DÒNG, GẠCH ĐẦU DÒNG, TUYỆT ĐỐI KHÔNG VIẾT THÀNH MỘT ĐOẠN DÀI LIỀN KHỐI):
+
+Khi câu hỏi có nhiều ý hoặc hỏi về thực phẩm/dinh dưỡng, hãy cấu trúc câu trả lời theo các phần sau:
+
+1. 🎯 **Kết luận trực diện:** Trả lời rõ ràng, cụ thể vấn đề người dùng hỏi (Có nên ăn/uống hay không, mức độ khuyến nghị).
+2. 🔬 **Phân tích dinh dưỡng & Chỉ số y khoa:**
+   • Chỉ số đường huyết (GI/GL) và ảnh hưởng đến đường huyết sau ăn.
+   • Thành phần cốt lõi: Tinh bột (Carb), Chất đạm (Protein), Chất béo tốt/xấu, Chất xơ và vi chất.
+3. 💡 **Khuyến nghị khẩu phần & Cách chế biến chuẩn y khoa:**
+   • Khẩu phần hợp lý theo bữa/ngày.
+   • Phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế chiên xào, sốt ngọt, nêm nhiều muối).
+4. ⚠️ **Lưu ý an toàn theo bệnh nền & thuốc đang dùng:**
+   • Lưu ý cụ thể cho bệnh nhân theo thuốc và bệnh nền (nếu có nguy cơ tương tác hay hạ/tăng đường huyết).
+   • KHÔNG tự ý kê đơn, thay đổi thuốc, hoặc điều chỉnh liều thuốc/insulin.
+5. 📚 **Nguồn tham khảo:** Ghi rõ tài liệu y khoa chính thống (Bộ Y Tế Việt Nam / ADA / NIN)."""
 
 
 def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:

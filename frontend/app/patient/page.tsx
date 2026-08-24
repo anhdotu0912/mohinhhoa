@@ -19,6 +19,7 @@ import { MealSuggestionCard } from "@/components/patient-chat/cards/MealSuggesti
 import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComplianceCard";
 import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
 import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
+import { FormattedMessage } from "@/components/patient/FormattedMessage";
 
 export type { Message };
 
@@ -555,12 +556,10 @@ export default function PatientChatHomePage() {
 
                       {/* AI Message Text */}
                       {msg.text && (
-                        <div className="text-[15px] leading-relaxed text-slate-800 break-words font-normal">
-                          {msg.text}
-                          {msg.isStreaming && (
-                            <span className="inline-block w-1.5 h-4 bg-[#006857] ml-1 animate-pulse rounded-xs align-middle" />
-                          )}
-                        </div>
+                        <FormattedMessage
+                          text={msg.text}
+                          isStreaming={msg.isStreaming}
+                        />
                       )}
 
                       {/* Safety Correction Badge */}

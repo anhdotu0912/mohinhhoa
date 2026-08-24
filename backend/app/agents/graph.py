@@ -48,25 +48,32 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
         llm = get_chat_llm(temperature=0.3)
         if llm is not None:
             prompt = (
-                f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường.\n"
+                f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
                 f"Thuốc bệnh nhân đang dùng: {meds_str}.\n"
                 f"Câu hỏi của bệnh nhân: \"{message}\"\n"
                 f"Kết quả tra cứu y khoa: KHÔNG có tương tác nguy hiểm hoặc chống chỉ định nào giữa {meds_str} và {food_names_str}.\n\n"
-                f"Hãy trả lời bệnh nhân bằng tiếng Việt ngắn gọn, dễ hiểu (2-4 câu):\n"
-                f"1. Trực tiếp xác nhận {food_names_str} AN TOÀN / CÓ THỂ ăn/dùng được khi đang uống {meds_str}.\n"
-                f"2. Đưa ra 1-2 lời khuyên dinh dưỡng hữu ích phù hợp cho người bệnh đái tháo đường (ví dụ: lượng dùng, cách chế biến, hàm lượng chất xơ/chỉ số đường huyết).\n"
-                f"Trả lời trực tiếp, lịch sự, không tạo tiêu đề thừa."
+                f"Hãy trả lời bệnh nhân bằng tiếng Việt chuẩn mực y khoa, trình bày KHOA HỌC theo các mục rõ ràng (gạch đầu dòng, in đậm, không viết đoạn dài liền khối):\n\n"
+                f"1. ✅ **Xác nhận an toàn:** Trực tiếp xác nhận {food_names_str} an toàn / có thể ăn được khi đang dùng {meds_str}.\n"
+                f"2. 🥗 **Giá trị dinh dưỡng & Lợi ích:** Nêu 1-2 điểm nổi bật về chỉ số đường huyết (GI), chất xơ, chất béo hoặc đạm có lợi cho sức khỏe.\n"
+                f"3. 💡 **Khuyến nghị sử dụng & Chế biến:** Khẩu phần hợp lý và phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế đường/mỡ bão hòa).\n\n"
+                f"Trình bày mạch lạc, dễ đọc, cấu trúc rõ ràng."
             )
             response = llm.invoke(prompt)
             if response and getattr(response, "content", None):
-                return response.content.strip()
+                content = response.content.strip()
+                if content:
+                    return content
     except Exception as e:
         logger.warning("LLM safe food answer generation failed: %s", e)
 
     return (
-        f"Không ghi nhận tương tác nguy hiểm giữa các thuốc bạn đang dùng ({meds_str}) và {food_names_str}.\n\n"
-        f"Khuyến nghị: Bạn có thể ăn/dùng {food_names_str} bình thường với lượng vừa phải trong chế độ ăn cân bằng đối với người đái tháo đường."
+        f"✅ **Xác nhận an toàn:** Không ghi nhận tương tác nguy hiểm giữa các thuốc bạn đang dùng ({meds_str}) và **{food_names_str}**.\n\n"
+        f"🥗 **Giá trị dinh dưỡng:** {food_names_str.capitalize()} là thực phẩm an toàn, có thể bổ sung vào thực đơn đối với người bệnh đái tháo đường.\n\n"
+        f"💡 **Khuyến nghị sử dụng & Chế biến:**\n"
+        f"• Ăn với khẩu phần vừa phải, cân đối tổng lượng carbohydrate trong toàn bộ bữa ăn.\n"
+        f"• Ưu tiên các phương pháp chế biến lành mạnh như hấp, luộc, hoặc áp chảo ít dầu."
     )
+
 
 
 def meal_plan_node(state: AgentState) -> AgentState:
@@ -415,18 +422,61 @@ def refuse_node(state: AgentState) -> AgentState:
     }
 
 
+def _generate_dynamic_unknown_answer(message: str, profile: dict) -> str:
+    """Generate a concise, empathetic, safety-conscious fallback answer using LLM."""
+    diseases = ", ".join(profile.get("disease", [])) if profile else ""
+    medications = ", ".join(profile.get("medications", [])) if profile else ""
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            profile_context = ""
+            if diseases or medications:
+                profile_context = f"\nHồ sơ bệnh nhân: Bệnh nền [{diseases or 'Chưa rõ'}], Thuốc [{medications or 'Chưa rõ'}]."
+
+            prompt = (
+                f"Bạn là Trợ lý Dinh dưỡng & Tuân thủ AI cho người bệnh mạn tính.{profile_context}\n"
+                f"Tin nhắn người dùng: \"{message}\"\n\n"
+                "QUY TẮC PHẢN HỒI (BẮT BUỘC CỰC KỲ NGẮN GỌN, DƯỚI 80 TỪ, TỐI ĐA 4 Ý, TUYỆT ĐỐI KHÔNG VIẾT VĂN MỞ ĐẦU LAN MAN):\n\n"
+                "1. Nếu người dùng kêu MỆT, CHOÁNG, ĐÓI LẢ hoặc có triệu chứng thể chất:\n"
+                "   - Ý 1: Khuyên ngồi/nằm nghỉ ngơi ngay ở nơi thoáng mát (1 câu ngắn).\n"
+                "   - Ý 2: 🛑 **Nếu nghi hạ đường huyết** (run tay, vã mồ hôi, đói cồn cào): Uống ngay 1/2 ly nước đường/nước trái cây hoặc 3-4 viên kẹo (quy tắc 15-15).\n"
+                "   - Ý 3: 🚨 **Cấp cứu:** Gọi ngay 115 hoặc báo người nhà nếu đau ngực, khó thở, hoặc mệt không giảm sau nghỉ ngơi.\n"
+                "   - Ý 4: 💡 Khi đã hồi phục, tôi có thể gợi ý các món ăn nhẹ giúp bạn bồi bổ sức khỏe.\n\n"
+                "2. Nếu là câu hỏi trò chuyện chung ngoài phạm vi:\n"
+                "   - Trả lời thân thiện trong 1-2 câu ngắn.\n"
+                "   - Nêu 3 chức năng chính: (1) Thực đơn 7 ngày, (2) Kiểm tra tương tác thuốc, (3) Tư vấn dinh dưỡng lâm sàng.\n\n"
+                "YÊU CẦU ĐỊNH DẠNG: Chia các ý cách nhau bởi 1 dòng trống (double newline) để hiển thị thoáng đãng. Không tự ý chẩn đoán hay kê đơn."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM dynamic unknown answer failed: %s", e)
+
+    return (
+        "Bạn hãy tạm dừng công việc và **ngồi hoặc nằm nghỉ ngơi ngay** ở nơi thoáng mát nhé.\n\n"
+        "🛑 **Nếu nghi hạ đường huyết** (run tay, vã mồ hôi, đói cồn cào): Uống ngay 1/2 ly nước đường/nước trái cây hoặc 3-4 viên kẹo (quy tắc 15-15).\n\n"
+        "🚨 **Cấp cứu:** Gọi ngay **115** hoặc báo người nhà nếu tức ngực, khó thở, hoặc mệt không thuyên giảm.\n\n"
+        "💡 Khi bạn đã cảm thấy đỡ hơn, tôi là Trợ lý Dinh dưỡng AI sẵn sàng hỗ trợ gợi ý thực đơn và các món ăn nhẹ bồi bổ thể trạng."
+    )
+
+
+
 def unknown_node(state: AgentState) -> AgentState:
-    """Handle unknown/unclassified intents."""
+    """Handle unknown/unclassified intents with empathetic dynamic guidance."""
+    message = state.get("message", "")
+    profile = state.get("profile", {})
+    answer = _generate_dynamic_unknown_answer(message, profile)
     return {
         **state,
-        "answer": (
-            "Tôi chưa hiểu rõ yêu cầu của bạn. Tôi có thể hỗ trợ:\n"
-            "1. 📋 Lập thực đơn 7 ngày theo bệnh lý\n"
-            "2. ⚠️ Kiểm tra tương tác thuốc-thực phẩm\n"
-            "3. ❓ Trả lời câu hỏi về dinh dưỡng\n\n"
-            "Bạn muốn hỏi về vấn đề nào?"
-        ),
+        "answer": answer,
     }
+
 
 
 def apply_guardrails(state: AgentState) -> AgentState:
