@@ -1,9 +1,8 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   NAV_BY_ROLE,
   ROLE_META,
@@ -11,6 +10,7 @@ import {
   type AppRole,
 } from "@/lib/nav-config";
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
+import { NotificationBadge } from "@/components/shared/NotificationBadge";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -31,10 +31,12 @@ function NavLinks({
   role,
   activeId,
   onNavigate,
+  mealPlanRequestCount = 0,
 }: {
   role: AppRole;
   activeId: string;
   onNavigate?: () => void;
+  mealPlanRequestCount?: number;
 }) {
   const items = NAV_BY_ROLE[role];
 
@@ -42,6 +44,7 @@ function NavLinks({
     <div className="flex-1 flex flex-col gap-xs">
       {items.map((item) => {
         const isActive = item.id === activeId;
+        const showRequestBadge = role === "doctor" && item.id === "patients" && mealPlanRequestCount > 0;
         return (
           <Link
             key={item.id}
@@ -52,11 +55,14 @@ function NavLinks({
                 : "text-on-surface-variant font-body hover:text-primary hover:bg-surface-container-low"
               }`}
           >
-            <span
-              className={`material-symbols-outlined text-[26px] ${isActive ? "text-primary" : ""
-                }`}
-            >
-              {item.icon}
+            <span className="relative shrink-0">
+              <span
+                className={`material-symbols-outlined text-[26px] ${isActive ? "text-primary" : ""
+                  }`}
+              >
+                {item.icon}
+              </span>
+              {showRequestBadge && <NotificationBadge count={mealPlanRequestCount} />}
             </span>
             <span className="text-body font-body">{item.label}</span>
           </Link>
@@ -162,6 +168,28 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
   const { mobileMenuOpen, closeMobileMenu } = useMobileMenu();
   const meta = ROLE_META[role];
   const activeId = resolveActiveNavId(role, pathname, activeItem);
+  const token = useAuthStore((s) => s.token);
+  const authRole = useAuthStore((s) => s.role);
+  const [mealPlanRequestCount, setMealPlanRequestCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== "doctor" || authRole !== "doctor" || !token) {
+      setMealPlanRequestCount(0);
+      return;
+    }
+    let cancelled = false;
+    api
+      .listDoctorPatients({ meal_plan_request: "pending" })
+      .then((rows) => {
+        if (!cancelled) setMealPlanRequestCount(rows.length);
+      })
+      .catch(() => {
+        if (!cancelled) setMealPlanRequestCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, authRole, token, pathname]);
 
   return (
     <>
@@ -178,7 +206,7 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
           </Link>
         </div>
 
-        <NavLinks role={role} activeId={activeId} />
+        <NavLinks role={role} activeId={activeId} mealPlanRequestCount={mealPlanRequestCount} />
         <SidebarFooter role={role} />
       </nav>
 
@@ -206,7 +234,12 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
               </button>
             </div>
 
-            <NavLinks role={role} activeId={activeId} onNavigate={closeMobileMenu} />
+            <NavLinks
+              role={role}
+              activeId={activeId}
+              onNavigate={closeMobileMenu}
+              mealPlanRequestCount={mealPlanRequestCount}
+            />
             <SidebarFooter role={role} onNavigate={closeMobileMenu} />
           </nav>
         </div>

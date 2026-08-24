@@ -1,10 +1,11 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/shared/TopBar";
+import { NotificationBadge } from "@/components/shared/NotificationBadge";
 import Pagination, { getPageItems } from "@/components/shared/Pagination";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -25,6 +26,175 @@ const ADD_STEP_LABELS = [
 const PAGE_SIZE = 10;
 
 type UsageTab = "all" | "none" | "active" | "finished";
+
+type UsageTabCounts = {
+  all: number;
+  none: number;
+  active: number;
+  finished: number;
+};
+
+function UsageStatusFilterMenu({
+  value,
+  onChange,
+  counts,
+}: {
+  value: UsageTab;
+  onChange: (next: UsageTab) => void;
+  counts: UsageTabCounts;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const options: {
+    key: UsageTab;
+    label: string;
+    count: number;
+    icon: string;
+    description: string;
+  }[] = [
+    {
+      key: "all",
+      label: "Tất cả",
+      count: counts.all,
+      icon: "groups",
+      description: "Mọi trạng thái thực đơn",
+    },
+    {
+      key: "none",
+      label: "Chưa áp dụng",
+      count: counts.none,
+      icon: "hourglass_empty",
+      description: "Chưa có thực đơn được kích hoạt",
+    },
+    {
+      key: "active",
+      label: "Đang sử dụng",
+      count: counts.active,
+      icon: "play_circle",
+      description: "Đang hoặc sắp áp dụng",
+    },
+    {
+      key: "finished",
+      label: "Đã hoàn thành",
+      count: counts.finished,
+      icon: "check_circle",
+      description: "Đã hết chu kỳ thực đơn",
+    },
+  ];
+
+  const activeLabel = options.find((o) => o.key === value)?.label ?? "Tất cả";
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        title={`Lọc trạng thái thực đơn: ${activeLabel}`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`Lọc trạng thái thực đơn, đang chọn ${activeLabel}`}
+        className={`relative inline-flex items-center justify-center w-10 h-10 rounded-xl border bg-surface-container-lowest transition-all cursor-pointer shadow-2xs active:scale-95 ${
+          open || value !== "all"
+            ? "border-primary/40 text-primary"
+            : "border-outline-variant/60 text-on-surface-variant hover:text-primary hover:border-primary/40"
+        }`}
+      >
+        <span className="material-symbols-outlined text-[20px]">filter_list</span>
+        {value !== "all" && (
+          <span
+            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary ring-2 ring-white"
+            aria-hidden
+          />
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Lọc trạng thái thực đơn"
+          className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),288px)] bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-lg overflow-hidden animate-slide-down"
+        >
+          <div className="px-4 py-3 border-b border-outline-variant/30 bg-surface-container-low/40">
+            <p className="text-sm font-bold text-on-surface">Trạng thái thực đơn</p>
+            <p className="text-[11px] text-on-surface-variant mt-0.5">
+              Chọn nhóm bệnh nhân cần xem
+            </p>
+          </div>
+          <div className="py-1.5">
+            {options.map((opt) => {
+              const selected = value === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onChange(opt.key);
+                    setOpen(false);
+                  }}
+                  className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
+                    selected
+                      ? "bg-primary/10 text-primary"
+                      : "text-on-surface hover:bg-surface-container-low"
+                  }`}
+                >
+                  <span className="flex items-start gap-2.5 min-w-0">
+                    <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">
+                      {opt.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold truncate">{opt.label}</span>
+                      <span className="block text-[11px] text-on-surface-variant/90 truncate mt-0.5">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`min-w-[24px] h-6 px-1.5 rounded-full text-[11px] font-bold tabular-nums inline-flex items-center justify-center ${
+                        selected
+                          ? "bg-primary text-on-primary"
+                          : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      {opt.count}
+                    </span>
+                    {selected && (
+                      <span className="material-symbols-outlined text-[18px]">check</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function truncateId(id: string): string {
   return id.length > 6 ? `...${id.slice(-4)}` : id;
@@ -505,6 +675,12 @@ export default function PatientsListPage() {
               />
             </div>
 
+            <UsageStatusFilterMenu
+              value={usageTab}
+              onChange={setUsageTab}
+              counts={usageTabCounts}
+            />
+
             <button
               type="button"
               onClick={() => setIsAddPatientOpen(true)}
@@ -554,31 +730,6 @@ export default function PatientsListPage() {
               }`}
             >
               {opt.label} ({opt.count})
-            </button>
-          ))}
-        </div>
-
-        {/* Usage Status Filter Pills */}
-        <div className="flex items-center gap-2 pb-1 overflow-x-auto">
-          {(
-            [
-              ["all", "Tất cả", usageTabCounts.all],
-              ["none", "Chưa áp dụng", usageTabCounts.none],
-              ["active", "Đang sử dụng", usageTabCounts.active],
-              ["finished", "Đã hoàn thành", usageTabCounts.finished],
-            ] as const
-          ).map(([key, label, count]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setUsageTab(key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
-                usageTab === key
-                  ? "bg-surface-container-high text-primary font-bold border border-primary/30"
-                  : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/50 hover:text-on-surface"
-              }`}
-            >
-              {label} ({count})
             </button>
           ))}
         </div>
@@ -637,11 +788,36 @@ export default function PatientsListPage() {
                   {pagedPatients.map((patient) => {
                     const planPending = patient.planPending ?? 0;
                     const planTotal = patient.planTotal ?? 0;
+                    const hasMealPlanRequest =
+                      (patient.mealPlanRequestStatus ?? "none") === "pending";
+                    const mealPlanRequestTitle = patient.mealPlanRequestNote
+                      ? `Yêu cầu thực đơn: ${patient.mealPlanRequestNote}`
+                      : "Bệnh nhân yêu cầu tạo thực đơn";
                     const avatar =
                       patient.avatar &&
                       !patient.avatar.startsWith("https://api.dicebear.com")
                         ? assetUrl(patient.avatar)
                         : "";
+                    const avatarContent = (
+                      <>
+                        <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
+                          {initials(patient.name)}
+                        </div>
+                        {avatar && (
+                          <img
+                            src={avatar}
+                            alt={patient.name}
+                            className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                        {hasMealPlanRequest && (
+                          <NotificationBadge dot className="-top-0.5 -right-0.5 bottom-auto" />
+                        )}
+                      </>
+                    );
                     return (
                       <tr key={patient.id} className="transition-colors hover:bg-surface-container-low/40">
                         <td className="px-5 py-3.5">
@@ -655,18 +831,17 @@ export default function PatientsListPage() {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <div className="relative w-9 h-9 shrink-0">
-                              <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
-                                {initials(patient.name)}
-                              </div>
-                              {avatar && (
-                                <img
-                                  src={avatar}
-                                  alt={patient.name}
-                                  className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
+                              {hasMealPlanRequest ? (
+                                <Link
+                                  href={`/doctor/patients/${patient.id}/generate`}
+                                  title={mealPlanRequestTitle}
+                                  aria-label={mealPlanRequestTitle}
+                                  className="relative block w-9 h-9 rounded-full transition-transform hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                >
+                                  {avatarContent}
+                                </Link>
+                              ) : (
+                                avatarContent
                               )}
                             </div>
                             <p className="font-body-bold text-on-surface font-bold text-sm">

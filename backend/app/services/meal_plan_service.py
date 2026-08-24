@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -12,11 +12,13 @@ from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
+from app.core.errors import APIError
 from app.schemas.meal_plan import (
     DayPlan,
     FoodItem,
     Meal,
     MealPlanOutput,
+    MealPlanRequestOut,
     MealPreviewMeal,
     MealPreviewOut,
 )
@@ -160,6 +162,86 @@ def persist_generated_plan(db: Session, user_id: str, plan: MealPlanOutput) -> M
     return plan
 
 
+def _format_request_dt(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _request_out_from_profile(row: Profile | None) -> MealPlanRequestOut:
+    if row is None:
+        return MealPlanRequestOut()
+    status = getattr(row, "meal_plan_request_status", None) or "none"
+    if status not in ("none", "pending"):
+        status = "none"
+    return MealPlanRequestOut(
+        status=status,  # type: ignore[arg-type]
+        note=getattr(row, "meal_plan_request_note", None),
+        requested_at=_format_request_dt(getattr(row, "meal_plan_requested_at", None)),
+    )
+
+
+def _ensure_profile_row(db: Session, user_id: str) -> Profile:
+    row = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if row is None:
+        row = Profile(user_id=user_id)
+        db.add(row)
+        db.flush()
+    return row
+
+
+def get_meal_plan_request(db: Session, user_id: str) -> MealPlanRequestOut:
+    row = db.query(Profile).filter(Profile.user_id == user_id).first()
+    return _request_out_from_profile(row)
+
+
+def _latest_plan_row(db: Session, user_id: str) -> MealPlan | None:
+    return (
+        db.query(MealPlan)
+        .filter(MealPlan.user_id == user_id)
+        .order_by(MealPlan.created_at.desc())
+        .first()
+    )
+
+
+def submit_meal_plan_request(db: Session, user: User, note: str = "") -> MealPlanRequestOut:
+    latest = _latest_plan_row(db, user.id)
+    if latest is not None and latest.status == "pending_review":
+        raise APIError(
+            400,
+            "PLAN_ALREADY_PENDING",
+            "Bạn đã có thực đơn đang chờ bác sĩ duyệt.",
+        )
+
+    row = _ensure_profile_row(db, user.id)
+    current_status = getattr(row, "meal_plan_request_status", None) or "none"
+    if current_status == "pending":
+        db.commit()
+        return _request_out_from_profile(row)
+
+    cleaned_note = note.strip() or None
+    row.meal_plan_request_status = "pending"
+    row.meal_plan_request_note = cleaned_note
+    row.meal_plan_requested_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(row)
+    return _request_out_from_profile(row)
+
+
+def clear_meal_plan_request(db: Session, user_id: str) -> None:
+    row = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if row is None:
+        return
+    if getattr(row, "meal_plan_request_status", None) != "pending":
+        return
+    row.meal_plan_request_status = "none"
+    row.meal_plan_request_note = None
+    row.meal_plan_requested_at = None
+    db.flush()
+
+
 def generate_meal_plan(
     db: Session,
     user: User,
@@ -171,6 +253,7 @@ def generate_meal_plan(
 
     profile = get_profile(db, user.id)
     plan = build_plan(profile, notes=notes, priorities=priorities or [], db=db)
+    clear_meal_plan_request(db, user.id)
     return persist_generated_plan(db, user.id, plan)
 
 

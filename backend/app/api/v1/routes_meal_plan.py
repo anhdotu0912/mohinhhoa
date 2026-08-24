@@ -13,12 +13,20 @@ from app.db.session import get_db
 from app.models.meal_plan import MealPlan
 from app.models.user import User
 from app.schemas.doctor import MealPlanScheduleOut
-from app.schemas.meal_plan import GenerateMealPlanRequest, MealPlanOutput, RequestAdjustmentRequest
+from app.schemas.meal_plan import (
+    GenerateMealPlanRequest,
+    MealPlanOutput,
+    MealPlanRequestIn,
+    MealPlanRequestOut,
+    RequestAdjustmentRequest,
+)
 from app.services import plan_expiry
 from app.services.meal_plan_service import (
     generate_meal_plan,
+    get_meal_plan_request,
     meal_plan_from_row,
     resolve_patient_plan_row,
+    submit_meal_plan_request,
 )
 from app.services.notification import NotificationService
 from app.services.plan_schedule import build_meal_plan_schedule
@@ -72,6 +80,24 @@ def get_my_meal_plan_schedule(
 ) -> MealPlanScheduleOut:
     data = build_meal_plan_schedule(db, user.id)
     return MealPlanScheduleOut(**data)
+
+
+@router.get("/request", response_model=MealPlanRequestOut)
+def get_meal_plan_request_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("patient")),
+) -> MealPlanRequestOut:
+    return get_meal_plan_request(db, user.id)
+
+
+@router.post("/request", response_model=MealPlanRequestOut)
+def create_meal_plan_request(
+    payload: MealPlanRequestIn | None = Body(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("patient")),
+) -> MealPlanRequestOut:
+    req = payload or MealPlanRequestIn()
+    return submit_meal_plan_request(db, user, note=req.note)
 
 
 @router.get("/{meal_plan_id}", response_model=MealPlanOutput)

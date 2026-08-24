@@ -81,7 +81,10 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
 
   if (!plan) {
     return (
-      <MealPlanEmptyState message="Bạn chưa có thực đơn tuần nào. Hãy liên hệ bác sĩ để được lập kế hoạch dinh dưỡng 7 ngày." />
+      <MealPlanEmptyState
+        message="Bạn chưa có thực đơn tuần nào. Bạn có thể gửi yêu cầu để bác sĩ lập kế hoạch dinh dưỡng 7 ngày."
+        showRequest
+      />
     );
   }
 

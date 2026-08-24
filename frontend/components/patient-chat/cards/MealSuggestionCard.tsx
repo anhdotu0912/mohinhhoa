@@ -49,7 +49,10 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
 
   if (!preview) {
     return (
-      <MealPlanEmptyState message="Bạn chưa có thực đơn được bác sĩ kích hoạt. Hãy liên hệ bác sĩ để được lập kế hoạch dinh dưỡng." />
+      <MealPlanEmptyState
+        message="Bạn chưa có thực đơn được bác sĩ kích hoạt. Bạn có thể gửi yêu cầu để bác sĩ lập kế hoạch dinh dưỡng."
+        showRequest
+      />
     );
   }
 

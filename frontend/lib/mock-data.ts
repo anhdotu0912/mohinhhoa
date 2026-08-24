@@ -40,6 +40,9 @@ export interface Patient {
   saltDailyG?: number;
   sugarDailyG?: number;
   constraintsStatus?: "confirmed" | "pending_doctor_review";
+  mealPlanRequestStatus?: "none" | "pending";
+  mealPlanRequestNote?: string | null;
+  mealPlanRequestedAt?: string | null;
 }
 
 export function statusColorFor(
@@ -103,6 +106,9 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     saltDailyG: p.salt_daily_g ?? undefined,
     sugarDailyG: p.sugar_daily_g ?? undefined,
     constraintsStatus: p.constraints_status ?? "confirmed",
+    mealPlanRequestStatus: p.meal_plan_request_status ?? "none",
+    mealPlanRequestNote: p.meal_plan_request_note ?? null,
+    mealPlanRequestedAt: p.meal_plan_requested_at ?? null,
   };
 }
 

@@ -155,6 +155,9 @@ export default function DoctorGenerateMealPlanPage() {
       setSummary(row);
       setPatient(toUiPatient(row));
       setAllPatients(list.map(toUiPatient));
+      if (row.meal_plan_request_status === "pending" && row.meal_plan_request_note) {
+        setAiNotes((prev) => prev || row.meal_plan_request_note || "");
+      }
     } catch (err) {
       setLoadError(
         err instanceof ApiError ? err.message : "Không tải được hồ sơ bệnh nhân."

@@ -66,6 +66,9 @@ class DoctorPatientSummary(BaseModel):
     plan_days_left: int | None = None
     plan_expiry: Literal["expiring", "expired", "ok", "none"] = "none"
     plan_usage: Literal["none", "active", "finished"] = "none"
+    meal_plan_request_status: Literal["none", "pending"] = "none"
+    meal_plan_request_note: str | None = None
+    meal_plan_requested_at: str | None = None
 
 
 class MetricsUpdateRequest(BaseModel):

@@ -170,6 +170,30 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 // Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
 ```
 
+### `POST /meal-plans/request` (as-built 2026-08-24)
+**Role:** `patient`. Bệnh nhân yêu cầu bác sĩ tạo thực đơn — **không** tự gọi AI generate. Lưu cờ trên `profiles` (`meal_plan_request_status`), **không** tạo bản ghi `notifications`.
+```json
+// Request (optional body)
+{ "note": "Tôi mới hoàn tất hồ sơ, mong bác sĩ lập thực đơn tuần này." }
+// Response 200 → MealPlanRequestOut
+{
+  "status": "pending",
+  "note": "Tôi mới hoàn tất hồ sơ, mong bác sĩ lập thực đơn tuần này.",
+  "requested_at": "2026-08-24T10:30:00Z"
+}
+// Error 400 { "code": "PLAN_ALREADY_PENDING", "detail": "Bạn đã có thực đơn đang chờ bác sĩ duyệt." }
+```
+- Cho phép khi chưa có plan đã apply (`plan_usage=none`) hoặc plan đã hết hạn (`finished`). Chặn khi đã có plan `pending_review`.
+- Gửi lại khi `status=pending`: idempotent `200`, giữ `note`/`requested_at` cũ.
+- Khi doctor `POST /doctor/patients/{id}/meal-plans/generate` → BE tự reset `meal_plan_request_status` về `"none"`.
+
+### `GET /meal-plans/request`
+**Role:** `patient`. Trạng thái yêu cầu hiện tại của chính mình.
+```json
+// Response 200 → MealPlanRequestOut (status "none" | "pending")
+{ "status": "none", "note": null, "requested_at": null }
+```
+
 ### `POST /meal-plans/{meal_plan_id}/request-adjustment` (as-built 2026-08-18)
 **Role:** `patient`, chỉ chủ plan. **Quyết định 2026-08-15:** patient có thể yêu cầu điều chỉnh 1 plan đã `approved`, nhưng yêu cầu **phải qua bác sĩ duyệt lại** — không tự động regenerate. Tái sử dụng luồng review sẵn có: set `status` plan về lại `"pending_review"` kèm `adjustment_note`, plan sẽ xuất hiện lại trong `GET /doctor/meal-plans` (default filter) để doctor xử lý qua `POST /doctor/meal-plans/{id}/review` như bình thường.
 ```json
@@ -263,10 +287,11 @@ GET /notifications?status=pending&type=meal_reminder
 ## 8. Doctor Patient Management
 
 ### `GET /doctor/patients`
-**Role:** `doctor`. Query optional: `q`, `status` (`status_key`), `plan_usage` (`none` \| `active` \| `finished`).
+**Role:** `doctor`. Query optional: `q`, `status` (`status_key`), `plan_usage` (`none` \| `active` \| `finished`), `meal_plan_request` (`pending` \| `all`, default `all`).
 ```json
 // Response 200 → list[DoctorPatientSummary]
-// DoctorPatientSummary thêm: active_plan_id, active_plan_status, plan_starts_on, plan_usage
+// DoctorPatientSummary thêm: active_plan_id, active_plan_status, plan_starts_on, plan_usage,
+//   meal_plan_request_status ("none" | "pending"), meal_plan_request_note, meal_plan_requested_at
 ```
 
 ### `GET /doctor/patients/{patient_id}/meal-plans`
@@ -766,12 +791,14 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `FoodLogEntry.slot` | `morning` \| `noon` \| `evening` | ADR-009, khớp UI 3-slot |
 | `BodyMetricsEntry.recorded_by` | `patient` \| `doctor` | `models/body_metrics.py` |
 | `PatientProfile.constraints_status` | `confirmed` \| `pending_doctor_review` | As-built, `specs/04-clinical-constraints.md` |
+| `MealPlanRequestOut.status` / `DoctorPatientSummary.meal_plan_request_status` | `none` \| `pending` | `profiles` table, as-built 2026-08-24 |
 
 ---
 
 ## Versioning
 
-- Version hiện tại: **1.9**.
+- Version hiện tại: **1.10**.
+- **Changelog 1.9 → 1.10 (2026-08-24):** thêm `POST /meal-plans/request` + `GET /meal-plans/request` (patient yêu cầu bác sĩ tạo thực đơn, cờ trên `profiles`, không dùng bảng `notifications`); `DoctorPatientSummary` thêm `meal_plan_request_status`, `meal_plan_request_note`, `meal_plan_requested_at`; filter `GET /doctor/patients?meal_plan_request=pending`. Không breaking change (field mới optional/default).
 - **Changelog 1.8 → 1.9 (2026-08-24):** thêm `POST /auth/me/avatar` (user đã đăng nhập tự upload ảnh đại diện, cùng rule 2MB / png-jpg-webp-gif với endpoint doctor). Không breaking change.
 - **Changelog 1.7 → 1.8 (2026-08-24):** Food Log + compliance dùng ngày lịch **Asia/Ho_Chi_Minh** — `GET /food-log?date=` lọc theo cửa sổ UTC của ngày VN; `POST /food-log` upsert 1 log / user / ngày VN / slot; `FoodLogEntry.logged_at` serialize timezone-aware (naive DB = UTC). `GET /compliance/me` và `GET /doctor/patients/{id}/compliance` lấy `today` + gán food-log vào ngày VN (không còn `date.today()` UTC của container). Không đổi request shape / enum slot.
 - **Changelog 1.6 → 1.7 (2026-08-23):** `POST /metrics` đổi từ insert-only sang upsert 1 entry patient/ngày (Asia/Ho_Chi_Minh); lần ghi sau merge field vào cùng `id`. Không đổi request/response shape — behavior change có chủ đích cho UI ghi chỉ số hàng ngày.

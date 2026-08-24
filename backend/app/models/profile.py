@@ -33,6 +33,9 @@ class Profile(Base):
     restrictions: Mapped[dict] = mapped_column(JSON, default=dict)
     preferences: Mapped[list] = mapped_column(JSON, default=list)
     constraints_status: Mapped[str] = mapped_column(String(32), default="confirmed")
+    meal_plan_request_status: Mapped[str] = mapped_column(String(16), default="none")
+    meal_plan_request_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    meal_plan_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

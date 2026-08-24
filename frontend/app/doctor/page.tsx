@@ -201,6 +201,10 @@ export default function DoctorDashboardPage() {
     .slice(0, 5)
     .map(doctorPatientToUi);
 
+  const mealPlanRequestPatients = patientSummaries
+    .filter((p) => p.meal_plan_request_status === "pending")
+    .slice(0, 5);
+
   // Demo: giả lập thực đơn sắp/đã hết hạn (backend chặn ở production)
   const handleDemoExpiry = async (mode: "expiring" | "expired") => {
     if (demoBusy) return;
@@ -345,6 +349,59 @@ export default function DoctorDashboardPage() {
             <div className="absolute top-0 right-0 w-1.5 h-full bg-rose-500"></div>
           </Link>
         </section>
+
+        {mealPlanRequestPatients.length > 0 && (
+          <section className="bg-surface-container-lowest border border-emerald-200/80 rounded-2xl shadow-subtle overflow-hidden">
+            <div className="p-5 border-b border-emerald-100 bg-emerald-50/40 flex flex-wrap justify-between items-center gap-3">
+              <div>
+                <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+                    restaurant_menu
+                  </span>
+                  Yêu cầu tạo thực đơn
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Bệnh nhân đã gửi yêu cầu — bấm để vào trang tạo thực đơn AI
+                </p>
+              </div>
+              <Link
+                href="/doctor/patients"
+                className="text-primary font-body-bold hover:underline text-xs cursor-pointer flex items-center gap-0.5 font-semibold"
+              >
+                <span>Xem danh sách</span>
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              </Link>
+            </div>
+            <ul className="divide-y divide-outline-variant/30">
+              {mealPlanRequestPatients.map((p) => (
+                <li
+                  key={p.id}
+                  className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low/30"
+                >
+                  <div className="min-w-0">
+                    <p className="font-body-bold text-sm text-on-surface font-bold">{p.name}</p>
+                    {p.meal_plan_request_note ? (
+                      <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
+                        “{p.meal_plan_request_note}”
+                      </p>
+                    ) : (
+                      <p className="text-xs text-on-surface-variant mt-1">
+                        Chưa có ghi chú kèm theo
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/doctor/patients/${p.id}/generate`}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    Tạo thực đơn AI
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Main Section (1:1 ratio) */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">

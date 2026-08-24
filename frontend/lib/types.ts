@@ -293,6 +293,15 @@ export interface DoctorPatientSummary {
   plan_days_left?: number | null;
   plan_expiry?: "expiring" | "expired" | "ok" | "none";
   plan_usage?: "none" | "active" | "finished";
+  meal_plan_request_status?: "none" | "pending";
+  meal_plan_request_note?: string | null;
+  meal_plan_requested_at?: string | null;
+}
+
+export interface MealPlanRequestOut {
+  status: "none" | "pending";
+  note?: string | null;
+  requested_at?: string | null;
 }
 
 export interface PlanExpiryDemoOut {

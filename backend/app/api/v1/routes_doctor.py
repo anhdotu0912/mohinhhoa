@@ -46,7 +46,7 @@ from app.schemas.notification import NotificationOut
 from app.services import plan_expiry
 from app.services.avatar_service import save_user_avatar
 from app.services.compliance import ComplianceService
-from app.services.meal_plan_service import generate_meal_plan, get_profile, meal_plan_from_row
+from app.services.meal_plan_service import generate_meal_plan, get_profile, meal_plan_from_row, _format_request_dt
 from app.services.notification import NotificationService
 from app.services.plan_apply import (
     apply_meal_plan,
@@ -270,6 +270,17 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         plan_days_left=plan_days_left,
         plan_expiry=plan_expiry_bucket,
         plan_usage=usage,  # type: ignore[arg-type]
+        meal_plan_request_status=(
+            getattr(profile, "meal_plan_request_status", None) or "none"
+            if profile
+            else "none"
+        ),  # type: ignore[arg-type]
+        meal_plan_request_note=getattr(profile, "meal_plan_request_note", None)
+        if profile
+        else None,
+        meal_plan_requested_at=_format_request_dt(
+            getattr(profile, "meal_plan_requested_at", None) if profile else None
+        ),
     )
 
 
@@ -278,6 +289,7 @@ def list_patients(
     q: str | None = None,
     status: str | None = None,
     plan_usage: str | None = None,
+    meal_plan_request: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[DoctorPatientSummary]:
@@ -307,6 +319,10 @@ def list_patients(
 
     if plan_usage and plan_usage != "all":
         rows = [r for r in rows if r.plan_usage == plan_usage]
+
+    if meal_plan_request and meal_plan_request != "all":
+        if meal_plan_request == "pending":
+            rows = [r for r in rows if r.meal_plan_request_status == "pending"]
 
     return rows
 

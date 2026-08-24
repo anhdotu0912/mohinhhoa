@@ -83,6 +83,18 @@ class RequestAdjustmentRequest(BaseModel):
     adjustment_note: str = Field(min_length=1)
 
 
+class MealPlanRequestIn(BaseModel):
+    """Patient request for doctor to create a meal plan."""
+    note: str = ""
+
+
+class MealPlanRequestOut(BaseModel):
+    """Status of patient's meal plan creation request."""
+    status: Literal["none", "pending"] = "none"
+    note: str | None = None
+    requested_at: str | None = None
+
+
 class MealPlanOutput(BaseModel):
     """Full multi-day meal plan output — contract §1.2."""
     id: str = ""

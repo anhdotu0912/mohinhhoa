@@ -8,6 +8,7 @@ Done — luồng `POST /meal-plans/generate` (persist trực tiếp qua `meal_pl
 
 ## 2. User story
 - Là **bệnh nhân**, tôi muốn nhận thực đơn 7 ngày phù hợp bệnh lý của mình chỉ bằng 1 lượt bấm, để tôi không phải tự tính toán dinh dưỡng.
+- Là **bệnh nhân**, tôi muốn **yêu cầu bác sĩ tạo thực đơn** khi chưa có plan (as-built 2026-08-24), để bác sĩ biết cần lập kế hoạch dinh dưỡng cho tôi mà không phải tự gọi AI.
 - Là **bác sĩ**, tôi muốn hệ thống tự sinh sẵn 1 bản dự thảo thực đơn cho bệnh nhân, để tôi chỉ cần duyệt/chỉnh sửa thay vì soạn từ đầu.
 - Là **AI**, tôi cần đảm bảo mọi món ăn sinh ra không vi phạm dị ứng, có nguồn trích dẫn dinh dưỡng, và các tương tác thuốc–thực phẩm nguy hiểm đã được xử lý (swap) trước khi trả kết quả.
 
@@ -35,17 +36,23 @@ Done — luồng `POST /meal-plans/generate` (persist trực tiếp qua `meal_pl
 4. FE hiển thị "Đang chờ bác sĩ duyệt" — patient xem chi tiết plan qua `GET /meal-plans/me` (`specs/07-patient-meal-plan-view.md`).
 5. Bác sĩ duyệt plan (`specs/06-meal-plan-review.md`).
 6. (Biến thể) Doctor có thể tự generate hộ patient qua `POST /doctor/patients/{patient_id}/meal-plans/generate` — cùng pipeline, cùng persist.
+7. (Biến thể — as-built 2026-08-24) Patient yêu cầu bác sĩ tạo qua `POST /meal-plans/request` → cờ `meal_plan_request_status=pending` trên profile; bác sĩ thấy badge trên danh sách bệnh nhân rồi vào generate thủ công — **không** auto-generate, **không** notification inbox bác sĩ.
 
 ## 5. Edge cases
 - **`meal_plan` qua `/chat` là read-only theo thiết kế (không phải gap):** khi patient hỏi AI qua chat (ví dụ "lập thực đơn cho tôi") và intent được phân loại `meal_plan`, `meal_plan_node` trong LangGraph graph tạo `MealPlanOutput` đầy đủ để **hiển thị ngay trong hội thoại** (preview nhanh, không cần rời màn hình chat), nhưng **không ghi vào bảng `meal_plans`** — `meal_plan_id` trả trong `AgentRunOutput` (nếu có) không dùng lại được qua `GET /meal-plans/{id}` (`404`). Muốn có 1 plan chính thức, patient dùng `POST /meal-plans/generate` (rule 6) — 2 code path dùng chung `meal_planner_agent` nhưng có chủ đích khác nhau về persist, tránh chat tạo ra nhiều bản draft rác trong DB mỗi lần patient hỏi thử. Xem `adrs/002-agent-orchestration-langgraph.md`.
 - Patient generate nhiều lần liên tiếp → mỗi lần tạo 1 `MealPlan` mới, `GET /meal-plans/me` chỉ trả **bản mới nhất** (`ORDER BY created_at DESC LIMIT 1`) — các plan cũ vẫn còn trong DB (xem được qua `GET /meal-plans/{id}` nếu biết ID) nhưng không có API "list toàn bộ lịch sử" cho patient.
 - Patient chưa có `PatientProfile` (chưa qua onboarding) → generate vẫn chạy được với profile default (`target_kcal=1800`, mọi list rỗng) — không có validation chặn, chỉ kết quả kém cá nhân hoá (nhất quán `specs/02` §3 rule 5).
 - SLA: brief gốc ghi "<15s p95 chỉ áp dụng nhánh thật (LLM)" — nhánh rule-based (khi không có `OPENAI_API_KEY`/`LLM_PROVIDER` không set) chạy nhanh hơn nhiều (không gọi network); nhánh LLM phụ thuộc độ trễ API ngoài, chưa có test đo p95 chính thức trong repo — coi ngưỡng 15s là mục tiêu thiết kế, không phải số đã verify bằng benchmark.
+- Patient gửi `POST /meal-plans/request` khi đã có plan `pending_review` → `400 PLAN_ALREADY_PENDING`.
+- Patient gửi lại request khi đang `pending` → idempotent `200`, giữ note/thời điểm cũ.
+- Doctor generate hộ patient → cờ request tự về `none`.
 
 ## 6. Ngoài phạm vi (Out of scope)
 - Sinh nhiều biến thể (A/B variants) — field `variant_group_id/variant_index/total_variants` đã có trong schema nhưng chưa endpoint nào dùng (xem `contracts/agent-io-schema.md` §2).
 - Tuỳ chỉnh số ngày plan qua API (luôn cố định 7 ngày).
 - RAG/ChromaDB cho việc chọn món — meal planner dùng catalog tĩnh, không phải vector search (khác với `rag_qa` trong chat).
+- Inbox / push notification cho bác sĩ khi patient request (as-built: badge trên danh sách bệnh nhân).
+- Patient FE gọi `POST /meal-plans/generate` trực tiếp (API có sẵn nhưng product chọn doctor-owned flow).
 
 ## 7. Schema tham chiếu
 - `MealPlanOutput`, `DayPlan`, `Meal`, `FoodItem`, `Swap` — `contracts/agent-io-schema.md` §2.
@@ -55,6 +62,8 @@ Done — luồng `POST /meal-plans/generate` (persist trực tiếp qua `meal_pl
 | Method | Path | Role |
 |---|---|---|
 | POST | `/meal-plans/generate` | patient |
+| POST | `/meal-plans/request` | patient |
+| GET | `/meal-plans/request` | patient |
 | GET | `/meal-plans/me` | patient |
 | GET | `/meal-plans/{meal_plan_id}` | patient (chỉ plan của mình) / doctor (bất kỳ) |
 | POST | `/doctor/patients/{patient_id}/meal-plans/generate` | doctor |

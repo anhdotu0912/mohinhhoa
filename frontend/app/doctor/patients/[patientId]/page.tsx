@@ -609,6 +609,33 @@ export default function PatientDetailPage() {
 
         {/* Main Container */}
         <main className="p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
+          {summary?.meal_plan_request_status === "pending" && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[20px]">mail</span>
+                  Bệnh nhân đã yêu cầu tạo thực đơn
+                </p>
+                {summary.meal_plan_request_note ? (
+                  <p className="text-xs text-emerald-800/90 mt-1 leading-relaxed">
+                    Ghi chú: “{summary.meal_plan_request_note}”
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-800/90 mt-1">
+                    Chưa có ghi chú — bạn có thể thêm yêu cầu khi tạo thực đơn AI.
+                  </p>
+                )}
+              </div>
+              <Link
+                href={`/doctor/patients/${patientId}/generate`}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
+              >
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                Tạo thực đơn bằng AI
+              </Link>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row gap-6">
             {/* Left Column: Patient Profile (30%) */}
             <div className="w-full md:w-[32%] flex flex-col gap-6">

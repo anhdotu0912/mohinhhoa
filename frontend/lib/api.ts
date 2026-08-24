@@ -19,6 +19,7 @@ import {
   type InteractionCheckInput,
   type InteractionCheckOutput,
   type MealPlanOutput,
+  type MealPlanRequestOut,
   type MetricsHistoryPoint,
   type MetricsLogCreate,
   type NotificationOut,
@@ -240,6 +241,17 @@ export const api = {
     return request(`/api/v1/meal-plans/${id}`);
   },
 
+  getMealPlanRequest(): Promise<MealPlanRequestOut> {
+    return request("/api/v1/meal-plans/request");
+  },
+
+  requestMealPlan(note?: string): Promise<MealPlanRequestOut> {
+    return request("/api/v1/meal-plans/request", {
+      method: "POST",
+      body: { note: note ?? "" },
+    });
+  },
+
   listAlerts(patientId?: string): Promise<AlertOut[]> {
     const q = patientId ? `?patient_id=${encodeURIComponent(patientId)}` : "";
     return request(`/api/v1/alerts${q}`);
@@ -289,11 +301,13 @@ export const api = {
     q?: string;
     status?: string;
     plan_usage?: string;
+    meal_plan_request?: string;
   }): Promise<DoctorPatientSummary[]> {
     const search = new URLSearchParams();
     if (params?.q) search.set("q", params.q);
     if (params?.status) search.set("status", params.status);
     if (params?.plan_usage) search.set("plan_usage", params.plan_usage);
+    if (params?.meal_plan_request) search.set("meal_plan_request", params.meal_plan_request);
     const qs = search.toString() ? `?${search}` : "";
     return request(`/api/v1/doctor/patients${qs}`);
   },
