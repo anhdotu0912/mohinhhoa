@@ -383,6 +383,13 @@ GET /notifications?status=pending&type=meal_reminder
 // Error 413 { "code": "IMAGE_TOO_LARGE", "detail": "Ảnh tối đa 2MB." }
 ```
 
+### `DELETE /doctor/patients/{patient_id}`
+**Role:** `doctor`. Xóa hoàn toàn một bệnh nhân và toàn bộ dữ liệu liên quan (hồ sơ, thực đơn, nhật ký ăn uống, thông báo, chỉ số sức khỏe, hội thoại chat).
+```json
+// Response 204 No Content
+// Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
+```
+
 ---
 
 ## 9. Doctor Review
@@ -391,6 +398,13 @@ GET /notifications?status=pending&type=meal_reminder
 **Role:** `doctor`. Query `status` (default `"pending_review"`, dùng `"all"` để lấy hết).
 ```json
 // Response 200 → list[MealPlanOutput]
+```
+
+### `DELETE /doctor/meal-plans/{meal_plan_id}`
+**Role:** `doctor`. Xóa một thực đơn đã tạo (chờ duyệt, đã duyệt, hoặc đã áp dụng).
+```json
+// Response 204 No Content
+// Error 404 { "code": "MEAL_PLAN_NOT_FOUND", "detail": "Không tìm thấy thực đơn." }
 ```
 
 ### `POST /doctor/meal-plans/{meal_plan_id}/review`

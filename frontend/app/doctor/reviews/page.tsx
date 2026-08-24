@@ -225,6 +225,8 @@ export default function DoctorReviewsPage() {
     string | null
   >(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<MealPlanItem | null>(null);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
 
   const [page, setPage] = useState(1);
 
@@ -235,6 +237,22 @@ export default function DoctorReviewsPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleDeletePlan = async () => {
+    if (!planToDelete) return;
+    setIsDeletingPlan(true);
+    try {
+      await api.deleteDoctorMealPlan(planToDelete.id);
+      showToast(`Đã xóa thực đơn #${truncateId(planToDelete.id)} thành công.`);
+      setPlanToDelete(null);
+      await load();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể xóa thực đơn lúc này.";
+      showToast(msg);
+    } finally {
+      setIsDeletingPlan(false);
+    }
   };
 
   const load = useCallback(async () => {
@@ -873,15 +891,25 @@ export default function DoctorReviewsPage() {
 
                             {/* Thao tác */}
                             <td className="px-5 py-3.5 text-right">
-                              <Link
-                                href={`/doctor/reviews/${encodeURIComponent(plan.patientId)}/${encodeURIComponent(plan.id)}`}
-                                className="inline-flex items-center gap-1 bg-primary hover:bg-primary/90 text-on-primary font-body-bold h-8 px-3.5 rounded-xl transition-all text-xs font-semibold shrink-0 cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap"
-                              >
-                                <span>Xem chi tiết</span>
-                                <span className="material-symbols-outlined text-[15px]">
-                                  arrow_forward
-                                </span>
-                              </Link>
+                              <div className="flex items-center justify-end gap-2">
+                                <Link
+                                  href={`/doctor/reviews/${encodeURIComponent(plan.patientId)}/${encodeURIComponent(plan.id)}`}
+                                  className="inline-flex items-center gap-1 bg-primary hover:bg-primary/90 text-on-primary font-body-bold h-8 px-3.5 rounded-xl transition-all text-xs font-semibold shrink-0 cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap"
+                                >
+                                  <span>Xem chi tiết</span>
+                                  <span className="material-symbols-outlined text-[15px]">
+                                    arrow_forward
+                                  </span>
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => setPlanToDelete(plan)}
+                                  title="Xóa thực đơn này"
+                                  className="w-8 h-8 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1290,6 +1318,48 @@ export default function DoctorReviewsPage() {
               >
                 <span className="material-symbols-outlined text-[16px]">check</span>
                 <span>Xong</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {planToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">
+            <div className="flex items-center gap-3 text-rose-600 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-on-surface">Xóa thực đơn</h3>
+                <p className="text-xs text-on-surface-variant">Mã #{truncateId(planToDelete.id)}</p>
+              </div>
+            </div>
+            <p className="text-sm text-on-surface-variant mb-6">
+              Bạn có chắc chắn muốn xóa thực đơn của bệnh nhân{" "}
+              <strong className="text-on-surface">{planToDelete.patientName}</strong>? Thao tác này sẽ giải phóng lịch trình và không thể hoàn tác.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPlanToDelete(null)}
+                disabled={isDeletingPlan}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeletePlan()}
+                disabled={isDeletingPlan}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {isDeletingPlan ? "hourglass_empty" : "delete"}
+                </span>
+                <span>{isDeletingPlan ? "Đang xóa..." : "Xác nhận xóa"}</span>
               </button>
             </div>
           </div>

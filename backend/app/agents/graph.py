@@ -116,15 +116,60 @@ def meal_plan_node(state: AgentState) -> AgentState:
     }
 
 
+def _check_allergy_match(allergies: list[str], foods: list[str]) -> list[str]:
+    """Check if any queried foods match patient allergies.
+
+    Returns list of allergy warnings (empty if no match).
+    Handles common Vietnamese food-allergy mappings.
+    """
+    if not allergies or not foods:
+        return []
+
+    # Mapping from allergy category → food items that belong to it
+    _ALLERGY_FOOD_MAP: dict[str, list[str]] = {
+        "hải sản": [
+            "tôm", "cua", "mực", "nghêu", "sò", "ốc", "hàu", "bạch tuộc",
+            "cá hồi", "cá thu", "cá basa", "cá rô phi", "cá lóc", "cá ngừ",
+            "cá", "hải sản", "tôm hùm", "ghẹ", "cá tra", "cá chẽm",
+        ],
+        "sữa": ["sữa", "phô mai", "bơ", "kem", "sữa chua", "whey"],
+        "đậu phộng": ["đậu phộng", "lạc", "bơ đậu phộng"],
+        "trứng": ["trứng", "trứng gà", "trứng vịt"],
+        "đậu nành": ["đậu nành", "đậu hũ", "tàu hũ", "nước tương", "miso"],
+        "gluten": ["lúa mì", "bánh mì", "mì ống", "mì", "bột mì"],
+    }
+
+    warnings: list[str] = []
+    for allergy in allergies:
+        allergy_lower = allergy.lower().strip()
+        related_foods = _ALLERGY_FOOD_MAP.get(allergy_lower, [allergy_lower])
+
+        for food in foods:
+            food_lower = food.lower().strip()
+            if food_lower in related_foods or any(rf in food_lower for rf in related_foods):
+                warnings.append(
+                    f"⚠️ **CẢNH BÁO DỊ ỨNG:** Hồ sơ của bạn ghi nhận dị ứng **{allergy}**. "
+                    f"**{food.capitalize()}** thuộc nhóm {allergy} — bạn **KHÔNG NÊN** ăn/dùng. "
+                    f"Vui lòng tham khảo bác sĩ nếu cần thay thế."
+                )
+                break  # One warning per allergy category is enough
+
+    return warnings
+
+
 def interaction_check_node(state: AgentState) -> AgentState:
     """InteractionChecker node — checks drug-food interactions from user query or state."""
     profile_data = state.get("profile", {})
     profile = PatientProfile(**profile_data) if isinstance(profile_data, dict) else profile_data
     db = state.get("db")
     medications = profile.medications or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
+    allergies = profile.allergies or []
 
     message = state.get("message", "")
     foods, is_specific_query = extract_foods_from_message(message)
+
+    # P4: Check allergy FIRST — this takes priority over interaction check
+    allergy_warnings = _check_allergy_match(allergies, foods)
 
     check_input = InteractionCheckInput(
         medications=medications,
@@ -155,6 +200,10 @@ def interaction_check_node(state: AgentState) -> AgentState:
                 meds_str = ", ".join(m.capitalize() for m in medications)
                 answer_text = f"Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra."
 
+        # Prepend allergy warnings if any
+        if allergy_warnings:
+            answer_text = "\n\n".join(allergy_warnings) + "\n\n---\n\n" + answer_text
+
         all_sources = list({src for item in interactions for src in item.sources})
 
         return {
@@ -165,9 +214,13 @@ def interaction_check_node(state: AgentState) -> AgentState:
         }
     except Exception as e:
         logger.error("Interaction check failed: %s", e, exc_info=True)
+        # Still show allergy warnings even if interaction check fails
+        error_msg = f"Lỗi khi kiểm tra tương tác: {str(e)}"
+        if allergy_warnings:
+            error_msg = "\n\n".join(allergy_warnings) + "\n\n---\n\n" + error_msg
         return {
             **state,
-            "answer": f"Lỗi khi kiểm tra tương tác: {str(e)}",
+            "answer": error_msg,
             "interactions": None,
             "errors": state.get("errors", []) + [str(e)],
         }

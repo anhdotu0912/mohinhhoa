@@ -477,6 +477,26 @@ export const api = {
     });
   },
 
+  deleteDoctorMealPlan(planId: string): Promise<void> {
+    const id = asRouteId(planId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PLAN_ID", "Thiếu mã thực đơn."));
+    }
+    return request(`/api/v1/doctor/meal-plans/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  deleteDoctorPatient(patientId: string): Promise<void> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
   demoPlanExpiry(
     mode: "expiring" | "expired"
   ): Promise<PlanExpiryDemoOut> {

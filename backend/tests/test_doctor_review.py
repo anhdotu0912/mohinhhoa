@@ -245,3 +245,39 @@ def test_doctor_alerts_requires_patient_id(client):
     assert isinstance(alerts, list)
     # demo_patient_1 uses metformin — alerts depend on plan foods vs interaction KB.
     assert len(alerts) >= 0
+
+
+def test_doctor_delete_meal_plan(client):
+    doctor_headers = _login(client, DOCTOR)
+    patient_headers = _login(client, PATIENT)
+    plan = _generate_plan(client, patient_headers)
+    plan_id = plan["id"]
+
+    # Delete the meal plan
+    response = client.delete(f"/api/v1/doctor/meal-plans/{plan_id}", headers=doctor_headers)
+    assert response.status_code == 204, response.text
+
+    # Verify 404 when querying deleted plan
+    response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=doctor_headers)
+    assert response.status_code == 404
+
+
+def test_doctor_delete_patient(client):
+    doctor_headers = _login(client, DOCTOR)
+
+    # Register a new patient to delete
+    reg_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "temp_delete_patient@example.com", "password": "password123", "role": "patient", "full_name": "Test Delete"},
+    )
+    assert reg_res.status_code == 201
+    user_id = reg_res.json()["id"]
+
+    # Delete the patient
+    response = client.delete(f"/api/v1/doctor/patients/{user_id}", headers=doctor_headers)
+    assert response.status_code == 204, response.text
+
+    # Verify patient no longer exists
+    response = client.get(f"/api/v1/doctor/patients/{user_id}", headers=doctor_headers)
+    assert response.status_code == 404
+
