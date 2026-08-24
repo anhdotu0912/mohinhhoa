@@ -52,6 +52,15 @@ _INTENT_PATTERNS = {
         r"uống\s*(thuốc|metformin|gliclazide).*ăn",
         r"kiểm tra tương tác",
         r"có ăn được không.*đang uống",
+        # P1: "ăn X được không" — food safety questions implying medication check
+        r"(?:tôi|em|mình)?\s*(?:có thể|có nên|có)?\s*ăn\s+\S+.*(?:được không|không ạ|chứ|hả)",
+        r"\S+\s+(?:ăn được không|có ăn được|uống được không|có uống được)",
+        r"(?:ăn|uống|dùng)\s+\S+.*(?:được không|có sao không|có tốt không|an toàn không)",
+        r"(?:tôi|em|mình)?\s*(?:có nên|nên)\s+(?:ăn|uống|dùng)\s+\S+",
+        r"\b(?:kiêng|kỵ|kị)\b",
+        # "ăn X khi uống/đang dùng thuốc Y"
+        r"(?:ăn|uống|dùng)\s+\S+.*(?:khi|đang)\s*(?:uống|dùng)",
+        r"(?:khi|đang)\s*(?:uống|dùng)\s+\S+.*(?:ăn|uống|dùng)",
     ],
     "food_log": [
         r"ghi lại", r"log", r"vừa ăn", r"đã ăn", r"hôm nay ăn rồi",
@@ -138,13 +147,19 @@ def _classify_by_llm(message: str) -> str:
         prompt = f"""Phân loại intent của tin nhắn bệnh nhân sau vào ĐÚNG MỘT trong các loại:
 - greeting: câu chào hỏi (hello, hi, xin chào), cảm ơn, tạm biệt, hỏi bạn là ai
 - meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng, xem thực đơn tuần
-- interaction_check: hỏi về tương tác thuốc-thực phẩm
+- interaction_check: hỏi về tương tác thuốc-thực phẩm, HOẶC hỏi "ăn/uống X được không" (kiểm tra an toàn thực phẩm khi đang dùng thuốc), hỏi kiêng gì, hỏi có nên ăn/uống X không
 - food_log: ghi lại bữa ăn đã ăn
 - weekly_compliance: hỏi tỉ lệ/báo cáo tuân thủ tuần, tuân thủ gần đây
 - doctor_note: hỏi lời dặn/lời nhắc/ghi chú từ bác sĩ
-- rag_qa: câu hỏi chung về dinh dưỡng, sức khỏe, đi chợ mua gì
+- rag_qa: câu hỏi KIẾN THỨC chung về dinh dưỡng (calo, chỉ số GI, so sánh thực phẩm), KHÔNG phải hỏi "được không" hay "có nên không"
 - refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
 - unknown: không rõ ý định
+
+Lưu ý phân biệt:
+- "tôi ăn cá hồi được không" → interaction_check (hỏi AN TOÀN)
+- "cá hồi bao nhiêu calo" → rag_qa (hỏi KIẾN THỨC)
+- "hôm nay ăn gì" → meal_plan (hỏi THỰC ĐƠN)
+- "ăn gì cho khỏe" → rag_qa (hỏi LỜI KHUYÊN chung)
 
 Tin nhắn: "{message}"
 
