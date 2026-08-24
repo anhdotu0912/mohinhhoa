@@ -864,3 +864,67 @@ def simulate_plan_expiry(
 
     db.commit()
     return PlanExpiryDemoOut(updated=updated, skipped=skipped)
+
+
+@router.delete("/meal-plans/{meal_plan_id}", status_code=204)
+def delete_doctor_meal_plan(
+    meal_plan_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> None:
+    """Xóa một thực đơn đã tạo (chờ duyệt, đã duyệt, hoặc đã áp dụng)."""
+    del user
+    plan = db.get(MealPlan, meal_plan_id)
+    if plan is None:
+        raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+
+    # Xóa alerts liên quan đến plan này
+    db.query(Alert).filter(Alert.meal_plan_id == meal_plan_id).delete(synchronize_session=False)
+
+    # Xóa notifications liên quan đến plan này
+    from app.models.notification import Notification
+    notifs = db.query(Notification).filter(Notification.user_id == plan.user_id).all()
+    for notif in notifs:
+        rel = notif.related_ids or {}
+        if isinstance(rel, dict) and rel.get("meal_plan_id") == meal_plan_id:
+            db.delete(notif)
+
+    db.delete(plan)
+    db.commit()
+    return None
+
+
+@router.delete("/patients/{patient_id}", status_code=204)
+def delete_doctor_patient(
+    patient_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> None:
+    """Xóa hoàn toàn một bệnh nhân và toàn bộ dữ liệu phụ thuộc liên quan."""
+    del user
+    target_user = db.get(User, patient_id)
+    if target_user is None or target_user.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+
+    from app.models.body_metrics import BodyMetricsEntry
+    from app.models.chat_session import ChatMessage, ChatSession
+    from app.models.food_log import FoodLog
+    from app.models.notification import Notification
+    from app.models.password_reset import PasswordResetToken
+
+    # Cascade delete all related records
+    session_ids = [s.id for s in db.query(ChatSession.id).filter(ChatSession.user_id == patient_id).all()]
+    if session_ids:
+        db.query(ChatMessage).filter(ChatMessage.session_id.in_(session_ids)).delete(synchronize_session=False)
+    db.query(ChatSession).filter(ChatSession.user_id == patient_id).delete(synchronize_session=False)
+    db.query(FoodLog).filter(FoodLog.user_id == patient_id).delete(synchronize_session=False)
+    db.query(Notification).filter(Notification.user_id == patient_id).delete(synchronize_session=False)
+    db.query(Alert).filter(Alert.user_id == patient_id).delete(synchronize_session=False)
+    db.query(MealPlan).filter(MealPlan.user_id == patient_id).delete(synchronize_session=False)
+    db.query(BodyMetricsEntry).filter(BodyMetricsEntry.user_id == patient_id).delete(synchronize_session=False)
+    db.query(PasswordResetToken).filter(PasswordResetToken.user_id == patient_id).delete(synchronize_session=False)
+    db.query(Profile).filter(Profile.user_id == patient_id).delete(synchronize_session=False)
+    db.delete(target_user)
+    db.commit()
+    return None
+

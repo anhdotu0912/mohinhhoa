@@ -84,6 +84,8 @@ export default function PatientsListPage() {
   const [medSearch, setMedSearch] = useState("");
   const [allergySearch, setAllergySearch] = useState("");
   const [diagnosisSearch, setDiagnosisSearch] = useState("");
+  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
+  const [isDeletingPatient, setIsDeletingPatient] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -92,6 +94,22 @@ export default function PatientsListPage() {
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleDeletePatient = async () => {
+    if (!patientToDelete) return;
+    setIsDeletingPatient(true);
+    try {
+      await api.deleteDoctorPatient(patientToDelete.id);
+      showToast(`Đã xóa bệnh nhân ${patientToDelete.name} thành công.`);
+      setPatientToDelete(null);
+      await loadPatients();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể xóa bệnh nhân lúc này.";
+      showToast(msg);
+    } finally {
+      setIsDeletingPatient(false);
+    }
   };
 
   const loadPatients = useCallback(async () => {
@@ -697,16 +715,26 @@ export default function PatientsListPage() {
                           {patient.lastUpdate}
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <Link
-                            href={`/doctor/patients/${patient.id}`}
-                            title="Xem chi tiết"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold text-xs rounded-xl hover:bg-primary hover:text-white transition-all cursor-pointer active:scale-95 shadow-2xs font-semibold"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">
-                              visibility
-                            </span>
-                            Xem chi tiết
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/doctor/patients/${patient.id}`}
+                              title="Xem chi tiết"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold text-xs rounded-xl hover:bg-primary hover:text-white transition-all cursor-pointer active:scale-95 shadow-2xs font-semibold"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                visibility
+                              </span>
+                              Xem chi tiết
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setPatientToDelete(patient)}
+                              title="Xóa bệnh nhân này"
+                              className="w-8 h-8 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">delete</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1339,6 +1367,52 @@ export default function PatientsListPage() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PATIENT CONFIRMATION MODAL */}
+      {patientToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">
+            <div className="flex items-center gap-3 text-rose-600 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[24px]">person_remove</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-on-surface">Xóa bệnh nhân</h3>
+                <p className="text-xs text-on-surface-variant">Mã: {patientToDelete.id}</p>
+              </div>
+            </div>
+            <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
+              Bạn có chắc chắn muốn xóa hồ sơ bệnh nhân{" "}
+              <strong className="text-on-surface">{patientToDelete.name}</strong>? 
+              <br />
+              <span className="text-xs text-rose-600 font-semibold mt-1 block">
+                ⚠️ Toàn bộ thực đơn, nhật ký bữa ăn, chỉ số sức khỏe và tin nhắn của bệnh nhân này sẽ bị xóa vĩnh viễn khỏi hệ thống.
+              </span>
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPatientToDelete(null)}
+                disabled={isDeletingPatient}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeletePatient()}
+                disabled={isDeletingPatient}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {isDeletingPatient ? "hourglass_empty" : "delete_forever"}
+                </span>
+                <span>{isDeletingPatient ? "Đang xóa..." : "Xác nhận xóa"}</span>
+              </button>
             </div>
           </div>
         </div>
