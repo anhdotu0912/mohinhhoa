@@ -3,11 +3,37 @@
 import React, { useState } from "react";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/types";
+import {
+  firstFieldError,
+  sanitizeBloodPressureInput,
+  validateBloodPressure,
+  validatePositiveNumber,
+} from "@/lib/profile-validation";
 
 interface RecordMetricsFormPanelProps {
   onBack: () => void;
   onClose: () => void;
   onSaved: () => void;
+}
+
+type FieldName = "weight" | "bloodPressure" | "bloodGlucose";
+type FieldErrors = Partial<Record<FieldName, string>>;
+
+function FieldHint({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-[11px] text-rose-600 font-medium leading-snug">
+      {message}
+    </p>
+  );
+}
+
+function inputClass(hasError: boolean) {
+  return `w-full bg-slate-50 border rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white outline-none transition-all ${
+    hasError
+      ? "border-rose-400 focus:ring-4 focus:ring-rose-500/15 focus:border-rose-500"
+      : "border-slate-200/90 focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500"
+  }`;
 }
 
 export function RecordMetricsFormPanel({
@@ -20,11 +46,50 @@ export function RecordMetricsFormPanel({
   const [bloodGlucose, setBloodGlucose] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const setFieldError = (name: FieldName, message: string | null) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[name] = message;
+      else delete next[name];
+      return next;
+    });
+  };
+
+  const collectErrors = (): FieldErrors => {
+    const next: FieldErrors = {};
+    if (weight.trim()) {
+      const weightErr = validatePositiveNumber(weight, 20, 300, "Cân nặng");
+      if (weightErr) next.weight = weightErr;
+    }
+    const bpErr = validateBloodPressure(bloodPressure);
+    if (bpErr) next.bloodPressure = bpErr;
+    if (bloodGlucose.trim()) {
+      const glucoseErr = validatePositiveNumber(
+        bloodGlucose,
+        2,
+        33,
+        "Đường huyết"
+      );
+      if (glucoseErr) next.bloodGlucose = glucoseErr;
+    }
+    return next;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!weight.trim() && !bloodPressure.trim() && !bloodGlucose.trim()) {
+      setFieldErrors({});
       setError("Vui lòng nhập ít nhất một chỉ số sức khỏe.");
+      return;
+    }
+
+    const nextErrors = collectErrors();
+    setFieldErrors(nextErrors);
+    const first = firstFieldError(nextErrors);
+    if (first) {
+      setError(first);
       return;
     }
 
@@ -32,7 +97,7 @@ export function RecordMetricsFormPanel({
     setError(null);
     try {
       await api.recordMetrics({
-        weight: weight.trim() ? parseFloat(weight) : undefined,
+        weight: weight.trim() ? parseFloat(weight.replace(",", ".")) : undefined,
         blood_pressure: bloodPressure.trim() || undefined,
         blood_glucose: bloodGlucose.trim() || undefined,
       });
@@ -78,7 +143,11 @@ export function RecordMetricsFormPanel({
       </div>
 
       {/* Form Content */}
-      <form onSubmit={handleSubmit} className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between"
+      >
         <div className="space-y-5">
           {error && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 animate-in fade-in duration-200">
@@ -97,11 +166,30 @@ export function RecordMetricsFormPanel({
             <input
               type="number"
               step="0.1"
+              min={20}
+              max={300}
+              inputMode="decimal"
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
+              onChange={(e) => {
+                setWeight(e.target.value);
+                setFieldError("weight", null);
+              }}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) {
+                  setFieldError("weight", null);
+                  return;
+                }
+                setFieldError(
+                  "weight",
+                  validatePositiveNumber(e.target.value, 20, 300, "Cân nặng")
+                );
+              }}
               placeholder="Ví dụ: 68.5"
-              className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition-all"
+              aria-invalid={Boolean(fieldErrors.weight)}
+              aria-describedby={fieldErrors.weight ? "record-weight-error" : undefined}
+              className={inputClass(Boolean(fieldErrors.weight))}
             />
+            <FieldHint id="record-weight-error" message={fieldErrors.weight} />
           </div>
 
           {/* Huyết áp */}
@@ -115,10 +203,22 @@ export function RecordMetricsFormPanel({
             <input
               type="text"
               value={bloodPressure}
-              onChange={(e) => setBloodPressure(e.target.value)}
+              onChange={(e) => {
+                setBloodPressure(sanitizeBloodPressureInput(e.target.value));
+                setFieldError("bloodPressure", null);
+              }}
+              onBlur={(e) =>
+                setFieldError("bloodPressure", validateBloodPressure(e.target.value))
+              }
+              maxLength={20}
               placeholder="Ví dụ: 120/80"
-              className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition-all"
+              aria-invalid={Boolean(fieldErrors.bloodPressure)}
+              aria-describedby={
+                fieldErrors.bloodPressure ? "record-bp-error" : undefined
+              }
+              className={inputClass(Boolean(fieldErrors.bloodPressure))}
             />
+            <FieldHint id="record-bp-error" message={fieldErrors.bloodPressure} />
           </div>
 
           {/* Đường huyết */}
@@ -130,13 +230,32 @@ export function RecordMetricsFormPanel({
               Đường huyết (mmol/L)
             </label>
             <input
-              type="number"
-              step="0.1"
+              type="text"
+              inputMode="decimal"
               value={bloodGlucose}
-              onChange={(e) => setBloodGlucose(e.target.value)}
+              onChange={(e) => {
+                setBloodGlucose(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8));
+                setFieldError("bloodGlucose", null);
+              }}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) {
+                  setFieldError("bloodGlucose", null);
+                  return;
+                }
+                setFieldError(
+                  "bloodGlucose",
+                  validatePositiveNumber(e.target.value, 2, 33, "Đường huyết")
+                );
+              }}
+              maxLength={8}
               placeholder="Ví dụ: 5.6"
-              className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition-all"
+              aria-invalid={Boolean(fieldErrors.bloodGlucose)}
+              aria-describedby={
+                fieldErrors.bloodGlucose ? "record-glucose-error" : undefined
+              }
+              className={inputClass(Boolean(fieldErrors.bloodGlucose))}
             />
+            <FieldHint id="record-glucose-error" message={fieldErrors.bloodGlucose} />
           </div>
         </div>
 

@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
-from app.core.image_validation import detect_image_type
 from app.core.security import require_roles
 from app.core.config import settings
 from app.db.session import get_db
@@ -46,6 +44,7 @@ from app.schemas.meal_plan import ApplyMealPlanRequest, GenerateMealPlanRequest,
 from app.schemas.profile import PatientProfile
 from app.schemas.notification import NotificationOut
 from app.services import plan_expiry
+from app.services.avatar_service import save_user_avatar
 from app.services.compliance import ComplianceService
 from app.services.meal_plan_service import generate_meal_plan, get_profile, meal_plan_from_row
 from app.services.notification import NotificationService
@@ -58,8 +57,6 @@ from app.services.plan_apply import (
 from app.services.plan_schedule import build_meal_plan_schedule, validate_slot_start
 
 router = APIRouter(prefix="/doctor", tags=["doctor"])
-
-STATIC_AVATARS_DIR = Path(__file__).resolve().parents[3] / "static" / "avatars"
 
 _DISEASE_LABELS = {
     "diabetes_t2": "Tiểu đường type 2",
@@ -626,27 +623,14 @@ async def upload_patient_avatar(
     if patient is None or patient.role != "patient":
         raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
 
-    content_type = (file.content_type or "").lower()
-    if not content_type.startswith("image/"):
-        raise APIError(415, "INVALID_IMAGE", "File phải là ảnh (png/jpg/webp/gif).")
-
     content = await file.read()
-    if len(content) > 2 * 1024 * 1024:
-        raise APIError(413, "IMAGE_TOO_LARGE", "Ảnh tối đa 2MB.")
-
-    detected = detect_image_type(content)
-    if detected is None:
-        raise APIError(415, "INVALID_IMAGE", "File phải là ảnh (png/jpg/webp/gif).")
-    _, ext = detected
-
-    avatars_dir = STATIC_AVATARS_DIR
-    avatars_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{patient.id}{ext}"
-    (avatars_dir / filename).write_bytes(content)
-
-    patient.avatar = f"/static/avatars/{filename}"
-    db.commit()
-    return AvatarOut(avatar=patient.avatar)
+    avatar = save_user_avatar(
+        user=patient,
+        content=content,
+        content_type=file.content_type or "",
+        db=db,
+    )
+    return AvatarOut(avatar=avatar)
 
 
 @router.post(

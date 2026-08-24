@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -25,7 +25,9 @@ from app.schemas.auth import (
     TokenResponse,
     UserMeResponse,
 )
+from app.schemas.doctor import AvatarOut
 from app.services import email as email_service
+from app.services.avatar_service import save_user_avatar
 from app.services.login_rate_limit import check_rate_limit, clear_attempts, record_failed_attempt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -197,3 +199,22 @@ def get_me(user: User = Depends(get_current_user)) -> UserMeResponse:
         full_name=user.full_name,
         avatar=user.avatar,
     )
+
+
+@router.post("/me/avatar", response_model=AvatarOut)
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> AvatarOut:
+    row = db.get(User, user.id)
+    if row is None:
+        raise APIError(401, "USER_NOT_FOUND", "Người dùng không tồn tại.")
+    content = await file.read()
+    avatar = save_user_avatar(
+        user=row,
+        content=content,
+        content_type=file.content_type or "",
+        db=db,
+    )
+    return AvatarOut(avatar=avatar)

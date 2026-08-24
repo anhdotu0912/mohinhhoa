@@ -55,6 +55,8 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 |---|---|---|
 | POST | `/auth/register` | Không cần auth |
 | POST | `/auth/login` | Không cần auth |
+| GET | `/auth/me` | User đã đăng nhập |
+| POST | `/auth/me/avatar` | User đã đăng nhập (multipart ảnh ≤ 2MB) |
 | POST | `/auth/forgot-password` | Không cần auth |
 | POST | `/auth/reset-password` | Không cần auth |
 

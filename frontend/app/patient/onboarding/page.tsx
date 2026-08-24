@@ -15,7 +15,55 @@ import {
   suggestRestrictions,
   suggestTargetKcal,
 } from "@/lib/profile-mappers";
+import {
+  firstFieldError,
+  sanitizeBloodGlucoseInput,
+  sanitizeBloodPressureInput,
+  sanitizePhoneInput,
+  validateAddress,
+  validateBloodGlucose,
+  validateBloodPressure,
+  validateFreeTextLabel,
+  validatePhone,
+  validatePositiveInt,
+  validatePositiveNumber,
+  validatePreferencesText,
+} from "@/lib/profile-validation";
 import { ApiError, type CatalogItem, type CatalogOut } from "@/lib/types";
+
+type FieldName =
+  | "age"
+  | "gender"
+  | "phone"
+  | "address"
+  | "weight"
+  | "height"
+  | "bloodPressure"
+  | "bloodGlucose"
+  | "conditions"
+  | "customGoal"
+  | "preferences"
+  | "targetKcal"
+  | "goals";
+
+type FieldErrors = Partial<Record<FieldName, string>>;
+
+function FieldHint({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-xs text-error mt-xs font-caption">
+      {message}
+    </p>
+  );
+}
+
+function inputClass(hasError: boolean, extras = "") {
+  return `w-full px-md py-sm bg-surface-container-lowest border rounded-lg text-sm text-on-surface focus:outline-none ${
+    hasError
+      ? "border-error focus:border-error"
+      : "border-outline-variant focus:border-primary"
+  } ${extras}`;
+}
 
 const STEP_META = [
   {
@@ -69,8 +117,20 @@ export default function PatientOnboardingPage() {
   const [targetKcalInput, setTargetKcalInput] = useState("");
 
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+
+  const setFieldError = (name: FieldName, message: string | null) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[name] = message;
+      else delete next[name];
+      return next;
+    });
+  };
+
+  const clearFieldError = (name: FieldName) => setFieldError(name, null);
 
   const conditionOptions = useMemo(() => {
     if (catalog?.diagnoses?.length) {
@@ -147,6 +207,7 @@ export default function PatientOnboardingPage() {
   }, [hydrated, token, role]);
 
   const toggleCondition = (cond: string) => {
+    clearFieldError("conditions");
     if (selectedConditions.includes(cond)) {
       setSelectedConditions(selectedConditions.filter((c) => c !== cond));
     } else {
@@ -167,6 +228,7 @@ export default function PatientOnboardingPage() {
   };
 
   const toggleGoal = (goal: string) => {
+    clearFieldError("goals");
     if (selectedGoals.includes(goal)) {
       setSelectedGoals(selectedGoals.filter((g) => g !== goal));
     } else {
@@ -175,65 +237,92 @@ export default function PatientOnboardingPage() {
   };
 
   const handleAddCustomGoal = () => {
+    const err = validateFreeTextLabel(customGoalInput, {
+      required: true,
+      min: 3,
+      max: 80,
+      label: "Mục tiêu",
+    });
+    if (err) {
+      setFieldError("customGoal", err);
+      return;
+    }
     const g = customGoalInput.trim();
-    if (!g) return;
     if (!selectedGoals.includes(g)) {
       setSelectedGoals([...selectedGoals, g]);
     }
     setCustomGoalInput("");
+    clearFieldError("customGoal");
   };
 
-  const validateStep1 = (): string | null => {
-    const ageNum = Number(age);
-    if (!age || !Number.isFinite(ageNum) || ageNum <= 0 || ageNum > 130) {
-      return "Nhập tuổi hợp lệ (1–130).";
-    }
-    if (!gender.trim()) {
-      return "Chọn giới tính.";
-    }
-    const w = Number(weight);
-    const h = Number(height);
-    if (!w || !h || w <= 0 || h <= 0) {
-      return "Nhập cân nặng và chiều cao hợp lệ.";
-    }
-    return null;
+  const collectStep1Errors = (): FieldErrors => {
+    const next: FieldErrors = {};
+    const ageErr = validatePositiveInt(age, 1, 130, "Tuổi");
+    if (ageErr) next.age = ageErr;
+    if (!gender.trim()) next.gender = "Chọn giới tính.";
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) next.phone = phoneErr;
+    const addressErr = validateAddress(address);
+    if (addressErr) next.address = addressErr;
+    const weightErr = validatePositiveNumber(weight, 20, 300, "Cân nặng");
+    if (weightErr) next.weight = weightErr;
+    const heightErr = validatePositiveNumber(height, 80, 250, "Chiều cao");
+    if (heightErr) next.height = heightErr;
+    const bpErr = validateBloodPressure(bloodPressure);
+    if (bpErr) next.bloodPressure = bpErr;
+    const glucoseErr = validateBloodGlucose(bloodGlucose);
+    if (glucoseErr) next.bloodGlucose = glucoseErr;
+    return next;
   };
 
-  const validateStep2 = (): string | null => {
+  const collectStep2Errors = (): FieldErrors => {
     if (selectedConditions.length === 0) {
-      return "Chọn ít nhất một bệnh lý nền.";
+      return { conditions: "Chọn ít nhất một bệnh lý nền." };
     }
-    return null;
+    return {};
   };
 
-  const validateStep3 = (): string | null => {
-    if (selectedGoals.length === 0) {
-      return "Chọn ít nhất một mục tiêu điều trị & dinh dưỡng.";
+  const collectStep3Errors = (): FieldErrors => {
+    const next: FieldErrors = {};
+    const kcalErr = validatePositiveInt(targetKcalInput, 800, 5000, "Mục tiêu kcal");
+    if (kcalErr) next.targetKcal = kcalErr;
+    const prefErr = validatePreferencesText(preferencesText);
+    if (prefErr) next.preferences = prefErr;
+    const pendingGoal = customGoalInput.trim();
+    if (pendingGoal) {
+      const goalErr = validateFreeTextLabel(pendingGoal, {
+        min: 3,
+        max: 80,
+        label: "Mục tiêu",
+      });
+      if (goalErr) next.customGoal = goalErr;
     }
-    const kcal = Number(targetKcalInput);
-    if (!kcal || kcal < 800 || kcal > 5000) {
-      return "Nhập mục tiêu kcal hợp lệ (800–5000).";
+    const hasGoal =
+      selectedGoals.length > 0 || Boolean(pendingGoal && !next.customGoal);
+    if (!hasGoal) {
+      next.goals = "Chọn ít nhất một mục tiêu điều trị & dinh dưỡng.";
     }
-    return null;
+    return next;
+  };
+
+  const applyErrors = (next: FieldErrors): string | null => {
+    setFieldErrors(next);
+    const first = firstFieldError(next);
+    setError(first);
+    return first;
   };
 
   const goNext = () => {
     setError(null);
     if (step === 1) {
-      const err = validateStep1();
-      if (err) {
-        setError(err);
-        return;
-      }
+      if (applyErrors(collectStep1Errors())) return;
+      setFieldErrors({});
       setStep(2);
       return;
     }
     if (step === 2) {
-      const err = validateStep2();
-      if (err) {
-        setError(err);
-        return;
-      }
+      if (applyErrors(collectStep2Errors())) return;
+      setFieldErrors({});
       setTargetKcalInput((prev) => prev || String(suggestedKcal));
       // Defer step change so the click that triggered "Tiếp tục" cannot
       // land on a newly-mounted type="submit" button and auto-submit.
@@ -243,29 +332,27 @@ export default function PatientOnboardingPage() {
 
   const goBack = () => {
     setError(null);
+    setFieldErrors({});
     if (step === 2) setStep(1);
     if (step === 3) setStep(2);
   };
 
   const completeOnboarding = async () => {
     setError(null);
-    const err1 = validateStep1();
-    if (err1) {
-      setError(err1);
+    const err1 = collectStep1Errors();
+    if (firstFieldError(err1)) {
+      applyErrors(err1);
       setStep(1);
       return;
     }
-    const err2 = validateStep2();
-    if (err2) {
-      setError(err2);
+    const err2 = collectStep2Errors();
+    if (firstFieldError(err2)) {
+      applyErrors(err2);
       setStep(2);
       return;
     }
-    const err3 = validateStep3();
-    if (err3) {
-      setError(err3);
-      return;
-    }
+    const err3 = collectStep3Errors();
+    if (applyErrors(err3)) return;
 
     const w = Number(weight);
     const h = Number(height);
@@ -286,6 +373,11 @@ export default function PatientOnboardingPage() {
       .split(/[,;\n]+/)
       .map((p) => p.trim())
       .filter(Boolean);
+    const pendingGoal = customGoalInput.trim();
+    const treatmentGoals =
+      pendingGoal && !selectedGoals.includes(pendingGoal)
+        ? [...selectedGoals, pendingGoal]
+        : selectedGoals;
 
     setLoading(true);
     try {
@@ -305,7 +397,7 @@ export default function PatientOnboardingPage() {
         target_kcal: targetKcal,
         restrictions,
         preferences,
-        treatment_goals: selectedGoals,
+        treatment_goals: treatmentGoals,
       });
       router.push("/patient");
     } catch (err) {
@@ -384,7 +476,7 @@ export default function PatientOnboardingPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-lg">
+        <form onSubmit={handleSubmit} noValidate className="space-y-lg">
           {step === 1 && (
             <>
               <div>
@@ -407,12 +499,25 @@ export default function PatientOnboardingPage() {
                   <input
                     type="number"
                     value={age}
-                    onChange={(e) => setAge(e.target.value)}
+                    onChange={(e) => {
+                      setAge(e.target.value);
+                      clearFieldError("age");
+                    }}
+                    onBlur={(e) =>
+                      setFieldError(
+                        "age",
+                        validatePositiveInt(e.target.value, 1, 130, "Tuổi")
+                      )
+                    }
                     min={1}
                     max={130}
+                    inputMode="numeric"
+                    aria-invalid={Boolean(fieldErrors.age)}
+                    aria-describedby={fieldErrors.age ? "age-error" : undefined}
                     placeholder="Ví dụ: 45"
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass(Boolean(fieldErrors.age), "font-bold")}
                   />
+                  <FieldHint id="age-error" message={fieldErrors.age} />
                 </div>
                 <div>
                   <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
@@ -420,8 +525,13 @@ export default function PatientOnboardingPage() {
                   </label>
                   <select
                     value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                    onChange={(e) => {
+                      setGender(e.target.value);
+                      clearFieldError("gender");
+                    }}
+                    aria-invalid={Boolean(fieldErrors.gender)}
+                    aria-describedby={fieldErrors.gender ? "gender-error" : undefined}
+                    className={inputClass(Boolean(fieldErrors.gender), "font-bold")}
                   >
                     <option value="" disabled>
                       Chọn giới tính
@@ -430,6 +540,7 @@ export default function PatientOnboardingPage() {
                     <option value="Nữ">Nữ</option>
                     <option value="Khác">Khác</option>
                   </select>
+                  <FieldHint id="gender-error" message={fieldErrors.gender} />
                 </div>
               </div>
 
@@ -440,10 +551,20 @@ export default function PatientOnboardingPage() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(sanitizePhoneInput(e.target.value));
+                    clearFieldError("phone");
+                  }}
+                  onBlur={(e) => setFieldError("phone", validatePhone(e.target.value))}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  maxLength={16}
+                  aria-invalid={Boolean(fieldErrors.phone)}
+                  aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
                   placeholder="0901 234 567"
-                  className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary"
+                  className={inputClass(Boolean(fieldErrors.phone))}
                 />
+                <FieldHint id="phone-error" message={fieldErrors.phone} />
               </div>
 
               <div>
@@ -453,10 +574,19 @@ export default function PatientOnboardingPage() {
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value.slice(0, 200));
+                    clearFieldError("address");
+                  }}
+                  onBlur={(e) => setFieldError("address", validateAddress(e.target.value))}
+                  autoComplete="street-address"
+                  maxLength={200}
+                  aria-invalid={Boolean(fieldErrors.address)}
+                  aria-describedby={fieldErrors.address ? "address-error" : undefined}
                   placeholder="Quận 1, TP. Hồ Chí Minh"
-                  className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary"
+                  className={inputClass(Boolean(fieldErrors.address))}
                 />
+                <FieldHint id="address-error" message={fieldErrors.address} />
               </div>
 
               <div className="grid grid-cols-2 gap-md">
@@ -467,10 +597,26 @@ export default function PatientOnboardingPage() {
                   <input
                     type="number"
                     value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
+                    onChange={(e) => {
+                      setWeight(e.target.value);
+                      clearFieldError("weight");
+                    }}
+                    onBlur={(e) =>
+                      setFieldError(
+                        "weight",
+                        validatePositiveNumber(e.target.value, 20, 300, "Cân nặng")
+                      )
+                    }
+                    min={20}
+                    max={300}
+                    step="0.1"
+                    inputMode="decimal"
+                    aria-invalid={Boolean(fieldErrors.weight)}
+                    aria-describedby={fieldErrors.weight ? "weight-error" : undefined}
                     placeholder="Ví dụ: 68"
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass(Boolean(fieldErrors.weight), "font-bold")}
                   />
+                  <FieldHint id="weight-error" message={fieldErrors.weight} />
                 </div>
                 <div>
                   <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
@@ -479,10 +625,26 @@ export default function PatientOnboardingPage() {
                   <input
                     type="number"
                     value={height}
-                    onChange={(e) => setHeight(e.target.value)}
+                    onChange={(e) => {
+                      setHeight(e.target.value);
+                      clearFieldError("height");
+                    }}
+                    onBlur={(e) =>
+                      setFieldError(
+                        "height",
+                        validatePositiveNumber(e.target.value, 80, 250, "Chiều cao")
+                      )
+                    }
+                    min={80}
+                    max={250}
+                    step="0.1"
+                    inputMode="decimal"
+                    aria-invalid={Boolean(fieldErrors.height)}
+                    aria-describedby={fieldErrors.height ? "height-error" : undefined}
                     placeholder="Ví dụ: 168"
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass(Boolean(fieldErrors.height), "font-bold")}
                   />
+                  <FieldHint id="height-error" message={fieldErrors.height} />
                 </div>
               </div>
 
@@ -501,10 +663,25 @@ export default function PatientOnboardingPage() {
                   <input
                     type="text"
                     value={bloodPressure}
-                    onChange={(e) => setBloodPressure(e.target.value)}
+                    onChange={(e) => {
+                      setBloodPressure(sanitizeBloodPressureInput(e.target.value));
+                      clearFieldError("bloodPressure");
+                    }}
+                    onBlur={(e) =>
+                      setFieldError(
+                        "bloodPressure",
+                        validateBloodPressure(e.target.value)
+                      )
+                    }
+                    maxLength={20}
+                    aria-invalid={Boolean(fieldErrors.bloodPressure)}
+                    aria-describedby={
+                      fieldErrors.bloodPressure ? "bp-error" : undefined
+                    }
                     placeholder="130/80"
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass(Boolean(fieldErrors.bloodPressure))}
                   />
+                  <FieldHint id="bp-error" message={fieldErrors.bloodPressure} />
                 </div>
                 <div>
                   <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
@@ -513,10 +690,25 @@ export default function PatientOnboardingPage() {
                   <input
                     type="text"
                     value={bloodGlucose}
-                    onChange={(e) => setBloodGlucose(e.target.value)}
+                    onChange={(e) => {
+                      setBloodGlucose(sanitizeBloodGlucoseInput(e.target.value));
+                      clearFieldError("bloodGlucose");
+                    }}
+                    onBlur={(e) =>
+                      setFieldError(
+                        "bloodGlucose",
+                        validateBloodGlucose(e.target.value)
+                      )
+                    }
+                    maxLength={24}
+                    aria-invalid={Boolean(fieldErrors.bloodGlucose)}
+                    aria-describedby={
+                      fieldErrors.bloodGlucose ? "glucose-error" : undefined
+                    }
                     placeholder="135 mg/dL"
-                    className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass(Boolean(fieldErrors.bloodGlucose))}
                   />
+                  <FieldHint id="glucose-error" message={fieldErrors.bloodGlucose} />
                 </div>
               </div>
             </>
@@ -548,6 +740,7 @@ export default function PatientOnboardingPage() {
                     );
                   })}
                 </div>
+                <FieldHint id="conditions-error" message={fieldErrors.conditions} />
               </div>
 
               <div>
@@ -562,7 +755,8 @@ export default function PatientOnboardingPage() {
                 <input
                   type="text"
                   value={allergySearch}
-                  onChange={(e) => setAllergySearch(e.target.value)}
+                  onChange={(e) => setAllergySearch(e.target.value.slice(0, 80))}
+                  maxLength={80}
                   placeholder="Tìm dị ứng..."
                   className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
                 />
@@ -612,7 +806,8 @@ export default function PatientOnboardingPage() {
                 <input
                   type="text"
                   value={medSearch}
-                  onChange={(e) => setMedSearch(e.target.value)}
+                  onChange={(e) => setMedSearch(e.target.value.slice(0, 80))}
+                  maxLength={80}
                   placeholder="Tìm thuốc..."
                   className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
                 />
@@ -667,6 +862,7 @@ export default function PatientOnboardingPage() {
                 <p className="font-caption text-caption text-on-surface-variant text-xs mb-sm">
                   Chọn một hoặc nhiều mục tiêu phù hợp với tình trạng của bạn.
                 </p>
+                <FieldHint id="goals-error" message={fieldErrors.goals} />
                 <div className="flex flex-wrap gap-xs mb-sm">
                   {TREATMENT_GOAL_OPTIONS.map((goal) => {
                     const isSelected = selectedGoals.includes(goal);
@@ -699,27 +895,57 @@ export default function PatientOnboardingPage() {
                       </button>
                     ))}
                 </div>
-                <div className="flex gap-xs">
-                  <input
-                    type="text"
-                    value={customGoalInput}
-                    onChange={(e) => setCustomGoalInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddCustomGoal();
+                <div>
+                  <div className="flex gap-xs">
+                    <input
+                      type="text"
+                      value={customGoalInput}
+                      onChange={(e) => {
+                        setCustomGoalInput(e.target.value.slice(0, 80));
+                        clearFieldError("customGoal");
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (!value.trim()) {
+                          clearFieldError("customGoal");
+                          return;
+                        }
+                        setFieldError(
+                          "customGoal",
+                          validateFreeTextLabel(value, {
+                            min: 3,
+                            max: 80,
+                            label: "Mục tiêu",
+                          })
+                        );
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomGoal();
+                        }
+                      }}
+                      maxLength={80}
+                      aria-invalid={Boolean(fieldErrors.customGoal)}
+                      aria-describedby={
+                        fieldErrors.customGoal ? "custom-goal-error" : undefined
                       }
-                    }}
-                    placeholder="Thêm mục tiêu khác..."
-                    className="flex-1 px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomGoal}
-                    className="px-md py-sm bg-surface-container-low border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-colors"
-                  >
-                    + Thêm
-                  </button>
+                      placeholder="Thêm mục tiêu khác..."
+                      className={`flex-1 px-md py-sm bg-surface-container-lowest border rounded-lg text-xs text-on-surface focus:outline-none ${
+                        fieldErrors.customGoal
+                          ? "border-error focus:border-error"
+                          : "border-outline-variant focus:border-primary"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomGoal}
+                      className="px-md py-sm bg-surface-container-low border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-colors"
+                    >
+                      + Thêm
+                    </button>
+                  </div>
+                  <FieldHint id="custom-goal-error" message={fieldErrors.customGoal} />
                 </div>
               </div>
 
@@ -729,11 +955,30 @@ export default function PatientOnboardingPage() {
                 </label>
                 <textarea
                   value={preferencesText}
-                  onChange={(e) => setPreferencesText(e.target.value)}
+                  onChange={(e) => {
+                    setPreferencesText(e.target.value.slice(0, 500));
+                    clearFieldError("preferences");
+                  }}
+                  onBlur={(e) =>
+                    setFieldError(
+                      "preferences",
+                      validatePreferencesText(e.target.value)
+                    )
+                  }
                   rows={2}
+                  maxLength={500}
+                  aria-invalid={Boolean(fieldErrors.preferences)}
+                  aria-describedby={
+                    fieldErrors.preferences ? "preferences-error" : undefined
+                  }
                   placeholder="Ví dụ: thích ăn cơm, không ăn thịt bò (cách nhau bằng dấu phẩy)"
-                  className="w-full p-md bg-surface-container-lowest border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:border-primary"
+                  className={`w-full p-md bg-surface-container-lowest border rounded-lg text-xs text-on-surface focus:outline-none ${
+                    fieldErrors.preferences
+                      ? "border-error focus:border-error"
+                      : "border-outline-variant focus:border-primary"
+                  }`}
                 />
+                <FieldHint id="preferences-error" message={fieldErrors.preferences} />
               </div>
 
               <div>
@@ -743,11 +988,26 @@ export default function PatientOnboardingPage() {
                 <input
                   type="number"
                   value={targetKcalInput}
-                  onChange={(e) => setTargetKcalInput(e.target.value)}
+                  onChange={(e) => {
+                    setTargetKcalInput(e.target.value);
+                    clearFieldError("targetKcal");
+                  }}
+                  onBlur={(e) =>
+                    setFieldError(
+                      "targetKcal",
+                      validatePositiveInt(e.target.value, 800, 5000, "Mục tiêu kcal")
+                    )
+                  }
                   min={800}
                   max={5000}
-                  className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(fieldErrors.targetKcal)}
+                  aria-describedby={
+                    fieldErrors.targetKcal ? "kcal-error" : undefined
+                  }
+                  className={inputClass(Boolean(fieldErrors.targetKcal), "font-bold")}
                 />
+                <FieldHint id="kcal-error" message={fieldErrors.targetKcal} />
                 <p className="mt-xs text-xs text-on-surface-variant">
                   Gợi ý theo BMI & bệnh lý: {suggestedKcal} kcal
                 </p>

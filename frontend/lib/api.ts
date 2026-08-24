@@ -60,6 +60,33 @@ function getStoredToken(): string | null {
   }
 }
 
+async function uploadAvatarForm(
+  url: string,
+  file: File
+): Promise<{ avatar: string }> {
+  const token = getStoredToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = res.statusText || "Upload failed";
+    let code = "HTTP_ERROR";
+    try {
+      const data = (await res.json()) as { detail?: string; code?: string };
+      if (data.detail) detail = data.detail;
+      if (data.code) code = data.code;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, code, detail);
+  }
+  return (await res.json()) as { avatar: string };
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -403,30 +430,14 @@ export const api = {
     patientId: string,
     file: File
   ): Promise<{ avatar: string }> {
-    const token = getStoredToken();
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(
+    return uploadAvatarForm(
       `${API_BASE}/api/v1/doctor/patients/${encodeURIComponent(patientId)}/avatar`,
-      {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      }
+      file
     );
-    if (!res.ok) {
-      let detail = res.statusText || "Upload failed";
-      let code = "HTTP_ERROR";
-      try {
-        const data = (await res.json()) as { detail?: string; code?: string };
-        if (data.detail) detail = data.detail;
-        if (data.code) code = data.code;
-      } catch {
-        /* ignore */
-      }
-      throw new ApiError(res.status, code, detail);
-    }
-    return (await res.json()) as { avatar: string };
+  },
+
+  uploadMyAvatar(file: File): Promise<{ avatar: string }> {
+    return uploadAvatarForm(`${API_BASE}/api/v1/auth/me/avatar`, file);
   },
 
   generateMealPlanForPatient(

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { isPlaceholderAvatar, resolveUserAvatar, userInitials } from "@/lib/avatar";
+import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { AVATAR_PRESETS } from "@/lib/avatar-presets";
 import {
   COMMON_ALLERGIES,
@@ -18,6 +18,14 @@ import {
   suggestTargetKcal,
 } from "@/lib/profile-mappers";
 import {
+  firstFieldError,
+  sanitizeBloodGlucoseInput,
+  sanitizeBloodPressureInput,
+  validateBloodGlucose,
+  validateBloodPressure,
+  validatePositiveNumber,
+} from "@/lib/profile-validation";
+import {
   ApiError,
   type CatalogItem,
   type CatalogOut,
@@ -25,6 +33,18 @@ import {
   type ProfileUpsert,
   type UserMeResponse,
 } from "@/lib/types";
+
+type MetricField = "weight" | "height" | "bloodPressure" | "bloodGlucose";
+type MetricFieldErrors = Partial<Record<MetricField, string>>;
+
+function MetricFieldHint({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-[11px] text-rose-600 mt-1 font-medium leading-snug">
+      {message}
+    </p>
+  );
+}
 
 type EditFormState = {
   age: string;
@@ -166,12 +186,14 @@ export default function PatientProfilePage() {
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Edit form state
   const [form, setForm] = useState<EditFormState | null>(null);
   const [allergySearch, setAllergySearch] = useState("");
   const [medSearch, setMedSearch] = useState("");
   const [customGoalInput, setCustomGoalInput] = useState("");
+  const [metricErrors, setMetricErrors] = useState<MetricFieldErrors>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -186,15 +208,10 @@ export default function PatientProfilePage() {
       setUser(userData);
       setCatalog(catalogData);
 
-      // Prefer backend avatar; drop stale Stitch/dicebear placeholders from persist
-      if (isPlaceholderAvatar(authAvatar)) {
-        setUserProfile({
-          avatar: userData.avatar ?? null,
-          displayName: userData.full_name?.trim() || userData.email,
-        });
-      } else if (userData.full_name) {
-        setUserProfile({ displayName: userData.full_name });
-      }
+      setUserProfile({
+        avatar: userData.avatar ?? null,
+        displayName: userData.full_name?.trim() || userData.email,
+      });
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Không tải được hồ sơ bệnh nhân."
@@ -202,7 +219,7 @@ export default function PatientProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [authAvatar, setUserProfile]);
+  }, [setUserProfile]);
 
   useEffect(() => {
     setHydrated(true);
@@ -290,6 +307,7 @@ export default function PatientProfilePage() {
     setForm(profileToForm(profile, catalog));
     setSaveNotice(null);
     setError(null);
+    setMetricErrors({});
     setEditing(true);
     if (!catalog) {
       setCatalogLoading(true);
@@ -307,6 +325,7 @@ export default function PatientProfilePage() {
     setMedSearch("");
     setCustomGoalInput("");
     setError(null);
+    setMetricErrors({});
     setEditing(false);
   };
 
@@ -358,34 +377,37 @@ export default function PatientProfilePage() {
     setCustomGoalInput("");
   };
 
-  // Avatar file upload handler
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Avatar file upload handler — persist via POST /auth/me/avatar
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setAvatarUploadError(null);
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
-    // Check size limit (max 4MB)
-    if (file.size > 4 * 1024 * 1024) {
-      setAvatarUploadError("Kích thước ảnh tối đa 4MB.");
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarUploadError("Ảnh tối đa 2MB.");
       return;
     }
 
     if (!file.type.startsWith("image/")) {
-      setAvatarUploadError("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).");
+      setAvatarUploadError("Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP, GIF).");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setUserProfile({ avatar: dataUrl });
+    setUploadingAvatar(true);
+    try {
+      const out = await api.uploadMyAvatar(file);
+      setUserProfile({ avatar: out.avatar });
+      setUser((prev) => (prev ? { ...prev, avatar: out.avatar } : prev));
       setAvatarModalOpen(false);
       setSaveNotice("Đã cập nhật ảnh đại diện thành công.");
-    };
-    reader.onerror = () => {
-      setAvatarUploadError("Không đọc được tệp hình ảnh.");
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setAvatarUploadError(
+        err instanceof ApiError ? err.message : "Không tải được ảnh đại diện."
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleSelectPresetAvatar = (svgDataUri: string) => {
@@ -400,6 +422,28 @@ export default function PatientProfilePage() {
     setSaveNotice("Đã đặt lại avatar mặc định.");
   };
 
+  const setMetricError = (name: MetricField, message: string | null) => {
+    setMetricErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[name] = message;
+      else delete next[name];
+      return next;
+    });
+  };
+
+  const collectMetricErrors = (f: EditFormState): MetricFieldErrors => {
+    const next: MetricFieldErrors = {};
+    const weightErr = validatePositiveNumber(f.weight, 20, 300, "Cân nặng");
+    if (weightErr) next.weight = weightErr;
+    const heightErr = validatePositiveNumber(f.height, 80, 250, "Chiều cao");
+    if (heightErr) next.height = heightErr;
+    const bpErr = validateBloodPressure(f.bloodPressure);
+    if (bpErr) next.bloodPressure = bpErr;
+    const glucoseErr = validateBloodGlucose(f.bloodGlucose);
+    if (glucoseErr) next.bloodGlucose = glucoseErr;
+    return next;
+  };
+
   const validateForm = (): string | null => {
     if (!form) return "Form không hợp lệ.";
     const ageNum = Number(form.age);
@@ -407,11 +451,10 @@ export default function PatientProfilePage() {
       return "Nhập tuổi hợp lệ (1–130).";
     }
     if (!form.gender.trim()) return "Chọn giới tính.";
-    const w = Number(form.weight);
-    const h = Number(form.height);
-    if (!w || !h || w <= 0 || h <= 0) {
-      return "Nhập cân nặng và chiều cao hợp lệ.";
-    }
+    const metricErrs = collectMetricErrors(form);
+    setMetricErrors(metricErrs);
+    const firstMetric = firstFieldError(metricErrs);
+    if (firstMetric) return firstMetric;
     if (form.diseaseCodes.length === 0) {
       return "Chọn ít nhất một bệnh lý nền.";
     }
@@ -480,6 +523,7 @@ export default function PatientProfilePage() {
       setProfile(updated);
       setEditing(false);
       setForm(null);
+      setMetricErrors({});
       if (updated.constraints_status === "pending_doctor_review") {
         setSaveNotice(
           "Thay đổi mục tiêu kcal hoặc ràng buộc dinh dưỡng đã được lưu và đang chờ bác sĩ duyệt lại."
@@ -689,7 +733,7 @@ export default function PatientProfilePage() {
 
                 <div className="flex flex-col items-center text-center">
                   {/* Avatar with Upload & Glow */}
-                  <div className="relative group mb-4">
+                  <div className="relative group mb-4 overflow-visible">
                     <div className="relative w-28 h-28 rounded-full ring-4 ring-primary/20 p-1 bg-white shadow-md overflow-hidden">
                       <div
                         translate="no"
@@ -699,6 +743,7 @@ export default function PatientProfilePage() {
                       </div>
                       {currentAvatar ? (
                         <img
+                          key={currentAvatar}
                           src={currentAvatar}
                           alt="Avatar bệnh nhân"
                           className="relative z-10 w-full h-full rounded-full object-cover"
@@ -714,7 +759,7 @@ export default function PatientProfilePage() {
                       type="button"
                       onClick={() => setAvatarModalOpen(true)}
                       title="Đổi ảnh đại diện"
-                      className="absolute bottom-1 right-1 w-9 h-9 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer border-2 border-white"
+                      className="absolute bottom-1 right-1 z-20 w-9 h-9 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer border-2 border-white"
                     >
                       <span className="material-symbols-outlined text-[18px]">
                         photo_camera
@@ -785,12 +830,6 @@ export default function PatientProfilePage() {
                       Chỉ số Thể trạng & Sinh hiệu
                     </h3>
                   </div>
-                  <Link
-                    href="/patient/history"
-                    className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5"
-                  >
-                    Chi tiết →
-                  </Link>
                 </div>
 
                 {/* Visual BMI Gauge */}
@@ -844,9 +883,29 @@ export default function PatientProfilePage() {
                         <input
                           type="number"
                           step="0.1"
+                          min={20}
+                          max={300}
+                          inputMode="decimal"
                           value={form.weight}
-                          onChange={(e) => setForm({ ...form, weight: e.target.value })}
-                          className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                          onChange={(e) => {
+                            setForm({ ...form, weight: e.target.value });
+                            setMetricError("weight", null);
+                          }}
+                          onBlur={(e) =>
+                            setMetricError(
+                              "weight",
+                              validatePositiveNumber(e.target.value, 20, 300, "Cân nặng")
+                            )
+                          }
+                          aria-invalid={Boolean(metricErrors.weight)}
+                          aria-describedby={
+                            metricErrors.weight ? "profile-weight-error" : undefined
+                          }
+                          className={`w-full bg-white border rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none ${
+                            metricErrors.weight
+                              ? "border-rose-400 focus:border-rose-500"
+                              : "border-outline-variant focus:border-primary"
+                          }`}
                         />
                         <span className="text-xs text-on-surface-variant font-semibold">kg</span>
                       </div>
@@ -854,6 +913,12 @@ export default function PatientProfilePage() {
                       <p className="text-lg font-bold text-on-surface">
                         {profile.weight ? `${profile.weight} kg` : "—"}
                       </p>
+                    )}
+                    {editing && (
+                      <MetricFieldHint
+                        id="profile-weight-error"
+                        message={metricErrors.weight}
+                      />
                     )}
                   </div>
 
@@ -870,9 +935,29 @@ export default function PatientProfilePage() {
                         <input
                           type="number"
                           step="0.5"
+                          min={80}
+                          max={250}
+                          inputMode="decimal"
                           value={form.height}
-                          onChange={(e) => setForm({ ...form, height: e.target.value })}
-                          className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
+                          onChange={(e) => {
+                            setForm({ ...form, height: e.target.value });
+                            setMetricError("height", null);
+                          }}
+                          onBlur={(e) =>
+                            setMetricError(
+                              "height",
+                              validatePositiveNumber(e.target.value, 80, 250, "Chiều cao")
+                            )
+                          }
+                          aria-invalid={Boolean(metricErrors.height)}
+                          aria-describedby={
+                            metricErrors.height ? "profile-height-error" : undefined
+                          }
+                          className={`w-full bg-white border rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none ${
+                            metricErrors.height
+                              ? "border-rose-400 focus:border-rose-500"
+                              : "border-outline-variant focus:border-primary"
+                          }`}
                         />
                         <span className="text-xs text-on-surface-variant font-semibold">cm</span>
                       </div>
@@ -880,6 +965,12 @@ export default function PatientProfilePage() {
                       <p className="text-lg font-bold text-on-surface">
                         {profile.height ? `${profile.height} cm` : "—"}
                       </p>
+                    )}
+                    {editing && (
+                      <MetricFieldHint
+                        id="profile-height-error"
+                        message={metricErrors.height}
+                      />
                     )}
                   </div>
 
@@ -892,13 +983,40 @@ export default function PatientProfilePage() {
                       <span>Huyết áp</span>
                     </div>
                     {editing && form ? (
-                      <input
-                        type="text"
-                        placeholder="120/80"
-                        value={form.bloodPressure}
-                        onChange={(e) => setForm({ ...form, bloodPressure: e.target.value })}
-                        className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          placeholder="120/80"
+                          value={form.bloodPressure}
+                          onChange={(e) => {
+                            setForm({
+                              ...form,
+                              bloodPressure: sanitizeBloodPressureInput(e.target.value),
+                            });
+                            setMetricError("bloodPressure", null);
+                          }}
+                          onBlur={(e) =>
+                            setMetricError(
+                              "bloodPressure",
+                              validateBloodPressure(e.target.value)
+                            )
+                          }
+                          maxLength={20}
+                          aria-invalid={Boolean(metricErrors.bloodPressure)}
+                          aria-describedby={
+                            metricErrors.bloodPressure ? "profile-bp-error" : undefined
+                          }
+                          className={`w-full bg-white border rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none ${
+                            metricErrors.bloodPressure
+                              ? "border-rose-400 focus:border-rose-500"
+                              : "border-outline-variant focus:border-primary"
+                          }`}
+                        />
+                        <MetricFieldHint
+                          id="profile-bp-error"
+                          message={metricErrors.bloodPressure}
+                        />
+                      </>
                     ) : (
                       <p className="text-lg font-bold text-on-surface">
                         {profile.blood_pressure ? `${profile.blood_pressure} mmHg` : "—"}
@@ -915,13 +1033,42 @@ export default function PatientProfilePage() {
                       <span>Đường huyết</span>
                     </div>
                     {editing && form ? (
-                      <input
-                        type="text"
-                        placeholder="125 mg/dL"
-                        value={form.bloodGlucose}
-                        onChange={(e) => setForm({ ...form, bloodGlucose: e.target.value })}
-                        className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none focus:border-primary"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          placeholder="125 mg/dL"
+                          value={form.bloodGlucose}
+                          onChange={(e) => {
+                            setForm({
+                              ...form,
+                              bloodGlucose: sanitizeBloodGlucoseInput(e.target.value),
+                            });
+                            setMetricError("bloodGlucose", null);
+                          }}
+                          onBlur={(e) =>
+                            setMetricError(
+                              "bloodGlucose",
+                              validateBloodGlucose(e.target.value)
+                            )
+                          }
+                          maxLength={24}
+                          aria-invalid={Boolean(metricErrors.bloodGlucose)}
+                          aria-describedby={
+                            metricErrors.bloodGlucose
+                              ? "profile-glucose-error"
+                              : undefined
+                          }
+                          className={`w-full bg-white border rounded-lg px-2 py-1 text-sm font-bold text-on-surface focus:outline-none ${
+                            metricErrors.bloodGlucose
+                              ? "border-rose-400 focus:border-rose-500"
+                              : "border-outline-variant focus:border-primary"
+                          }`}
+                        />
+                        <MetricFieldHint
+                          id="profile-glucose-error"
+                          message={metricErrors.bloodGlucose}
+                        />
+                      </>
                     ) : (
                       <p className="text-lg font-bold text-on-surface truncate">
                         {profile.blood_glucose || "—"}
@@ -1660,22 +1807,23 @@ export default function PatientProfilePage() {
                   Tải ảnh từ máy tính / điện thoại
                 </p>
                 <p className="text-[11px] text-on-surface-variant mt-0.5">
-                  Định dạng JPG, PNG hoặc WebP (Tối đa 4MB)
+                  Định dạng JPG, PNG, WebP hoặc GIF (Tối đa 2MB)
                 </p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/jpg"
+                accept="image/png,image/jpeg,image/webp,image/jpg,image/gif"
                 onChange={handleFileChange}
                 className="hidden"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs hover:bg-primary-container transition-colors cursor-pointer"
+                disabled={uploadingAvatar}
+                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Chọn tệp ảnh
+                {uploadingAvatar ? "Đang tải ảnh..." : "Chọn tệp ảnh"}
               </button>
             </div>
 

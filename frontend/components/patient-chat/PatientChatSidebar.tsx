@@ -3,9 +3,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { isPlaceholderAvatar, resolveUserAvatar, userInitials } from "@/lib/avatar";
+import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { useAuthStore } from "@/lib/auth-store";
 import {
   usePatientChatHistoryStore,
@@ -23,6 +23,7 @@ export function PatientChatSidebar({
   onNewChat,
 }: PatientChatSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const token = useAuthStore((s) => s.token);
   const displayName = useAuthStore((s) => s.displayName);
   const email = useAuthStore((s) => s.email);
@@ -68,12 +69,9 @@ export function PatientChatSidebar({
       .getCurrentUser(token)
       .then((user) => {
         if (cancelled) return;
-        const storedAvatar = useAuthStore.getState().avatar;
         setUserProfile({
           displayName: user.full_name?.trim() || user.email,
-          ...(isPlaceholderAvatar(storedAvatar)
-            ? { avatar: user.avatar ?? null }
-            : {}),
+          avatar: user.avatar ?? null,
         });
       })
       .catch(() => {
@@ -127,9 +125,16 @@ export function PatientChatSidebar({
     return groupSessionsByRecency(filteredSessions);
   }, [filteredSessions]);
 
+  const navigateToChat = () => {
+    if (pathname !== "/patient") {
+      router.push("/patient");
+    }
+  };
+
   const handleStartNewChat = () => {
     void createNewSession().then(() => {
       onNewChat?.();
+      navigateToChat();
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
@@ -139,6 +144,7 @@ export function PatientChatSidebar({
   const handleSelectSession = (id: string) => {
     void selectSession(id).then(() => {
       onSelectSession?.(id);
+      navigateToChat();
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
@@ -401,6 +407,7 @@ export function PatientChatSidebar({
             </div>
             {avatarSrc ? (
               <img
+                key={avatarSrc}
                 src={avatarSrc}
                 alt="Avatar"
                 className="relative z-10 w-full h-full object-cover"

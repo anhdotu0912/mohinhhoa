@@ -524,6 +524,39 @@ def test_doctor_upload_avatar(client):
         f.unlink()
 
 
+def test_patient_upload_own_avatar(client):
+    headers = _login(client, PATIENT)
+    png = b"\x89PNG\r\n\x1a\nfake-image-bytes"
+
+    response = client.post(
+        "/api/v1/auth/me/avatar",
+        files={"file": ("avatar.png", png, "image/png")},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    avatar = response.json()["avatar"]
+    assert avatar.startswith("/static/avatars/")
+
+    me = client.get("/api/v1/auth/me", headers=headers).json()
+    assert me["avatar"] == avatar
+
+    # không phải ảnh -> 415
+    response = client.post(
+        "/api/v1/auth/me/avatar",
+        files={"file": ("doc.txt", b"hello", "text/plain")},
+        headers=headers,
+    )
+    assert response.status_code == 415
+
+    from pathlib import Path
+
+    user_id = me["id"]
+    for f in (Path(__file__).resolve().parents[1] / "static" / "avatars").glob(
+        f"{user_id}.*"
+    ):
+        f.unlink()
+
+
 def test_update_patient_metrics(client):
     doctor_headers = _login(client, DOCTOR)
     patient_id = "demo_patient_1"

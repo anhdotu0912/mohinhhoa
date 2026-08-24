@@ -41,6 +41,15 @@
 ```
 `full_name` / `avatar` có thể `null`.
 
+### `POST /auth/me/avatar`
+**Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`). Multipart form upload (`file`), ảnh ≤ 2MB, mime `image/*` (png/jpg/webp/gif — kiểm tra magic bytes). Bệnh nhân tự tải ảnh đại diện trên `/patient/profile`; bác sĩ tải hộ bệnh nhân vẫn dùng `POST /doctor/patients/{id}/avatar`.
+```json
+// Response 200
+{ "avatar": "/static/avatars/<user_id>.png" }
+// Error 415 { "code": "INVALID_IMAGE", "detail": "File phải là ảnh (png/jpg/webp/gif)." }
+// Error 413 { "code": "IMAGE_TOO_LARGE", "detail": "Ảnh tối đa 2MB." }
+```
+
 ### `POST /auth/forgot-password` (as-built 2026-08-18)
 **Role:** Không cần auth. **Quyết định 2026-08-18:** gửi **mật khẩu mới** qua SMTP tới email đã đăng ký (không in token ra log). Nếu email không tồn tại vẫn trả 200 cùng message — tránh lộ thông tin tồn tại email. Mật khẩu cũ chỉ bị thay khi gửi email thành công.
 ```json
@@ -748,7 +757,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.8**.
+- Version hiện tại: **1.9**.
+- **Changelog 1.8 → 1.9 (2026-08-24):** thêm `POST /auth/me/avatar` (user đã đăng nhập tự upload ảnh đại diện, cùng rule 2MB / png-jpg-webp-gif với endpoint doctor). Không breaking change.
 - **Changelog 1.7 → 1.8 (2026-08-24):** Food Log + compliance dùng ngày lịch **Asia/Ho_Chi_Minh** — `GET /food-log?date=` lọc theo cửa sổ UTC của ngày VN; `POST /food-log` upsert 1 log / user / ngày VN / slot; `FoodLogEntry.logged_at` serialize timezone-aware (naive DB = UTC). `GET /compliance/me` và `GET /doctor/patients/{id}/compliance` lấy `today` + gán food-log vào ngày VN (không còn `date.today()` UTC của container). Không đổi request shape / enum slot.
 - **Changelog 1.6 → 1.7 (2026-08-23):** `POST /metrics` đổi từ insert-only sang upsert 1 entry patient/ngày (Asia/Ho_Chi_Minh); lần ghi sau merge field vào cùng `id`. Không đổi request/response shape — behavior change có chủ đích cho UI ghi chỉ số hàng ngày.
 - **Changelog 1.5 → 1.6 (2026-08-23):** thêm Chat Sessions (`GET|POST /chat/sessions`, `GET|PATCH|DELETE /chat/sessions/{id}`, `DELETE /chat/sessions`, `PUT /chat/sessions/{id}/messages`) — role `patient` only; persist transcript UI + card payload trên Postgres; agent `/chat` vẫn stateless. Không breaking change cho client cũ (endpoint mới).
