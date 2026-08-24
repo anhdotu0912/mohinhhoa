@@ -21,6 +21,18 @@ interface ComplianceLog {
   time: string;
   description: string;
   type: "warning" | "success" | "info";
+  isoDate?: string;
+}
+
+interface ComplianceDayItem {
+  date: string;
+  dayName: string;
+  fullDayName: string;
+  shortDate: string;
+  fullDate: string;
+  isToday: boolean;
+  rate: number | null;
+  logs: ComplianceLog[];
 }
 
 interface PatientComplianceSummary {
@@ -33,7 +45,7 @@ interface PatientComplianceSummary {
     type: "warning" | "success" | "info";
     time: string;
   };
-  chartData: (number | null)[];
+  dailySeries: ComplianceDayItem[];
   logs: ComplianceLog[];
 }
 
@@ -42,6 +54,38 @@ const COMPLIANCE_DAYS = 14;
 const EVENT_LOG_PREVIEW = 3;
 const DEFAULT_REMIND_MESSAGE =
   "Bác sĩ nhắc bạn ghi nhận tuân thủ thực đơn hôm nay nhé.";
+
+function weekdayShort(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()];
+}
+
+function weekdayFull(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return [
+    "Chủ Nhật",
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
+  ][d.getDay()];
+}
+
+function formatShortDate(iso: string): string {
+  const parts = iso.split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+  return iso;
+}
+
+function formatFullDate(iso: string): string {
+  const parts = iso.split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return iso;
+}
 
 function formatEventTime(iso: string): string {
   try {
@@ -101,6 +145,7 @@ function complianceToSummary(data: PatientComplianceOut): PatientComplianceSumma
     time: formatEventTime(ev.at),
     description: complianceEventDescription(ev),
     type: complianceEventLogType(ev),
+    isoDate: ev.at ? ev.at.split("T")[0] : undefined,
   }));
 
   const lastEvent = data.events[0];
@@ -116,18 +161,54 @@ function complianceToSummary(data: PatientComplianceOut): PatientComplianceSumma
         time: "—",
       };
 
+  const lastIndex = data.daily_series.length - 1;
+  const dailySeries: ComplianceDayItem[] = data.daily_series.map((d, idx) => {
+    const isToday = idx === lastIndex;
+    const dayLogs = logs.filter((l) => l.isoDate === d.date);
+    return {
+      date: d.date,
+      dayName: weekdayShort(d.date),
+      fullDayName: weekdayFull(d.date),
+      shortDate: formatShortDate(d.date),
+      fullDate: formatFullDate(d.date),
+      isToday,
+      rate: d.adherence_pct,
+      logs: dayLogs,
+    };
+  });
+
   return {
     rate: data.overall_adherence_pct,
     asPlannedMeals: data.checkins_as_planned,
     totalMeals: data.checkins_done,
     lowThreshold: data.low_threshold_pct,
     lastAlert,
-    chartData: data.daily_series.map((d) => d.adherence_pct),
+    dailySeries,
     logs,
   };
 }
 
 function emptyComplianceSummary(lowThreshold = 50): PatientComplianceSummary {
+  const today = new Date();
+  const dailySeries: ComplianceDayItem[] = Array.from(
+    { length: COMPLIANCE_DAYS },
+    (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (COMPLIANCE_DAYS - 1 - i));
+      const iso = d.toISOString().split("T")[0];
+      return {
+        date: iso,
+        dayName: weekdayShort(iso),
+        fullDayName: weekdayFull(iso),
+        shortDate: formatShortDate(iso),
+        fullDate: formatFullDate(iso),
+        isToday: i === COMPLIANCE_DAYS - 1,
+        rate: null,
+        logs: [],
+      };
+    }
+  );
+
   return {
     rate: null,
     asPlannedMeals: 0,
@@ -138,7 +219,7 @@ function emptyComplianceSummary(lowThreshold = 50): PatientComplianceSummary {
       type: "info",
       time: "—",
     },
-    chartData: Array.from({ length: COMPLIANCE_DAYS }, () => null),
+    dailySeries,
     logs: [],
   };
 }
@@ -170,32 +251,6 @@ function matchesComplianceBand(
   return stats.rate < 75;
 }
 
-type ChartPoint = { val: number; idx: number };
-
-function buildChartSegments(chartData: (number | null)[]) {
-  const points = chartData
-    .map((val, idx) => (val === null ? null : { val, idx }))
-    .filter((p): p is ChartPoint => p !== null);
-
-  const segments: ChartPoint[][] = [];
-  let current: ChartPoint[] = [];
-
-  for (let i = 0; i < chartData.length; i++) {
-    const val = chartData[i];
-    if (val === null) {
-      if (current.length > 0) {
-        segments.push(current);
-        current = [];
-      }
-    } else {
-      current.push({ val, idx: i });
-    }
-  }
-  if (current.length > 0) segments.push(current);
-
-  return { points, segments };
-}
-
 export default function PatientCompliancePage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -217,6 +272,7 @@ export default function PatientCompliancePage() {
   const [page, setPage] = useState(1);
 
   const [viewingPatient, setViewingPatient] = useState<Patient | null>(null);
+  const [hoveredModalDay, setHoveredModalDay] = useState<ComplianceDayItem | null>(null);
   const [remindMessage, setRemindMessage] = useState(DEFAULT_REMIND_MESSAGE);
   const [remindSending, setRemindSending] = useState(false);
   const [remindFeedback, setRemindFeedback] = useState<{
@@ -371,7 +427,7 @@ export default function PatientCompliancePage() {
 
   const viewingStats = viewingPatient ? getStats(viewingPatient) : null;
   const hasChartData =
-    viewingStats?.chartData.some((val) => val !== null) ?? false;
+    viewingStats?.dailySeries.some((val) => val.rate !== null) ?? false;
 
   return (
     <>
@@ -728,229 +784,227 @@ export default function PatientCompliancePage() {
               </div>
 
               <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-2xs">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-body-bold text-sm font-bold text-on-surface">
-                    Biểu đồ tỷ lệ tuân thủ (14 ngày gần nhất)
-                  </h4>
-                  <span className="text-xs text-on-surface-variant font-semibold">
-                    Mức độ tuân thủ (%)
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-outline-variant/40">
+                  <div>
+                    <h4 className="font-body-bold text-sm font-bold text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[20px]">
+                        monitoring
+                      </span>
+                      Biểu đồ tỷ lệ tuân thủ (14 ngày gần nhất)
+                    </h4>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      Rà chuột lên từng ngày để xem chi tiết bữa ăn và tương tác ghi nhận
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-on-surface-variant font-medium">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+                      Đạt (≥80%)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      TB (60-79%)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      Kém (&lt;60%)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-outline-variant/80" />
+                      Chưa ghi nhận
+                    </span>
+                  </div>
                 </div>
-                { !hasChartData ? (
-                  <div className="h-[260px] flex items-center justify-center text-xs text-on-surface-variant">
-                    Chưa có check-in tuân thủ trong 14 ngày qua
+
+                {!hasChartData ? (
+                  <div className="h-[240px] flex flex-col items-center justify-center text-on-surface-variant py-8">
+                    <span className="material-symbols-outlined text-[36px] text-outline/40 mb-1">
+                      bar_chart
+                    </span>
+                    <p className="text-sm font-bold">Chưa có dữ liệu tuân thủ</p>
+                    <p className="text-xs mt-0.5 text-center text-on-surface-variant max-w-[280px]">
+                      Bệnh nhân chưa có ghi nhận bữa ăn (Food Log) hoặc xác nhận check-in trong 14 ngày qua.
+                    </p>
                   </div>
                 ) : (
-                  <div className="w-full pt-2 pb-1">
-                    <svg
-                      className="w-full h-auto block"
-                      viewBox="0 0 1000 300"
-                      preserveAspectRatio="xMidYMid meet"
-                      role="img"
-                      aria-label="Biểu đồ tỷ lệ tuân thủ 14 ngày"
+                  <div className="relative pt-6 pb-2 min-h-[250px] flex flex-col justify-end">
+                    {/* Benchmark Target Line (80%) */}
+                    <div
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-start pl-2 pointer-events-none"
+                      style={{ bottom: "calc(44px + 130px * 0.8)" }}
                     >
-                      {(() => {
-                        const padLeft = 52;
-                        const padRight = 24;
-                        const plotTop = 28;
-                        const plotBottom = 224;
-                        const tickBottom = 232;
-                        const labelY = 252;
-                        const captionY = 278;
-                        const plotWidth = 1000 - padLeft - padRight;
-                        const plotHeight = plotBottom - plotTop;
-                        const minVal = 0;
-                        const maxVal = 100;
-                        const chartData = viewingStats.chartData;
-                        const total = chartData.length;
-                        const xStep =
-                          total > 1 ? plotWidth / (total - 1) : 0;
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
+                        Chỉ tiêu 80%
+                      </span>
+                    </div>
 
-                        const toX = (idx: number) => padLeft + idx * xStep;
-                        const toY = (val: number) => {
-                          const clamped = Math.max(0, Math.min(100, val));
-                          return (
-                            plotBottom -
-                            ((clamped - minVal) / (maxVal - minVal)) * plotHeight
-                          );
-                        };
+                    {/* 50% grid line */}
+                    <div
+                      className="absolute left-0 right-0 border-b border-outline-variant/30 z-0 pointer-events-none"
+                      style={{ bottom: "calc(44px + 130px * 0.5)" }}
+                    />
 
-                        const gridPercents = [100, 75, 50, 25, 0] as const;
-                        const { points, segments } =
-                          buildChartSegments(chartData);
+                    {/* 14-day Interactive Columns Container */}
+                    <div className="w-full flex items-end justify-between z-10 gap-1 sm:gap-1.5">
+                      {viewingStats.dailySeries.map((item) => {
+                        const hasVal = item.rate !== null;
+                        const rate = item.rate ?? 0;
+                        const isHigh = hasVal && rate >= 80;
+                        const isMedium = hasVal && rate >= 60 && rate < 80;
 
-                        const segmentPath = (seg: ChartPoint[]) =>
-                          seg
-                            .map((p, i) =>
-                              i === 0
-                                ? `M ${toX(p.idx)},${toY(p.val)}`
-                                : `L ${toX(p.idx)},${toY(p.val)}`
-                            )
-                            .join(" ");
+                        let barBg = "bg-rose-500 hover:bg-rose-600";
+                        let textBg = "text-rose-700";
+                        if (isHigh) {
+                          barBg = "bg-primary hover:bg-primary/90";
+                          textBg = "text-primary";
+                        } else if (isMedium) {
+                          barBg = "bg-amber-500 hover:bg-amber-600";
+                          textBg = "text-amber-700";
+                        }
 
-                        const segmentArea = (seg: ChartPoint[]) => {
-                          if (seg.length === 0) return "";
-                          if (seg.length === 1) {
-                            const p = seg[0];
-                            const x = toX(p.idx);
-                            return `M ${x},${toY(p.val)} L ${x},${plotBottom} Z`;
-                          }
-                          const line = seg
-                            .map((p) => `${toX(p.idx)},${toY(p.val)}`)
-                            .join(" L ");
-                          const first = seg[0];
-                          const last = seg[seg.length - 1];
-                          return `M ${toX(first.idx)},${plotBottom} L ${line} L ${toX(last.idx)},${plotBottom} Z`;
-                        };
+                        const isHovered = hoveredModalDay?.date === item.date;
 
                         return (
-                          <>
-                            <g
-                              stroke="#e5e7eb"
-                              strokeDasharray="4 4"
-                              strokeWidth="1"
-                            >
-                              {gridPercents.map((pct) => (
-                                <line
-                                  key={pct}
-                                  x1={padLeft}
-                                  x2={padLeft + plotWidth}
-                                  y1={toY(pct)}
-                                  y2={toY(pct)}
-                                />
-                              ))}
-                            </g>
-
-                            <g
-                              fill="#6e7a75"
-                              fontFamily="Inter, sans-serif"
-                              fontSize="12"
-                              textAnchor="end"
-                            >
-                              {gridPercents.map((pct) => (
-                                <text key={pct} x={padLeft - 10} y={toY(pct) + 4}>
-                                  {pct}%
-                                </text>
-                              ))}
-                            </g>
-
-                            <line
-                              x1={padLeft}
-                              x2={padLeft + plotWidth}
-                              y1={plotBottom}
-                              y2={plotBottom}
-                              stroke="#d1d5db"
-                              strokeWidth="1.5"
-                            />
-
-                            {Array.from({ length: total }, (_, idx) => {
-                              const hasValue = chartData[idx] !== null;
-                              return (
-                                <g key={`tick-${idx}`}>
-                                  <line
-                                    x1={toX(idx)}
-                                    x2={toX(idx)}
-                                    y1={plotBottom}
-                                    y2={tickBottom}
-                                    stroke="#d1d5db"
-                                    strokeWidth="1.5"
-                                  />
-                                  {!hasValue && (
-                                    <circle
-                                      cx={toX(idx)}
-                                      cy={plotBottom}
-                                      r="3"
-                                      fill="#cbd5e1"
-                                      stroke="none"
+                          <div
+                            key={item.date}
+                            className="flex-1 flex flex-col items-center group relative cursor-pointer select-none"
+                            onMouseEnter={() => setHoveredModalDay(item)}
+                            onMouseLeave={() => setHoveredModalDay(null)}
+                          >
+                            {/* Hover Tooltip Popup */}
+                            {isHovered && (
+                              <div className="absolute bottom-full mb-3 z-30 w-56 bg-surface-container-lowest text-on-surface text-xs p-3.5 rounded-2xl shadow-xl border border-outline-variant/70 backdrop-blur-md animate-fadeIn pointer-events-none">
+                                <div className="flex justify-between items-center border-b border-outline-variant/40 pb-1.5 mb-1.5 font-bold">
+                                  <span>
+                                    {item.fullDayName}, {item.shortDate}
+                                  </span>
+                                  {hasVal ? (
+                                    <span
+                                      className={`font-bold ${
+                                        isHigh
+                                          ? "text-primary"
+                                          : isMedium
+                                          ? "text-amber-700"
+                                          : "text-rose-600"
+                                      }`}
                                     >
-                                      <title>{`Ngày ${idx + 1}: Không có dữ liệu`}</title>
-                                    </circle>
+                                      {rate}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-on-surface-variant font-normal text-[11px]">
+                                      Trống
+                                    </span>
                                   )}
-                                </g>
-                              );
-                            })}
+                                </div>
+                                {hasVal ? (
+                                  <div className="space-y-1 text-[11px] text-on-surface-variant">
+                                    <p>
+                                      Đánh giá:{" "}
+                                      <strong className="text-on-surface font-semibold">
+                                        {isHigh
+                                          ? "Đạt chỉ tiêu"
+                                          : isMedium
+                                          ? "Cần lưu ý"
+                                          : "Kém"}
+                                      </strong>
+                                    </p>
+                                    {item.logs.length > 0 ? (
+                                      <div className="pt-1 border-t border-outline-variant/30 space-y-1">
+                                        <p className="font-semibold text-on-surface">
+                                          Ghi nhận trong ngày:
+                                        </p>
+                                        {item.logs.map((lg, lgIdx) => (
+                                          <p
+                                            key={lgIdx}
+                                            className="text-[10px] flex items-center gap-1 text-on-surface leading-tight"
+                                          >
+                                            <span
+                                              className={
+                                                lg.type === "warning"
+                                                  ? "text-amber-600"
+                                                  : "text-primary"
+                                              }
+                                            >
+                                              •
+                                            </span>
+                                            {lg.title}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-[10px] text-on-surface-variant italic">
+                                        Không có ghi chú bất thường
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-on-surface-variant">
+                                    Bệnh nhân không ghi nhận bữa ăn hoặc check-in vào ngày này.
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
-                            <g
-                              fill="#6e7a75"
-                              fontFamily="Inter, sans-serif"
-                              fontSize="12"
-                              fontWeight="500"
-                              textAnchor="middle"
+                            {/* Value Text Above Bar */}
+                            <span
+                              className={`text-[10px] font-bold mb-1 tabular-nums ${
+                                hasVal ? textBg : "text-outline/40"
+                              }`}
                             >
-                              {Array.from({ length: total }, (_, idx) => (
-                                <text key={idx} x={toX(idx)} y={labelY}>
-                                  {idx + 1}
-                                </text>
-                              ))}
-                            </g>
+                              {hasVal ? `${rate}%` : "—"}
+                            </span>
 
-                            <text
-                              x={padLeft + plotWidth / 2}
-                              y={captionY}
-                              fill="#9ca3af"
-                              fontFamily="Inter, sans-serif"
-                              fontSize="11"
-                              textAnchor="middle"
+                            {/* Bar Track */}
+                            <div
+                              className={`w-full h-[130px] rounded-xl flex items-end justify-center transition-colors p-0.5 ${
+                                isHovered
+                                  ? "bg-surface-container-low"
+                                  : "bg-transparent"
+                              }`}
                             >
-                              Ngày (1 = cũ nhất → {total} = hôm nay)
-                            </text>
+                              {hasVal ? (
+                                <div
+                                  className={`w-full max-w-[24px] rounded-t-lg transition-all duration-200 ${barBg} ${
+                                    isHovered ? "ring-2 ring-primary/40 shadow-xs" : ""
+                                  }`}
+                                  style={{ height: `${Math.max(rate, 6)}%` }}
+                                />
+                              ) : (
+                                <div className="w-1.5 h-1.5 rounded-full bg-outline-variant/60 mb-2" />
+                              )}
+                            </div>
 
-                            <defs>
-                              <linearGradient
-                                id="modal-teal-fade"
-                                x1="0"
-                                x2="0"
-                                y1="0"
-                                y2="1"
+                            {/* X-axis Day Label & Date */}
+                            <div className="mt-1.5 flex flex-col items-center">
+                              <span
+                                className={`text-[10px] font-semibold ${
+                                  item.isToday
+                                    ? "text-primary font-bold"
+                                    : "text-on-surface-variant"
+                                }`}
                               >
-                                <stop
-                                  offset="0%"
-                                  stopColor="#006857"
-                                  stopOpacity="0.25"
+                                {item.dayName}
+                              </span>
+                              <span
+                                className={`text-[9px] tabular-nums ${
+                                  item.isToday
+                                    ? "text-primary font-bold"
+                                    : "text-outline"
+                                }`}
+                              >
+                                {item.shortDate}
+                              </span>
+                              {item.isToday && (
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5"
+                                  title="Hôm nay"
                                 />
-                                <stop
-                                  offset="100%"
-                                  stopColor="#006857"
-                                  stopOpacity="0.02"
-                                />
-                              </linearGradient>
-                            </defs>
-
-                            {segments.map((seg, i) => (
-                              <path
-                                key={`area-${i}`}
-                                d={segmentArea(seg)}
-                                fill="url(#modal-teal-fade)"
-                              />
-                            ))}
-                            {segments.map((seg, i) => (
-                              <path
-                                key={`line-${i}`}
-                                d={segmentPath(seg)}
-                                fill="none"
-                                stroke="#006857"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="3"
-                              />
-                            ))}
-                            <g fill="#ffffff" stroke="#006857" strokeWidth="2.5">
-                              {points.map((p) => (
-                                <circle
-                                  key={p.idx}
-                                  cx={toX(p.idx)}
-                                  cy={toY(p.val)}
-                                  r="4.5"
-                                  className="cursor-pointer transition-transform hover:scale-125"
-                                >
-                                  <title>{`Ngày ${p.idx + 1}: ${p.val}%`}</title>
-                                </circle>
-                              ))}
-                            </g>
-                          </>
+                              )}
+                            </div>
+                          </div>
                         );
-                      })()}
-                    </svg>
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

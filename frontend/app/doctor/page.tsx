@@ -380,10 +380,10 @@ export default function DoctorDashboardPage() {
                     <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
                       Chỉ số biến động
                     </th>
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
                       Trạng thái
                     </th>
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-right">
+                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
                       Hành động
                     </th>
                   </tr>
@@ -441,17 +441,17 @@ export default function DoctorDashboardPage() {
                           <td className="px-5 py-3.5 text-on-surface-variant text-xs font-medium">
                             {patient.bloodSugar ? `Đường huyết (${patient.bloodSugar})` : patient.condition}
                           </td>
-                          <td className="px-5 py-3.5">
+                          <td className="px-5 py-3.5 text-center">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${patient.statusColor}`}
+                              className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${patient.statusColor}`}
                             >
                               {patient.status}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-right">
+                          <td className="px-5 py-3.5 text-center">
                             <Link
                               href={`/doctor/patients/${patient.id}`}
-                              className="inline-flex items-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-xl hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold"
+                              className="inline-flex items-center justify-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-xl hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold whitespace-nowrap"
                             >
                               <span>Chi tiết</span>
                               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -569,10 +569,10 @@ export default function DoctorDashboardPage() {
                   <>
                     {/* Benchmark Target Line (80%) */}
                     <div
-                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-end pr-1 pointer-events-none"
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-start pl-2 pointer-events-none"
                       style={{ bottom: "calc(26px + 120px * 0.8)" }}
                     >
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
                         Chỉ tiêu 80%
                       </span>
                     </div>
@@ -601,13 +601,13 @@ export default function DoctorDashboardPage() {
 
                         return (
                           <div
-                            key={item.day}
-                            className="flex-1 flex flex-col items-center group relative cursor-pointer"
+                            key={`${item.day}-${item.date}`}
+                            className="flex-1 flex flex-col items-center group relative cursor-pointer select-none"
                             onMouseEnter={() => setHoveredDay(item)}
                             onMouseLeave={() => setHoveredDay(null)}
                           >
                             {/* Hover Tooltip Popup */}
-                            {hoveredDay?.day === item.day && (
+                            {hoveredDay?.date === item.date && (
                               <div className="absolute bottom-full mb-2 z-30 w-44 bg-surface-container-lowest text-on-surface text-xs p-3 rounded-2xl shadow-xl border border-outline-variant/60 backdrop-blur-md animate-fadeIn pointer-events-none">
                                 <div className="flex justify-between items-center border-b border-outline-variant/40 pb-1 mb-1 font-bold">
                                   <span>Thứ ({item.day}) - {item.date}</span>
@@ -631,8 +631,8 @@ export default function DoctorDashboardPage() {
                             {/* Bar Track */}
                             <div className="w-full h-[120px] flex items-end justify-center">
                               <div
-                                className={`w-full max-w-[28px] rounded-t-lg transition-all duration-300 ${barBg} ${
-                                  hoveredDay?.day === item.day ? "scale-105 shadow-md" : ""
+                                className={`w-full max-w-[28px] rounded-t-lg transition-all duration-200 ${barBg} ${
+                                  hoveredDay?.date === item.date ? "ring-2 ring-primary/40 shadow-xs" : ""
                                 }`}
                                 style={{ height: `${item.rate}%` }}
                               ></div>
