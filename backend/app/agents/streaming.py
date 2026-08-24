@@ -12,6 +12,7 @@ from app.agents.graph import (
     build_agent_run_output,
     doctor_note_node,
     food_log_node,
+    greeting_node,
     interaction_check_node,
     meal_plan_node,
     refuse_node,
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 _STATUS_MESSAGES: dict[str, str] = {
     "profile_loader": "Đang tải hồ sơ bệnh nhân...",
     "intent_classifier": "Đang phân loại yêu cầu...",
+    "greeting": "Đang gửi lời chào...",
     "rag_qa": "Đang tìm tài liệu tham khảo...",
     "rag_qa_compose": "Đang soạn câu trả lời...",
     "meal_plan": "Đang đọc thực đơn từ hệ thống...",
@@ -42,6 +44,7 @@ _STATUS_MESSAGES: dict[str, str] = {
 }
 
 _INTENT_NODE_HANDLERS = {
+    "greeting": greeting_node,
     "meal_plan": meal_plan_node,
     "interaction_check": interaction_check_node,
     "food_log": food_log_node,

@@ -150,3 +150,31 @@ Probiotics (Men vi sinh):
 - Bằng chứng: Một số meta-analysis cho thấy probiotics giảm nhẹ đường huyết lúc đói và HbA1c, đặc biệt chủng Lactobacillus và Bifidobacterium.
 - Nguồn: Sữa chua không đường, kim chi, dưa muối tự nhiên (không phẩm màu), miso.
 - Kết luận: Ăn sữa chua không đường hàng ngày là cách bổ sung probiotics tốt nhất và an toàn nhất.
+
+## Nhóm Cá Béo, Thủy Hải Sản và Axit Béo Omega-3 (Cá Hồi, Cá Thu, Cá Basa, Cá Ngừ, Tôm, Cua)
+- **Cá Hồi và Cá Béo:** Cá hồi, cá thu, cá trích, cá mòi là nguồn cung cấp axit béo Omega-3 (EPA và DHA) tự nhiên dồi dào nhất.
+- **Tác động lên người đái tháo đường:** 
+  - Hoàn toàn **KHUYẾN KHÍCH NÊN ĂN** (khuyến nghị ADA & BYT: ít nhất 2–3 bữa cá mỗi tuần, khoảng 100g–150g/bữa).
+  - Không chứa tinh bột (Carbohydrate = 0g, GI = 0) nên không làm tăng đường huyết sau ăn.
+  - Omega-3 giúp giảm nồng độ Triglyceride máu, giảm viêm mạch máu mạn tính, tăng cường độ nhạy insulin và giảm nguy cơ xơ vữa động mạch, nhồi máu cơ tim ở bệnh nhân ĐTĐ.
+- **Cách chế biến khuyến nghị:** Áp chảo ít dầu ô-liu, hấp gừng hành, nướng muối tiêu chanh, nấu canh chua nhạt. Tránh tẩm bột chiên giòn, rim nước hàng có đường.
+
+## Nhóm Thịt Đỏ và Gia Súc (Thịt Trâu, Thịt Bò, Thịt Heo/Lợn)
+- **Thịt Trâu:**
+  - *Giá trị dinh dưỡng:* Rất giàu protein nạc (20.4g protein/100g), ít calo (~110 kcal/100g) và đặc biệt **hàm lượng chất béo bão hòa rất thấp** (chỉ 1.6g–2g chất béo/100g), thấp hơn nhiều so với thịt bò và thịt heo. Rất giàu sắt và kẽm.
+  - *Người tiểu đường có ăn được không:* Hoàn toàn **ĂN ĐƯỢC VÀ RẤT TỐT**. Phù hợp cho bệnh nhân ĐTĐ cần kiểm soát mỡ máu và cân nặng.
+  - *Cách chế biến:* Hấp, luộc, xào cần tỏi ít dầu, nấu canh rau. Khẩu phần: 100g–120g/bữa, 2–3 lần/tuần.
+- **Thịt Bò:**
+  - *Người tiểu đường có ăn được không:* Ăn được nhưng cần chọn **thịt bò nạc** (thịt thăn, bắp bò, nạc vai). Tránh phần thịt nhiều mỡ giắt, mỡ gầu, gân béo.
+  - *Lưu ý y khoa:* Giới hạn chất béo bão hòa $< 7\%$ tổng năng lượng hàng ngày để phòng ngừa tăng LDL-Cholesterol và xơ vữa động mạch. Khẩu phần: 100g/bữa, 2–3 lần/tuần.
+- **Thịt Heo (Lợn):** Ưu tiên thịt thăn nạc, thịt nạc vai bỏ mỡ; tránh thịt ba chỉ, mỡ lợn, tóp mỡ, giò chả nhiều mỡ.
+
+## Nhóm Thịt Gia Cầm (Thịt Gà, Vịt, Ngan)
+- Ưu tiên **ức gà bỏ da**, thịt nạc đùi gà bỏ da. Da gia cầm chứa nhiều chất béo bão hòa và cholesterol.
+- Thịt gà nạc cung cấp đạm chất lượng cao, dễ tiêu hóa, GI = 0, an toàn tuyệt đối cho người ĐTĐ.
+
+## Nhóm Trứng và Đậu Phụ (Đạm Thực Vật)
+- **Trứng:** Bệnh nhân ĐTĐ có thể ăn 3–5 quả trứng/tuần (luộc, ốp-la ít dầu). Trứng giàu choline, lutein và protein hoàn chỉnh.
+- **Đậu phụ (Tàu hũ) và các loại đậu:** Nguồn đạm thực vật lý tưởng, giàu isoflavone và chất xơ, giúp hạ cholesterol và ổn định đường huyết.
+
+

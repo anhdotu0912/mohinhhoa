@@ -39,6 +39,10 @@ _INTENT_PATTERNS = {
         r"thực đơn.*(tuần|7 ngày|cả tuần|này)",
         r"(xem|cho tôi xem|lịch ăn|kế hoạch ăn|xem lại).*thực đơn",
         r"thực đơn của tôi|thực đơn tuần này|tuần này ăn gì",
+        r"(có|đã có|bác sĩ.*(đã|vừa)?\s*(tạo|lập|cho|lên))\s*(thực đơn|món)",
+        r"(tôi|mình)\s*(đã)?\s*có\s*(thực đơn|kế hoạch ăn)\s*(chưa|nào)",
+        r"(xem|kiểm tra)\s*(thực đơn|món ăn|bữa ăn)",
+        r"món ăn.*(hôm nay|tuần này|bác sĩ)",
     ],
     "interaction_check": [
         r"tương tác.*(thuốc|metformin|gliclazide|insulin)",
@@ -139,9 +143,6 @@ def _classify_by_llm(message: str) -> str:
 - weekly_compliance: hỏi tỉ lệ/báo cáo tuân thủ tuần, tuân thủ gần đây
 - doctor_note: hỏi lời dặn/lời nhắc/ghi chú từ bác sĩ
 - rag_qa: câu hỏi chung về dinh dưỡng, sức khỏe, đi chợ mua gì
-- refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
-- unknown: không rõ ý định
-
 - refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
 - unknown: không rõ ý định
 
