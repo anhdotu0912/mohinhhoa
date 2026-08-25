@@ -813,6 +813,10 @@ export default function PatientCompliancePage() {
                       <span className="w-2.5 h-2.5 rounded-full bg-outline-variant/80" />
                       Chưa ghi nhận
                     </span>
+                    <span className="flex items-center gap-1.5 text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                      <span className="w-3.5 border-b-2 border-dashed border-emerald-600 inline-block" />
+                      Chỉ tiêu (80%)
+                    </span>
                   </div>
                 </div>
 
@@ -830,13 +834,9 @@ export default function PatientCompliancePage() {
                   <div className="relative pt-6 pb-2 min-h-[250px] flex flex-col justify-end">
                     {/* Benchmark Target Line (80%) */}
                     <div
-                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-start pl-2 pointer-events-none"
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 pointer-events-none"
                       style={{ bottom: "calc(44px + 130px * 0.8)" }}
-                    >
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
-                        Chỉ tiêu 80%
-                      </span>
-                    </div>
+                    />
 
                     {/* 50% grid line */}
                     <div

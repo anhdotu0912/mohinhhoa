@@ -593,21 +593,27 @@ export default function DoctorDashboardPage() {
                     )}
                   </div>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold shadow-2xs ${
-                    avgCompliance === null
-                      ? "bg-surface-container text-on-surface-variant"
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                    <span className="w-3 border-b-2 border-dashed border-emerald-600 inline-block"></span>
+                    Chỉ tiêu: 80%
+                  </span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold shadow-2xs ${
+                      avgCompliance === null
+                        ? "bg-surface-container text-on-surface-variant"
+                        : avgCompliance >= 75
+                          ? "bg-emerald-600 text-white"
+                          : "bg-amber-500 text-white"
+                    }`}
+                  >
+                    {avgCompliance === null
+                      ? "Chưa có dữ liệu"
                       : avgCompliance >= 75
-                        ? "bg-emerald-600 text-white"
-                        : "bg-amber-500 text-white"
-                  }`}
-                >
-                  {avgCompliance === null
-                    ? "Chưa có dữ liệu"
-                    : avgCompliance >= 75
-                      ? "Đạt mục tiêu"
-                      : "Cần theo dõi"}
-                </span>
+                        ? "Đạt mục tiêu"
+                        : "Cần theo dõi"}
+                  </span>
+                </div>
               </div>
 
               {/* Interactive Bar Chart */}
@@ -626,13 +632,9 @@ export default function DoctorDashboardPage() {
                   <>
                     {/* Benchmark Target Line (80%) */}
                     <div
-                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 flex items-center justify-start pl-2 pointer-events-none"
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 pointer-events-none"
                       style={{ bottom: "calc(26px + 120px * 0.8)" }}
-                    >
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
-                        Chỉ tiêu 80%
-                      </span>
-                    </div>
+                    ></div>
 
                     {/* Y-axis grid line 50% */}
                     <div
@@ -710,7 +712,7 @@ export default function DoctorDashboardPage() {
 
             {/* Legend & Link */}
             <div className="pt-3 border-t border-outline-variant/40 mt-3">
-              <div className="flex items-center justify-between text-xs text-on-surface-variant mb-3 font-medium">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-variant mb-3 font-medium">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
                   Đạt (≥80%)
@@ -722,6 +724,10 @@ export default function DoctorDashboardPage() {
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
                   Kém (&lt;60%)
+                </span>
+                <span className="flex items-center gap-1.5 text-emerald-800 font-semibold">
+                  <span className="w-3.5 border-b-2 border-dashed border-emerald-500 inline-block"></span>
+                  Chỉ tiêu (80%)
                 </span>
               </div>
 
