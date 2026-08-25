@@ -11,6 +11,7 @@ import {
   type PatientComplianceOut,
 } from "@/lib/types";
 import { MealItemRow } from "@/components/patient-chat/MealItemRow";
+import { WeeklyAdherenceChart } from "@/components/patient-chat/WeeklyAdherenceChart";
 import { mealsToDayTotals } from "@/lib/meal-plan-display";
 
 
@@ -127,40 +128,6 @@ export function MealLogPanel() {
   }, [mealPlan, selectedDayIndex]);
 
   const isToday = selectedDayIndex === todayDayOfWeek;
-
-  const adherencePct = compliance?.overall_adherence_pct ?? null;
-  const adherenceBadgeLabel =
-    adherencePct != null
-      ? `${Math.round(adherencePct)}% Đạt chuẩn y khoa`
-      : "Chưa có dữ liệu";
-
-  // Build 7-day compliance data points from the actual daily_series (rolling 7 days up to today)
-  const compliancePoints = useMemo(() => {
-    const rawSeries = compliance?.daily_series ?? [];
-    return rawSeries.map((point, index) => {
-      const pct = point?.adherence_pct ?? null;
-      const pointDateStr = point?.date;
-      let label = `D${index + 1}`;
-      let isPointToday = false;
-
-      if (pointDateStr) {
-        const [year, month, day] = pointDateStr.split("-").map(Number);
-        if (year && month && day) {
-          const d = new Date(year, month - 1, day);
-          const dayOfWeekIndex = (d.getDay() + 6) % 7;
-          label = DAY_LABELS[dayOfWeekIndex]?.short ?? label;
-        }
-        isPointToday = pointDateStr === todayDateStr;
-      }
-
-      return {
-        label,
-        date: pointDateStr ?? `D${index + 1}`,
-        pct: pct != null ? Math.round(pct) : null,
-        isToday: isPointToday,
-      };
-    });
-  }, [compliance, todayDateStr]);
 
   // Determine logged status for each slot today
   const isSlotLogged = useCallback(
@@ -319,104 +286,16 @@ export function MealLogPanel() {
 
         {/* Scrollable Content Body */}
         <div className="p-5 md:p-7 flex-1 overflow-y-auto custom-scrollbar space-y-5">
-          {/* Mini 7-day Compliance Chart with Explicit Values and Labels */}
-          <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-3.5 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-[#006857]">monitoring</span>
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Mức độ tuân thủ 7 ngày qua
-                </span>
-              </div>
-              <span
-                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border shadow-2xs ${
-                  adherencePct != null && adherencePct >= 85
-                    ? "text-[#006857] bg-emerald-50 border-emerald-200"
-                    : adherencePct != null
-                    ? "text-amber-800 bg-amber-50 border-amber-200"
-                    : "text-slate-500 bg-slate-100 border-slate-200"
-                }`}
-              >
-                {adherenceBadgeLabel}
-              </span>
-            </div>
-
-            {/* Visual 7-day Bar Chart with Exact Numbers & Day Labels */}
-            <div className="bg-white rounded-xl p-3 border border-slate-200/70 shadow-2xs">
-              <div className="h-24 w-full flex items-end justify-between gap-2 px-1">
-                {compliancePoints.map((point) => {
-                  const hasData = point.pct !== null;
-                  const barHeight = hasData ? Math.max(12, Math.min(100, point.pct)) : 10;
-                  const isHigh = hasData && point.pct >= 85;
-                  const isMed = hasData && point.pct < 85 && point.pct > 0;
-
-                  return (
-                    <div
-                      key={point.label}
-                      className="flex-1 flex flex-col items-center justify-end h-full group relative"
-                    >
-                      {/* Exact Number / Percentage Label on Top of Bar */}
-                      <span
-                        className={`text-[10px] font-bold mb-1 leading-none transition-transform group-hover:scale-110 ${
-                          !hasData
-                            ? "text-slate-300"
-                            : isHigh
-                            ? "text-[#006857]"
-                            : "text-amber-600"
-                        }`}
-                      >
-                        {hasData ? `${point.pct}%` : "--"}
-                      </span>
-
-                      {/* Bar Column */}
-                      <div className="w-full max-w-[28px] h-14 bg-slate-100 rounded-t-md flex items-end overflow-hidden">
-                        <div
-                          className={`w-full rounded-t-md transition-all duration-300 ${
-                            !hasData
-                              ? "bg-slate-200"
-                              : isHigh
-                              ? "bg-[#006857] group-hover:bg-[#005245]"
-                              : "bg-amber-500 group-hover:bg-amber-600"
-                          }`}
-                          style={{ height: `${barHeight}%` }}
-                        />
-                      </div>
-
-                      {/* Day Label Below Bar */}
-                      <div className="mt-1.5 flex flex-col items-center">
-                        <span
-                          className={`text-[11px] font-bold ${
-                            point.isToday
-                              ? "text-[#006857] underline decoration-emerald-500 decoration-2 font-black"
-                              : "text-slate-600"
-                          }`}
-                        >
-                          {point.label}
-                        </span>
-                        {point.isToday && (
-                          <span className="w-1 h-1 rounded-full bg-emerald-600 mt-0.5" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-xs bg-[#006857]" />
-                    <span>≥85% Đạt chuẩn</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-xs bg-amber-500" />
-                    <span>&lt;85% Cần lưu ý</span>
-                  </span>
-                </div>
-                <span className="font-semibold text-slate-600">Mục tiêu y khoa: 85%</span>
-              </div>
-            </div>
-          </div>
+          <WeeklyAdherenceChart
+            series={compliance?.daily_series ?? []}
+            todayDateStr={todayDateStr}
+            selectedDayIndex={selectedDayIndex}
+            loading={loading}
+            onSelectDay={(index) => {
+              setSelectedDayIndex(index);
+              setCustomSlot(null);
+            }}
+          />
 
           {/* Meals for Selected Day Section */}
           <div className="space-y-3.5">

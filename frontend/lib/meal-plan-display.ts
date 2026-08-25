@@ -30,13 +30,13 @@ export const SLOT_META: Record<string, { label: string; icon: string }> = {
 };
 
 export const DAY_LABELS = [
-  { short: "T2", full: "Thứ 2", index: 0 },
-  { short: "T3", full: "Thứ 3", index: 1 },
-  { short: "T4", full: "Thứ 4", index: 2 },
-  { short: "T5", full: "Thứ 5", index: 3 },
-  { short: "T6", full: "Thứ 6", index: 4 },
-  { short: "T7", full: "Thứ 7", index: 5 },
-  { short: "CN", full: "Chủ nhật", index: 6 },
+  { short: "T2", full: "Thứ 2", index: 0, dayIndex: 1 },
+  { short: "T3", full: "Thứ 3", index: 1, dayIndex: 2 },
+  { short: "T4", full: "Thứ 4", index: 2, dayIndex: 3 },
+  { short: "T5", full: "Thứ 5", index: 3, dayIndex: 4 },
+  { short: "T6", full: "Thứ 6", index: 4, dayIndex: 5 },
+  { short: "T7", full: "Thứ 7", index: 5, dayIndex: 6 },
+  { short: "CN", full: "Chủ nhật", index: 6, dayIndex: 7 },
 ] as const;
 
 export interface MealNutrition {
@@ -54,17 +54,23 @@ export function normalizeSlot(slot: string): CanonicalSlot {
   return "noon";
 }
 
-/** Monday = 0 … Sunday = 6 — same as MealLogPanel. */
+/** UI week index: Monday = 0 … Sunday = 6 — same as MealLogPanel tab state. */
 export function todayDayIndex(now: Date = new Date()): number {
   return (now.getDay() + 6) % 7;
 }
 
+/** Map UI tab index (0..6) to API `day_index` (1..7, Monday = 1). */
+export function toApiDayIndex(uiDayIndex: number): number {
+  return uiDayIndex + 1;
+}
+
 export function findDayPlan(
   plan: MealPlanOutput | null | undefined,
-  dayIndex: number
+  uiDayIndex: number
 ): DayPlan | null {
   if (!plan?.days?.length) return null;
-  return plan.days.find((d) => d.day_index === dayIndex) ?? null;
+  const apiDayIndex = toApiDayIndex(uiDayIndex);
+  return plan.days.find((d) => d.day_index === apiDayIndex) ?? null;
 }
 
 export function sumMealNutrition(meal: Meal): MealNutrition {
@@ -136,13 +142,14 @@ export function mealsToDayTotals(meals: Meal[], previous?: DayTotals | null): Da
 
 export function replaceDayMeals(
   plan: MealPlanOutput,
-  dayIndex: number,
+  uiDayIndex: number,
   meals: Meal[]
 ): MealPlanOutput {
+  const apiDayIndex = toApiDayIndex(uiDayIndex);
   return {
     ...plan,
     days: plan.days.map((day) => {
-      if (day.day_index !== dayIndex) return day;
+      if (day.day_index !== apiDayIndex) return day;
       return { ...day, meals, totals: mealsToDayTotals(meals, day.totals) };
     }),
   };
