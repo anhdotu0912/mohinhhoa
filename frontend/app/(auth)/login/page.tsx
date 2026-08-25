@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { homePathForRole, useAuthStore } from "@/lib/auth-store";
 import { ApiError } from "@/lib/types";
+import { DemoAccountsCard } from "./DemoAccountsCard";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -112,6 +113,14 @@ export default function LoginPage() {
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
+
+        {/* DEMO ONLY — xóa cùng file DemoAccountsCard.tsx */}
+        <DemoAccountsCard
+          onPick={(demoEmail, demoPassword) => {
+            setEmail(demoEmail);
+            setPassword(demoPassword);
+          }}
+        />
 
         <div className="mt-lg pt-md border-t border-outline-variant/40 text-center space-y-2">
           <p className="font-caption text-caption text-on-surface-variant text-xs">
