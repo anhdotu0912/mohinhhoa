@@ -21,7 +21,7 @@ import {
   type PlanValidityRange,
 } from "@/lib/plan-expiry";
 import { pickDefaultSlot, visibleScheduleSlots } from "@/lib/plan-schedule-helpers";
-import { buildReviewHref, intentFromSlot, saveSlotIntent } from "@/lib/plan-slot-intent";
+import { buildReviewHref } from "@/lib/plan-slot-intent";
 import type { DayMealPlan, MealPlanItem } from "@/lib/plans-store";
 import { asRouteId } from "@/lib/route-params";
 import {
@@ -57,10 +57,11 @@ function getDayMealByIndex(
   );
 }
 
-const MEAL_ROWS: { slot: "breakfast" | "lunch" | "dinner"; label: string; icon: string }[] = [
+const MEAL_ROWS: { slot: "breakfast" | "lunch" | "dinner" | "snack"; label: string; icon: string }[] = [
   { slot: "breakfast", label: "Sáng", icon: "wb_twilight" },
   { slot: "lunch", label: "Trưa", icon: "wb_sunny" },
   { slot: "dinner", label: "Tối", icon: "bedtime" },
+  { slot: "snack", label: "Phụ", icon: "cookie" },
 ];
 
 const WEEKDAY_FULL = [
@@ -347,7 +348,7 @@ export default function DoctorPatientHistoryPage() {
   if (loadError || !patient || !summary) {
     return (
       <main className="p-6 max-w-[1440px] mx-auto">
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-rose-800 text-sm">
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-rose-800 text-sm">
           {loadError || "Không tìm thấy bệnh nhân."}
         </div>
       </main>
@@ -388,16 +389,9 @@ export default function DoctorPatientHistoryPage() {
             <PlanExpiryBadge expiry={selectedExpiryFields} />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {selectedEntry?.plan.status === "pending" && patientId && selectedSlot && (
+            {selectedEntry?.plan.status === "pending" && patientId && (
               <Link
-                href={buildReviewHref(
-                  patientId,
-                  selectedEntry.plan.id,
-                  intentFromSlot(patientId, selectedSlot, "add")
-                )}
-                onClick={() =>
-                  saveSlotIntent(intentFromSlot(patientId, selectedSlot, "add"))
-                }
+                href={buildReviewHref(patientId, selectedEntry.plan.id)}
                 className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">assignment_turned_in</span>
@@ -405,7 +399,7 @@ export default function DoctorPatientHistoryPage() {
               </Link>
             )}
             <Link
-              href={buildHistoryGenerateHref(patientId!, schedule)}
+              href={buildHistoryGenerateHref(patientId!)}
               className="bg-primary hover:bg-primary/90 text-on-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
@@ -432,19 +426,19 @@ export default function DoctorPatientHistoryPage() {
         {selectedSlot && (
           <div id="meal-week-grid" className="space-y-6">
             {/* Unified Weekly Toolbar & KPI Summary */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 shadow-xs">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs">
               {/* Controls row */}
               <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-4 border-b border-outline-variant/50">
                 {/* Week selector buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={handlePrevWeek}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
                   >
                     <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                     Tuần trước
                   </button>
-                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary/10 border border-primary/25 rounded-xl text-primary font-bold text-xs">
+                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary/10 border border-primary/25 rounded-lg text-primary font-bold text-xs">
                     <span className="material-symbols-outlined text-primary text-[18px]">
                       calendar_month
                     </span>
@@ -452,14 +446,14 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                   <button
                     onClick={handleNextWeek}
-                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                    className="px-3 py-1.5 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
                   >
                     Tuần sau
                     <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                   </button>
                   <button
                     onClick={handleResetCurrentWeek}
-                    className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-900 border border-emerald-500/25 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                    className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-900 border border-emerald-500/25 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
                   >
                     <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                     Về hôm nay
@@ -467,11 +461,11 @@ export default function DoctorPatientHistoryPage() {
                 </div>
 
                 {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-2xl border border-outline-variant/50 self-start lg:self-auto">
+                <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-outline-variant/50 self-start lg:self-auto">
                   <button
                     type="button"
                     onClick={() => setViewMode("grid")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                       viewMode === "grid"
                         ? "bg-primary text-on-primary shadow-2xs"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -483,7 +477,7 @@ export default function DoctorPatientHistoryPage() {
                   <button
                     type="button"
                     onClick={() => setViewMode("day")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                       viewMode === "day"
                         ? "bg-primary text-on-primary shadow-2xs"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -497,8 +491,8 @@ export default function DoctorPatientHistoryPage() {
 
               {/* 4 KPI Metric Chips */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4">
-                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">check_circle</span>
                   </div>
                   <div>
@@ -511,8 +505,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">grain</span>
                   </div>
                   <div>
@@ -530,8 +524,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">local_fire_department</span>
                   </div>
                   <div>
@@ -544,8 +538,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-800 flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">event</span>
                   </div>
                   <div>
@@ -560,7 +554,7 @@ export default function DoctorPatientHistoryPage() {
 
             {/* Main Menu Display Area */}
             {!weekInPlan ? (
-              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-10 text-center text-on-surface-variant shadow-xs">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-10 text-center text-on-surface-variant shadow-xs">
                 <span className="material-symbols-outlined text-[48px] text-outline mb-2">
                   calendar_today
                 </span>
@@ -581,7 +575,7 @@ export default function DoctorPatientHistoryPage() {
                   return (
                     <div
                       key={day.isoDate}
-                      className={`rounded-3xl p-3.5 flex flex-col justify-between transition-all group relative overflow-hidden ${
+                      className={`rounded-xl p-3.5 flex flex-col justify-between transition-all group relative overflow-hidden ${
                         day.isToday
                           ? "bg-gradient-to-b from-primary/[0.08] via-emerald-50/30 to-white border-2 border-primary shadow-lg ring-4 ring-primary/15"
                           : "bg-white border border-outline-variant/60 shadow-xs hover:border-primary/40 hover:shadow-md"
@@ -590,7 +584,7 @@ export default function DoctorPatientHistoryPage() {
                       {/* Today Ribbon / Badge */}
                       {day.isToday && (
                         <div className="absolute top-0 right-0">
-                          <div className="bg-primary text-on-primary text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-bl-xl shadow-xs flex items-center gap-1">
+                          <div className="bg-primary text-on-primary text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-bl-md shadow-xs flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
                             Hôm nay
                           </div>
@@ -610,7 +604,7 @@ export default function DoctorPatientHistoryPage() {
                           </span>
                           {adherence != null && (
                             <span
-                              className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                              className={`px-1.5 py-0.2 rounded-md text-[9px] font-bold ${
                                 adherence >= 80
                                   ? "bg-emerald-500/15 text-emerald-900 border border-emerald-500/20"
                                   : adherence >= 50
@@ -633,7 +627,7 @@ export default function DoctorPatientHistoryPage() {
                       {/* 3 Meals Mini Cards */}
                       <div className="space-y-2 flex-1 mb-3">
                         {/* Breakfast */}
-                        <div className={`rounded-xl p-2 transition-all ${
+                        <div className={`rounded-lg p-2 transition-all ${
                           day.isToday
                             ? "bg-amber-500/[0.12] border-2 border-amber-500/30 shadow-2xs"
                             : "bg-amber-500/[0.06] border border-amber-500/15"
@@ -661,7 +655,7 @@ export default function DoctorPatientHistoryPage() {
                         </div>
 
                         {/* Lunch */}
-                        <div className={`rounded-xl p-2 transition-all ${
+                        <div className={`rounded-lg p-2 transition-all ${
                           day.isToday
                             ? "bg-emerald-500/[0.12] border-2 border-emerald-500/30 shadow-2xs"
                             : "bg-emerald-500/[0.06] border border-emerald-500/15"
@@ -689,7 +683,7 @@ export default function DoctorPatientHistoryPage() {
                         </div>
 
                         {/* Dinner */}
-                        <div className={`rounded-xl p-2 transition-all ${
+                        <div className={`rounded-lg p-2 transition-all ${
                           day.isToday
                             ? "bg-sky-500/[0.12] border-2 border-sky-500/30 shadow-2xs"
                             : "bg-sky-500/[0.06] border border-sky-500/15"
@@ -721,7 +715,7 @@ export default function DoctorPatientHistoryPage() {
                       <button
                         type="button"
                         onClick={() => handleDaySelect(day.dayIndex)}
-                        className={`w-full py-1.5 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        className={`w-full py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
                           day.isToday
                             ? "bg-primary text-on-primary hover:bg-primary/90 shadow-2xs ring-2 ring-primary/20"
                             : "text-primary hover:bg-primary/10 border border-primary/20"
@@ -746,7 +740,7 @@ export default function DoctorPatientHistoryPage() {
                         key={day.isoDate}
                         type="button"
                         onClick={() => setSelectedDayIdx(day.dayIndex)}
-                        className={`px-4 py-2 rounded-2xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-2 ${
+                        className={`px-4 py-2 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-2 ${
                           isActive
                             ? "bg-primary text-on-primary shadow-xs ring-2 ring-primary/30"
                             : day.isToday
@@ -760,7 +754,7 @@ export default function DoctorPatientHistoryPage() {
                         </span>
                         {day.isToday && (
                           <span
-                            className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
+                            className={`px-1.5 py-0.2 rounded-md text-[9px] font-black uppercase ${
                               isActive ? "bg-white/20 text-white" : "bg-primary text-white"
                             }`}
                           >
@@ -777,20 +771,20 @@ export default function DoctorPatientHistoryPage() {
 
                 {/* Day Overview Summary */}
                 {currentDayData ? (
-                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 shadow-xs">
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs">
                     <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-outline-variant/40 mb-5">
                       <div>
                         <h4 className="font-h2 text-base font-bold text-on-surface flex items-center gap-2">
                           <span>
                             {currentWeekDayMeta?.fullDayName} ({currentWeekDayMeta?.shortDate})
                             {currentWeekDayMeta?.isToday && (
-                              <span className="ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-primary text-on-primary">
+                              <span className="ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-black uppercase bg-primary text-on-primary">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
                                 Hôm nay
                               </span>
                             )}
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-900 border border-emerald-500/20 font-mono">
+                          <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-900 border border-emerald-500/20 font-mono">
                             Tổng: {currentDayData.totalCalories} kcal
                           </span>
                         </h4>
@@ -798,7 +792,7 @@ export default function DoctorPatientHistoryPage() {
                       {patientId && selectedEntry && (
                         <Link
                           href={`/doctor/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(selectedEntry.plan.id)}`}
-                          className="px-3 py-1.5 bg-primary text-on-primary rounded-xl text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1 shadow-2xs"
+                          className="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1 shadow-2xs"
                         >
                           <span className="material-symbols-outlined text-[16px]">edit</span>
                           <span>Chỉnh sửa thực đơn này</span>
@@ -806,23 +800,23 @@ export default function DoctorPatientHistoryPage() {
                       )}
                     </div>
 
-                    {/* 3 Spacious Meal Cards */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* 4 Spacious Meal Cards */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Breakfast Large Card */}
-                      <div className="bg-surface-container-low/30 border border-amber-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <div className="bg-surface-container-low/30 border border-amber-500/20 rounded-lg p-4 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-amber-500/15">
                             <span className="font-bold text-sm text-amber-950 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-amber-700 text-[18px]">wb_twilight</span>
                               Bữa sáng
                             </span>
-                            <span className="font-mono font-bold text-xs text-amber-900 bg-amber-500/15 px-2 py-0.5 rounded-full">
+                            <span className="font-mono font-bold text-xs text-amber-900 bg-amber-500/15 px-2 py-0.5 rounded-md">
                               {currentDayData.breakfast?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
                             </span>
                           </div>
                           <div className="space-y-2">
                             {currentDayData.breakfast?.map((food, idx) => (
-                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                              <div key={idx} className="bg-white rounded-lg p-2.5 border border-outline-variant/40">
                                 <div className="flex justify-between items-start">
                                   <span className="font-bold text-xs text-on-surface">{food.name}</span>
                                   <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
@@ -839,20 +833,20 @@ export default function DoctorPatientHistoryPage() {
                       </div>
 
                       {/* Lunch Large Card */}
-                      <div className="bg-surface-container-low/30 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <div className="bg-surface-container-low/30 border border-emerald-500/20 rounded-lg p-4 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-emerald-500/15">
                             <span className="font-bold text-sm text-emerald-950 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-emerald-700 text-[18px]">wb_sunny</span>
                               Bữa trưa
                             </span>
-                            <span className="font-mono font-bold text-xs text-emerald-900 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                            <span className="font-mono font-bold text-xs text-emerald-900 bg-emerald-500/15 px-2 py-0.5 rounded-md">
                               {currentDayData.lunch?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
                             </span>
                           </div>
                           <div className="space-y-2">
                             {currentDayData.lunch?.map((food, idx) => (
-                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                              <div key={idx} className="bg-white rounded-lg p-2.5 border border-outline-variant/40">
                                 <div className="flex justify-between items-start">
                                   <span className="font-bold text-xs text-on-surface">{food.name}</span>
                                   <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
@@ -869,20 +863,50 @@ export default function DoctorPatientHistoryPage() {
                       </div>
 
                       {/* Dinner Large Card */}
-                      <div className="bg-surface-container-low/30 border border-sky-500/20 rounded-2xl p-4 flex flex-col justify-between">
+                      <div className="bg-surface-container-low/30 border border-sky-500/20 rounded-lg p-4 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-sky-500/15">
                             <span className="font-bold text-sm text-sky-950 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sky-700 text-[18px]">bedtime</span>
                               Bữa tối
                             </span>
-                            <span className="font-mono font-bold text-xs text-sky-900 bg-sky-500/15 px-2 py-0.5 rounded-full">
+                            <span className="font-mono font-bold text-xs text-sky-900 bg-sky-500/15 px-2 py-0.5 rounded-md">
                               {currentDayData.dinner?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
                             </span>
                           </div>
                           <div className="space-y-2">
                             {currentDayData.dinner?.map((food, idx) => (
-                              <div key={idx} className="bg-white rounded-xl p-2.5 border border-outline-variant/40">
+                              <div key={idx} className="bg-white rounded-lg p-2.5 border border-outline-variant/40">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-bold text-xs text-on-surface">{food.name}</span>
+                                  <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-1">
+                                  {food.salt !== undefined && <span>Muối: {food.salt}g</span>}
+                                  {food.carbG !== undefined && <span>• Carb: {food.carbG}g</span>}
+                                  {food.fat !== undefined && <span>• Chất béo: {food.fat}g</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Snack Large Card */}
+                      <div className="bg-surface-container-low/30 border border-emerald-500/20 rounded-lg p-4 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-emerald-500/15">
+                            <span className="font-bold text-sm text-emerald-950 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-emerald-700 text-[18px]">cookie</span>
+                              Bữa phụ
+                            </span>
+                            <span className="font-mono font-bold text-xs text-emerald-900 bg-emerald-500/15 px-2 py-0.5 rounded-md">
+                              {currentDayData.snack?.reduce((s, i) => s + (i.calories || 0), 0)} kcal
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {currentDayData.snack?.map((food, idx) => (
+                              <div key={idx} className="bg-white rounded-lg p-2.5 border border-outline-variant/40">
                                 <div className="flex justify-between items-start">
                                   <span className="font-bold text-xs text-on-surface">{food.name}</span>
                                   <span className="font-mono text-xs text-emerald-900 font-semibold">{food.calories} kcal</span>
@@ -900,7 +924,7 @@ export default function DoctorPatientHistoryPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-8 text-center text-on-surface-variant">
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-8 text-center text-on-surface-variant">
                     <p className="text-xs italic">Không có dữ liệu chi tiết cho ngày được chọn.</p>
                   </div>
                 )}
@@ -908,7 +932,7 @@ export default function DoctorPatientHistoryPage() {
             )}
 
             {/* Bottom footnote */}
-            <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl text-xs text-on-surface-variant flex items-center justify-between gap-4 flex-wrap shadow-xs">
+            <div className="p-4 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs text-on-surface-variant flex items-center justify-between gap-4 flex-wrap shadow-xs">
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-[18px]">info</span>
                 Dữ liệu thực đơn đã qua cổng kiểm soát lâm sàng tự động và đối soát tương tác thuốc.

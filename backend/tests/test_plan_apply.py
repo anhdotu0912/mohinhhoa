@@ -15,18 +15,13 @@ def _login(client, email: str, password: str = "demo1234") -> dict:
     return {"Authorization": f"Bearer {data['access_token']}"}
 
 
+from tests.plan_helpers import generate_approve_apply
+
+
 def _generate_and_approve(client, patient_email: str, doctor_headers: dict) -> str:
-    patient_headers = _login(client, patient_email)
-    plan = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
-    assert plan.status_code == 200, plan.text
-    plan_id = plan.json()["id"]
-    review = client.post(
-        f"/api/v1/doctor/meal-plans/{plan_id}/review",
-        headers=doctor_headers,
-        json={"action": "approve", "notes": "OK"},
+    return generate_approve_apply(
+        client, patient_email, doctor_headers, apply=False
     )
-    assert review.status_code == 200, review.text
-    return plan_id
 
 
 def _apply(client, doctor_headers: dict, plan_id: str, start: date | None = None):
@@ -116,6 +111,56 @@ def test_apply_overlapping_active_without_replace_rejected(client):
     )
     assert response.status_code == 409, response.text
     assert response.json()["code"] == "PLAN_DATE_OVERLAP"
+
+
+def test_apply_mode_from_today_replaces_active(client):
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    plan_a = _generate_and_approve(client, "demo_patient_1@example.com", doctor_headers)
+    assert _apply(client, doctor_headers, plan_a).status_code == 200
+
+    plan_b = _generate_and_approve(client, "demo_patient_1@example.com", doctor_headers)
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_b}/apply",
+        headers=doctor_headers,
+        json={"apply_mode": "from_today"},
+    )
+    assert response.status_code == 200, response.text
+    plan_a_row = client.get(f"/api/v1/meal-plans/{plan_a}", headers=doctor_headers).json()
+    assert plan_a_row["ends_on"] == (date.today() - timedelta(days=1)).isoformat()
+    plan_b_row = client.get(f"/api/v1/meal-plans/{plan_b}", headers=doctor_headers).json()
+    assert plan_b_row["starts_on"] == date.today().isoformat()
+
+
+def test_apply_mode_after_current(client):
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    plan_a = _generate_and_approve(client, "demo_patient_1@example.com", doctor_headers)
+    assert _apply(client, doctor_headers, plan_a).status_code == 200
+    plan_a_before = client.get(
+        f"/api/v1/meal-plans/{plan_a}", headers=doctor_headers
+    ).json()
+    next_start = date.fromisoformat(plan_a_before["ends_on"]) + timedelta(days=1)
+
+    plan_b = _generate_and_approve(client, "demo_patient_1@example.com", doctor_headers)
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_b}/apply",
+        headers=doctor_headers,
+        json={"apply_mode": "after_current"},
+    )
+    assert response.status_code == 200, response.text
+    plan_b_row = client.get(f"/api/v1/meal-plans/{plan_b}", headers=doctor_headers).json()
+    assert plan_b_row["starts_on"] == next_start.isoformat()
+
+
+def test_apply_mode_after_current_no_chain(client):
+    doctor_headers = _login(client, "demo_doctor@example.com")
+    plan_id = _generate_and_approve(client, "demo_patient_2@example.com", doctor_headers)
+    response = client.post(
+        f"/api/v1/doctor/meal-plans/{plan_id}/apply",
+        headers=doctor_headers,
+        json={"apply_mode": "after_current"},
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "NO_CHAIN_PLAN"
 
 
 def test_replace_active_plan(client):
@@ -209,8 +254,12 @@ def test_reconcile_unapplies_overlapping_plans(client):
     from tests.conftest import TestingSessionLocal
 
     doctor_headers = _login(client, "demo_doctor@example.com")
-    plan_a = _generate_and_approve(client, "demo_patient_3@example.com", doctor_headers)
-    plan_b = _generate_and_approve(client, "demo_patient_3@example.com", doctor_headers)
+    plan_a = generate_approve_apply(
+        client, "demo_patient_3@example.com", doctor_headers, apply_mode="from_today"
+    )
+    plan_b = generate_approve_apply(
+        client, "demo_patient_3@example.com", doctor_headers, apply_mode="after_current"
+    )
     today = date.today()
     end = today + timedelta(days=6)
 

@@ -22,8 +22,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("Mật khẩu tối thiểu 6 ký tự.");
+    if (password.length < 8) {
+      setError("Mật khẩu tối thiểu 8 ký tự.");
       return;
     }
     if (password !== confirmPassword) {
@@ -110,11 +110,13 @@ export default function RegisterPage() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
+              maxLength={128}
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+              placeholder="Nhập mật khẩu (tối thiểu 8 ký tự)"
+              title="Mật khẩu tối thiểu 8 ký tự"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -126,11 +128,13 @@ export default function RegisterPage() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={8}
+              maxLength={128}
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Nhập lại mật khẩu"
+              title="Mật khẩu tối thiểu 8 ký tự"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -144,7 +148,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-primary text-on-primary hover:bg-primary/90 font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Đang tạo tài khoản..." : "Đăng ký & tiếp tục hồ sơ"}
           </button>

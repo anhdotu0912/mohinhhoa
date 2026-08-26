@@ -4,6 +4,7 @@ import {
   ApiError,
   type AgentRunOutput,
   type AlertOut,
+  type ApplyMealPlanRequest,
   type CatalogOut,
   type ChatSessionOut,
   type ChatSessionSummaryOut,
@@ -50,6 +51,26 @@ type RequestOptions = {
   auth?: boolean;
 };
 
+function formatApiDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item) {
+          return String((item as { msg?: unknown }).msg ?? "");
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (msgs.some((m) => /at least 8 characters/i.test(m))) {
+      return "Mật khẩu tối thiểu 8 ký tự.";
+    }
+    if (msgs.length) return msgs.join(" ");
+  }
+  return fallback;
+}
+
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -78,8 +99,8 @@ async function uploadAvatarForm(
     let detail = res.statusText || "Upload failed";
     let code = "HTTP_ERROR";
     try {
-      const data = (await res.json()) as { detail?: string; code?: string };
-      if (data.detail) detail = data.detail;
+      const data = (await res.json()) as { detail?: unknown; code?: string };
+      detail = formatApiDetail(data.detail, detail);
       if (data.code) code = data.code;
     } catch {
       /* ignore */
@@ -113,8 +134,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     let detail = res.statusText || "Request failed";
     let code = "HTTP_ERROR";
     try {
-      const data = (await res.json()) as { detail?: string; code?: string };
-      if (data.detail) detail = data.detail;
+      const data = (await res.json()) as { detail?: unknown; code?: string };
+      detail = formatApiDetail(data.detail, detail);
       if (data.code) code = data.code;
     } catch {
       /* ignore */
@@ -174,6 +195,16 @@ export const api = {
       method: "POST",
       body: { token, new_password },
       auth: false,
+    });
+  },
+
+  changePassword(
+    current_password: string,
+    new_password: string
+  ): Promise<{ message: string }> {
+    return request("/api/v1/auth/change-password", {
+      method: "POST",
+      body: { current_password, new_password },
     });
   },
 
@@ -385,6 +416,19 @@ export const api = {
     );
   },
 
+  getDoctorPatientMetricsHistory(
+    patientId: string,
+    days = 90
+  ): Promise<MetricsHistoryPoint[]> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request<MetricsHistoryPoint[]>(
+      `/api/v1/doctor/patients/${encodeURIComponent(id)}/metrics/history?days=${days}`
+    ).catch(() => [] as MetricsHistoryPoint[]);
+  },
+
   updatePatientGoals(patientId: string, goals: string[]): Promise<GoalsOut> {
     return request(
       `/api/v1/doctor/patients/${encodeURIComponent(patientId)}/goals`,
@@ -480,11 +524,7 @@ export const api = {
 
   applyMealPlan(
     planId: string,
-    payload: {
-      start_date: string;
-      replace_active?: boolean;
-      slot_key?: "current" | "next" | "empty";
-    }
+    payload: ApplyMealPlanRequest
   ): Promise<MealPlanOutput> {
     return request(`/api/v1/doctor/meal-plans/${encodeURIComponent(planId)}/apply`, {
       method: "POST",

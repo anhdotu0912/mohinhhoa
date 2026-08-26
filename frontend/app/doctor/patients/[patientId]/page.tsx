@@ -432,7 +432,7 @@ export default function PatientDetailPage() {
   }, [catalog, editForm.disease]);
 
   const chipClass = (active: boolean) =>
-    `px-md py-xs rounded-full text-xs font-medium border transition-colors cursor-pointer ${active
+    `px-md py-xs rounded-md text-xs font-medium border transition-colors cursor-pointer ${active
       ? "bg-primary text-on-primary border-primary"
       : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary"
     }`;
@@ -545,7 +545,7 @@ export default function PatientDetailPage() {
   const previewAvatarUrl = editForm.avatarUrl.trim();
   const previewAvatarSrc =
     previewAvatarUrl &&
-    !previewAvatarUrl.startsWith("https://api.dicebear.com")
+      !previewAvatarUrl.startsWith("https://api.dicebear.com")
       ? assetUrl(previewAvatarUrl)
       : "";
   const hasGenerateRequest = summary?.meal_plan_request_status === "pending";
@@ -555,98 +555,108 @@ export default function PatientDetailPage() {
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-background font-body">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed top-20 right-6 z-50 bg-primary text-on-primary px-lg py-sm rounded-lg shadow-lg flex items-center gap-sm animate-bounce">
-            <span className="material-symbols-outlined">check_circle</span>
-            <span className="font-body-bold">{toastMessage}</span>
+          <div className="fixed top-20 right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
+            <span className="material-symbols-outlined text-[20px]">check_circle</span>
+            <span className="font-body-bold font-bold">{toastMessage}</span>
           </div>
         )}
 
-        <main className="p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              className="bg-surface-container-lowest border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-3.5 py-2 rounded-xl font-body-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold"
-            >
-              <span className="material-symbols-outlined text-[18px]">delete</span>
-              Xóa bệnh nhân
-            </button>
-            <button
-              type="button"
-              onClick={openEditProfile}
-              className="bg-surface-container-lowest border border-outline-variant/60 text-on-surface px-4 py-2 rounded-xl font-body-bold text-xs hover:bg-surface-container-low transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-              Chỉnh sửa hồ sơ
-            </button>
-            {!hasGenerateRequest && (
-              <Link
-                href={`/doctor/patients/${patientId}/generate`}
-                className="bg-primary text-on-primary px-4 py-2 rounded-xl font-body-bold text-xs hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold"
+        <main className="p-4 sm:p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
+          {/* Top Quick Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+
+            <div className="flex items-center flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                Tạo thực đơn bằng AI
-              </Link>
-            )}
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span>Xóa bệnh nhân</span>
+              </button>
+              <button
+                type="button"
+                onClick={openEditProfile}
+                className="bg-surface-container-lowest border border-outline-variant/60 text-on-surface px-4 py-2 rounded-lg text-xs font-bold hover:bg-surface-container-low transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                <span>Chỉnh sửa hồ sơ</span>
+              </button>
+              {!hasGenerateRequest && (
+                <Link
+                  href={`/doctor/patients/${patientId}/generate`}
+                  className="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                  <span>Tạo thực đơn AI</span>
+                </Link>
+              )}
+            </div>
           </div>
+
           {hasGenerateRequest && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="rounded-xl border border-primary/30 bg-primary/5 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs animate-in fade-in duration-200">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-emerald-900 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[20px]">mail</span>
-                  Bệnh nhân đã yêu cầu tạo thực đơn
+                <p className="text-sm font-bold text-primary flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">notifications_active</span>
+                  <span>Bệnh nhân đã gửi yêu cầu tạo thực đơn mới</span>
                 </p>
                 {summary.meal_plan_request_note ? (
-                  <p className="text-xs text-emerald-800/90 mt-1 leading-relaxed">
-                    Ghi chú: “{summary.meal_plan_request_note}”
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Ghi chú từ bệnh nhân: “{summary.meal_plan_request_note}”
                   </p>
                 ) : (
-                  <p className="text-xs text-emerald-800/90 mt-1">
-                    Chưa có ghi chú — bạn có thể thêm yêu cầu khi tạo thực đơn AI.
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Bệnh nhân đang chờ bác sĩ kích hoạt thực đơn AI tuần tiếp theo.
                   </p>
                 )}
               </div>
               <Link
                 href={`/doctor/patients/${patientId}/generate`}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0 shadow-2xs active:scale-95"
               >
-                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                Tạo thực đơn bằng AI
+                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                <span>Tạo thực đơn AI ngay</span>
               </Link>
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Left Column: Patient Profile (30%) */}
-            <div className="w-full md:w-[32%] flex flex-col gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left Column: Patient Profile & Demographics (32%) */}
+            <div className="w-full lg:w-[32%] flex flex-col gap-6">
               {/* Profile Card */}
-              <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-6 flex flex-col items-center text-center shadow-subtle hover:shadow-hover transition-all">
+              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 p-6 flex flex-col items-center text-center shadow-xs">
                 <div className="relative mb-4">
-                  <div className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-2xl font-bold ring-2 ring-primary/20">
-                    {initials(patient.name)}
+                  <div className="relative w-24 h-24 rounded-full ring-4 ring-primary/20 p-1 bg-white shadow-md overflow-hidden">
+                    <div
+                      translate="no"
+                      className="absolute inset-1 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold"
+                    >
+                      {initials(patient.name)}
+                    </div>
+                    {avatarSrc && (
+                      <img
+                        alt={`${patient.name} Avatar`}
+                        className="relative z-10 w-full h-full rounded-full object-cover"
+                        src={avatarSrc}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
                   </div>
-                  {avatarSrc && (
-                    <img
-                      alt={`${patient.name} Avatar`}
-                      className="absolute inset-0 w-24 h-24 rounded-full object-cover ring-2 ring-outline-variant/40"
-                      src={avatarSrc}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  )}
-                  <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 ring-2 ring-white rounded-full"></span>
+                  <span className="absolute bottom-0 right-0 z-20 w-4 h-4 bg-emerald-500 ring-2 ring-white rounded-full"></span>
                 </div>
-                <h3 className="font-h2 text-h2 text-on-surface mb-1 font-bold text-lg">
+                <h3 className="text-on-surface mb-1 font-black text-xl tracking-tight">
                   {patient.name}
                 </h3>
-                <p className="font-body text-body text-on-surface-variant mb-4 text-xs font-medium">
-                  {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender}
+                <p className="text-on-surface-variant mb-4 text-xs font-semibold">
+                  {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender === "male" ? "Nam" : patient.gender === "female" ? "Nữ" : patient.gender}
                 </p>
 
-                <div className="w-full text-left pt-3 border-t border-outline-variant/40">
-                  <p className="font-label text-label text-on-surface-variant mb-2 uppercase tracking-wider text-[11px] font-semibold">
-                    Chẩn đoán hiện tại
+                <div className="w-full text-left pt-4 border-t border-outline-variant/40">
+                  <p className="text-on-surface-variant mb-2 uppercase tracking-wider text-[10px] font-bold">
+                    Chẩn đoán &amp; Bệnh lý
                   </p>
                   <div className="flex flex-wrap gap-1.5 justify-start">
                     {patient.diagnoses.length === 0 ? (
@@ -657,7 +667,7 @@ export default function PatientDetailPage() {
                       patient.diagnoses.map((diag, index) => (
                         <span
                           key={index}
-                          className="bg-primary/10 text-primary px-3 py-1 rounded-full font-caption text-caption border border-primary/20 text-xs font-semibold"
+                          className="bg-primary/10 text-primary px-3 py-1 rounded-md font-caption text-caption border border-primary/20 text-xs font-semibold"
                         >
                           {diag}
                         </span>
@@ -668,49 +678,49 @@ export default function PatientDetailPage() {
               </div>
 
               {/* Contact & Extra Info Card */}
-              <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 p-6 shadow-subtle">
-                <h4 className="font-body-bold text-body-bold text-on-surface mb-4 pb-2 border-b border-outline-variant/40 font-bold flex items-center justify-between text-sm">
-                  <span>Thông tin liên hệ</span>
-                  <span className="material-symbols-outlined text-primary text-[20px]">
+              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 p-5 shadow-xs">
+                <h4 className="text-on-surface mb-3.5 pb-2.5 border-b border-outline-variant/40 font-bold flex items-center justify-between text-xs uppercase tracking-wider">
+                  <span>Thông tin liên hệ &amp; Hồ sơ</span>
+                  <span className="material-symbols-outlined text-primary text-[18px]">
                     badge
                   </span>
                 </h4>
-                <ul className="space-y-3 text-on-surface-variant font-body text-body text-xs">
+                <ul className="space-y-3 text-on-surface-variant text-xs">
                   <li className="flex items-start gap-2.5">
-                    <span className="material-symbols-outlined text-outline text-[18px] mt-0.5">
+                    <span className="material-symbols-outlined text-outline text-[16px] mt-0.5">
                       fingerprint
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-0.5">
-                        Mã hồ sơ
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-0.5">
+                        Mã định danh
                       </p>
                       <PatientRecordId id={patient.patientCode} />
                     </div>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-outline text-[18px]">
+                    <span className="material-symbols-outlined text-outline text-[16px]">
                       phone
                     </span>
-                    <span className="font-medium">{patient.phone || "—"}</span>
+                    <span className="font-semibold text-on-surface">{patient.phone || "—"}</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-outline text-[18px]">
+                    <span className="material-symbols-outlined text-outline text-[16px]">
                       mail
                     </span>
-                    <span className="truncate font-medium">{patient.email}</span>
+                    <span className="truncate font-semibold text-on-surface">{patient.email}</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-outline text-[18px]">
+                    <span className="material-symbols-outlined text-outline text-[16px]">
                       home
                     </span>
-                    <span className="font-medium">{patient.address || "—"}</span>
+                    <span className="font-medium text-on-surface">{patient.address || "—"}</span>
                   </li>
                 </ul>
               </div>
             </div>
 
             {/* Right Column: Stacked Cards (68%) */}
-            <div className="w-full md:w-[68%] flex flex-col gap-6">
+            <div className="w-full lg:w-[68%] flex flex-col gap-6">
               {/* Card 1: Body Vitals (Chỉ số cơ thể) */}
               <PatientMetricsCard
                 patientId={patientId}
@@ -726,39 +736,39 @@ export default function PatientDetailPage() {
               />
 
               {/* Card 2: Medications & Allergies */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Left Sub-card: Thuốc đang dùng */}
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle flex flex-col overflow-hidden">
-                  <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30">
-                    <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-2 font-bold text-sm">
-                      <span className="material-symbols-outlined text-primary text-[20px]">
+                <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
+                  <div className="p-4 border-b border-outline-variant/40 bg-surface-container-low/40">
+                    <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-primary text-[18px]">
                         medication
                       </span>
-                      Thuốc đang dùng
+                      <span>Thuốc điều trị đang dùng</span>
                     </h4>
                   </div>
-                  <div className="p-5 flex-1">
+                  <div className="p-4 flex-1">
                     {patient.medications.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
-                        Chưa khai báo thuốc.
+                        Chưa ghi nhận đơn thuốc.
                       </p>
                     ) : (
                       <>
-                        <ul className="space-y-3">
+                        <ul className="space-y-2.5">
                           {(showAllMeds
                             ? patient.medications
                             : patient.medications.slice(0, MAX_LIST_ITEMS)
                           ).map((med, idx) => (
-                            <li key={idx} className="flex items-start gap-2.5">
-                              <span className="material-symbols-outlined text-primary text-[18px] mt-0.5">
+                            <li key={idx} className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-container-low/30 border border-outline-variant/30">
+                              <span className="material-symbols-outlined text-primary text-[16px] mt-0.5">
                                 pill
                               </span>
-                              <div>
-                                <p className="font-body-bold text-body-bold text-on-surface font-bold text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-on-surface text-xs truncate">
                                   {med.name}
                                 </p>
-                                <p className="font-caption text-caption text-on-surface-variant text-[11px] mt-0.5">
-                                  {med.dosage || "—"}
+                                <p className="text-on-surface-variant text-[11px] mt-0.5 font-medium">
+                                  {med.dosage || "Theo chỉ định bác sĩ"}
                                 </p>
                               </div>
                             </li>
@@ -784,31 +794,31 @@ export default function PatientDetailPage() {
                 </div>
 
                 {/* Right Sub-card: Dị ứng */}
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle flex flex-col overflow-hidden">
-                  <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30">
-                    <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-2 font-bold text-sm">
-                      <span className="material-symbols-outlined text-rose-600 text-[20px]">
+                <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
+                  <div className="p-4 border-b border-outline-variant/40 bg-surface-container-low/40">
+                    <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                      <span className="material-symbols-outlined text-rose-600 text-[18px]">
                         warning
                       </span>
-                      Dị ứng & Phản ứng phụ
+                      <span>Dị ứng &amp; Phản ứng phụ</span>
                     </h4>
                   </div>
-                  <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div className="p-4 flex-1 flex flex-col justify-between">
                     {patient.allergies.severe.length === 0 &&
                       patient.allergies.mild.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
-                        Không khai báo dị ứng.
+                        Không ghi nhận tiền sử dị ứng thực phẩm.
                       </p>
                     ) : (
                       <>
-                        <ul className="list-disc list-inside space-y-1.5 font-body text-body text-on-surface-variant text-xs mb-3 font-medium">
+                        <ul className="list-disc list-inside space-y-1 text-on-surface-variant text-xs mb-2 font-medium">
                           {patient.allergies.mild.map((item, idx) => (
                             <li key={idx}>{item}</li>
                           ))}
                         </ul>
-                        <div className="pt-3 border-t border-outline-variant/30">
-                          <p className="font-label text-label text-on-surface-variant mb-1.5 text-[11px] uppercase tracking-wider font-semibold">
-                            Nghiêm trọng:
+                        <div className="pt-2.5 border-t border-outline-variant/30">
+                          <p className="text-rose-900 mb-1.5 text-[10px] uppercase tracking-wider font-black">
+                            Cần tránh tuyệt đối:
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {(showAllAllergies
@@ -817,8 +827,9 @@ export default function PatientDetailPage() {
                             ).map((item, idx) => (
                               <span
                                 key={idx}
-                                className="inline-block bg-rose-50 text-rose-800 px-3 py-1 rounded-full font-body-bold text-body-bold border border-rose-200 text-xs font-bold"
+                                className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 px-2.5 py-0.5 rounded-md border border-rose-200 text-xs font-bold"
                               >
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                                 {item}
                               </span>
                             ))}
@@ -827,7 +838,7 @@ export default function PatientDetailPage() {
                             <button
                               type="button"
                               onClick={() => setShowAllAllergies((v) => !v)}
-                              className="mt-3 text-primary hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              className="mt-2.5 text-primary hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-[14px]">
                                 {showAllAllergies ? "expand_less" : "expand_more"}
@@ -845,44 +856,44 @@ export default function PatientDetailPage() {
               </div>
 
               {/* Card 3: Treatment Goals */}
-              <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle flex flex-col overflow-hidden">
-                <div className="p-5 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/30">
-                  <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-2 font-bold text-sm">
-                    <span className="material-symbols-outlined text-primary text-[20px]">
+              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
+                  <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                    <span className="material-symbols-outlined text-primary text-[18px]">
                       flag
                     </span>
-                    Mục tiêu điều trị & Dinh dưỡng
+                    <span>Mục tiêu điều trị &amp; Dinh dưỡng</span>
                   </h4>
                   <button
                     onClick={() => setIsEditingGoals(!isEditingGoals)}
                     disabled={savingGoals}
-                    className="text-primary hover:text-primary/80 transition-colors text-xs font-body-bold flex items-center gap-1 cursor-pointer disabled:opacity-60 font-bold"
+                    className="text-primary hover:text-primary/80 transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-60"
                   >
-                    <span className="material-symbols-outlined text-[18px]">
+                    <span className="material-symbols-outlined text-[16px]">
                       {isEditingGoals ? "check_circle" : "edit_note"}
                     </span>
-                    {isEditingGoals ? "Xong" : "Quản lý mục tiêu"}
+                    {isEditingGoals ? "Hoàn tất" : "Quản lý mục tiêu"}
                   </button>
                 </div>
 
-                <div className="p-5 flex-1 space-y-4">
-                  <div className="bg-surface-container-low/40 border border-outline-variant/40 rounded-xl p-4 min-h-[120px]">
+                <div className="p-4 flex-1 space-y-4">
+                  <div className="bg-surface-container-low/30 border border-outline-variant/40 rounded-lg p-4 min-h-[100px]">
                     {goals.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
-                        Chưa có mục tiêu điều trị.
+                        Chưa thiết lập mục tiêu điều trị cụ thể.
                       </p>
                     ) : (
-                      <ul className="space-y-2 font-body text-body text-on-surface">
+                      <ul className="space-y-2 text-on-surface">
                         {goals.map((goal, idx) => (
                           <li
                             key={idx}
                             className="flex items-center justify-between group"
                           >
                             <div className="flex items-start gap-2">
-                              <span className="material-symbols-outlined text-primary text-[16px] mt-0.5">
+                              <span className="material-symbols-outlined text-primary text-[15px] mt-0.5">
                                 check_circle
                               </span>
-                              <span className="text-xs font-semibold">{goal}</span>
+                              <span className="text-xs font-bold">{goal}</span>
                             </div>
                             {isEditingGoals && (
                               <button
@@ -891,7 +902,7 @@ export default function PatientDetailPage() {
                                 className="text-rose-600 hover:text-rose-700 transition-colors p-1 rounded-lg hover:bg-rose-50 cursor-pointer disabled:opacity-60"
                                 title="Xóa mục tiêu"
                               >
-                                <span className="material-symbols-outlined text-[16px]">
+                                <span className="material-symbols-outlined text-[15px]">
                                   delete
                                 </span>
                               </button>
@@ -903,7 +914,7 @@ export default function PatientDetailPage() {
 
                     {/* Add New Goal Form */}
                     {isEditingGoals && (
-                      <div className="mt-4 pt-4 border-t border-outline-variant/40 flex gap-2">
+                      <div className="mt-3 pt-3 border-t border-outline-variant/40 flex gap-2">
                         <input
                           type="text"
                           value={newGoalInput}
@@ -911,14 +922,14 @@ export default function PatientDetailPage() {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") void handleAddGoal();
                           }}
-                          placeholder="Nhập mục tiêu mới..."
+                          placeholder="Nhập mục tiêu dinh dưỡng/điều trị mới..."
                           disabled={savingGoals}
-                          className="flex-1 px-3.5 py-2 bg-surface-container-lowest border border-outline-variant/60 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                          className="flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant/60 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
                         />
                         <button
                           onClick={() => void handleAddGoal()}
                           disabled={savingGoals || !newGoalInput.trim()}
-                          className="bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer disabled:opacity-60 active:scale-95"
+                          className="bg-primary text-on-primary px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer disabled:opacity-60 active:scale-95"
                         >
                           {savingGoals ? "Đang lưu..." : "Thêm"}
                         </button>
@@ -929,14 +940,14 @@ export default function PatientDetailPage() {
                   {/* Dinh dưỡng & Sở thích */}
                   {patient.preferences.length > 0 && (
                     <div className="pt-2 border-t border-outline-variant/30">
-                      <p className="font-label text-label text-on-surface-variant mb-2 text-[11px] uppercase tracking-wider font-semibold">
-                        Dinh dưỡng & Sở thích
+                      <p className="text-on-surface-variant mb-2 text-[10px] uppercase tracking-wider font-bold">
+                        Sở thích &amp; Thói quen ăn uống
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {patient.preferences.map((pref, idx) => (
                           <span
                             key={idx}
-                            className="inline-block bg-primary/10 text-primary px-3 py-1 rounded-full font-body-bold text-body-bold border border-primary/20 text-xs font-semibold"
+                            className="inline-block bg-primary/10 text-primary px-2.5 py-0.5 rounded-md border border-primary/20 text-xs font-semibold"
                           >
                             {pref}
                           </span>
@@ -948,30 +959,30 @@ export default function PatientDetailPage() {
               </div>
 
               {/* Card 4: Lịch sử thực đơn (Tóm tắt) */}
-              <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle flex flex-col overflow-hidden">
-                <div className="p-5 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/30">
-                  <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-2 font-bold text-sm">
-                    <span className="material-symbols-outlined text-primary text-[20px]">
+              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
+                  <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                    <span className="material-symbols-outlined text-primary text-[18px]">
                       history
                     </span>
-                    Lịch sử thực đơn gần đây
+                    <span>Thực đơn &amp; Lịch trình gần đây</span>
                   </h4>
                   <Link
                     href={`/doctor/patients/${patientId}/history`}
-                    className="text-primary hover:text-primary/80 transition-colors text-xs font-body-bold flex items-center gap-1 cursor-pointer font-bold"
+                    className="text-primary hover:text-primary/80 transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    <span>Xem lịch sử theo tuần</span>
-                    <span className="material-symbols-outlined text-[16px]">
+                    <span>Lưới 3 tuần</span>
+                    <span className="material-symbols-outlined text-[15px]">
                       arrow_forward
                     </span>
                   </Link>
                 </div>
 
-                <div className="p-5 space-y-4">
+                <div className="p-4 space-y-4">
                   {summary && summary.active_plan_id && activePlanUsage === "active" ? (
-                    <div className="bg-surface-container-low/40 border border-outline-variant/40 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                    <div className="bg-emerald-500/[0.06] border border-emerald-500/20 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                       <div>
-                        <p className="text-xs font-bold text-on-surface">
+                        <p className="text-xs font-bold text-emerald-950">
                           Thực đơn đang áp dụng
                         </p>
                         <p className="text-[11px] text-on-surface-variant mt-0.5 font-medium">
@@ -983,9 +994,10 @@ export default function PatientDetailPage() {
                         {activePlan && (
                           <Link
                             href={`/doctor/reviews/${patientId}/${activePlan.id}`}
-                            className="text-[11px] text-primary font-bold hover:underline mt-1 inline-block"
+                            className="text-xs text-primary font-bold hover:underline mt-1 inline-flex items-center gap-1"
                           >
-                            Xem nội dung
+                            <span>Xem chi tiết thực đơn</span>
+                            <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                           </Link>
                         )}
                       </div>
@@ -999,16 +1011,16 @@ export default function PatientDetailPage() {
                     </div>
                   ) : (
                     <p className="text-xs text-on-surface-variant italic">
-                      Chưa có thực đơn đang áp dụng.
+                      Chưa có thực đơn đang áp dụng trong chu kỳ này.
                     </p>
                   )}
 
-                  <div className="space-y-2.5">
-                    <h5 className="font-label text-label text-on-surface font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-primary">
+                  <div className="space-y-2">
+                    <h5 className="text-on-surface font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[15px] text-primary">
                         menu_book
                       </span>
-                      Thực đơn gần đây ({recentPlans.length})
+                      <span>Danh sách thực đơn gần nhất ({recentPlans.length})</span>
                     </h5>
 
                     {recentPlans.length === 0 ? (
@@ -1021,30 +1033,30 @@ export default function PatientDetailPage() {
                           <Link
                             key={plan.id}
                             href={`/doctor/reviews/${patientId}/${plan.id}`}
-                            className="bg-surface-container-low/30 border border-outline-variant/40 hover:border-primary/50 transition-all rounded-xl p-3 flex items-center justify-between gap-3 text-xs group cursor-pointer block shadow-2xs"
+                            className="bg-surface-container-low/30 border border-outline-variant/40 hover:border-primary/50 transition-all rounded-lg p-3 flex items-center justify-between gap-3 text-xs group cursor-pointer block shadow-2xs"
                           >
                             <div className="min-w-0 flex-1">
                               <p className="font-bold text-on-surface group-hover:text-primary transition-colors truncate text-xs">
                                 {plan.planTitle}
                               </p>
-                              <p className="text-on-surface-variant font-caption text-[11px] mt-0.5">
+                              <p className="text-on-surface-variant text-[11px] mt-0.5 font-mono">
                                 Khởi tạo: {plan.createdAt}
                               </p>
                             </div>
 
                             <div>
                               {plan.status === "approved" && (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-900 border border-emerald-500/20">
                                   Đã duyệt
                                 </span>
                               )}
                               {plan.status === "rejected" && (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
                                   Đã từ chối
                                 </span>
                               )}
                               {plan.status === "pending" && (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20">
                                   Chờ duyệt
                                 </span>
                               )}
@@ -1056,16 +1068,15 @@ export default function PatientDetailPage() {
                   </div>
                 </div>
 
-                <div className="px-5 py-3 bg-surface-container-low/40 border-t border-outline-variant/40 flex justify-end">
+                <div className="px-4 py-2.5 bg-surface-container-low/40 border-t border-outline-variant/40 flex justify-end">
                   <Link
                     href={`/doctor/patients/${patientId}/history`}
                     className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
                   >
                     <span>
-                      Xem lịch sử theo tuần ({reviewedPlans.length} thực đơn đã duyệt,{" "}
-                      {plans.length} tổng)
+                      Xem toàn bộ lịch trình ({reviewedPlans.length} thực đơn đã duyệt)
                     </span>
-                    <span className="material-symbols-outlined text-[16px]">
+                    <span className="material-symbols-outlined text-[15px]">
                       arrow_forward
                     </span>
                   </Link>
@@ -1079,7 +1090,7 @@ export default function PatientDetailPage() {
       {/* Modal: Chỉnh sửa hồ sơ bệnh nhân */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/40 backdrop-blur-xs">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md shrink-0">
               <div className="flex items-center gap-sm">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -1487,7 +1498,7 @@ export default function PatientDetailPage() {
               </section>
 
               {editError && (
-                <div className="rounded-xl border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
+                <div className="rounded-lg border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
                   {editError}
                 </div>
               )}
@@ -1524,9 +1535,9 @@ export default function PatientDetailPage() {
       {/* DELETE PATIENT CONFIRMATION MODAL */}
       {isDeleteModalOpen && patient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">
             <div className="flex items-center gap-3 text-rose-600 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-[24px]">person_remove</span>
               </div>
               <div>
@@ -1536,7 +1547,7 @@ export default function PatientDetailPage() {
             </div>
             <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
               Bạn có chắc chắn muốn xóa hồ sơ bệnh nhân{" "}
-              <strong className="text-on-surface">{patient.name}</strong>? 
+              <strong className="text-on-surface">{patient.name}</strong>?
               <br />
               <span className="text-xs text-rose-600 font-semibold mt-1 block">
                 ⚠️ Toàn bộ thực đơn, nhật ký bữa ăn, chỉ số sức khỏe và tin nhắn của bệnh nhân này sẽ bị xóa vĩnh viễn khỏi hệ thống.
@@ -1547,7 +1558,7 @@ export default function PatientDetailPage() {
                 type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
                 disabled={isDeletingPatient}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
@@ -1555,7 +1566,7 @@ export default function PatientDetailPage() {
                 type="button"
                 onClick={() => void handleDeletePatient()}
                 disabled={isDeletingPatient}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">
                   {isDeletingPatient ? "hourglass_empty" : "delete_forever"}

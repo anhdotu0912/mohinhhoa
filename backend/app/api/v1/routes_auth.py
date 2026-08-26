@@ -15,6 +15,8 @@ from app.db.session import get_db
 from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -188,6 +190,33 @@ def reset_password(
     db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
     db.commit()
     return ResetPasswordResponse(message="Đặt lại mật khẩu thành công.")
+
+
+@router.post("/change-password", response_model=ChangePasswordResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ChangePasswordResponse:
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit("change_password", user.email, client_ip)
+
+    if not verify_password(payload.current_password, user.hashed_password):
+        record_failed_attempt("change_password", user.email, client_ip)
+        raise APIError(401, "INVALID_CREDENTIALS", "Mật khẩu hiện tại không đúng.")
+
+    if payload.current_password == payload.new_password:
+        raise APIError(
+            400,
+            "SAME_PASSWORD",
+            "Mật khẩu mới phải khác mật khẩu hiện tại.",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    clear_attempts("change_password", user.email, client_ip)
+    return ChangePasswordResponse(message="Đổi mật khẩu thành công.")
 
 
 @router.get("/me", response_model=UserMeResponse)

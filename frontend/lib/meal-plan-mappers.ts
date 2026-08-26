@@ -254,20 +254,21 @@ export function setDayWarnings(
   };
 }
 
-export type MealSlotKey = "breakfast" | "lunch" | "dinner";
+export type MealSlotKey = "breakfast" | "lunch" | "dinner" | "snack";
 
-/** Tỉ lệ kcal gợi ý theo bữa chính — khớp BE meal planner (snack ~10% riêng). */
+/** Tỉ lệ kcal gợi ý theo bữa — khớp BE meal planner. */
 export const MEAL_KCAL_SHARES: Record<MealSlotKey, number> = {
   breakfast: 0.25,
   lunch: 0.35,
   dinner: 0.30,
+  snack: 0.10,
 };
 
 export type NutritionWarningSlots = {
   breakfast: MealDishItem[];
   lunch: MealDishItem[];
   dinner: MealDishItem[];
-  snack?: MealDishItem[];
+  snack: MealDishItem[];
 };
 
 export type KcalBand = { target: number; lower: number; upper: number };
@@ -296,6 +297,7 @@ export type StructuredNutritionWarnings = {
   breakfast: string[];
   lunch: string[];
   dinner: string[];
+  snack: string[];
 };
 
 export type NutritionWarningBundle = {
@@ -304,13 +306,13 @@ export type NutritionWarningBundle = {
 };
 
 function emptyStructuredWarnings(): StructuredNutritionWarnings {
-  return { day: [], breakfast: [], lunch: [], dinner: [] };
+  return { day: [], breakfast: [], lunch: [], dinner: [], snack: [] };
 }
 
 export function flattenStructuredWarnings(
   w: StructuredNutritionWarnings
 ): string[] {
-  return [...w.day, ...w.breakfast, ...w.lunch, ...w.dinner];
+  return [...w.day, ...w.breakfast, ...w.lunch, ...w.dinner, ...w.snack];
 }
 
 export function countStructuredWarnings(w: StructuredNutritionWarnings): number {
@@ -333,7 +335,7 @@ function allSlotKcal(slots: NutritionWarningSlots): number {
     slotCalories(slots.breakfast) +
       slotCalories(slots.lunch) +
       slotCalories(slots.dinner) +
-      slotCalories(slots.snack || [])
+      slotCalories(slots.snack)
   );
 }
 
@@ -342,7 +344,7 @@ function allSlotSodiumMg(slots: NutritionWarningSlots): number {
     slotSodiumMg(slots.breakfast) +
     slotSodiumMg(slots.lunch) +
     slotSodiumMg(slots.dinner) +
-    slotSodiumMg(slots.snack || [])
+    slotSodiumMg(slots.snack)
   );
 }
 
@@ -350,10 +352,12 @@ export function partitionMealWarnings(warnings: string[]): {
   breakfast: string[];
   lunch: string[];
   dinner: string[];
+  snack: string[];
 } {
   const breakfast: string[] = [];
   const lunch: string[] = [];
   const dinner: string[] = [];
+  const snack: string[] = [];
   for (const w of warnings) {
     const lower = w.toLowerCase();
     if (lower.includes("bữa sáng") || lower.includes("breakfast")) {
@@ -362,10 +366,12 @@ export function partitionMealWarnings(warnings: string[]): {
       lunch.push(w);
     } else if (lower.includes("bữa tối") || lower.includes("dinner")) {
       dinner.push(w);
+    } else if (lower.includes("bữa phụ") || lower.includes("snack")) {
+      snack.push(w);
     }
     // Cảnh báo toàn ngày không gắn vào từng bữa
   }
-  return { breakfast, lunch, dinner };
+  return { breakfast, lunch, dinner, snack };
 }
 
 export function countPlanWarnings(plan: MealPlanOutput): number {
@@ -441,6 +447,7 @@ export function computeNutritionWarningBundle(
     { key: "breakfast", label: "Bữa sáng", items: slots.breakfast },
     { key: "lunch", label: "Bữa trưa", items: slots.lunch },
     { key: "dinner", label: "Bữa tối", items: slots.dinner },
+    { key: "snack", label: "Bữa phụ", items: slots.snack },
   ];
 
   for (const { key, label, items } of slotMeta) {

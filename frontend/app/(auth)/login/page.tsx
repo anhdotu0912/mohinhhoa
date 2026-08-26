@@ -51,6 +51,10 @@ export default function LoginPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 8) {
+      setError("Mật khẩu tối thiểu 8 ký tự.");
+      return;
+    }
     void completeLogin(email, password);
   };
 
@@ -91,10 +95,13 @@ export default function LoginPage() {
             <input
               type="password"
               required
+              minLength={8}
+              maxLength={128}
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              title="Mật khẩu tối thiểu 8 ký tự"
               className="w-full px-md py-sm bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
             />
           </div>
@@ -108,7 +115,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-on-primary hover:bg-primary-container font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-primary text-on-primary hover:bg-primary/90 font-body-bold rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95 cursor-pointer mt-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useQueueStore, type GenerationJob } from "@/lib/queue-store";
-import { buildReviewHref, saveSlotIntent } from "@/lib/plan-slot-intent";
+import { buildReviewHref } from "@/lib/plan-slot-intent";
 
 const PIPELINE_NODES = [
   { title: "Phân tích hồ sơ", desc: "Tải BMI, dị ứng & mục tiêu" },
@@ -225,10 +225,7 @@ export function GenerationProgressPanel({
           )}
           {isDone && planId && (
             <Link
-              href={buildReviewHref(job.patientId, planId, job.slotIntent)}
-              onClick={() => {
-                if (job.slotIntent) saveSlotIntent(job.slotIntent);
-              }}
+              href={buildReviewHref(job.patientId, planId)}
               className="bg-emerald-700 text-white font-body-bold px-lg py-sm rounded-lg hover:bg-emerald-800 transition-colors text-xs font-bold flex items-center gap-xs shadow-xs"
             >
               <span>Xem thực đơn & món thay thế</span>

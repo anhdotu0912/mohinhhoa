@@ -10,7 +10,7 @@ import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import type { DoctorPatientSummary } from "@/lib/types";
 import { shortCondition } from "@/lib/format";
-import { buildReviewHref, saveSlotIntent } from "@/lib/plan-slot-intent";
+import { buildReviewHref } from "@/lib/plan-slot-intent";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -111,26 +111,26 @@ export default function QueuePage() {
     <>
       <TopBar title="Hàng đợi tạo thực đơn AI" />
 
-      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {/* Back link */}
         <div>
           <Link
             href="/doctor/patients"
-            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline cursor-pointer px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Quay lại Danh sách bệnh nhân
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            <span>Danh sách bệnh nhân</span>
           </Link>
         </div>
 
         {/* Page Title & Action */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="font-h1 text-h1 text-on-surface font-bold text-xl md:text-2xl">
-              Quản lý hàng đợi sinh thực đơn AI
+            <h2 className="text-on-surface font-black text-2xl tracking-tight">
+              Quản lý Hàng đợi Sinh Thực đơn AI
             </h2>
-            <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs font-medium">
-              Theo dõi tiến trình sinh thực đơn tự động theo cơ chế hàng đợi tuần tự (FIFO)
+            <p className="text-on-surface-variant mt-1 text-xs font-medium">
+              Theo dõi tiến trình sinh thực đơn tự động đa bước (RAG → Prompting → LLM → HITL Guardrails)
             </p>
           </div>
 
@@ -140,16 +140,75 @@ export default function QueuePage() {
               className="px-4 py-2 bg-surface-container-lowest border border-outline-variant/60 hover:border-rose-300 hover:bg-rose-50 text-on-surface-variant hover:text-rose-700 font-bold rounded-xl transition-all text-xs cursor-pointer active:scale-95 shadow-2xs shrink-0 flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
-              <span>Xoá các job đã hoàn tất/lỗi ({completedCount + failedCount})</span>
+              <span>Dọn dẹp job đã xong/lỗi ({completedCount + failedCount})</span>
             </button>
           )}
         </div>
 
+        {/* 4 Status KPI Counters */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">queue</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                Tổng số Job
+              </span>
+              <span className="text-xl font-black text-on-surface tabular-nums">
+                {jobs.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                Đang xử lý / Chờ
+              </span>
+              <span className="text-xl font-black text-sky-900 tabular-nums">
+                {activeCount}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">check_circle</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                Hoàn tất
+              </span>
+              <span className="text-xl font-black text-emerald-900 tabular-nums">
+                {completedCount}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">error</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block">
+                Lỗi cần thử lại
+              </span>
+              <span className="text-xl font-black text-rose-900 tabular-nums">
+                {failedCount}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "all"
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "all"
               ? "bg-primary text-on-primary"
               : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60 hover:bg-surface-container-low"
               }`}
@@ -158,7 +217,7 @@ export default function QueuePage() {
           </button>
           <button
             onClick={() => setStatusFilter("active")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "active"
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "active"
               ? "bg-primary text-on-primary"
               : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60 hover:bg-surface-container-low"
               }`}
@@ -167,7 +226,7 @@ export default function QueuePage() {
           </button>
           <button
             onClick={() => setStatusFilter("completed")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "completed"
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "completed"
               ? "bg-primary text-on-primary"
               : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60 hover:bg-surface-container-low"
               }`}
@@ -176,7 +235,7 @@ export default function QueuePage() {
           </button>
           <button
             onClick={() => setStatusFilter("failed")}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "failed"
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${statusFilter === "failed"
               ? "bg-primary text-on-primary"
               : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60 hover:bg-surface-container-low"
               }`}
@@ -186,53 +245,53 @@ export default function QueuePage() {
         </div>
 
         {/* Queue Table */}
-        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs overflow-hidden">
           {filteredJobs.length === 0 ? (
-            <div className="p-12 text-center text-on-surface-variant">
+            <div className="p-16 text-center text-on-surface-variant">
               <span className="material-symbols-outlined text-[48px] text-outline-variant mb-2">
                 queue_play_next
               </span>
               <p className="font-bold text-on-surface text-sm">Không có công việc nào trong hàng đợi</p>
-              <p className="font-caption text-caption text-xs mt-1">
+              <p className="text-xs mt-1 text-on-surface-variant">
                 Bạn có thể thêm bệnh nhân vào hàng đợi tại trang Danh sách bệnh nhân.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[860px]">
                 <thead>
                   <tr className="bg-surface-container-low/60 border-b border-outline-variant/40">
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px]">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
                       Bệnh nhân
                     </th>
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px]">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
                       Mã BN
                     </th>
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px]">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
                       Thời gian tạo
                     </th>
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px]">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
                       Trạng thái
                     </th>
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px]">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">
                       Chi tiết / Kết quả
                     </th>
-                    <th className="p-4 font-bold text-on-surface-variant uppercase tracking-wider text-[11px] text-right">
+                    <th className="px-5 py-3.5 font-bold text-on-surface-variant uppercase tracking-wider text-[10px] text-right">
                       Thao tác
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
+                <tbody className="divide-y divide-outline-variant/30">
                   {filteredJobs.map((job) => (
                     <tr
                       key={job.id}
                       className="hover:bg-surface-container-low/40 transition-colors"
                     >
-                      <td className="p-4">
+                      <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="relative w-10 h-10 shrink-0">
+                          <div className="relative w-9 h-9 shrink-0 overflow-hidden rounded-full">
                             <div
-                              className={`w-10 h-10 rounded-full border flex items-center justify-center text-xs font-bold ring-2 ring-primary/20 ${getAvatarColor(
+                              className={`w-9 h-9 rounded-full border flex items-center justify-center text-xs font-bold ring-1 ring-primary/20 ${getAvatarColor(
                                 job.patientName
                               )}`}
                             >
@@ -242,7 +301,7 @@ export default function QueuePage() {
                               <img
                                 src={getPatientAvatar(job.patientId, job.patientAvatar)}
                                 alt={job.patientName}
-                                className="absolute inset-0 w-10 h-10 rounded-full object-cover ring-2 ring-outline-variant/40 bg-surface-container"
+                                className="absolute inset-0 w-full h-full rounded-full object-cover ring-1 ring-outline-variant/40 bg-surface-container"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                 }}
@@ -250,7 +309,7 @@ export default function QueuePage() {
                             ) : null}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-on-surface text-xs truncate">
+                            <p className="font-bold text-on-surface text-sm truncate">
                               {job.patientName}
                             </p>
                             {getPatientCondition(job.patientId, job.patientCondition) && (
@@ -275,13 +334,13 @@ export default function QueuePage() {
                       </td>
                       <td className="p-4">
                         {job.status === "queued" && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
                             <span className="w-2 h-2 rounded-full bg-gray-400"></span>
                             Đang chờ
                           </span>
                         )}
                         {job.status === "processing" && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 animate-pulse">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 animate-pulse">
                             <span className="material-symbols-outlined text-[14px] animate-spin">
                               progress_activity
                             </span>
@@ -289,7 +348,7 @@ export default function QueuePage() {
                           </span>
                         )}
                         {job.status === "completed" && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <span className="material-symbols-outlined text-[14px]">
                               check_circle
                             </span>
@@ -297,7 +356,7 @@ export default function QueuePage() {
                           </span>
                         )}
                         {job.status === "failed" && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                             <span className="material-symbols-outlined text-[14px]">
                               error
                             </span>
@@ -340,7 +399,7 @@ export default function QueuePage() {
                                 `/doctor/patients/queue/${encodeURIComponent(job.id)}`
                               )
                             }
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl transition-all text-xs cursor-pointer active:scale-95 shadow-2xs"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg transition-all text-xs cursor-pointer active:scale-95 shadow-2xs"
                           >
                             <span className="material-symbols-outlined text-[16px] leading-none">
                               account_tree
@@ -358,7 +417,7 @@ export default function QueuePage() {
                                   `/doctor/patients/queue/${encodeURIComponent(job.id)}`
                                 )
                               }
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-outline-variant/60 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-semibold rounded-xl transition-all text-xs cursor-pointer shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-outline-variant/60 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-semibold rounded-lg transition-all text-xs cursor-pointer shadow-2xs"
                             >
                               <span className="material-symbols-outlined text-[16px] leading-none">
                                 account_tree
@@ -368,19 +427,14 @@ export default function QueuePage() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (job.slotIntent) saveSlotIntent(job.slotIntent);
                                 const planId = job.planIds?.[0];
                                 router.push(
                                   planId
-                                    ? buildReviewHref(
-                                        job.patientId,
-                                        planId,
-                                        job.slotIntent
-                                      )
+                                    ? buildReviewHref(job.patientId, planId)
                                     : `/doctor/patients/${job.patientId}/meals`
                                 );
                               }}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold rounded-xl transition-all text-xs cursor-pointer active:scale-95 shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold rounded-lg transition-all text-xs cursor-pointer active:scale-95 shadow-2xs"
                             >
                               So sánh &amp; Duyệt
                               <span className="material-symbols-outlined text-[16px] leading-none">
@@ -399,7 +453,7 @@ export default function QueuePage() {
                                   `/doctor/patients/queue/${encodeURIComponent(job.id)}`
                                 )
                               }
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-outline-variant/60 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-semibold rounded-xl transition-all text-xs cursor-pointer shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-outline-variant/60 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-semibold rounded-lg transition-all text-xs cursor-pointer shadow-2xs"
                             >
                               <span className="material-symbols-outlined text-[16px] leading-none">
                                 account_tree
@@ -409,7 +463,7 @@ export default function QueuePage() {
                             <button
                               type="button"
                               onClick={() => retryJob(job.id)}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-bold rounded-xl transition-all text-xs cursor-pointer shadow-2xs"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-bold rounded-lg transition-all text-xs cursor-pointer shadow-2xs"
                             >
                               <span className="material-symbols-outlined text-[16px] leading-none">
                                 refresh

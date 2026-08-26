@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.8 (2026-08-24 — Food Log/`GET /compliance*` dùng ngày lịch Asia/Ho_Chi_Minh; `logged_at` timezone-aware. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.13 (2026-08-27 — `POST /auth/change-password`. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -74,6 +74,18 @@ Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định
 // Error 400 { "code": "INVALID_OR_EXPIRED_TOKEN", "detail": "Token không hợp lệ hoặc đã hết hạn." }
 ```
 
+### `POST /auth/change-password` (as-built 2026-08-27)
+**Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`). Đổi mật khẩu khi biết mật khẩu hiện tại — khác luồng quên mật khẩu. Bệnh nhân dùng form trên `/patient/profile`.
+```json
+// Request
+{ "current_password": "matkhau123", "new_password": "matkhaumoi123" }
+// Response 200
+{ "message": "Đổi mật khẩu thành công." }
+// Error 401 { "code": "INVALID_CREDENTIALS", "detail": "Mật khẩu hiện tại không đúng." }
+// Error 400 { "code": "SAME_PASSWORD", "detail": "Mật khẩu mới phải khác mật khẩu hiện tại." }
+```
+`new_password` tối thiểu 8 ký tự (422 nếu thiếu). Rate-limit 5 lần thử sai / 15 phút theo `email`+IP → `429 TOO_MANY_ATTEMPTS`. JWT hiện tại vẫn còn hạn đến `exp` (prototype không thu hồi session).
+
 **Rate-limit `POST /auth/login` (as-built 2026-08-18):** giới hạn 5 lần thử sai / 15 phút theo `email`+IP → `429 TOO_MANY_ATTEMPTS`.
 
 ---
@@ -132,7 +144,11 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 ## 4. Meal Plans
 
 ### `POST /meal-plans/generate`
-**Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`. **Không** materialize `meal_reminder`/`adherence_checkin` tại thời điểm này — các nhắc nhở chỉ được tạo khi doctor `approve` (xem §9 side-effect `approve`).
+**Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`. **Không** materialize `meal_reminder`/`adherence_checkin` tại thời điểm này — các nhắc nhở chỉ được tạo khi doctor `apply` (xem §9).
+```json
+// Error 409 { "code": "PLAN_ALREADY_PENDING" | "PLAN_UNASSIGNED_APPROVED" }
+```
+**Giới hạn cứng (2026-08-27):** tối đa 1 plan `pending_review` và 1 plan `approved|edited` chưa có `starts_on` / mỗi bệnh nhân — phải duyệt/áp dụng/xóa trước khi tạo mới.
 ```json
 // Request (optional body)
 { "notes": "Bệnh nhân thích ăn cá", "priorities": ["giảm natri"] }
@@ -455,14 +471,20 @@ GET /notifications?status=pending&type=meal_reminder
 ### `POST /doctor/meal-plans/{meal_plan_id}/apply`
 **Role:** `doctor`. Gán cửa sổ áp dụng 7 ngày cho plan đã `approved|edited`. Generate **không** nhận ngày.
 ```json
-// Request
+// Request (preferred — apply_mode resolves start_date server-side)
+{ "apply_mode": "from_today" }
+{ "apply_mode": "after_current" }
+// Legacy request
 { "start_date": "2026-08-16", "replace_active": true, "slot_key": "current" }
-// slot_key optional: "current" | "next" | "empty" — when set, start_date must match that slot (empty = bất kỳ tuần trống đang add được, không chỉ tuần empty đầu tiên)
+// apply_mode: "from_today" → start_date=today; replace_active=true nếu đang có plan active (cắt ends_on cũ = hôm qua)
+// apply_mode: "after_current" → start_date = ends_on xa nhất (active/upcoming) + 1; 400 NO_CHAIN_PLAN nếu chưa có plan applied
+// slot_key optional (legacy): "current" | "next" | "empty" — when set with start_date, start_date must match that slot
 // Response 200 → MealPlanOutput (starts_on, ends_on, days[].date đã stamp)
-// Error 400 { "code": "PLAN_NOT_APPLYABLE" | "START_DATE_IN_PAST" | "INVALID_REPLACE_DATE" | "INVALID_SLOT_START" }
-// Error 409 { "code": "PLAN_DATE_OVERLAP" }
+// Error 400 { "code": "PLAN_NOT_APPLYABLE" | "START_DATE_IN_PAST" | "INVALID_REPLACE_DATE" | "INVALID_SLOT_START" | "NO_CHAIN_PLAN" | "APPLY_PARAMS_REQUIRED" }
+// Error 409 { "code": "PLAN_DATE_OVERLAP" | "UPCOMING_EXISTS" }
 ```
-**Side-effect:** materialize `meal_reminder`/`adherence_checkin` theo `start_date` (bỏ qua slot đã qua). `replace_active: true` cắt `ends_on` plan active cũ = `start_date - 1`.
+**Giới hạn cứng:** `after_current` bị chặn (`409 UPCOMING_EXISTS`) khi đã có plan upcoming khác.
+**Side-effect:** materialize `meal_reminder`/`adherence_checkin` theo `start_date` (bỏ qua slot đã qua). `replace_active: true` (hoặc `from_today` khi có active) cắt `ends_on` plan active cũ = `start_date - 1`.
 
 ### `POST /doctor/demo/plan-expiry`
 **Role:** `doctor`. Demo-only — dịch `starts_on`/`ends_on` của plan active (hoặc approved mới nhất) để giả lập expiring/expired trên `GET /doctor/patients`.
@@ -707,7 +729,7 @@ Theo `adrs/009-food-log-scope-strategy.md`, `specs/09-food-log-adherence.md`.
 // Response 200 → FoodLogEntry (xem contracts/agent-io-schema.md §3)
 // Error 422 — custom thiếu note
 ```
-`slot` ∈ `"morning" | "noon" | "evening"`. Custom log khớp KB tương tác → tạo `Alert` + `alert_ids[]`.
+`slot` ∈ `"morning" | "noon" | "evening" | "snack"`. Custom log khớp KB tương tác → tạo `Alert` + `alert_ids[]`.
 
 **Một user / một ngày lịch Asia/Ho_Chi_Minh / một slot = một log** (upsert): lần ghi sau trong cùng ngày VN + cùng slot cập nhật row hiện có (giữ `id`), không tạo bản ghi trùng. `logged_at` trên response là ISO-8601 timezone-aware (UTC `Z` hoặc offset). Timestamp naive trong DB được coi là UTC.
 
@@ -798,7 +820,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `AgentRunOutput.secondary_intents[]` | cùng enum intent phía trên, dạng mảng | As-built, đáp ứng multi-intent (`intent_classifier.py`) |
 | `FoodLogEntry.type` | `as_planned` \| `custom` | `schemas/food_log.py` |
 | `FoodLogEntry.status` | `logged` \| `adjusted` | `adrs/009-food-log-scope-strategy.md` |
-| `FoodLogEntry.slot` | `morning` \| `noon` \| `evening` | ADR-009, khớp UI 3-slot |
+| `FoodLogEntry.slot` | `morning` \| `noon` \| `evening` \| `snack` | ADR-009 (supersede 2026-08-27), 4 slot |
 | `BodyMetricsEntry.recorded_by` | `patient` \| `doctor` | `models/body_metrics.py` |
 | `PatientProfile.constraints_status` | `confirmed` \| `pending_doctor_review` | As-built, `specs/04-clinical-constraints.md` |
 | `MealPlanRequestOut.status` / `DoctorPatientSummary.meal_plan_request_status` | `none` \| `pending` | `profiles` table, as-built 2026-08-24 |
@@ -807,7 +829,9 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.11**.
+- Version hiện tại: **1.13**.
+- **Changelog 1.12 → 1.13 (2026-08-27):** thêm `POST /auth/change-password` (user đã đăng nhập đổi mật khẩu bằng `current_password` + `new_password`). Không breaking — endpoint mới.
+- **Changelog 1.11 → 1.12 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"`. Không breaking — client cũ vẫn gửi 3 slot. Đồng bộ `contracts/agent-io-schema.md` v1.9.
 - **Changelog 1.10 → 1.11 (2026-08-26):** `POST /metrics` nhận field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); response thêm `delta_advice` optional. Intent chat `metrics_delta_advice`. Không breaking — field mới default `null`. Đồng bộ `contracts/agent-io-schema.md` v1.8.
 - **Changelog 1.9 → 1.10 (2026-08-24):** thêm `POST /meal-plans/request` + `GET /meal-plans/request` (patient yêu cầu bác sĩ tạo thực đơn, cờ trên `profiles`, không dùng bảng `notifications`); `DoctorPatientSummary` thêm `meal_plan_request_status`, `meal_plan_request_note`, `meal_plan_requested_at`; filter `GET /doctor/patients?meal_plan_request=pending`. Không breaking change (field mới optional/default).
 - **Changelog 1.8 → 1.9 (2026-08-24):** thêm `POST /auth/me/avatar` (user đã đăng nhập tự upload ảnh đại diện, cùng rule 2MB / png-jpg-webp-gif với endpoint doctor). Không breaking change.

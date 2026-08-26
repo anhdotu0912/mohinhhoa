@@ -13,7 +13,7 @@ from app.core.datetime_vn import assume_utc
 class FoodLogCreate(BaseModel):
     meal_plan_id: str | None = None
     day_index: int | None = None
-    slot: Literal["morning", "noon", "evening"]
+    slot: Literal["morning", "noon", "evening", "snack"]
     type: Literal["as_planned", "custom"]
     note: str = ""
 

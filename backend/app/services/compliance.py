@@ -24,7 +24,7 @@ CHECKIN_TITLE_LABELS = {
     "partial": "Check-in — Có sai lệch một phần",
     "no": "Check-in — Không theo thực đơn",
 }
-FOOD_LOG_SLOT_LABELS = {"morning": "sáng", "noon": "trưa", "evening": "tối"}
+FOOD_LOG_SLOT_LABELS = {"morning": "sáng", "noon": "trưa", "evening": "tối", "snack": "phụ"}
 
 
 class ComplianceService:

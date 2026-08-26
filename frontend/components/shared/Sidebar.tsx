@@ -52,8 +52,8 @@ function NavLinks({
             key={item.id}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-md px-md py-sm rounded-lg transition-all duration-200 cursor-pointer active:translate-x-1 ${isActive
-                ? "text-primary font-body-bold border-r-4 border-primary bg-primary-container/10 font-semibold"
+            className={`flex items-center gap-md px-md py-2.5 rounded-xl transition-all duration-200 cursor-pointer active:translate-x-0.5 ${isActive
+                ? "text-primary font-body-bold bg-primary/10 font-semibold shadow-2xs"
                 : "text-on-surface-variant font-body hover:text-primary hover:bg-surface-container-low"
               }`}
           >

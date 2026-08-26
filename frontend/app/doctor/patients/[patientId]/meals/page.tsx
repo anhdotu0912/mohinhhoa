@@ -167,91 +167,93 @@ export default function PatientMealPlansListPage() {
   }
 
   return (
-    <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-h1 text-xl font-bold text-on-surface">Thực đơn</h2>
-            <p className="text-xs text-on-surface-variant mt-0.5">
-              Duyệt, so sánh biến thể và tạo thực đơn AI cho bệnh nhân này
-            </p>
-          </div>
-          <Link
-            href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
-            className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs"
-          >
-            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-            Tạo thực đơn AI
-          </Link>
+    <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-on-surface font-black text-2xl tracking-tight">
+            Quản lý Thực đơn &amp; Biến thể AI
+          </h2>
+          <p className="text-on-surface-variant mt-1 text-xs font-medium">
+            Xem lại các phương án thực đơn đã sinh, so sánh chỉ số dinh dưỡng và duyệt kế hoạch cho bệnh nhân
+          </p>
         </div>
+        <Link
+          href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
+          className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 self-start sm:self-auto"
+        >
+          <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+          <span>Tạo thực đơn AI mới</span>
+        </Link>
+      </div>
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-md border-b border-outline-variant mb-lg pb-xs flex-wrap">
-          <button
-            onClick={() => setActiveTab("pending")}
-            className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "pending"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Chờ duyệt ({pendingCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("approved")}
-            className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "approved"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Đã duyệt ({approvedCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("rejected")}
-            className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "rejected"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Đã từ chối ({rejectedCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`font-label text-label pb-xs px-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "all"
-                ? "border-primary text-primary font-bold"
-                : "border-transparent text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Tất cả ({allPatientPlans.length})
-          </button>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 pb-1 overflow-x-auto scrollbar-none">
+        <button
+          onClick={() => setActiveTab("pending")}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "pending"
+              ? "bg-amber-600 text-white shadow-2xs"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+          }`}
+        >
+          Chờ duyệt ({pendingCount})
+        </button>
+        <button
+          onClick={() => setActiveTab("approved")}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "approved"
+              ? "bg-primary text-on-primary shadow-2xs"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+          }`}
+        >
+          Đã duyệt ({approvedCount})
+        </button>
+        <button
+          onClick={() => setActiveTab("rejected")}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "rejected"
+              ? "bg-rose-600 text-white shadow-2xs"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+          }`}
+        >
+          Đã từ chối ({rejectedCount})
+        </button>
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "all"
+              ? "bg-surface-container-highest text-on-surface shadow-2xs font-black"
+              : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+          }`}
+        >
+          Tất cả ({allPatientPlans.length})
+        </button>
+      </div>
+
+      {/* Meal Plans Section */}
+      {filteredPlans.length === 0 ? (
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-16 text-center text-on-surface-variant shadow-xs">
+          <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
+            menu_book
+          </span>
+          <p className="text-on-surface text-sm font-bold">
+            Không có thực đơn nào ở trạng thái này
+          </p>
+          <p className="text-xs mt-1 text-on-surface-variant">
+            Chuyển tab khác hoặc bấm “Tạo thực đơn AI mới” cho bệnh nhân {patient.name}.
+          </p>
         </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Display Grouped Variant Batches */}
+          {groupsList.map((group) => {
+            const isExpanded = expandedGroups[group.groupId] !== false; // Default true (expanded)
 
-        {/* Meal Plans Section */}
-        {filteredPlans.length === 0 ? (
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl text-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
-              menu_book
-            </span>
-            <p className="font-body-bold text-body-bold">
-              Không có thực đơn nào ở trạng thái này
-            </p>
-            <p className="font-caption text-caption text-xs mt-xs">
-              Chuyển tab khác hoặc bấm &quot;Tạo thêm phương án mới (AI)&quot; cho bệnh nhân {patient.name}.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-xl">
-            {/* Display Grouped Variant Batches */}
-            {groupsList.map((group) => {
-              const isExpanded = expandedGroups[group.groupId] !== false; // Default true (expanded)
-
-              return (
-                <div
-                  key={group.groupId}
-                  className="bg-surface-container-low/40 border border-outline-variant rounded-2xl p-md md:p-lg space-y-md shadow-xs"
-                >
+            return (
+              <div
+                key={group.groupId}
+                className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 space-y-4 shadow-xs"
+              >
                   {/* Group Header Banner with Dropdown Toggle */}
                   <div
                     onClick={() => toggleGroupExpand(group.groupId)}
@@ -271,7 +273,7 @@ export default function PatientMealPlansListPage() {
 
                     <div className="flex items-center gap-md text-xs text-on-surface-variant font-caption">
                       <span>Thời gian: {group.createdAt}</span>
-                      <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-emerald-200">
+                      <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded-md font-semibold border border-emerald-200">
                         Độ dài: {group.duration}
                       </span>
 
@@ -349,13 +351,13 @@ export default function PatientMealPlansListPage() {
                           <div className="flex items-center gap-md shrink-0 w-full md:w-auto justify-between md:justify-end pt-sm md:pt-0 border-t md:border-t-0 border-outline-variant">
                             <div>
                               {plan.status === "pending" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                                   Chờ duyệt
                                 </span>
                               )}
                               {plan.status === "approved" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                                   <span className="material-symbols-outlined text-[14px]">
                                     check_circle
                                   </span>
@@ -363,7 +365,7 @@ export default function PatientMealPlansListPage() {
                                 </span>
                               )}
                               {plan.status === "edited" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200">
                                   <span className="material-symbols-outlined text-[14px]">
                                     edit_note
                                   </span>
@@ -371,7 +373,7 @@ export default function PatientMealPlansListPage() {
                                 </span>
                               )}
                               {plan.status === "rejected" && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-800 border border-red-200">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-800 border border-red-200">
                                   <span className="material-symbols-outlined text-[14px]">
                                     cancel
                                   </span>

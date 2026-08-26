@@ -250,7 +250,9 @@ def generate_meal_plan(
 ) -> MealPlanOutput:
     """Generate + persist a meal plan from catalog (+ LLM when API key is set)."""
     from app.agents.meal_planner_agent import generate_meal_plan as build_plan
+    from app.services.plan_limits import assert_can_generate_meal_plan
 
+    assert_can_generate_meal_plan(db, user.id)
     profile = get_profile(db, user.id)
     plan = build_plan(profile, notes=notes, priorities=priorities or [], db=db)
     clear_meal_plan_request(db, user.id)

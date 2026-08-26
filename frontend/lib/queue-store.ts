@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api";
 import { DEFAULT_VARIANTS_PER_JOB, DEFAULT_PLAN_DAYS } from "./config";
-import { saveSlotIntent, type MealPlanSlotIntent } from "./plan-slot-intent";
 
 export type JobLogItem = {
   text: string;
@@ -28,7 +27,6 @@ export interface GenerationJob {
   daysCount?: number;
   notes?: string;
   priorities?: string[];
-  slotIntent?: MealPlanSlotIntent;
   errorMessage?: string;
   /** Tiến trình UI (0–100) — chỉ tăng, không giảm khi job còn active. */
   progress: number;
@@ -55,7 +53,6 @@ interface QueueState {
       condition?: string;
       notes?: string;
       priorities?: string[];
-      slotIntent?: MealPlanSlotIntent;
     }[],
     options?: { daysCount?: number; variantsCount?: number }
   ) => string[];
@@ -219,7 +216,6 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       variantsCount,
       notes: p.notes,
       priorities: p.priorities,
-      slotIntent: p.slotIntent,
       progress: 12,
       activeStep: 0,
       logs: [
@@ -319,11 +315,6 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         nextJob.priorities
       );
 
-      const completedIntent = nextJob.slotIntent
-        ? { ...nextJob.slotIntent, planId: result.planIds[0] }
-        : nextJob.slotIntent;
-      if (completedIntent) saveSlotIntent(completedIntent);
-
       set((state) => ({
         jobs: state.jobs.map((job) =>
           job.id === nextJob.id
@@ -332,7 +323,6 @@ export const useQueueStore = create<QueueState>((set, get) => ({
                 status: "completed" as const,
                 variantGroupId: result.variantGroupId,
                 planIds: result.planIds,
-                slotIntent: completedIntent,
                 progress: 100,
                 activeStep: 5,
                 logs: pushLog(

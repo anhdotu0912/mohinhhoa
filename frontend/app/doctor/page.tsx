@@ -267,8 +267,8 @@ export default function DoctorDashboardPage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-xl shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
-          <span className="material-symbols-outlined text-[20px] text-emerald-300">
+        <div className="fixed top-20 right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
+          <span className="material-symbols-outlined text-[20px]">
             check_circle
           </span>
           <span>{toastMessage}</span>
@@ -281,9 +281,9 @@ export default function DoctorDashboardPage() {
           {/* Card 1 */}
           <Link
             href="/doctor/patients"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
               <span
                 className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
@@ -304,9 +304,9 @@ export default function DoctorDashboardPage() {
           {/* Card 2 */}
           <Link
             href="/doctor/inbox?type=plan_review"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-amber-500/40 group cursor-pointer relative overflow-hidden"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
               <span
                 className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
@@ -322,15 +322,14 @@ export default function DoctorDashboardPage() {
                 {pendingPlans.length}
               </p>
             </div>
-            <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>
           </Link>
 
           {/* Card 3 */}
           <Link
             href="/doctor/patients?status=attention"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-rose-500/40 group cursor-pointer relative overflow-hidden"
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0">
               <span
                 className="material-symbols-outlined text-[24px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
@@ -342,20 +341,26 @@ export default function DoctorDashboardPage() {
               <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
                 Cảnh báo lâm sàng
               </p>
-              <p className="font-h1 text-h1 text-rose-600 text-2xl font-bold tabular-nums">
-                {attentionSummaries.length}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
+                  {attentionSummaries.length}
+                </p>
+                {attentionSummaries.length > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+                    Cần chú ý
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="absolute top-0 right-0 w-1.5 h-full bg-rose-500"></div>
           </Link>
         </section>
 
         {mealPlanRequestPatients.length > 0 && (
-          <section className="bg-surface-container-lowest border border-emerald-200/80 rounded-2xl shadow-subtle overflow-hidden">
-            <div className="p-5 border-b border-emerald-100 bg-emerald-50/40 flex flex-wrap justify-between items-center gap-3">
+          <section className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
+            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex flex-wrap justify-between items-center gap-3">
               <div>
                 <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+                  <span className="material-symbols-outlined text-primary text-[20px]">
                     restaurant_menu
                   </span>
                   Yêu cầu tạo thực đơn
@@ -392,7 +397,7 @@ export default function DoctorDashboardPage() {
                   </div>
                   <Link
                     href={`/doctor/patients/${p.id}/generate`}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
                     Tạo thực đơn AI
@@ -406,7 +411,7 @@ export default function DoctorDashboardPage() {
         {/* Main Section (1:1 ratio) */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Col - Bệnh nhân cần chú ý */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden flex flex-col">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden flex flex-col">
             <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
                 <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
@@ -500,7 +505,7 @@ export default function DoctorDashboardPage() {
                           </td>
                           <td className="px-5 py-3.5 text-center">
                             <span
-                              className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${patient.statusColor}`}
+                              className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${patient.statusColor}`}
                             >
                               {patient.status}
                             </span>
@@ -508,7 +513,7 @@ export default function DoctorDashboardPage() {
                           <td className="px-5 py-3.5 text-center">
                             <Link
                               href={`/doctor/patients/${patient.id}`}
-                              className="inline-flex items-center justify-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-xl hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold whitespace-nowrap"
+                              className="inline-flex items-center justify-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-lg hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold whitespace-nowrap"
                             >
                               <span>Chi tiết</span>
                               <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -524,7 +529,7 @@ export default function DoctorDashboardPage() {
           </div>
 
           {/* Right Col - Biểu đồ tuân thủ dinh dưỡng */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle p-5 flex flex-col justify-between">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle p-5 flex flex-col justify-between">
             <div>
               {/* Header & Controls */}
               <div className="border-b border-outline-variant/40 pb-3 mb-4 flex items-start justify-between">
@@ -540,13 +545,13 @@ export default function DoctorDashboardPage() {
                   </p>
                 </div>
                 {/* Timeframe Selector */}
-                <div className="flex bg-surface-container-low rounded-full p-1 border border-outline-variant/40">
+                <div className="flex bg-surface-container-low rounded-lg p-1 border border-outline-variant/40">
                   <button
                     onClick={() => {
                       setTimeframe("this_week");
                       setHoveredDay(null);
                     }}
-                    className={`px-3 py-1 text-xs rounded-full transition-all font-semibold cursor-pointer ${
+                    className={`px-3 py-1 text-xs rounded-md transition-all font-semibold cursor-pointer ${
                       timeframe === "this_week"
                         ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -559,7 +564,7 @@ export default function DoctorDashboardPage() {
                       setTimeframe("last_week");
                       setHoveredDay(null);
                     }}
-                    className={`px-3 py-1 text-xs rounded-full transition-all font-semibold cursor-pointer ${
+                    className={`px-3 py-1 text-xs rounded-md transition-all font-semibold cursor-pointer ${
                       timeframe === "last_week"
                         ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                         : "text-on-surface-variant hover:text-on-surface"
@@ -571,9 +576,9 @@ export default function DoctorDashboardPage() {
               </div>
 
               {/* Stat Summary Box */}
-              <div className="mb-4 p-3.5 bg-primary/5 border border-primary/20 rounded-2xl flex items-center justify-between">
+              <div className="mb-4 p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-primary font-semibold block">Trung bình tuần</span>
+                  <span className="text-xs text-on-surface-variant font-semibold block">Trung bình tuần</span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl font-bold text-on-surface tabular-nums">
                       {avgCompliance !== null ? `${avgCompliance}%` : "—"}
@@ -594,17 +599,17 @@ export default function DoctorDashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-                    <span className="w-3 border-b-2 border-dashed border-emerald-600 inline-block"></span>
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60">
+                    <span className="w-3 border-b-2 border-dashed border-primary inline-block"></span>
                     Chỉ tiêu: 80%
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold shadow-2xs ${
+                    className={`px-3 py-1 rounded-md text-xs font-bold border ${
                       avgCompliance === null
-                        ? "bg-surface-container text-on-surface-variant"
+                        ? "bg-surface-container-lowest text-on-surface-variant border-outline-variant/60"
                         : avgCompliance >= 75
-                          ? "bg-emerald-600 text-white"
-                          : "bg-amber-500 text-white"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200/70"
+                          : "bg-amber-50 text-amber-800 border-amber-200/70"
                     }`}
                   >
                     {avgCompliance === null
@@ -632,13 +637,13 @@ export default function DoctorDashboardPage() {
                   <>
                     {/* Benchmark Target Line (80%) */}
                     <div
-                      className="absolute left-0 right-0 border-b-2 border-dashed border-emerald-400/80 z-0 pointer-events-none"
+                      className="absolute left-0 right-0 border-b-2 border-dashed border-primary/50 z-0 pointer-events-none"
                       style={{ bottom: "calc(26px + 120px * 0.8)" }}
                     ></div>
 
                     {/* Y-axis grid line 50% */}
                     <div
-                      className="absolute left-0 right-0 border-b border-outline-variant/30 z-0 pointer-events-none"
+                      className="absolute left-0 right-0 border-b border-outline-variant/40 z-0 pointer-events-none"
                       style={{ bottom: "calc(26px + 120px * 0.5)" }}
                     ></div>
 
@@ -648,13 +653,13 @@ export default function DoctorDashboardPage() {
                         const isHigh = item.rate >= 80;
                         const isMedium = item.rate >= 60 && item.rate < 80;
 
-                        let barBg = "bg-rose-500 hover:bg-rose-600";
+                        let barBg = "bg-rose-400/80 hover:bg-rose-500";
                         let textBg = "text-rose-700";
                         if (isHigh) {
                           barBg = "bg-primary hover:bg-primary/90";
                           textBg = "text-primary";
                         } else if (isMedium) {
-                          barBg = "bg-amber-500 hover:bg-amber-600";
+                          barBg = "bg-amber-400/90 hover:bg-amber-500";
                           textBg = "text-amber-700";
                         }
 
@@ -667,7 +672,7 @@ export default function DoctorDashboardPage() {
                           >
                             {/* Hover Tooltip Popup */}
                             {hoveredDay?.date === item.date && (
-                              <div className="absolute bottom-full mb-2 z-30 w-44 bg-surface-container-lowest text-on-surface text-xs p-3 rounded-2xl shadow-xl border border-outline-variant/60 backdrop-blur-md animate-fadeIn pointer-events-none">
+                              <div className="absolute bottom-full mb-2 z-30 w-44 bg-surface-container-lowest text-on-surface text-xs p-3 rounded-lg shadow-xl border border-outline-variant/60 backdrop-blur-md animate-fadeIn pointer-events-none">
                                 <div className="flex justify-between items-center border-b border-outline-variant/40 pb-1 mb-1 font-bold">
                                   <span>Thứ ({item.day}) - {item.date}</span>
                                   <span className={item.rate >= 80 ? "text-primary" : "text-amber-700"}>
@@ -690,8 +695,8 @@ export default function DoctorDashboardPage() {
                             {/* Bar Track */}
                             <div className="w-full h-[120px] flex items-end justify-center">
                               <div
-                                className={`w-full max-w-[28px] rounded-t-lg transition-all duration-200 ${barBg} ${
-                                  hoveredDay?.date === item.date ? "ring-2 ring-primary/40 shadow-xs" : ""
+                                className={`w-full max-w-[28px] rounded-t-md transition-all duration-200 ${barBg} ${
+                                  hoveredDay?.date === item.date ? "ring-2 ring-primary/30 shadow-xs" : ""
                                 }`}
                                 style={{ height: `${item.rate}%` }}
                               ></div>
@@ -718,22 +723,22 @@ export default function DoctorDashboardPage() {
                   Đạt (≥80%)
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
                   TB (60-79%)
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
                   Kém (&lt;60%)
                 </span>
-                <span className="flex items-center gap-1.5 text-emerald-800 font-semibold">
-                  <span className="w-3.5 border-b-2 border-dashed border-emerald-500 inline-block"></span>
+                <span className="flex items-center gap-1.5 text-primary font-semibold">
+                  <span className="w-3.5 border-b-2 border-dashed border-primary inline-block"></span>
                   Chỉ tiêu (80%)
                 </span>
               </div>
 
               <Link
                 href="/doctor/patients"
-                className="w-full py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-on-surface font-body-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 font-semibold"
+                className="w-full py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-on-surface font-body-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 font-semibold"
               >
                 <span>Mở hồ sơ bệnh nhân để xem tuân thủ</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -744,7 +749,7 @@ export default function DoctorDashboardPage() {
 
         {/* Bottom Section - Kế hoạch chờ duyệt mới nhất */}
         <section>
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
             <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
                 <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
@@ -782,7 +787,7 @@ export default function DoctorDashboardPage() {
                 visiblePendingPlans.map((plan) => (
                   <div
                     key={plan.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
                   >
                     <div className="flex items-center gap-3.5">
                       <div className="w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-sm shrink-0">
@@ -820,7 +825,7 @@ export default function DoctorDashboardPage() {
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-outline-variant/30">
                       <Link
                         href={`/doctor/reviews/${plan.patientId}/${plan.id}`}
-                        className="h-8 px-3.5 bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant font-body-bold rounded-xl hover:bg-surface-container-low hover:text-primary transition-all text-xs flex items-center gap-1 cursor-pointer font-semibold"
+                        className="h-8 px-3.5 bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant font-body-bold rounded-lg hover:bg-surface-container-low hover:text-primary transition-all text-xs flex items-center gap-1 cursor-pointer font-semibold"
                       >
                         <span className="material-symbols-outlined text-[16px]">visibility</span>
                         <span>Xem trước</span>
@@ -830,7 +835,7 @@ export default function DoctorDashboardPage() {
                         onClick={() =>
                           handleQuickApprove(plan.id, plan.planTitle)
                         }
-                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-xl hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
+                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
                       >
                         <span className="material-symbols-outlined text-[16px]">check</span>
                         <span>Duyệt nhanh</span>
@@ -845,7 +850,7 @@ export default function DoctorDashboardPage() {
 
         {/* Cảnh báo thực đơn hết hạn */}
         <section>
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-subtle overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
             <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
               <div>
                 <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
@@ -865,7 +870,7 @@ export default function DoctorDashboardPage() {
                     type="button"
                     onClick={() => void handleDemoExpiry("expiring")}
                     disabled={demoBusy}
-                    className="px-3 py-1.5 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                    className="px-3 py-1.5 border border-outline-variant/60 rounded-lg text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
                     title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
                   >
                     <span className="material-symbols-outlined text-[16px]">schedule</span>
@@ -875,7 +880,7 @@ export default function DoctorDashboardPage() {
                     type="button"
                     onClick={() => void handleDemoExpiry("expired")}
                     disabled={demoBusy}
-                    className="px-3 py-1.5 border border-outline-variant/60 rounded-xl text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                    className="px-3 py-1.5 border border-outline-variant/60 rounded-lg text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
                     title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
                   >
                     <span className="material-symbols-outlined text-[16px]">event_busy</span>
@@ -932,7 +937,7 @@ export default function DoctorDashboardPage() {
                 expiryList.map((p) => (
                   <div
                     key={p.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
                   >
                     <div className="flex items-center gap-3.5">
                       <div className="relative w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-xs shrink-0">
@@ -966,12 +971,12 @@ export default function DoctorDashboardPage() {
 
                     <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                       {p.plan_expiry === "expiring" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                           Còn {p.plan_days_left ?? "?"} ngày (đến {p.plan_end_date ?? "—"})
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                           <span className="material-symbols-outlined text-[14px]">
                             event_busy
                           </span>
@@ -981,7 +986,7 @@ export default function DoctorDashboardPage() {
 
                       <Link
                         href={`/doctor/patients/${encodeURIComponent(p.id)}/generate`}
-                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-xl hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
+                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
                       >
                         <span className="material-symbols-outlined text-[16px]">
                           auto_awesome

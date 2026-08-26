@@ -42,7 +42,7 @@ export type DayNutritionDashboardProps = {
   targetCalories: number;
   targetSaltG: number;
   targetSugarG: number;
-  mealBreakdown?: { breakfast: number; lunch: number; dinner: number };
+  mealBreakdown?: { breakfast: number; lunch: number; dinner: number; snack: number };
   /** Cảnh báo cứng cấp ngày (kalo/natri vượt ngưỡng). */
   dayWarnings?: string[];
   /** Gợi ý cấp ngày — không chặn duyệt. */
@@ -190,7 +190,7 @@ export function DayNutritionDashboard({
 
   return (
     <section
-      className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md mb-lg shadow-xs"
+      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md mb-lg shadow-xs"
       aria-label={`Chỉ số dinh dưỡng ${dayLabel}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-xs mb-md">
@@ -206,19 +206,19 @@ export function DayNutritionDashboard({
         {mealBreakdown ? (
           <p className="text-[11px] text-on-surface-variant tabular-nums shrink-0">
             Sáng {mealBreakdown.breakfast} · Trưa {mealBreakdown.lunch} · Tối{" "}
-            {mealBreakdown.dinner} kcal
+            {mealBreakdown.dinner} · Phụ {mealBreakdown.snack} kcal
           </p>
         ) : null}
       </div>
 
       {dayWarnings.length > 0 && (
-        <div className="mb-md p-sm bg-red-50 border border-red-200 rounded-xl space-y-xs">
-          <div className="flex items-center gap-xs text-red-900">
+        <div className="mb-md p-3 bg-rose-50/80 border border-rose-200/70 rounded-lg space-y-1">
+          <div className="flex items-center gap-1.5 text-rose-800">
             <span className="material-symbols-outlined text-[16px]">error</span>
             <strong className="text-[11px] font-bold">Vi phạm lâm sàng (cả ngày)</strong>
           </div>
           {dayWarnings.map((w) => (
-            <p key={w} className="text-xs text-red-950 leading-relaxed">
+            <p key={w} className="text-xs text-rose-900 leading-relaxed">
               {w}
             </p>
           ))}
@@ -226,13 +226,13 @@ export function DayNutritionDashboard({
       )}
 
       {dayAdvisoryWarnings.length > 0 && (
-        <div className="mb-md p-sm bg-sky-50 border border-sky-200 rounded-xl space-y-xs">
-          <div className="flex items-center gap-xs text-sky-900">
+        <div className="mb-md p-3 bg-slate-100 border border-slate-200/80 rounded-lg space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-800">
             <span className="material-symbols-outlined text-[16px]">info</span>
             <strong className="text-[11px] font-bold">Gợi ý (không chặn duyệt)</strong>
           </div>
           {dayAdvisoryWarnings.map((w) => (
-            <p key={w} className="text-xs text-sky-950 leading-relaxed">
+            <p key={w} className="text-xs text-slate-700 leading-relaxed">
               {w}
             </p>
           ))}
@@ -261,7 +261,7 @@ export function DayNutritionDashboard({
           return (
             <div
               key={metric.key}
-              className={`rounded-xl border border-outline-variant p-sm ${guide.track}`}
+              className={`rounded-lg border border-outline-variant p-sm ${guide.track}`}
             >
               <div className="flex items-start justify-between gap-sm mb-sm">
                 <div className="min-w-0">

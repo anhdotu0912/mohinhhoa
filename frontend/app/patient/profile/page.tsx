@@ -46,6 +46,247 @@ function MetricFieldHint({ id, message }: { id: string; message?: string }) {
   );
 }
 
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  visible,
+  onToggleVisible,
+  error,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+  visible: boolean;
+  onToggleVisible: () => void;
+  error?: string;
+  placeholder: string;
+}) {
+  const errorId = `${id}-error`;
+  return (
+    <div>
+      <label htmlFor={id} className="text-xs font-bold text-on-surface-variant mb-1 block">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          autoComplete={autoComplete}
+          minLength={8}
+          maxLength={128}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          className={`w-full px-3.5 py-2 pr-11 bg-surface-container-low border rounded-xl text-xs text-on-surface focus:outline-none ${
+            error
+              ? "border-rose-400 focus:border-rose-500"
+              : "border-outline-variant focus:border-primary"
+          }`}
+        />
+        <button
+          type="button"
+          onClick={onToggleVisible}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-on-surface-variant hover:text-on-surface rounded-lg cursor-pointer"
+          aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            {visible ? "visibility_off" : "visibility"}
+          </span>
+        </button>
+      </div>
+      <MetricFieldHint id={errorId} message={error} />
+    </div>
+  );
+}
+
+function ChangePasswordCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    current?: string;
+    next?: string;
+    confirm?: string;
+  }>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const clearFieldError = (key: "current" | "next" | "confirm") => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSuccess(null);
+
+    const nextErrors: { current?: string; next?: string; confirm?: string } = {};
+    if (!currentPassword) {
+      nextErrors.current = "Nhập mật khẩu hiện tại.";
+    }
+    if (newPassword.length < 8) {
+      nextErrors.next = "Mật khẩu mới tối thiểu 8 ký tự.";
+    } else if (currentPassword && newPassword === currentPassword) {
+      nextErrors.next = "Mật khẩu mới phải khác mật khẩu hiện tại.";
+    }
+    if (!confirmPassword) {
+      nextErrors.confirm = "Nhập lại mật khẩu mới.";
+    } else if (newPassword !== confirmPassword) {
+      nextErrors.confirm = "Mật khẩu xác nhận không khớp.";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      const res = await api.changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowCurrent(false);
+      setShowNew(false);
+      setShowConfirm(false);
+      setSuccess(res.message);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError ? err.message : "Không đổi được mật khẩu. Thử lại sau."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-4">
+      <div className="flex items-center gap-2 border-b border-outline-variant/50 pb-3">
+        <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+          <span className="material-symbols-outlined text-[22px]">lock</span>
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-on-surface">Bảo mật tài khoản</h3>
+          <p className="text-xs text-on-surface-variant">
+            Đổi mật khẩu đăng nhập. Mật khẩu mới tối thiểu 8 ký tự.
+          </p>
+        </div>
+      </div>
+
+      {success && (
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-300 bg-emerald-50/80 px-3.5 py-2.5 text-xs text-emerald-900 flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-emerald-600 text-[18px]">
+            check_circle
+          </span>
+          <span>{success}</span>
+        </div>
+      )}
+
+      {formError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-300 bg-rose-50/90 px-3.5 py-2.5 text-xs text-rose-900 flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-rose-600 text-[18px]">error</span>
+          <span>{formError}</span>
+        </div>
+      )}
+
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3.5">
+        <PasswordField
+          id="profile-current-password"
+          label="Mật khẩu hiện tại"
+          value={currentPassword}
+          onChange={(v) => {
+            setCurrentPassword(v);
+            clearFieldError("current");
+            setFormError(null);
+            setSuccess(null);
+          }}
+          autoComplete="current-password"
+          visible={showCurrent}
+          onToggleVisible={() => setShowCurrent((v) => !v)}
+          error={fieldErrors.current}
+          placeholder="Nhập mật khẩu đang dùng"
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <PasswordField
+            id="profile-new-password"
+            label="Mật khẩu mới"
+            value={newPassword}
+            onChange={(v) => {
+              setNewPassword(v);
+              clearFieldError("next");
+              setFormError(null);
+              setSuccess(null);
+            }}
+            autoComplete="new-password"
+            visible={showNew}
+            onToggleVisible={() => setShowNew((v) => !v)}
+            error={fieldErrors.next}
+            placeholder="Tối thiểu 8 ký tự"
+          />
+          <PasswordField
+            id="profile-confirm-password"
+            label="Xác nhận mật khẩu mới"
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              clearFieldError("confirm");
+              setFormError(null);
+              setSuccess(null);
+            }}
+            autoComplete="new-password"
+            visible={showConfirm}
+            onToggleVisible={() => setShowConfirm((v) => !v)}
+            error={fieldErrors.confirm}
+            placeholder="Nhập lại mật khẩu mới"
+          />
+        </div>
+
+        <div className="flex items-center justify-end pt-1">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary-container transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <span className="material-symbols-outlined text-[18px] animate-spin">
+                  progress_activity
+                </span>
+                Đang đổi mật khẩu...
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[18px]">key</span>
+                Đổi mật khẩu
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 type EditFormState = {
   age: string;
   gender: string;
@@ -1719,6 +1960,8 @@ export default function PatientProfilePage() {
                   </div>
                 </div>
               </div>
+
+              <ChangePasswordCard />
             </div>
           </div>
         )}

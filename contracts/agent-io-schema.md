@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.7 (2026-08-24 — `FoodLogEntry.logged_at` timezone-aware; ngày tuân thủ food-log theo Asia/Ho_Chi_Minh. Xem changelog ở §7 Versioning.)
+**Version:** 1.9 (2026-08-27 — `FoodLogEntry.slot` thêm `snack` (4 slot). Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -16,7 +16,8 @@
   ```
   HTTP status đi kèm theo ngữ cảnh (400/401/403/404/409/413/415/422/501/503).
 - **Severity enum** (dùng chung `Alert`, `InteractionItem`): `"Nguy hiểm" | "Cần chú ý" | "An toàn"` — đúng 3 mức, tiếng Việt, không viết tắt.
-- **Meal slot enum:** `"breakfast" | "lunch" | "dinner" | "snack"` — dùng cho `Meal.slot`, `Swap.slot`, `NotificationService.SLOT_TIMES`. **Lưu ý:** UI Food Log hiện chỉ có 3 slot (sáng/trưa/tối) — xem `adrs/009-food-log-scope-strategy.md`, [CẦN XÁC NHẬN] khi implement.
+- **Meal slot enum:** `"breakfast" | "lunch" | "dinner" | "snack"` — dùng cho `Meal.slot`, `Swap.slot`, `NotificationService.SLOT_TIMES`.
+- **Food Log slot enum:** `"morning" | "noon" | "evening" | "snack"` — dùng cho `FoodLogEntry.slot`. Ánh xạ meal plan: `breakfast→morning`, `lunch→noon`, `dinner→evening`, `snack→snack` (xem `adrs/009-food-log-scope-strategy.md`, supersede 2026-08-27).
 - Field không bắt buộc trong Pydantic đều có default rõ ràng (không dùng `Optional` trần không default trừ khi cố ý cho phép `null`).
 
 ---
@@ -144,7 +145,7 @@ Nguồn: `backend/app/models/food_log.py`, `backend/app/schemas/food_log.py`.
 - `type`: `"as_planned" | "custom"` — khớp 2 nút bấm đã có trên UI ("Đã ăn theo kế hoạch" / "Ăn khác").
 - `note`: bắt buộc khi `type="custom"`, rỗng khi `type="as_planned"`.
 - `status`: `"logged" | "adjusted"` — không có `pending/rejected` (không cần workflow duyệt, xem ADR-009).
-- `slot`: dùng đúng **3-slot theo UI**: `"morning" | "noon" | "evening"` — **KHÁC** 4-slot meal plan.
+- `slot`: `"morning" | "noon" | "evening" | "snack"` — ánh xạ meal plan: `morning≈breakfast`, `noon≈lunch`, `evening≈dinner`, `snack≈snack`.
 - `alert_ids[]`: liên kết tới `Alert` được tạo nếu `custom` log trùng khớp 1 cặp tương tác nguy hiểm trong KB.
 - `logged_at`: ISO-8601 timezone-aware (`Z` hoặc offset, ví dụ `+07:00` / `+00:00`). Giá trị naive trong DB được coi là UTC khi serialize. Ngày lịch để lọc/tuân thủ = ngày dương lịch **Asia/Ho_Chi_Minh**, không phải `date()` UTC của timestamp.
 - Một user / một ngày VN / một slot: một log (upsert khi `POST /food-log` lần 2 trong cùng ngày VN).
@@ -393,7 +394,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.8**.
+- Version hiện tại của contract này: **1.9**.
+- **Changelog 1.8 → 1.9 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"` (4 slot food log khớp meal plan bữa phụ). Không breaking — giá trị mới optional cho client cũ. Đồng bộ `contracts/api-v1.md` v1.12, `adrs/009` supersede, `specs/09`.
 - **Changelog 1.7 → 1.8 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.11.
 - **Changelog 1.6 → 1.7 (2026-08-24):** `FoodLogEntry.logged_at` chốt timezone-aware; ngày tuân thủ / filter food-log theo Asia/Ho_Chi_Minh; upsert 1 log / user / ngày VN / slot. Đồng bộ `contracts/api-v1.md` v1.8. Không đổi enum `slot`.
 - **Changelog 1.5 → 1.6 (2026-08-23):** `BodyMetricsEntry` §3.5 — `POST /metrics` upsert 1 entry patient/ngày VN (merge field, giữ `id`); đồng bộ `contracts/api-v1.md` v1.7. Không đổi JSON shape.

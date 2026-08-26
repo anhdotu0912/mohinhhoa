@@ -10,6 +10,7 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 - Là **bệnh nhân**, tôi muốn tự đăng ký tài khoản bằng email/mật khẩu, để tôi có thể đăng nhập và dùng app.
 - Là **bác sĩ**, tôi muốn tạo tài khoản hộ cho bệnh nhân mới (dùng chung API đăng ký, chỉ đổi `role`), để không cần bệnh nhân tự làm thao tác kỹ thuật này.
 - Là **Chung** (chưa đăng nhập), tôi muốn đăng nhập bằng email/mật khẩu để nhận JWT dùng cho các request tiếp theo.
+- Là **bệnh nhân đã đăng nhập**, tôi muốn đổi mật khẩu trên trang hồ sơ (`/patient/profile`) khi biết mật khẩu hiện tại, để giữ tài khoản an toàn mà không cần luồng quên mật khẩu.
 
 ## 3. Business rules
 1. Email là khoá duy nhất toàn hệ thống (không phân biệt theo `role`) — trùng email ở `POST /auth/register` trả `409 EMAIL_EXISTS`, không phân biệt email đó thuộc role nào.
@@ -44,7 +45,7 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 - **Luồng liên hệ (contact):** không có endpoint backend nào cho "liên hệ hỗ trợ". Nếu FE có trang liên hệ, đó là trang tĩnh không gọi API — **Status: Planned/Out of scope**, không nằm trong North Star demo.
 - Đa ngôn ngữ (chỉ tiếng Việt) — Won't Have theo `CLAUDE.md`.
 - OAuth/SSO (Google/Facebook login) — không có, chỉ email/password.
-- Đổi mật khẩu, đổi email tự-phục vụ cho patient (doctor đổi được email hộ patient qua `PUT /doctor/patients/{id}/profile`, patient tự đổi email của mình thì chưa có endpoint).
+- Đổi email tự-phục vụ cho patient (doctor đổi được email hộ patient qua `PUT /doctor/patients/{id}/profile`, patient tự đổi email của mình thì chưa có endpoint). Đổi mật khẩu khi đã đăng nhập: `POST /auth/change-password` (as-built 2026-08-27).
 
 ## 7. Schema tham chiếu
 - `RegisterRequest`/`RegisterResponse`/`LoginRequest`/`TokenResponse` — xem `backend/app/schemas/auth.py`; chi tiết field trong `contracts/api-v1.md` §1.
@@ -59,6 +60,7 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 | POST | `/auth/me/avatar` | User đã đăng nhập (multipart ảnh ≤ 2MB) |
 | POST | `/auth/forgot-password` | Không cần auth |
 | POST | `/auth/reset-password` | Không cần auth |
+| POST | `/auth/change-password` | User đã đăng nhập |
 
 ## 9. Liên quan
 - `specs/02-patient-profile-onboarding.md` — bước tiếp theo sau đăng ký patient.

@@ -95,10 +95,14 @@ export interface GenerateMealPlanRequest {
   priorities?: string[];
 }
 
+export type ApplyMode = "from_today" | "after_current";
+
 export interface ApplyMealPlanRequest {
-  start_date: string;
+  /** Legacy: explicit start date. Prefer apply_mode on new clients. */
+  start_date?: string;
   replace_active?: boolean;
   slot_key?: "current" | "next" | "empty";
+  apply_mode?: ApplyMode;
 }
 
 export interface Meal {
@@ -367,7 +371,7 @@ export interface FoodLogEntry {
   user_id: string;
   meal_plan_id?: string | null;
   day_index?: number | null;
-  slot: "morning" | "noon" | "evening";
+  slot: "morning" | "noon" | "evening" | "snack";
   type: "as_planned" | "custom";
   note?: string;
   status: string;
@@ -378,7 +382,7 @@ export interface FoodLogEntry {
 export interface FoodLogCreate {
   meal_plan_id?: string | null;
   day_index?: number | null;
-  slot: "morning" | "noon" | "evening";
+  slot: "morning" | "noon" | "evening" | "snack";
   type: "as_planned" | "custom";
   note?: string;
 }

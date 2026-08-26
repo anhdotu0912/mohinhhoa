@@ -17,6 +17,7 @@ from app.models.catalog import Allergy, Diagnosis, Medicine
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
+from app.schemas.body_metrics import MetricsHistoryPoint
 from app.schemas.doctor import (
     AvatarOut,
     CatalogItem,
@@ -53,6 +54,7 @@ from app.services.plan_apply import (
     find_active_plan,
     find_upcoming_plan,
     patient_plan_usage,
+    resolve_apply_request,
 )
 from app.services.plan_schedule import build_meal_plan_schedule, validate_slot_start
 
@@ -420,6 +422,25 @@ def update_patient_metrics(
         bmi_category=_bmi_category(profile.bmi),
         updated_at=_format_dt(datetime.now(UTC)),
     )
+
+
+@router.get(
+    "/patients/{patient_id}/metrics/history",
+    response_model=list[MetricsHistoryPoint],
+)
+def get_doctor_patient_metrics_history(
+    patient_id: str,
+    days: int = 90,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> list[MetricsHistoryPoint]:
+    del user
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != "patient":
+        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    from app.services.metrics_service import list_metrics_history
+    entries = list_metrics_history(db, patient.id, days=days)
+    return [MetricsHistoryPoint.model_validate(e) for e in entries]
 
 
 @router.put("/patients/{patient_id}/goals", response_model=GoalsOut)
@@ -791,18 +812,27 @@ def apply_plan_validity(
     row = db.get(MealPlan, meal_plan_id)
     if row is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
-    validate_slot_start(
+    start_date, replace_active = resolve_apply_request(
         db,
         row.user_id,
-        payload.start_date,
-        payload.slot_key,
+        plan_id=row.id,
+        apply_mode=payload.apply_mode,
+        start_date=payload.start_date,
         replace_active=payload.replace_active,
     )
+    if payload.slot_key is not None:
+        validate_slot_start(
+            db,
+            row.user_id,
+            start_date,
+            payload.slot_key,
+            replace_active=replace_active,
+        )
     result = apply_meal_plan(
         db,
         row,
-        payload.start_date,
-        replace_active=payload.replace_active,
+        start_date,
+        replace_active=replace_active,
     )
     db.commit()
     db.refresh(row)
@@ -878,18 +908,9 @@ def delete_doctor_meal_plan(
     if plan is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
 
-    # Xóa alerts liên quan đến plan này
-    db.query(Alert).filter(Alert.meal_plan_id == meal_plan_id).delete(synchronize_session=False)
+    from app.services.plan_limits import delete_meal_plan_cascade
 
-    # Xóa notifications liên quan đến plan này
-    from app.models.notification import Notification
-    notifs = db.query(Notification).filter(Notification.user_id == plan.user_id).all()
-    for notif in notifs:
-        rel = notif.related_ids or {}
-        if isinstance(rel, dict) and rel.get("meal_plan_id") == meal_plan_id:
-            db.delete(notif)
-
-    db.delete(plan)
+    delete_meal_plan_cascade(db, plan)
     db.commit()
     return None
 

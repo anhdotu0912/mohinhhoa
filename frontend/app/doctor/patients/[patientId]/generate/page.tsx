@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { PatientCard, truncatePatientId } from "@/components/doctor/PatientCard";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
@@ -11,15 +11,6 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useQueueStore } from "@/lib/queue-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
-import {
-  formatDateFull,
-  parseFlexibleDate,
-} from "@/lib/plan-expiry";
-import {
-  parseSlotIntentParams,
-  saveSlotIntent,
-  type MealPlanSlotIntent,
-} from "@/lib/plan-slot-intent";
 
 const PRIORITY_OPTIONS = [
   "Ưu tiên món quen thuộc",
@@ -57,7 +48,6 @@ function toUiPatient(row: DoctorPatientSummary): Patient {
 export default function DoctorGenerateMealPlanPage() {
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
   const patientId = asRouteId(params?.patientId);
 
   const token = useAuthStore((s) => s.token);
@@ -80,6 +70,7 @@ export default function DoctorGenerateMealPlanPage() {
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
   const [enqueueing, setEnqueueing] = useState(false);
+  const [generateBlocked, setGenerateBlocked] = useState<string | null>(null);
 
   const openDrawer = useQueueStore((s) => s.openDrawer);
   const jobs = useQueueStore((s) => s.jobs);
@@ -88,43 +79,13 @@ export default function DoctorGenerateMealPlanPage() {
     () =>
       patientId
         ? jobs.find(
-            (j) =>
-              j.patientId === patientId &&
-              (j.status === "queued" || j.status === "processing")
-          )
+          (j) =>
+            j.patientId === patientId &&
+            (j.status === "queued" || j.status === "processing")
+        )
         : undefined,
     [jobs, patientId]
   );
-
-  const slotIntent = useMemo((): MealPlanSlotIntent | null => {
-    if (!patientId) return null;
-    return parseSlotIntentParams(patientId, searchParams);
-  }, [patientId, searchParams]);
-
-  const slotIntentLabel = useMemo(() => {
-    if (!slotIntent) return null;
-    const start = parseFlexibleDate(slotIntent.startsOn);
-    const end = start ? new Date(start) : null;
-    if (end) end.setDate(end.getDate() + 6);
-    const range =
-      start && end
-        ? `${formatDateFull(start)} – ${formatDateFull(end)}`
-        : slotIntent.startsOn;
-    if (slotIntent.action === "replace") {
-      return `Sẽ thay thế thực đơn tuần ${slotIntent.slotKey === "current" ? "này" : "sau"} (${range})`;
-    }
-    if (slotIntent.slotKey === "next") {
-      return `Sẽ gán vào tuần sau (${range})`;
-    }
-    if (slotIntent.slotKey === "current") {
-      return `Sẽ gán vào tuần hiện tại (${range})`;
-    }
-    return `Sẽ gán vào tuần trống (${range})`;
-  }, [slotIntent]);
-
-  useEffect(() => {
-    if (slotIntent) saveSlotIntent(slotIntent);
-  }, [slotIntent]);
 
   useEffect(() => {
     setHydrated(true);
@@ -172,6 +133,32 @@ export default function DoctorGenerateMealPlanPage() {
     void loadPatient();
   }, [loadPatient]);
 
+  useEffect(() => {
+    if (!patientId || !token) return;
+    void api
+      .getPatientMealPlanSchedule(patientId)
+      .then((schedule) => {
+        const pending = schedule.unassigned_plans.some(
+          (p) => p.status === "pending_review"
+        );
+        const approved = schedule.unassigned_plans.some(
+          (p) => p.status === "approved" || p.status === "edited"
+        );
+        if (pending) {
+          setGenerateBlocked(
+            "Bệnh nhân đã có thực đơn chờ duyệt. Hãy duyệt hoặc xóa trước khi tạo mới."
+          );
+        } else if (approved) {
+          setGenerateBlocked(
+            "Đã có thực đơn đã duyệt chưa áp dụng. Hãy áp dụng hoặc xóa trước khi tạo mới."
+          );
+        } else {
+          setGenerateBlocked(null);
+        }
+      })
+      .catch(() => setGenerateBlocked(null));
+  }, [patientId, token]);
+
   const filteredPatients = allPatients.filter((p) => {
     if (!patientSearch.trim()) return true;
     const q = patientSearch.toLowerCase().trim();
@@ -197,11 +184,10 @@ export default function DoctorGenerateMealPlanPage() {
 
   /** Đưa 1 bệnh nhân vào hàng đợi AI rồi chuyển sang trang theo dõi. */
   const handleStartGeneration = () => {
-    if (!patientId || !patient || enqueueing) return;
+    if (!patientId || !patient || enqueueing || generateBlocked) return;
 
     // Đã có job đang chờ/xử lý → mở bảng hàng đợi
     if (activeJob) {
-      if (slotIntent) saveSlotIntent(slotIntent);
       openDrawer();
       router.push("/doctor/patients/queue");
       return;
@@ -215,7 +201,6 @@ export default function DoctorGenerateMealPlanPage() {
     ];
 
     setEnqueueing(true);
-    if (slotIntent) saveSlotIntent(slotIntent);
     useQueueStore.getState().addJobs([
       {
         id: patientId,
@@ -226,7 +211,6 @@ export default function DoctorGenerateMealPlanPage() {
         gender: patient.gender,
         notes: aiNotes.trim() || undefined,
         priorities,
-        slotIntent: slotIntent ?? undefined,
       },
     ]);
     openDrawer();
@@ -251,7 +235,7 @@ export default function DoctorGenerateMealPlanPage() {
       <main className="p-6 md:p-8 max-w-7xl mx-auto">
         <p className="text-sm text-error mb-3">{loadError || "Không tìm thấy bệnh nhân."}</p>
         <Link href="/doctor/patients" className="text-xs font-semibold text-primary hover:underline">
-            Quay lại danh sách bệnh nhân
+          Quay lại danh sách bệnh nhân
         </Link>
       </main>
     );
@@ -260,28 +244,16 @@ export default function DoctorGenerateMealPlanPage() {
   return (
     <>
       <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-        {slotIntentLabel && (
-          <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 text-sm text-on-surface font-medium shadow-2xs">
-            <span className="material-symbols-outlined text-primary text-[18px] align-middle mr-1.5">
-              event_available
-            </span>
-            {slotIntentLabel}
-          </div>
-        )}
-        {slotIntent && (
-          <div className="flex items-center justify-between">
-            <Link
-              href={`/doctor/patients/${patient.id}/history`}
-              className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              Quay lại Lịch sử tuần
-            </Link>
+
+
+        {generateBlocked && (
+          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-950 font-medium">
+            {generateBlocked}
           </div>
         )}
 
         {activeJob && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border border-primary/30 bg-primary/5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-xl border border-primary/30 bg-primary/5 shadow-2xs">
             <div className="flex items-start gap-3 min-w-0">
               <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">
                 hourglass_top
@@ -299,7 +271,7 @@ export default function DoctorGenerateMealPlanPage() {
             </div>
             <Link
               href="/doctor/patients/queue"
-              className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer active:scale-95"
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs cursor-pointer active:scale-95"
             >
               Mở hàng đợi
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -308,7 +280,7 @@ export default function DoctorGenerateMealPlanPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle flex flex-col justify-between space-y-6">
+          <div className="lg:col-span-7 bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-subtle flex flex-col justify-between space-y-6">
             <div>
               <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/40 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -331,17 +303,17 @@ export default function DoctorGenerateMealPlanPage() {
                   <label className="font-label text-label text-on-surface block mb-1.5 font-bold text-xs uppercase tracking-wider">
                     Số ngày mỗi thực đơn bao phủ
                   </label>
-                  <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant/60 rounded-xl gap-1">
+                  <div className="inline-flex p-1 bg-surface-container-low border border-outline-variant/60 rounded-lg gap-1">
                     <button
                       type="button"
-                      className="px-4 py-1.5 rounded-lg text-xs font-bold bg-primary text-on-primary shadow-2xs"
+                      className="px-4 py-1.5 rounded-md text-xs font-bold bg-primary text-on-primary shadow-2xs"
                     >
                       7 ngày (Khuyến nghị)
                     </button>
-                    <span className="px-4 py-1.5 rounded-lg text-xs text-on-surface-variant/50 font-medium">
+                    <span className="px-4 py-1.5 rounded-md text-xs text-on-surface-variant/50 font-medium">
                       3 ngày
                     </span>
-                    <span className="px-4 py-1.5 rounded-lg text-xs text-on-surface-variant/50 font-medium">
+                    <span className="px-4 py-1.5 rounded-md text-xs text-on-surface-variant/50 font-medium">
                       14 ngày
                     </span>
                   </div>
@@ -372,11 +344,10 @@ export default function DoctorGenerateMealPlanPage() {
                           key={item}
                           type="button"
                           onClick={() => togglePriority(item)}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${
-                            isSelected
-                              ? "bg-primary text-on-primary border-primary"
-                              : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
-                          }`}
+                          className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${isSelected
+                            ? "bg-primary text-on-primary border-primary"
+                            : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
+                            }`}
                         >
                           {isSelected && (
                             <span className="material-symbols-outlined text-[14px]">check</span>
@@ -388,11 +359,10 @@ export default function DoctorGenerateMealPlanPage() {
                     <button
                       type="button"
                       onClick={() => setIsCustomPriorityActive(!isCustomPriorityActive)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${
-                        isCustomPriorityActive
-                          ? "bg-primary text-on-primary border-primary"
-                          : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
-                      }`}
+                      className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${isCustomPriorityActive
+                        ? "bg-primary text-on-primary border-primary"
+                        : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
+                        }`}
                     >
                       {isCustomPriorityActive && (
                         <span className="material-symbols-outlined text-[14px]">check</span>
@@ -407,7 +377,7 @@ export default function DoctorGenerateMealPlanPage() {
                         value={customPriorityText}
                         onChange={(e) => setCustomPriorityText(e.target.value)}
                         placeholder="Nhập ưu tiên đặc biệt khác..."
-                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                     </div>
                   )}
@@ -422,7 +392,7 @@ export default function DoctorGenerateMealPlanPage() {
                     onChange={(e) => setAiNotes(e.target.value)}
                     rows={3}
                     placeholder="Ví dụ: ưu tiên món hấp luộc miền Bắc, hạn chế đồ chiên xào..."
-                    className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-xl font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
+                    className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
                   />
                 </div>
               </div>
@@ -431,8 +401,8 @@ export default function DoctorGenerateMealPlanPage() {
             <div className="pt-6 border-t border-outline-variant/40 mt-6">
               <button
                 onClick={handleStartGeneration}
-                disabled={enqueueing}
-                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-on-primary font-bold py-3 px-6 rounded-xl transition-all shadow-2xs active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer"
+                disabled={enqueueing || Boolean(generateBlocked)}
+                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-on-primary font-bold py-3 px-6 rounded-lg transition-all shadow-2xs active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[20px]">
                   {activeJob ? "queue" : "playlist_add"}
@@ -451,7 +421,7 @@ export default function DoctorGenerateMealPlanPage() {
           </div>
 
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-subtle">
               <div className="flex justify-between items-center pb-3 border-b border-outline-variant/40 mb-4">
                 <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">person</span>
@@ -460,7 +430,7 @@ export default function DoctorGenerateMealPlanPage() {
                 <button
                   type="button"
                   onClick={() => setIsSelectModalOpen(true)}
-                  className="px-3 py-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-xl text-xs font-bold text-primary flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                  className="px-3 py-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg text-xs font-bold text-primary flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                   Thay đổi
@@ -492,7 +462,7 @@ export default function DoctorGenerateMealPlanPage() {
                 </div>
                 <div>
                   <span className="text-on-surface-variant block mb-1 font-semibold text-[11px] uppercase tracking-wider">Chẩn đoán:</span>
-                  <span className="px-3 py-1 bg-primary/10 text-primary font-bold rounded-full text-xs inline-block border border-primary/20">
+                  <span className="px-3 py-1 bg-primary/10 text-primary font-bold rounded-md text-xs inline-block border border-primary/20">
                     {patient.condition}
                   </span>
                 </div>
@@ -512,7 +482,7 @@ export default function DoctorGenerateMealPlanPage() {
               </div>
             </div>
 
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-subtle">
               <div className="flex justify-between items-center pb-3 border-b border-outline-variant/40 mb-3">
                 <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">gavel</span>
@@ -532,7 +502,7 @@ export default function DoctorGenerateMealPlanPage() {
 
       {isSelectModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden animate-scaleUp">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col overflow-hidden animate-scaleUp">
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-outline-variant/40 shrink-0">
               <div>
                 <h3 className="text-base font-bold text-on-surface">Chọn bệnh nhân để tạo thực đơn AI</h3>
@@ -542,7 +512,7 @@ export default function DoctorGenerateMealPlanPage() {
               </div>
               <button
                 onClick={() => setIsSelectModalOpen(false)}
-                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-xl hover:bg-surface-container-low transition-colors"
+                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -553,7 +523,7 @@ export default function DoctorGenerateMealPlanPage() {
                 value={patientSearch}
                 onChange={(e) => setPatientSearch(e.target.value)}
                 placeholder="Tìm theo tên, mã, hoặc bệnh lý..."
-                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                 autoFocus
               />
             </div>

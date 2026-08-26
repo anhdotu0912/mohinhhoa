@@ -314,7 +314,7 @@ def food_log_node(state: AgentState) -> AgentState:
         db.query(FoodLog)
         .filter(FoodLog.user_id == user_id)
         .order_by(FoodLog.logged_at.desc())
-        .limit(3)
+        .limit(4)
         .all()
     )
     if not logs:
@@ -327,7 +327,7 @@ def food_log_node(state: AgentState) -> AgentState:
             "food_log": None,
         }
 
-    slot_labels = {"morning": "Bữa sáng", "noon": "Bữa trưa", "evening": "Bữa tối"}
+    slot_labels = {"morning": "Bữa sáng", "noon": "Bữa trưa", "evening": "Bữa tối", "snack": "Bữa phụ"}
     lines = ["Ghi nhận bữa ăn gần đây của bạn:"]
     for log in reversed(logs):
         label = slot_labels.get(log.slot, log.slot)

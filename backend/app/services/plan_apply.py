@@ -199,6 +199,68 @@ def reconcile_overlapping_applied_plans(
     return unapplied
 
 
+def find_chain_end_date(
+    db: Session, user_id: str, today: date | None = None
+) -> date | None:
+    """Latest ends_on among applied plans still covering today or upcoming."""
+    today = today or date.today()
+    applied = (
+        db.query(MealPlan)
+        .filter(
+            MealPlan.user_id == user_id,
+            MealPlan.status.in_(APPLY_ELIGIBLE_STATUSES),
+            MealPlan.starts_on.isnot(None),
+            MealPlan.ends_on.isnot(None),
+            MealPlan.ends_on >= today,
+        )
+        .all()
+    )
+    if not applied:
+        return None
+    return max(row.ends_on for row in applied if row.ends_on is not None)
+
+
+def resolve_apply_request(
+    db: Session,
+    user_id: str,
+    *,
+    plan_id: str | None = None,
+    apply_mode: str | None = None,
+    start_date: date | None = None,
+    replace_active: bool = False,
+    today: date | None = None,
+) -> tuple[date, bool]:
+    """Map apply_mode (or legacy start_date) to concrete start + replace flag."""
+    from app.services.plan_limits import assert_can_apply_mode
+
+    today = today or date.today()
+    if apply_mode is not None and plan_id is not None:
+        assert_can_apply_mode(db, user_id, plan_id, apply_mode, today=today)
+    if apply_mode == "from_today":
+        active = find_active_plan(db, user_id, today)
+        return today, active is not None
+    if apply_mode == "after_current":
+        chain_end = find_chain_end_date(db, user_id, today)
+        if chain_end is None:
+            from app.core.errors import APIError
+
+            raise APIError(
+                400,
+                "NO_CHAIN_PLAN",
+                "Không có thực đơn đang chạy hoặc xếp sẵn để tiếp nối.",
+            )
+        return chain_end + timedelta(days=1), False
+    if start_date is None:
+        from app.core.errors import APIError
+
+        raise APIError(
+            400,
+            "APPLY_PARAMS_REQUIRED",
+            "Cần apply_mode hoặc start_date.",
+        )
+    return start_date, replace_active
+
+
 def apply_meal_plan(
     db: Session,
     plan_row: MealPlan,
@@ -245,7 +307,7 @@ def apply_meal_plan(
                 "Khoảng ngày trùng với thực đơn đang áp dụng. "
                 "Dùng Thay thế trên tuần đó, hoặc gán vào tuần trống khác.",
             )
-        if start_date <= active.starts_on:
+        if start_date < active.starts_on:
             raise APIError(
                 400,
                 "INVALID_REPLACE_DATE",

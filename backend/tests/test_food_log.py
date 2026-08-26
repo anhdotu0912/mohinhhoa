@@ -54,11 +54,22 @@ def test_create_food_log_custom_with_interaction_alert(client):
     assert len(linked) >= 1
 
 
+def test_create_food_log_snack_as_planned(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/food-log",
+        json={"slot": "snack", "type": "as_planned"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["slot"] == "snack"
+
+
 def test_list_food_logs_by_date(client):
     headers = _login(client, PATIENT)
     today = vn_today().isoformat()
 
-    for slot in ("morning", "noon", "evening"):
+    for slot in ("morning", "noon", "evening", "snack"):
         resp = client.post(
             "/api/v1/food-log",
             json={"slot": slot, "type": "as_planned"},
@@ -68,7 +79,7 @@ def test_list_food_logs_by_date(client):
 
     response = client.get(f"/api/v1/food-log?date={today}", headers=headers)
     assert response.status_code == 200
-    assert len(response.json()) == 3
+    assert len(response.json()) == 4
 
 
 def test_create_food_log_upserts_same_slot_same_vn_day(client):

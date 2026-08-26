@@ -82,6 +82,59 @@ def test_reset_password_invalid_token(client):
     assert response.json()["code"] == "INVALID_OR_EXPIRED_TOKEN"
 
 
+def test_change_password_success(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": "demo1234", "new_password": "newpass123"},
+    )
+    assert response.status_code == 200
+    assert "thành công" in response.json()["message"].lower()
+
+    old = client.post(
+        "/api/v1/auth/login",
+        json={"email": PATIENT, "password": "demo1234"},
+    )
+    assert old.status_code == 401
+
+    new = client.post(
+        "/api/v1/auth/login",
+        json={"email": PATIENT, "password": "newpass123"},
+    )
+    assert new.status_code == 200
+
+
+def test_change_password_wrong_current(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": "sai-mat-khau", "new_password": "newpass123"},
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == "INVALID_CREDENTIALS"
+
+
+def test_change_password_same_as_current(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": "demo1234", "new_password": "demo1234"},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "SAME_PASSWORD"
+
+
+def test_change_password_requires_auth(client):
+    response = client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "demo1234", "new_password": "newpass123"},
+    )
+    assert response.status_code == 401
+
+
 def test_metrics_incomplete(client):
     doctor_headers = _login(client, DOCTOR)
     patient_id = client.get("/api/v1/auth/me", headers=_login(client, PATIENT)).json()["id"]

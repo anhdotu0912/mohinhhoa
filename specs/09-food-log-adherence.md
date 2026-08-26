@@ -11,7 +11,7 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 
 ## 3. Business rules (as-built)
 1. **Phạm vi tối thiểu (theo ADR-009):** nhập tay có cấu trúc — mỗi bữa (theo slot) chọn 1 trong 2: `as_planned` (đã ăn theo kế hoạch) hoặc `custom` (ăn khác, kèm `note` free-text bắt buộc, validate bởi `FoodLogCreate.note_required_for_custom`). **Không** làm nhận diện ảnh món ăn, **không** làm NLP parse tự do thành danh sách món có định lượng dinh dưỡng — quá phức tạp cho quy mô demo, đã bị brief xếp Won't Have.
-2. **Slot vocabulary:** đúng 3 slot cố định `"morning" | "noon" | "evening"` (Bữa sáng/Bữa trưa/Bữa tối) — **không** mở rộng thêm slot thứ 4 để khớp meal plan. Hệ quả chấp nhận: food log không ghi nhận riêng cho "bữa phụ/snack" (Out of scope có chủ đích, không phải gap). Khi đối chiếu tuân thủ (`specs/10`), dùng ánh xạ gần đúng `morning≈breakfast`, `noon≈lunch`, `evening≈dinner`.
+2. **Slot vocabulary:** 4 slot cố định `"morning" | "noon" | "evening" | "snack"` (Bữa sáng/Bữa trưa/Bữa tối/Bữa phụ). Ánh xạ meal plan: `morning≈breakfast`, `noon≈lunch`, `evening≈dinner`, `snack≈snack`. Khi đối chiếu tuân thủ (`specs/10`), gồm cả bữa phụ.
 3. **Không có workflow duyệt** — `FoodLog.status` chỉ có `"logged"` (không có `pending`/`rejected` như meal plan), vì đây là ghi nhận thực tế đã xảy ra, không phải đề xuất cần bác sĩ chấp thuận.
 4. **Liên kết Alert (as-built):** khi log `type="custom"` với `note` không rỗng, `_persist_food_log_alerts` (`services/food_log_service.py`) gọi `interaction_checker_agent.check_interactions` với `medications` từ `Profile` của patient và `foods=[note]` — nếu khớp KB tương tác, tạo `Alert` mới (dùng lại đúng service chung ở `specs/08-drug-food-interaction-check.md`, không viết lại logic matching riêng) + gọi `NotificationService.on_alert_created`. `alert_ids[]` được ghi lại trên `FoodLog`.
 5. `FoodLog.user_id`/`meal_plan_id`/`id` đều kiểu `str` (UUID) — nhất quán convention toàn hệ thống.
@@ -21,7 +21,7 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 9. **Một user / một ngày VN / một slot = một log** — `POST /food-log` upsert row hiện có (giữ `id`) thay vì tạo bản ghi trùng khi bệnh nhân bấm lại.
 
 ## 4. Luồng chính (happy path)
-1. Patient mở trang ghi nhận bữa ăn (3 slot cố định: sáng/trưa/tối).
+1. Patient mở trang ghi nhận bữa ăn (4 slot cố định: sáng/trưa/tối/phụ).
 2. Với mỗi slot: chọn "Đã ăn theo kế hoạch" (→ `type="as_planned"`) hoặc "Ăn khác" (→ `type="custom"`, bắt buộc nhập `note`).
 3. FE gọi `POST /food-log`.
 4. BE persist `FoodLog`; nếu `custom` + khớp KB tương tác → tạo `Alert` liên kết (`alert_ids[]`).

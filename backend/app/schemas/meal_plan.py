@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.body_metrics import MetricsDeltaAdviceOut
 
@@ -73,11 +73,21 @@ class GenerateMealPlanRequest(BaseModel):
     priorities: list[str] = Field(default_factory=list)
 
 
+ApplyMode = Literal["from_today", "after_current"]
+
+
 class ApplyMealPlanRequest(BaseModel):
     """Doctor assigns validity window after HITL approval."""
-    start_date: date
+    start_date: date | None = None
     replace_active: bool = False
     slot_key: Literal["current", "next", "empty"] | None = None
+    apply_mode: ApplyMode | None = None
+
+    @model_validator(mode="after")
+    def require_start_or_mode(self) -> "ApplyMealPlanRequest":
+        if self.apply_mode is None and self.start_date is None:
+            raise ValueError("Cần apply_mode hoặc start_date.")
+        return self
 
 
 class RequestAdjustmentRequest(BaseModel):

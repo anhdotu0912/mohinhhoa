@@ -103,7 +103,7 @@ export function PatientListPage({
                 placeholder="Tìm tên, Mã BN (VD: BN-10293)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors shadow-2xs"
+                className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors shadow-2xs"
               />
             </div>
           </div>
@@ -113,7 +113,7 @@ export function PatientListPage({
         <div className="flex items-center gap-xs overflow-x-auto pb-sm mb-lg border-b border-outline-variant/60">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-md py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "all"
                 ? "bg-primary text-on-primary shadow-xs"
                 : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
@@ -123,7 +123,7 @@ export function PatientListPage({
           </button>
           <button
             onClick={() => setStatusFilter("attention")}
-            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-md py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "attention"
                 ? "bg-error text-on-error shadow-xs"
                 : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
@@ -133,7 +133,7 @@ export function PatientListPage({
           </button>
           <button
             onClick={() => setStatusFilter("warning")}
-            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-md py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "warning"
                 ? "bg-tertiary text-on-tertiary shadow-xs"
                 : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
@@ -143,7 +143,7 @@ export function PatientListPage({
           </button>
           <button
             onClick={() => setStatusFilter("stable")}
-            className={`px-md py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-md py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               statusFilter === "stable"
                 ? "bg-emerald-700 text-white shadow-xs"
                 : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
@@ -156,7 +156,7 @@ export function PatientListPage({
         {/* Patient Cards List */}
         <div className="flex flex-col gap-md">
           {filteredPatients.length === 0 ? (
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl text-center text-on-surface-variant">
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center text-on-surface-variant">
               <span className="material-symbols-outlined text-[48px] text-outline mb-sm">
                 person_search
               </span>

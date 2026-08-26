@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { DayNutritionDashboard } from "@/components/doctor/DayNutritionDashboard";
 import { TopBar } from "@/components/shared/TopBar";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
@@ -27,18 +27,9 @@ import {
 import { MealDishItem, MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type FoodCatalogItem, type MealPlanOutput } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
-import { formatDateIso } from "@/lib/plan-expiry";
-import { firstEmptyScheduleSlot } from "@/lib/plan-schedule-helpers";
-import {
-  buildHistoryHref,
-  clearSlotIntent,
-  loadSlotIntent,
-  parseSlotIntentParams,
-  saveSlotIntent,
-  type MealPlanSlotIntent,
-  type SlotIntentKey,
-} from "@/lib/plan-slot-intent";
-import { useQueueStore } from "@/lib/queue-store";
+import { formatDateFull, formatDateIso, parseFlexibleDate } from "@/lib/plan-expiry";
+import { buildHistoryHref } from "@/lib/plan-slot-intent";
+import type { ApplyMode, MealPlanScheduleOut } from "@/lib/types";
 
 type MealSlot = MealSlotKey;
 
@@ -46,6 +37,7 @@ const SLOT_LABELS: Record<MealSlot, { title: string; icon: string; iconClass: st
   breakfast: { title: "Bữa sáng (07:00 - 08:00)", icon: "wb_sunny", iconClass: "text-amber-500" },
   lunch: { title: "Bữa trưa (11:30 - 12:30)", icon: "sunny", iconClass: "text-amber-600" },
   dinner: { title: "Bữa tối (18:00 - 19:00)", icon: "nights_stay", iconClass: "text-indigo-500" },
+  snack: { title: "Bữa phụ (15:30)", icon: "cookie", iconClass: "text-emerald-600" },
 };
 
 function clonePlan(plan: MealPlanOutput): MealPlanOutput {
@@ -65,21 +57,6 @@ function realAvatarUrl(avatar?: string | null): string | null {
   return assetUrl(avatar) || avatar;
 }
 
-function existingSnackDishes(plan: MealPlanOutput, dayIndex: number): MealDishItem[] {
-  const day = plan.days.find((d) => d.day_index === dayIndex);
-  const snack = day?.meals.find((m) => m.slot === "snack");
-  if (!snack) return [];
-  return snack.items.map((item) => ({
-    name: item.name,
-    calories: Math.round(item.kcal),
-    salt: Math.round(((item.macros?.sodium_mg ?? 0) / 1000) * 10) / 10,
-    sugar: 0,
-    carbG: item.macros?.carb_g ?? 0,
-    foodId: item.food_id,
-    alternatives: [],
-  }));
-}
-
 function warningSlotsForDay(
   breakfast: MealDishItem[],
   lunch: MealDishItem[],
@@ -92,7 +69,6 @@ function warningSlotsForDay(
 export default function PlanReviewDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
 
   const patientId = asRouteId(params?.patientId);
   const planId = asRouteId(params?.planId);
@@ -113,6 +89,7 @@ export default function PlanReviewDetailPage() {
   const [breakfast, setBreakfast] = useState<MealDishItem[]>([]);
   const [lunch, setLunch] = useState<MealDishItem[]>([]);
   const [dinner, setDinner] = useState<MealDishItem[]>([]);
+  const [snack, setSnack] = useState<MealDishItem[]>([]);
   const [dirty, setDirty] = useState(false);
 
   /** Slot đang mở chế độ chỉnh sửa món (null = đang xem). */
@@ -122,12 +99,8 @@ export default function PlanReviewDetailPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showApplyPrompt, setShowApplyPrompt] = useState(false);
-  const [applyStartDate, setApplyStartDate] = useState(() =>
-    formatDateIso(new Date())
-  );
   const [applyingPlan, setApplyingPlan] = useState(false);
-  const [slotIntent, setSlotIntent] = useState<MealPlanSlotIntent | null>(null);
-  const [suggestedSlotKey, setSuggestedSlotKey] = useState<SlotIntentKey | null>(
+  const [patientSchedule, setPatientSchedule] = useState<MealPlanScheduleOut | null>(
     null
   );
 
@@ -142,6 +115,7 @@ export default function PlanReviewDetailPage() {
     breakfast: true,
     lunch: true,
     dinner: true,
+    snack: true,
   });
 
   const daysList = plan?.days && plan.days.length > 0 ? plan.days : [];
@@ -153,19 +127,14 @@ export default function PlanReviewDetailPage() {
     [rawPlan?.profile_snapshot]
   );
 
-  const snackItems = useMemo(() => {
-    if (!rawPlan) return currentDayData?.snack || [];
-    return existingSnackDishes(rawPlan, activeDayIndex);
-  }, [rawPlan, activeDayIndex, currentDayData?.snack]);
-
   const slotKcal = useMemo(
     () => ({
       breakfast: slotCalories(breakfast),
       lunch: slotCalories(lunch),
       dinner: slotCalories(dinner),
-      snack: slotCalories(snackItems),
+      snack: slotCalories(snack),
     }),
-    [breakfast, lunch, dinner, snackItems]
+    [breakfast, lunch, dinner, snack]
   );
 
   const dayCalories =
@@ -175,16 +144,17 @@ export default function PlanReviewDetailPage() {
     breakfast.reduce((sum, item) => sum + item.salt, 0) +
     lunch.reduce((sum, item) => sum + item.salt, 0) +
     dinner.reduce((sum, item) => sum + item.salt, 0) +
-    snackItems.reduce((sum, item) => sum + item.salt, 0);
+    snack.reduce((sum, item) => sum + item.salt, 0);
 
   const daySugar =
     breakfast.reduce((sum, item) => sum + item.sugar, 0) +
     lunch.reduce((sum, item) => sum + item.sugar, 0) +
-    dinner.reduce((sum, item) => sum + item.sugar, 0);
+    dinner.reduce((sum, item) => sum + item.sugar, 0) +
+    snack.reduce((sum, item) => sum + item.sugar, 0);
 
   const activeWarningSlots = useMemo(
-    () => warningSlotsForDay(breakfast, lunch, dinner, snackItems),
-    [breakfast, lunch, dinner, snackItems]
+    () => warningSlotsForDay(breakfast, lunch, dinner, snack),
+    [breakfast, lunch, dinner, snack]
   );
 
   const warningBundle = useMemo(
@@ -202,11 +172,13 @@ export default function PlanReviewDetailPage() {
     breakfast: warningBundle.hard.breakfast,
     lunch: warningBundle.hard.lunch,
     dinner: warningBundle.hard.dinner,
+    snack: warningBundle.hard.snack,
   };
   const advisoryBySlot = {
     breakfast: warningBundle.advisory.breakfast,
     lunch: warningBundle.advisory.lunch,
     dinner: warningBundle.advisory.dinner,
+    snack: warningBundle.advisory.snack,
   };
   const dayOnlyWarnings = warningBundle.hard.day;
   const dayAdvisoryWarnings = warningBundle.advisory.day;
@@ -218,9 +190,7 @@ export default function PlanReviewDetailPage() {
 
   const daySwaps = useMemo(() => {
     if (!rawPlan) return [];
-    return (rawPlan.swaps || []).filter(
-      (s) => s.day_index === activeDayIndex && s.slot !== "snack"
-    );
+    return (rawPlan.swaps || []).filter((s) => s.day_index === activeDayIndex);
   }, [rawPlan, activeDayIndex]);
 
   const hardWarningCount = useMemo(() => {
@@ -252,6 +222,34 @@ export default function PlanReviewDetailPage() {
   const isReviewable = status === "pending" || status === "edited";
   const canEdit = isReviewable;
 
+  const todayRangeLabel = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return `${formatDateFull(start)} – ${formatDateFull(end)}`;
+  }, []);
+
+  const chainApplyInfo = useMemo(() => {
+    if (!patientSchedule) return { hasChain: false, nextStartLabel: null as string | null };
+    const active = patientSchedule.active_plan;
+    const upcoming = patientSchedule.slots.find(
+      (slot) => slot.occupancy === "upcoming" && slot.plan
+    );
+    const chainEndIso = upcoming?.ends_on ?? active?.ends_on ?? null;
+    if (!chainEndIso) return { hasChain: false, nextStartLabel: null };
+    const chainEnd = parseFlexibleDate(chainEndIso);
+    if (!chainEnd) return { hasChain: false, nextStartLabel: null };
+    const nextStart = new Date(chainEnd);
+    nextStart.setDate(nextStart.getDate() + 1);
+    const nextEnd = new Date(nextStart);
+    nextEnd.setDate(nextEnd.getDate() + 6);
+    return {
+      hasChain: true,
+      nextStartLabel: `${formatDateFull(nextStart)} – ${formatDateFull(nextEnd)}`,
+    };
+  }, [patientSchedule]);
+
   const avatarSrc = realAvatarUrl(patient?.avatar);
 
   const syncSlotsFromPlan = useCallback((uiPlan: MealPlanItem, dayIdx: number) => {
@@ -260,11 +258,13 @@ export default function PlanReviewDetailPage() {
       setBreakfast([]);
       setLunch([]);
       setDinner([]);
+      setSnack([]);
       return;
     }
     setBreakfast(day.breakfast || []);
     setLunch(day.lunch || []);
     setDinner(day.dinner || []);
+    setSnack(day.snack || []);
   }, []);
 
   const applyRawToUi = useCallback(
@@ -298,51 +298,10 @@ export default function PlanReviewDetailPage() {
   useEffect(() => {
     setHydrated(true);
     if (!patientId) return;
-
-    const fromUrl = parseSlotIntentParams(patientId, searchParams);
-    if (fromUrl) {
-      setSlotIntent(fromUrl);
-      setApplyStartDate(fromUrl.startsOn);
-      saveSlotIntent(fromUrl);
-      return;
-    }
-
-    const jobs = useQueueStore.getState().jobs;
-    const job =
-      jobs.find(
-        (j) =>
-          j.patientId === patientId &&
-          j.slotIntent &&
-          j.planIds?.includes(planId ?? "")
-      ) ??
-      jobs.find(
-        (j) =>
-          j.patientId === patientId &&
-          j.slotIntent &&
-          (!j.planIds || j.planIds.length === 0)
-      );
-    if (job?.slotIntent) {
-      setSlotIntent(job.slotIntent);
-      setApplyStartDate(job.slotIntent.startsOn);
-      saveSlotIntent({ ...job.slotIntent, planId: planId ?? job.slotIntent.planId });
-      return;
-    }
-
-    const fromStorage = loadSlotIntent(patientId, planId);
-    if (fromStorage) {
-      setSlotIntent(fromStorage);
-      setApplyStartDate(fromStorage.startsOn);
-      return;
-    }
-
-    void api.getPatientMealPlanSchedule(patientId).then((sched) => {
-      const emptySlot = firstEmptyScheduleSlot(sched);
-      if (emptySlot) {
-        setApplyStartDate(emptySlot.starts_on);
-        setSuggestedSlotKey(emptySlot.slot_key);
-      }
+    void api.getPatientMealPlanSchedule(patientId).then(setPatientSchedule).catch(() => {
+      setPatientSchedule(null);
     });
-  }, [patientId, planId, searchParams]);
+  }, [patientId]);
 
   const load = useCallback(async () => {
     if (!planId || !patientId) return;
@@ -385,12 +344,12 @@ export default function PlanReviewDetailPage() {
           breakfast,
           lunch,
           dinner,
-          snack: existingSnackDishes(base, activeDayIndex),
+          snack,
         },
         { warnings: dayHardWarnings }
       );
     },
-    [activeDayIndex, breakfast, lunch, dinner, dayHardWarnings]
+    [activeDayIndex, breakfast, lunch, dinner, snack, dayHardWarnings]
   );
 
   const handleSelectDay = (dayIdx: number) => {
@@ -422,33 +381,21 @@ export default function PlanReviewDetailPage() {
 
   const markDirty = () => setDirty(true);
 
-  const applyIntentToPlan = useCallback(
-    async (intent: MealPlanSlotIntent) => {
-      const payload = {
-        start_date: intent.startsOn.slice(0, 10),
-        replace_active: intent.replaceActive,
-        slot_key: intent.slotKey,
-      };
-      try {
-        await api.applyMealPlan(planId, payload);
-        return payload.start_date;
-      } catch (err) {
-        if (!(err instanceof ApiError) || err.code !== "INVALID_SLOT_START") {
-          throw err;
-        }
-        const sched = await api.getPatientMealPlanSchedule(patientId);
-        const live = sched.slots.find((slot) => slot.slot_key === intent.slotKey);
-        if (!live) throw err;
-        await api.applyMealPlan(planId, {
-          start_date: live.starts_on.slice(0, 10),
-          replace_active: intent.replaceActive,
-          slot_key: intent.slotKey,
-        });
-        return live.starts_on.slice(0, 10);
-      }
-    },
-    [planId, patientId]
-  );
+  const handleApplyWithMode = async (mode: ApplyMode) => {
+    setApplyingPlan(true);
+    try {
+      const applied = await api.applyMealPlan(planId, { apply_mode: mode });
+      showToast("Đã áp dụng thực đơn.");
+      setShowApplyPrompt(false);
+      router.push(buildHistoryHref(patientId, applied.starts_on ?? formatDateIso(new Date())));
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : "Không áp dụng được thực đơn."
+      );
+    } finally {
+      setApplyingPlan(false);
+    }
+  };
 
   const handleApprove = async () => {
     if (editingSlot) {
@@ -470,26 +417,7 @@ export default function PlanReviewDetailPage() {
       await api.reviewMealPlan(planId, { action: "approve" });
       setStatus("approved");
       showToast("Đã duyệt thực đơn.");
-      if (slotIntent) {
-        setApplyingPlan(true);
-        try {
-          const appliedStart = await applyIntentToPlan(slotIntent);
-          clearSlotIntent();
-          showToast("Đã áp dụng thực đơn vào lịch tuần.");
-          router.push(buildHistoryHref(patientId, appliedStart));
-        } catch (applyErr) {
-          showToast(
-            applyErr instanceof ApiError
-              ? applyErr.message
-              : "Không áp dụng được thực đơn."
-          );
-          setShowApplyPrompt(true);
-        } finally {
-          setApplyingPlan(false);
-        }
-      } else {
-        setShowApplyPrompt(true);
-      }
+      setShowApplyPrompt(true);
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
       if (err instanceof ApiError && err.code === "PLAN_ALREADY_REVIEWED") {
@@ -500,37 +428,9 @@ export default function PlanReviewDetailPage() {
     }
   };
 
-  const handleApplyAfterApprove = async () => {
-    if (!applyStartDate) return;
-    const slotKey = slotIntent?.slotKey ?? suggestedSlotKey ?? undefined;
-    const replaceActive =
-      slotIntent?.replaceActive ?? (slotKey === "current");
-    setApplyingPlan(true);
-    try {
-      if (slotIntent) {
-        const appliedStart = await applyIntentToPlan(slotIntent);
-        clearSlotIntent();
-        showToast("Đã áp dụng thực đơn.");
-        setShowApplyPrompt(false);
-        router.push(buildHistoryHref(patientId, appliedStart));
-        return;
-      }
-      await api.applyMealPlan(planId, {
-        start_date: applyStartDate,
-        replace_active: replaceActive,
-        slot_key: slotKey,
-      });
-      clearSlotIntent();
-      showToast("Đã áp dụng thực đơn.");
-      setShowApplyPrompt(false);
-      router.push(buildHistoryHref(patientId, applyStartDate));
-    } catch (err) {
-      showToast(
-        err instanceof ApiError ? err.message : "Không áp dụng được thực đơn."
-      );
-    } finally {
-      setApplyingPlan(false);
-    }
+  const handleSkipApply = () => {
+    setShowApplyPrompt(false);
+    router.push(`/doctor/patients/${patientId}/history`);
   };
 
   const handleRejectConfirm = async () => {
@@ -616,6 +516,7 @@ export default function PlanReviewDetailPage() {
     if (meal === "breakfast") setBreakfast((list) => list.filter((_, i) => i !== index));
     if (meal === "lunch") setLunch((list) => list.filter((_, i) => i !== index));
     if (meal === "dinner") setDinner((list) => list.filter((_, i) => i !== index));
+    if (meal === "snack") setSnack((list) => list.filter((_, i) => i !== index));
   };
 
   const openAddDish = (slot: MealSlot) => {
@@ -677,6 +578,7 @@ export default function PlanReviewDetailPage() {
     if (addingToSlot === "breakfast") setBreakfast((list) => [...list, newItem]);
     if (addingToSlot === "lunch") setLunch((list) => [...list, newItem]);
     if (addingToSlot === "dinner") setDinner((list) => [...list, newItem]);
+    if (addingToSlot === "snack") setSnack((list) => [...list, newItem]);
     closeAddDish();
     showToast(`Đã thêm «${food.name}».`);
   };
@@ -708,6 +610,7 @@ export default function PlanReviewDetailPage() {
     if (meal === "breakfast") setBreakfast(replace);
     if (meal === "lunch") setLunch(replace);
     if (meal === "dinner") setDinner(replace);
+    if (meal === "snack") setSnack(replace);
   };
 
   const slotSwaps = (slot: MealSlot) =>
@@ -729,7 +632,7 @@ export default function PlanReviewDetailPage() {
     return (
       <div
         key={slot}
-        className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-md shadow-xs"
+        className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-xs"
       >
         <div className="flex items-center justify-between gap-sm pb-sm border-b border-outline-variant/60">
           <div className="flex items-center gap-xs min-w-0 flex-1">
@@ -861,13 +764,13 @@ export default function PlanReviewDetailPage() {
             </div>
 
             {slotWarnings.length > 0 && (
-              <div className="p-sm bg-red-50 border border-red-200 rounded-xl space-y-xs">
-                <div className="flex items-center gap-xs text-red-900">
+              <div className="p-3 bg-rose-50/80 border border-rose-200/70 rounded-lg space-y-1">
+                <div className="flex items-center gap-1.5 text-rose-800">
                   <span className="material-symbols-outlined text-[16px]">error</span>
                   <strong className="text-[11px] font-bold">Vi phạm lâm sàng</strong>
                 </div>
                 {slotWarnings.map((w) => (
-                  <p key={w} className="text-xs text-red-950 leading-relaxed">
+                  <p key={w} className="text-xs text-rose-900 leading-relaxed">
                     {w}
                   </p>
                 ))}
@@ -875,13 +778,13 @@ export default function PlanReviewDetailPage() {
             )}
 
             {slotAdvisory.length > 0 && (
-              <div className="p-sm bg-sky-50 border border-sky-200 rounded-xl space-y-xs">
-                <div className="flex items-center gap-xs text-sky-900">
+              <div className="p-3 bg-slate-100 border border-slate-200/80 rounded-lg space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-800">
                   <span className="material-symbols-outlined text-[16px]">info</span>
                   <strong className="text-[11px] font-bold">Gợi ý (không chặn duyệt)</strong>
                 </div>
                 {slotAdvisory.map((w) => (
-                  <p key={w} className="text-xs text-sky-950 leading-relaxed">
+                  <p key={w} className="text-xs text-slate-700 leading-relaxed">
                     {w}
                   </p>
                 ))}
@@ -889,12 +792,12 @@ export default function PlanReviewDetailPage() {
             )}
 
             {swaps.length > 0 && (
-              <div className="p-sm bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-950 space-y-1">
-                <strong className="font-bold block text-[11px]">
+              <div className="p-3 bg-slate-100 border border-slate-200/80 rounded-lg text-xs text-slate-800 space-y-1">
+                <strong className="font-bold block text-[11px] text-slate-900">
                   Đổi món do tương tác thuốc–thực phẩm
                 </strong>
                 {swaps.map((s, idx) => (
-                  <p key={idx}>
+                  <p key={idx} className="text-slate-700">
                     {(s.from || "—") + " → " + s.to}
                     {s.reason ? ` — ${s.reason}` : ""}
                   </p>
@@ -958,7 +861,7 @@ export default function PlanReviewDetailPage() {
       <TopBar title={`Chi tiết thực đơn - ${plan.planTitle}`} />
 
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-xl shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
+        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-lg shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">
             check_circle
           </span>
@@ -977,7 +880,7 @@ export default function PlanReviewDetailPage() {
           </Link>
         </div>
 
-        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-subtle">
+        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-subtle">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/40">
             <div className="flex items-center gap-4 min-w-0">
               {avatarSrc ? (
@@ -999,7 +902,7 @@ export default function PlanReviewDetailPage() {
                   <h2 className="font-h1 text-h1 text-on-surface font-bold text-lg truncate">
                     {patient.name}
                   </h2>
-                  <span className="font-mono text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">
+                  <span className="font-mono text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-md">
                     {patient.id}
                   </span>
                 </div>
@@ -1012,31 +915,31 @@ export default function PlanReviewDetailPage() {
 
             <div className="flex items-center gap-2 flex-wrap">
               {status === "pending" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   Chờ duyệt
                 </span>
               )}
               {status === "approved" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
                   <span className="material-symbols-outlined text-[14px]">check_circle</span>
                   Đã duyệt
                 </span>
               )}
               {status === "edited" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
                   <span className="material-symbols-outlined text-[14px]">edit_note</span>
                   Đã chỉnh sửa
                 </span>
               )}
               {status === "rejected" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
                   <span className="material-symbols-outlined text-[14px]">cancel</span>
                   Đã từ chối
                 </span>
               )}
               {hardWarningCount > 0 && isReviewable && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-900 border border-rose-300">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
                   {hardWarningCount} vi phạm lâm sàng
                 </span>
               )}
@@ -1056,64 +959,49 @@ export default function PlanReviewDetailPage() {
           </div>
         </div>
 
-        {slotIntent && isReviewable && (
-          <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 text-sm text-on-surface shadow-2xs font-medium">
-            Sau khi duyệt, thực đơn sẽ được gán vào{" "}
-            <strong>
-              {slotIntent.slotKey === "next"
-                ? "tuần sau"
-                : slotIntent.slotKey === "current"
-                  ? "tuần hiện tại"
-                  : "tuần trống"}
-            </strong>{" "}
-            ({slotIntent.startsOn}, 7 ngày).
-          </div>
-        )}
-
         {showApplyPrompt && (
-          <div className="p-5 rounded-2xl border border-primary/30 bg-primary/5 flex flex-col sm:flex-row sm:items-end gap-4 shadow-2xs">
-            <div className="flex-1">
+          <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 flex flex-col gap-4 shadow-2xs">
+            <div>
               <p className="text-sm font-bold text-on-surface">
-                {slotIntent
-                  ? "Áp dụng thực đơn vào lịch tuần?"
-                  : "Áp dụng thực đơn từ ngày nào?"}
+                Áp dụng thực đơn cho bệnh nhân?
               </p>
-              <p className="text-xs text-on-surface-variant mt-1 mb-3">
-                {slotIntent
-                  ? `Thực đơn đã duyệt — sẽ gán từ ${applyStartDate} (7 ngày) hoặc bỏ qua để xếp lịch sau trên trang lịch sử.`
-                  : suggestedSlotKey
-                    ? `Tuần này đang có thực đơn — đề xuất gán từ ${applyStartDate} (tuần trống tiếp theo). Có thể bỏ qua và gán sau trên trang lịch sử.`
-                    : "Thực đơn đã duyệt — chọn ngày bắt đầu (7 ngày) hoặc bỏ qua để xếp lịch sau trên trang lịch sử."}
+              <p className="text-xs text-on-surface-variant mt-1">
+                Thực đơn đã duyệt — chọn thời điểm bắt đầu 7 ngày, hoặc bỏ qua để xếp lịch sau
+                trên trang lịch sử.
               </p>
-              {!slotIntent && !suggestedSlotKey && (
-                <input
-                  type="date"
-                  value={applyStartDate}
-                  onChange={(e) => setApplyStartDate(e.target.value)}
-                  className="rounded-xl border border-outline-variant/60 px-3 py-1.5 text-sm bg-surface font-mono"
-                />
-              )}
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2">
               <button
                 type="button"
                 disabled={applyingPlan}
-                onClick={() => void handleApplyAfterApprove()}
-                className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+                onClick={() => void handleApplyWithMode("from_today")}
+                className="px-4 py-2.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs disabled:opacity-50 cursor-pointer text-left"
               >
-                {applyingPlan ? "Đang áp dụng..." : "Áp dụng luôn"}
+                {applyingPlan ? "Đang áp dụng..." : "Bắt đầu hôm nay"}
+                <span className="block text-[10px] font-medium opacity-90 mt-0.5">
+                  {todayRangeLabel}
+                  {patientSchedule?.active_plan
+                    ? " · thay thế thực đơn đang chạy"
+                    : ""}
+                </span>
               </button>
+              {chainApplyInfo.hasChain && (
+                <button
+                  type="button"
+                  disabled={applyingPlan}
+                  onClick={() => void handleApplyWithMode("after_current")}
+                  className="px-4 py-2.5 rounded-lg border border-primary/40 bg-white text-primary text-xs font-bold hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer text-left"
+                >
+                  Xếp tiếp nối
+                  <span className="block text-[10px] font-medium text-on-surface-variant mt-0.5">
+                    {chainApplyInfo.nextStartLabel}
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  setShowApplyPrompt(false);
-                  router.push(
-                    slotIntent
-                      ? buildHistoryHref(patientId, slotIntent.startsOn)
-                      : `/doctor/patients/${patientId}/meals`
-                  );
-                }}
-                className="px-4 py-2 rounded-xl border border-outline-variant/60 text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+                onClick={handleSkipApply}
+                className="px-4 py-2.5 rounded-lg border border-outline-variant/60 text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Bỏ qua
               </button>
@@ -1122,7 +1010,7 @@ export default function PlanReviewDetailPage() {
         )}
 
         {daysList.length > 0 && (
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-3 shadow-2xs overflow-x-auto">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-3 shadow-2xs overflow-x-auto">
             <div className="flex items-center gap-2 min-w-max">
               <span className="text-xs font-bold text-on-surface-variant px-2 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[18px] text-primary">
@@ -1150,7 +1038,7 @@ export default function PlanReviewDetailPage() {
                     key={d.dayIndex}
                     type="button"
                     onClick={() => handleSelectDay(d.dayIndex)}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                       isDayActive
                         ? "bg-primary text-on-primary shadow-2xs font-bold"
                         : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
@@ -1196,17 +1084,18 @@ export default function PlanReviewDetailPage() {
                 Chi tiết khẩu phần: {currentDayData?.dayName || `Ngày ${activeDayIndex}`}
               </h3>
               <span className="text-xs text-on-surface-variant font-medium">
-                {breakfast.length + lunch.length + dinner.length} món ăn
+                {breakfast.length + lunch.length + dinner.length + snack.length} món ăn
               </span>
             </div>
 
             {renderMealSection("breakfast", breakfast)}
             {renderMealSection("lunch", lunch)}
             {renderMealSection("dinner", dinner)}
+            {renderMealSection("snack", snack)}
           </div>
 
           <div className="space-y-4">
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle">
+            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle">
               <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-3 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-[18px]">
                   menu_book
@@ -1222,7 +1111,7 @@ export default function PlanReviewDetailPage() {
                   {plan.citations.map((cite, idx) => (
                     <li
                       key={idx}
-                      className="flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-xl border border-outline-variant/40 font-medium"
+                      className="flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-lg border border-outline-variant/40 font-medium"
                     >
                       <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
                         verified
@@ -1264,7 +1153,7 @@ export default function PlanReviewDetailPage() {
                 type="button"
                 onClick={() => setRejectModalOpen(true)}
                 disabled={saving || !!editingSlot}
-                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[18px]">cancel</span>
                 <span>Từ chối thực đơn này</span>
@@ -1273,7 +1162,7 @@ export default function PlanReviewDetailPage() {
                 type="button"
                 onClick={() => void handleApprove()}
                 disabled={saving || !canApprove}
-                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-on-primary rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
                 <span>{saving ? "Đang xử lý…" : "Duyệt thực đơn này"}</span>
@@ -1285,7 +1174,7 @@ export default function PlanReviewDetailPage() {
 
       {addingToSlot && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <h4 className="font-h2 text-h2 font-bold text-on-surface text-base">
                 Thêm món vào{" "}
@@ -1293,12 +1182,14 @@ export default function PlanReviewDetailPage() {
                   ? "bữa sáng"
                   : addingToSlot === "lunch"
                     ? "bữa trưa"
-                    : "bữa tối"}
+                    : addingToSlot === "dinner"
+                      ? "bữa tối"
+                      : "bữa phụ"}
               </h4>
               <button
                 type="button"
                 onClick={closeAddDish}
-                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-xl hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface p-1.5 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
                 aria-label="Đóng"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -1315,7 +1206,7 @@ export default function PlanReviewDetailPage() {
                 onChange={(e) => setFoodQuery(e.target.value)}
                 placeholder="Tìm món trong catalog (vd: ức gà, cơm lứt…)"
                 autoFocus
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
               />
             </div>
 
@@ -1327,7 +1218,7 @@ export default function PlanReviewDetailPage() {
                   : `Hiển thị ${foodResults.length}/${foodTotal} món từ database`}
             </p>
 
-            <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/60 rounded-2xl divide-y divide-outline-variant/40 max-h-[50vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/60 rounded-lg divide-y divide-outline-variant/40 max-h-[50vh]">
               {!foodLoading && foodResults.length === 0 ? (
                 <p className="text-xs text-on-surface-variant italic p-6 text-center">
                   Không tìm thấy món phù hợp.
@@ -1370,7 +1261,7 @@ export default function PlanReviewDetailPage() {
               <button
                 type="button"
                 onClick={closeAddDish}
-                className="px-4 py-2 border border-outline-variant/60 rounded-xl text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="px-4 py-2 border border-outline-variant/60 rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -1381,7 +1272,7 @@ export default function PlanReviewDetailPage() {
 
       {rejectModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-4 animate-scaleUp overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-4 animate-scaleUp overflow-hidden">
             <h4 className="font-h2 text-h2 font-bold text-on-surface text-base">
               Lý do từ chối thực đơn
             </h4>
@@ -1389,13 +1280,13 @@ export default function PlanReviewDetailPage() {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Nhập lý do hoặc chỉ dẫn điều chỉnh…"
-              className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-xl text-xs h-28 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
+              className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs h-28 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none transition-all"
             />
             <div className="flex justify-end gap-3 pt-3 border-t border-outline-variant/40">
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(false)}
-                className="px-4 py-2 border border-outline-variant/60 rounded-xl text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+                className="px-4 py-2 border border-outline-variant/60 rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -1403,7 +1294,7 @@ export default function PlanReviewDetailPage() {
                 type="button"
                 onClick={() => void handleRejectConfirm()}
                 disabled={!rejectReason.trim() || saving}
-                className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-bold hover:bg-rose-700 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
               >
                 {saving ? "Đang gửi…" : "Xác nhận từ chối"}
               </button>
@@ -1428,7 +1319,7 @@ function DishRow({
 }) {
   const alts = item.alternatives || [];
   return (
-    <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-xl text-xs space-y-2">
+    <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-lg text-xs space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="font-bold text-on-surface font-body break-words min-w-0 text-xs">
           {item.name}
@@ -1459,7 +1350,7 @@ function DishRow({
               type="button"
               onClick={() => onSwap(alt)}
               disabled={!isEditing}
-              className="px-2.5 py-0.5 rounded-full border border-outline-variant/60 text-[11px] font-medium text-on-surface-variant hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default shadow-2xs"
+              className="px-2.5 py-0.5 rounded-md border border-outline-variant/60 text-[11px] font-medium text-on-surface-variant hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default shadow-2xs"
               title={`${alt.calories} kcal`}
             >
               {alt.name}

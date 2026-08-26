@@ -236,12 +236,6 @@ type Props = {
 
 export function MetricsOverlayChart({ history, loading = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [enabled, setEnabled] = useState<Record<MetricSeriesId, boolean>>(() =>
-    Object.fromEntries(METRIC_SERIES.map((s) => [s.id, s.defaultOn])) as Record<
-      MetricSeriesId,
-      boolean
-    >
-  );
   const [focused, setFocused] = useState<MetricSeriesId>("glucose_fasting");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -260,7 +254,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
 
   const hasAny = historyDays.some((d) => METRIC_SERIES.some((s) => d.values[s.id] != null));
   const focusedSeries = METRIC_SERIES.find((s) => s.id === focused) ?? METRIC_SERIES[0];
-  const visible = METRIC_SERIES.filter((s) => enabled[s.id]);
+  const visible = [focusedSeries];
 
   const focusedDomain = useMemo(() => {
     const observed = historyDays
@@ -272,33 +266,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
     return yDomain(observed, [...forecast, ...extra]);
   }, [historyDays, forecasts, focused, focusedSeries]);
 
-  const seriesDomain = useMemo(() => {
-    const map = {} as Record<MetricSeriesId, [number, number]>;
-    for (const series of METRIC_SERIES) {
-      const observed = historyDays
-        .map((d) => d.values[series.id])
-        .filter((v): v is number => v != null);
-      const forecast = (forecasts[series.id] ?? []).filter((v): v is number => v != null);
-      const extra: number[] = [];
-      if (series.targetMax != null) extra.push(series.targetMax);
-      map[series.id] = yDomain(observed, [...forecast, ...extra]);
-    }
-    return map;
-  }, [historyDays, forecasts]);
-
   const onChip = (id: MetricSeriesId) => {
-    const isOn = enabled[id];
-    if (isOn && focused === id) {
-      const remaining = visible.filter((s) => s.id !== id);
-      setEnabled((prev) => ({ ...prev, [id]: false }));
-      if (remaining[0]) setFocused(remaining[0].id);
-      return;
-    }
-    if (isOn) {
-      setFocused(id);
-      return;
-    }
-    setEnabled((prev) => ({ ...prev, [id]: true }));
     setFocused(id);
   };
 
@@ -323,41 +291,36 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
     <section className="space-y-3.5">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h3 className="font-bold text-sm text-slate-900">Xu hướng 7 ngày</h3>
+          <h3 className="font-bold text-sm text-slate-900">Xu hướng &amp; Dự đoán 7 ngày</h3>
           <p className="text-xs text-slate-500 font-medium">
-            Nét liền là đã ghi · nét đứt tới là dự kiến · đường ngang là mục tiêu
+            Chọn 1 chỉ số để theo dõi: Nét liền là đã ghi · nét đứt là dự đoán · đường ngang là mục tiêu lâm sàng
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {METRIC_SERIES.map((series) => {
-          const on = enabled[series.id];
           const isFocus = focused === series.id;
           return (
             <button
               key={series.id}
               type="button"
               onClick={() => onChip(series.id)}
-              aria-pressed={on}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-                on
-                  ? isFocus
-                    ? "text-white border-transparent"
-                    : "bg-white text-slate-800 border-slate-200"
-                  : "bg-slate-50 text-slate-400 border-slate-200"
+              aria-pressed={isFocus}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                isFocus
+                  ? "text-white shadow-2xs border-transparent scale-102"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-200"
               }`}
               style={
-                on && isFocus
+                isFocus
                   ? { backgroundColor: series.color, borderColor: series.color }
-                  : on
-                    ? { boxShadow: `inset 0 0 0 1px ${series.color}33` }
-                    : undefined
+                  : undefined
               }
             >
               <span
                 className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: on ? series.color : "#cbd5e1" }}
+                style={{ backgroundColor: isFocus ? "#ffffff" : series.color }}
               />
               {series.label}
             </button>
@@ -421,7 +384,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
               />
 
               {visible.map((series) => {
-                const domain = series.id === focused ? focusedDomain : seriesDomain[series.id];
+                const domain = focusedDomain;
                 const pointCount = observedCount(historyDays, series.id);
                 const observedPath = linePath(
                   days.slice(0, HISTORY_DAYS),

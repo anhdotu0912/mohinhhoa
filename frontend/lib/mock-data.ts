@@ -50,13 +50,13 @@ export function statusColorFor(
 ): string {
   switch (status) {
     case "Cảnh báo":
-      return "bg-tertiary-fixed text-tertiary-fixed-dim";
+      return "bg-rose-50 text-rose-700 border-rose-200/70";
     case "Cần chú ý":
-      return "bg-error-container text-error";
+      return "bg-amber-50 text-amber-800 border-amber-200/70";
     case "Chờ duyệt":
-      return "bg-amber-100 text-amber-800";
+      return "bg-amber-50 text-amber-800 border-amber-200/70";
     default:
-      return "bg-primary-container/20 text-primary";
+      return "bg-emerald-50 text-emerald-800 border-emerald-200/70";
   }
 }
 

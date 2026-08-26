@@ -29,8 +29,8 @@ export function pickDefaultSlot(
 }
 
 /**
- * Exactly 3 columns: tuần trước, tuần hiện tại, tuần sau.
- * If tuần hiện tại is empty, show the latest unassigned plan there.
+ * Exactly 3 columns: đã qua, đang chạy, xếp sẵn.
+ * Empty slots stay empty — unassigned plans are listed separately.
  */
 export function visibleScheduleSlots(
   schedule: MealPlanScheduleOut
@@ -38,20 +38,6 @@ export function visibleScheduleSlots(
   const current = schedule.slots.find((s) => s.slot_key === "current");
   const next = schedule.slots.find((s) => s.slot_key === "next");
   if (!current || !next) return schedule.slots.slice(0, 3);
-
-  let currentDisplay: MealPlanScheduleSlot = { ...current };
-  if (!currentDisplay.plan && currentDisplay.occupancy === "empty") {
-    const preview = schedule.unassigned_plans[0];
-    if (preview) {
-      currentDisplay = {
-        ...currentDisplay,
-        plan: preview,
-        actions: currentDisplay.actions.includes("view")
-          ? currentDisplay.actions
-          : ["view", ...currentDisplay.actions],
-      };
-    }
-  }
 
   const currentStart = parseFlexibleDate(current.starts_on);
   const pastApplied = [...schedule.slots]
@@ -74,14 +60,14 @@ export function visibleScheduleSlots(
         actions: ["view"],
       };
 
-  return [past, currentDisplay, { ...next }];
+  return [past, { ...current }, { ...next }];
 }
 
 export function displaySlotTitle(index: number): string {
-  if (index === 0) return "Tuần trước";
-  if (index === 1) return "Tuần hiện tại";
-  if (index === 2) return "Tuần sau";
-  return "Tuần";
+  if (index === 0) return "Đã qua";
+  if (index === 1) return "Đang áp dụng";
+  if (index === 2) return "Xếp sẵn";
+  return "Chu kỳ";
 }
 
 /** First empty week to generate/apply into. Prefer tuần hiện tại when it is still empty. */
@@ -100,11 +86,11 @@ export function firstEmptyScheduleSlot(
 }
 
 export function slotTitle(slot: MealPlanScheduleSlot): string {
-  if (slot.slot_key === "current") return "Tuần hiện tại";
-  if (slot.slot_key === "next") return "Tuần sau";
-  if (slot.occupancy === "upcoming") return "Tuần đã xếp";
-  if (slot.occupancy === "past") return "Tuần trước";
-  return "Tuần trống";
+  if (slot.slot_key === "current") return "Đang áp dụng";
+  if (slot.slot_key === "next") return "Xếp sẵn";
+  if (slot.occupancy === "upcoming") return "Xếp sẵn";
+  if (slot.occupancy === "past") return "Đã qua";
+  return "Chu kỳ trống";
 }
 
 export function slotAllowsAdd(slot: MealPlanScheduleSlot, todayIso?: string): boolean {

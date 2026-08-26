@@ -72,35 +72,35 @@ export function PatientMetricsCard({
   };
 
   const inputClass =
-    "w-24 text-center px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-60";
+    "w-24 text-center px-3 py-1.5 bg-surface-container-lowest border border-outline-variant/80 rounded-lg text-sm font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-60";
 
   return (
-    <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-subtle overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs overflow-hidden">
       {/* Header: title + updatedAt + actions */}
-      <div className="px-5 py-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/30">
-        <h4 className="font-body-bold text-body-bold text-on-surface flex items-center gap-2 font-bold text-sm">
+      <div className="px-5 py-3.5 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
+        <h4 className="text-on-surface flex items-center gap-2 font-bold text-sm">
           <span className="material-symbols-outlined text-primary text-[20px]">
             monitor_weight
           </span>
-          Chỉ số cơ thể
+          <span>Chỉ số thể trạng &amp; Sinh hiệu cơ bản</span>
         </h4>
 
         {isEditing ? (
           <div className="flex items-center gap-2">
             {error ? (
-              <span className="text-xs text-error font-medium max-w-[220px] truncate">
+              <span className="text-xs text-rose-600 font-medium max-w-[220px] truncate">
                 {error}
               </span>
             ) : (
-              <span className="font-caption text-caption text-outline text-xs">
-                Sửa trực tiếp trên thẻ
+              <span className="text-on-surface-variant text-xs font-medium">
+                Sửa trực tiếp
               </span>
             )}
             <button
               type="button"
               onClick={cancelEdit}
               disabled={saving}
-              className="px-3 py-1.5 border border-outline-variant text-on-surface-variant rounded-xl text-xs font-body-bold hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-60"
+              className="px-3 py-1.5 border border-outline-variant text-on-surface-variant rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer disabled:opacity-60"
             >
               Hủy
             </button>
@@ -108,7 +108,7 @@ export function PatientMetricsCard({
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="bg-primary text-on-primary px-3 py-1.5 rounded-xl text-xs font-body-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
+              className="bg-primary text-on-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-60"
             >
               <span
                 className={`material-symbols-outlined text-[16px] ${
@@ -122,13 +122,13 @@ export function PatientMetricsCard({
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="font-caption text-caption text-outline text-xs">
-              Cập nhật: {metrics.updated_at}
+            <span className="text-on-surface-variant text-xs font-medium">
+              Cập nhật: {metrics.updated_at || "—"}
             </span>
             <button
               type="button"
               onClick={startEdit}
-              className="text-primary hover:text-primary/80 transition-colors text-xs font-body-bold flex items-center gap-1 cursor-pointer font-semibold"
+              className="text-primary hover:text-primary/80 transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">
                 edit_note
@@ -139,15 +139,15 @@ export function PatientMetricsCard({
         )}
       </div>
 
-      {/* Body: 4 ô chỉ số — cùng p-5 với header, ô đều nhau */}
-      <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-outline-variant/40">
+      {/* Body: 4 clinical metric cells */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant/40">
         {/* Cân nặng */}
-        <div className="px-5 py-5 min-h-[7.5rem] flex flex-col items-center justify-center text-center">
-          <p className="font-label text-label text-on-surface-variant mb-2 uppercase tracking-wider text-[11px] font-semibold">
+        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+          <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Cân nặng
           </p>
           {isEditing ? (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex items-center justify-center gap-1.5 my-1">
               <input
                 type="number"
                 step="0.1"
@@ -158,27 +158,24 @@ export function PatientMetricsCard({
                 className={inputClass}
                 aria-label="Cân nặng (kg)"
               />
-              <span className="font-body text-body text-on-surface-variant text-sm">
-                kg
-              </span>
+              <span className="text-on-surface-variant text-xs font-semibold">kg</span>
             </div>
           ) : (
-            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
+            <p className="text-on-surface text-2xl font-black tabular-nums tracking-tight">
               {metrics.weight ?? "—"}{" "}
-              <span className="font-body text-body text-on-surface-variant text-sm font-normal">
-                kg
-              </span>
+              <span className="text-on-surface-variant text-xs font-semibold">kg</span>
             </p>
           )}
+          <span className="text-[10px] text-on-surface-variant mt-1 font-medium">Khối lượng hiện tại</span>
         </div>
 
         {/* Chiều cao */}
-        <div className="px-5 py-5 min-h-[7.5rem] flex flex-col items-center justify-center text-center">
-          <p className="font-label text-label text-on-surface-variant mb-2 uppercase tracking-wider text-[11px] font-semibold">
+        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+          <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Chiều cao
           </p>
           {isEditing ? (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex items-center justify-center gap-1.5 my-1">
               <input
                 type="number"
                 step="0.5"
@@ -189,49 +186,53 @@ export function PatientMetricsCard({
                 className={inputClass}
                 aria-label="Chiều cao (cm)"
               />
-              <span className="font-body text-body text-on-surface-variant text-sm">
-                cm
-              </span>
+              <span className="text-on-surface-variant text-xs font-semibold">cm</span>
             </div>
           ) : (
-            <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
+            <p className="text-on-surface text-2xl font-black tabular-nums tracking-tight">
               {metrics.height ?? "—"}{" "}
-              <span className="font-body text-body text-on-surface-variant text-sm font-normal">
-                cm
-              </span>
+              <span className="text-on-surface-variant text-xs font-semibold">cm</span>
             </p>
           )}
+          <span className="text-[10px] text-on-surface-variant mt-1 font-medium">Chiều cao đo đứng</span>
         </div>
 
         {/* BMI */}
-        <div className="px-5 py-5 min-h-[7.5rem] flex flex-col items-center justify-center text-center">
-          <p className="font-label text-label text-on-surface-variant mb-2 uppercase tracking-wider text-[11px] font-semibold">
-            BMI
+        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+          <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
+            Chỉ số BMI
           </p>
-          <p className="font-h1 text-h1 text-primary text-2xl font-bold tabular-nums">
+          <p className="text-primary text-2xl font-black tabular-nums tracking-tight">
             {metrics.bmi ?? "—"}
           </p>
-          <p className="font-caption text-caption text-primary/90 mt-1 text-xs font-semibold">
-            {metrics.bmi_category}
-          </p>
-          {isEditing && (
-            <p className="font-caption text-caption text-outline mt-1 text-[11px]">
-              tự tính lại từ backend
-            </p>
+          {metrics.bmi_category ? (
+            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+              {metrics.bmi_category}
+            </span>
+          ) : (
+            <span className="text-[10px] text-on-surface-variant mt-1">Chưa phân loại</span>
           )}
         </div>
 
         {/* Huyết áp / Đường huyết */}
-        <div className="px-5 py-5 min-h-[7.5rem] flex flex-col items-center justify-center text-center">
-          <p className="font-label text-label text-on-surface-variant mb-2 uppercase tracking-wider text-[11px] font-semibold">
-            Huyết áp / Đường huyết
+        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+          <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
+            Huyết áp &amp; Đường huyết
           </p>
-          <p className="font-body-bold text-on-surface font-bold text-sm tabular-nums">
-            {bloodPressure}
-          </p>
-          <p className="font-caption text-caption text-on-surface-variant text-xs mt-1 tabular-nums">
-            {bloodGlucose}
-          </p>
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-[15px] text-rose-600">cardiology</span>
+              <span className="text-on-surface font-bold text-sm tabular-nums">
+                {bloodPressure || "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-1">
+              <span className="material-symbols-outlined text-[15px] text-amber-600">bloodtype</span>
+              <span className="text-on-surface-variant text-xs font-semibold tabular-nums">
+                {bloodGlucose || "—"}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

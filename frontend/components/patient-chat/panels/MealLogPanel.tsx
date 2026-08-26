@@ -56,10 +56,11 @@ function parseLoggedAt(value: string): Date {
   return new Date(`${value}Z`);
 }
 
-function toFoodLogSlot(slot: string): "morning" | "noon" | "evening" | null {
+function toFoodLogSlot(slot: string): "morning" | "noon" | "evening" | "snack" | null {
   if (slot === "breakfast" || slot === "morning") return "morning";
   if (slot === "lunch" || slot === "noon") return "noon";
   if (slot === "dinner" || slot === "evening") return "evening";
+  if (slot === "snack") return "snack";
   return null;
 }
 

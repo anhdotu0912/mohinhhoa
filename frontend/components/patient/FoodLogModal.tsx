@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/types";
 
-export type FoodLogSlot = "morning" | "noon" | "evening";
+export type FoodLogSlot = "morning" | "noon" | "evening" | "snack";
 
 export type FoodLogModalContext = {
   slot: FoodLogSlot;

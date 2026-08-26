@@ -24,9 +24,15 @@ export function doctorPatientsHref(): string {
   return "/doctor/patients";
 }
 
-export function doctorInboxHref(type?: InboxJobType | "all"): string {
-  if (!type || type === "all") return "/doctor/inbox";
-  return `/doctor/inbox?type=${encodeURIComponent(type)}`;
+export function doctorInboxHref(
+  type?: InboxJobType | "all",
+  opts?: { urgency?: "soon" }
+): string {
+  const params = new URLSearchParams();
+  if (type && type !== "all") params.set("type", type);
+  if (opts?.urgency) params.set("urgency", opts.urgency);
+  const qs = params.toString();
+  return qs ? `/doctor/inbox?${qs}` : "/doctor/inbox";
 }
 
 export function doctorChartHref(
