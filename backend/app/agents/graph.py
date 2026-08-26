@@ -38,6 +38,60 @@ from app.schemas.profile import PatientProfile
 logger = logging.getLogger(__name__)
 
 
+def _generate_allergy_blocked_answer(
+    message: str,
+    medications: list[str],
+    foods: list[str],
+    matched_allergies: list[str],
+    interactions: list,
+) -> str:
+    """Generate a clear, medically safe response when queried food is blocked by patient's allergy."""
+    meds_str = ", ".join(m.capitalize() for m in medications) or "thuốc điều trị hiện tại"
+    food_names_str = ", ".join(f.capitalize() for f in foods)
+    allergy_names_str = ", ".join(a.capitalize() for a in matched_allergies)
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            prompt = (
+                f"Bạn là chuyên gia an toàn dinh dưỡng y tế và sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
+                f"Bệnh nhân có tiền sử DỊ ỨNG: [{allergy_names_str}].\n"
+                f"Thuốc bệnh nhân đang dùng: [{meds_str}].\n"
+                f"Câu hỏi của bệnh nhân: \"{message}\"\n"
+                f"Thực phẩm được hỏi: [{food_names_str}] thuộc nhóm dị ứng [{allergy_names_str}].\n\n"
+                "YÊU CẦU BẮT BUỘC (TUYỆT ĐỐI KHÔNG TỰ MÂU THUẪN, KHÔNG NÓI AN TOÀN KHI ĐÃ BỊ DỊ ỨNG):\n"
+                "1. Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man (như 'Chào bạn, cảm ơn bạn...', 'Dựa trên kết quả...').\n"
+                "2. TUYỆT ĐỐI KHÔNG dùng đường kẻ `---`.\n"
+                "3. Cấu trúc đúng 3 phần rõ ràng, cách nhau bởi 1 dòng trống (double newline):\n\n"
+                f"🚫 **KHÔNG NÊN ĂN (Cảnh báo dị ứng):**\n"
+                f"• Khẳng định rõ {food_names_str} thuộc nhóm dị ứng {allergy_names_str} trong hồ sơ của bạn. Tuyệt đối không nên ăn/dùng để tránh nguy cơ dị ứng hoặc sốc phản vệ.\n\n"
+                f"💊 **Về thuốc đang sử dụng ({meds_str}):**\n"
+                f"• Giải thích ngắn gọn: Mặc dù {food_names_str} không có tương tác hóa học xấu với {meds_str}, nhưng do yếu tố dị ứng nên bạn bắt buộc phải kiêng hoàn toàn.\n\n"
+                f"💡 **Gợi ý thực phẩm thay thế an toàn:**\n"
+                f"• Đưa ra 2-3 nguồn thực phẩm lành mạnh thay thế giàu dinh dưỡng (đạm, chất béo tốt) an toàn cho người đái tháo đường và không gây dị ứng {allergy_names_str} (ví dụ: thịt ức gà, thịt nạc, trứng, đậu phụ, quả bơ, dầu thực vật, hạt chia...).\n\n"
+                "Trình bày khoa học, súc tích, định dạng markdown chuẩn."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM allergy blocked answer generation failed: %s", e)
+
+    return (
+        f"🚫 **KHÔNG NÊN ĂN (Cảnh báo dị ứng):**\n"
+        f"• Hồ sơ của bạn ghi nhận tiền sử dị ứng **{allergy_names_str}**, trong khi **{food_names_str}** thuộc nhóm này. Bạn **tuyệt đối không nên ăn** để tránh nguy cơ dị ứng hoặc sốc phản vệ.\n\n"
+        f"💊 **Về thuốc đang sử dụng ({meds_str}):**\n"
+        f"• Mặc dù {food_names_str} không ghi nhận tương tác nguy hiểm với thuốc bạn đang dùng, nhưng vì lý do dị ứng nên bạn **bắt buộc phải kiêng hoàn toàn**.\n\n"
+        f"💡 **Gợi ý thực phẩm thay thế an toàn:**\n"
+        f"• **Bổ sung chất đạm:** Thịt ức gà, thịt nạc lợn, trứng, đậu phụ.\n"
+        f"• **Bổ sung chất béo tốt:** Quả bơ, dầu ô liu, hạt chia, hạt óc chó."
+    )
+
+
 def _generate_safe_food_answer(message: str, medications: list[str], foods: list[str]) -> str:
     """Generate an informative, friendly response when no dangerous interaction is found for queried foods."""
     meds_str = ", ".join(m.capitalize() for m in medications)
@@ -46,18 +100,20 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
     try:
         from app.core.llm import get_chat_llm
 
-        llm = get_chat_llm(temperature=0.3)
+        llm = get_chat_llm(temperature=0.2)
         if llm is not None:
             prompt = (
                 f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
                 f"Thuốc bệnh nhân đang dùng: {meds_str}.\n"
                 f"Câu hỏi của bệnh nhân: \"{message}\"\n"
                 f"Kết quả tra cứu y khoa: KHÔNG có tương tác nguy hiểm hoặc chống chỉ định nào giữa {meds_str} và {food_names_str}.\n\n"
-                f"Hãy trả lời bệnh nhân bằng tiếng Việt chuẩn mực y khoa, trình bày KHOA HỌC theo các mục rõ ràng (gạch đầu dòng, in đậm, không viết đoạn dài liền khối):\n\n"
-                f"1. ✅ **Xác nhận an toàn:** Trực tiếp xác nhận {food_names_str} an toàn / có thể ăn được khi đang dùng {meds_str}.\n"
+                "YÊU CẦU BẮT BUỘC:\n"
+                "- Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man (như 'Chào bạn, cảm ơn bạn...', 'Dựa trên kết quả...').\n"
+                "- TUYỆT ĐỐI KHÔNG dùng đường kẻ `---`.\n"
+                "- Trình bày KHOA HỌC, ngắn gọn theo 3 mục rõ ràng, cách nhau bởi 1 dòng trống (double newline):\n\n"
+                f"1. ✅ **Xác nhận an toàn:** Khẳng định {food_names_str} an toàn / có thể ăn được khi đang dùng {meds_str}.\n"
                 f"2. 🥗 **Giá trị dinh dưỡng & Lợi ích:** Nêu 1-2 điểm nổi bật về chỉ số đường huyết (GI), chất xơ, chất béo hoặc đạm có lợi cho sức khỏe.\n"
-                f"3. 💡 **Khuyến nghị sử dụng & Chế biến:** Khẩu phần hợp lý và phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế đường/mỡ bão hòa).\n\n"
-                f"Trình bày mạch lạc, dễ đọc, cấu trúc rõ ràng."
+                f"3. 💡 **Khuyến nghị sử dụng & Chế biến:** Khẩu phần hợp lý và phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế đường/mỡ bão hòa)."
             )
             response = llm.invoke(prompt)
             if response and getattr(response, "content", None):
@@ -74,6 +130,7 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
         f"• Ăn với khẩu phần vừa phải, cân đối tổng lượng carbohydrate trong toàn bộ bữa ăn.\n"
         f"• Ưu tiên các phương pháp chế biến lành mạnh như hấp, luộc, hoặc áp chảo ít dầu."
     )
+
 
 
 
@@ -189,7 +246,16 @@ def interaction_check_node(state: AgentState) -> AgentState:
         result = interaction_checker_agent(check_input, db=db)
         interactions = result.interactions
 
-        if interactions:
+        if allergy_warnings:
+            # When food is matched with patient's allergy, use dedicated allergy-blocked answer
+            # to NEVER contradict by saying "it is completely safe to eat"
+            matched_allergies = [
+                a for a in allergies if any(w for w in allergy_warnings if a.lower() in w.lower())
+            ] or allergies
+            answer_text = _generate_allergy_blocked_answer(
+                message, medications, foods, matched_allergies, interactions
+            )
+        elif interactions:
             if is_specific_query:
                 lines = [f"Phát hiện {len(interactions)} tương tác thuốc-thực phẩm cho yêu cầu của bạn:"]
             else:
@@ -197,20 +263,16 @@ def interaction_check_node(state: AgentState) -> AgentState:
 
             for item in interactions:
                 lines.append(
-                    f"• {item.drug.capitalize()} + {item.food}: [{item.severity}] {item.mechanism}\n"
-                    f"  Khuyến nghị: {item.recommendation}"
+                    f"• **{item.drug.capitalize()} + {item.food}** [{item.severity}]: {item.mechanism}\n"
+                    f"  💡 Khuyến nghị: {item.recommendation}"
                 )
-            answer_text = "\n".join(lines)
+            answer_text = "\n\n".join(lines)
         else:
             if is_specific_query and foods:
                 answer_text = _generate_safe_food_answer(message, medications, foods)
             else:
                 meds_str = ", ".join(m.capitalize() for m in medications)
-                answer_text = f"Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra."
-
-        # Prepend allergy warnings if any
-        if allergy_warnings:
-            answer_text = "\n\n".join(allergy_warnings) + "\n\n---\n\n" + answer_text
+                answer_text = f"✅ Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra."
 
         all_sources = list({src for item in interactions for src in item.sources})
 
@@ -225,7 +287,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
         # Still show allergy warnings even if interaction check fails
         error_msg = f"Lỗi khi kiểm tra tương tác: {str(e)}"
         if allergy_warnings:
-            error_msg = "\n\n".join(allergy_warnings) + "\n\n---\n\n" + error_msg
+            error_msg = "\n\n".join(allergy_warnings) + "\n\n" + error_msg
         return {
             **state,
             "answer": error_msg,

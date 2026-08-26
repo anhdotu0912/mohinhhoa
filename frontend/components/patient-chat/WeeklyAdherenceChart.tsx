@@ -352,7 +352,7 @@ export function WeeklyAdherenceChart({
                 minPointSize={0}
                 isAnimationActive
                 animationDuration={240}
-                background={{ fill: "#e2e8f0", radius: [6, 6, 0, 0] }}
+                background={{ fill: "#e2e8f0", radius: 6 }}
                 label={<PctLabel chartData={chartData} targetPct={targetPct} />}
               >
                 {chartData.map((row) => (

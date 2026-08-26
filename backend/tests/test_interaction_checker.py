@@ -120,3 +120,22 @@ class TestInteractionChecker:
         assert len(output.interactions) >= 1
         assert any(p.drug == "metformin" and p.food == "cơm gạo lứt" for p in output.unmatched_pairs)
         assert not any(p.food == "rượu" for p in output.unmatched_pairs)
+
+    def test_interaction_check_node_allergy_blocked_response(self):
+        """interaction_check_node should warn about allergy and NOT say food is completely safe."""
+        state = {
+            "message": "Cá hồi ăn được không",
+            "profile": {
+                "medications": ["acarbay", "actidine"],
+                "allergies": ["hải sản"],
+            },
+        }
+        res_state = interaction_check_node(state)
+        answer = res_state.get("answer", "")
+
+        assert answer, "Answer must not be empty"
+        # Must contain allergy warning and NOT say safe to eat
+        assert "dị ứng" in answer.lower()
+        assert "cá hồi" in answer.lower()
+        assert "hoàn toàn có thể ăn được" not in answer.lower()
+
