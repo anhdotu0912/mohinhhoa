@@ -26,6 +26,7 @@ from app.services.compliance import ComplianceService
         ("Thực đơn tuần này của tôi", "meal_plan"),
         ("Hôm nay ăn gì?", "meal_plan"),
         ("Hôm nay đi chợ mua nguyên liệu gì?", "rag_qa"),
+        ("Chỉ số sức khỏe của tôi thế nào?", "metrics_delta_advice"),
     ],
 )
 def test_intent_classifier_sample_phrases(message: str, expected: str):
@@ -176,6 +177,20 @@ def test_run_agent_doctor_note_force_intent(db_session):
     assert output.intent == "doctor_note"
     assert output.doctor_note is not None
     assert "Uống thuốc" in output.doctor_note.note
+
+
+def test_run_agent_metrics_delta_advice_force_intent(db_session):
+    reset_compiled_graph()
+    output = run_agent(
+        AgentRunInput(
+            user_id="demo_patient_metrics_advice",
+            message="ignored",
+            force_intent="metrics_delta_advice",
+        ),
+        db=db_session,
+    )
+    assert output.intent == "metrics_delta_advice"
+    assert "chỉ số" in (output.message or "").lower()
 
 
 def test_unknown_node_fatigue_and_symptom_empathy():

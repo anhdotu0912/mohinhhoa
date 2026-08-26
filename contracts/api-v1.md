@@ -731,9 +731,19 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 - Lần ghi sau trong ngày → **cập nhật cùng row** (giữ `id`); field có trong request được ghi đè, field không gửi giữ nguyên giá trị entry hiện tại; `recorded_at` cập nhật thời điểm ghi cuối.
 - Endpoint doctor `PUT /doctor/patients/{id}/metrics` vẫn insert entry riêng mỗi lần gọi.
 ```json
-// Request (ít nhất 1 trong weight/blood_pressure/blood_glucose)
-{ "weight": 71.5, "blood_pressure": "128/78 mmHg", "blood_glucose": "130 mg/dL", "note": "" }
-// Response 200 → BodyMetricsEntry (contracts/agent-io-schema.md §3.5)
+// Request (ít nhất 1 field đo được; client cũ vẫn gửi blood_pressure / blood_glucose string)
+{
+  "weight": 71.5,
+  "waist_cm": 92,
+  "systolic": 128,
+  "diastolic": 78,
+  "glucose_fasting": 6.2,
+  "glucose_postprandial": 8.4,
+  "hba1c": 6.8,
+  "note": ""
+}
+// Response 200 → BodyMetricsEntry + optional delta_advice (MetricsDeltaAdviceOut)
+// delta_advice chỉ có khi lần ghi vượt ngưỡng so với bản ghi trước (cùng ngày: so với giá trị trước khi merge)
 // Error 400 METRICS_EMPTY — không có field nào
 ```
 
@@ -784,7 +794,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `DoctorPatientSummary.status_key` | `attention` \| `stable` \| `warning` \| `pending` | `schemas/doctor.py` |
 | `PlanExpiryDemoRequest.mode` / `DoctorPatientSummary.plan_expiry` | `expiring` \| `expired` (request) — `expiring` \| `expired` \| `ok` \| `none` (summary field) | `schemas/doctor.py`, `services/plan_expiry.py` |
 | Meal slot (`Meal.slot`, `Swap.slot`) | `breakfast` \| `lunch` \| `dinner` \| `snack` | `schemas/meal_plan.py` — **khác** `FoodLogEntry.slot` (xem dòng dưới) |
-| Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` \| `weekly_compliance` \| `doctor_note` | `agents/nodes/intent_classifier.py::VALID_INTENTS` — 2 intent cuối as-built Phase 2 |
+| Agent intent (`AgentRunOutput.intent`) | `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` \| `weekly_compliance` \| `doctor_note` \| `metrics_delta_advice` | `agents/nodes/intent_classifier.py::VALID_INTENTS` |
 | `AgentRunOutput.secondary_intents[]` | cùng enum intent phía trên, dạng mảng | As-built, đáp ứng multi-intent (`intent_classifier.py`) |
 | `FoodLogEntry.type` | `as_planned` \| `custom` | `schemas/food_log.py` |
 | `FoodLogEntry.status` | `logged` \| `adjusted` | `adrs/009-food-log-scope-strategy.md` |
@@ -797,7 +807,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.10**.
+- Version hiện tại: **1.11**.
+- **Changelog 1.10 → 1.11 (2026-08-26):** `POST /metrics` nhận field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); response thêm `delta_advice` optional. Intent chat `metrics_delta_advice`. Không breaking — field mới default `null`. Đồng bộ `contracts/agent-io-schema.md` v1.8.
 - **Changelog 1.9 → 1.10 (2026-08-24):** thêm `POST /meal-plans/request` + `GET /meal-plans/request` (patient yêu cầu bác sĩ tạo thực đơn, cờ trên `profiles`, không dùng bảng `notifications`); `DoctorPatientSummary` thêm `meal_plan_request_status`, `meal_plan_request_note`, `meal_plan_requested_at`; filter `GET /doctor/patients?meal_plan_request=pending`. Không breaking change (field mới optional/default).
 - **Changelog 1.8 → 1.9 (2026-08-24):** thêm `POST /auth/me/avatar` (user đã đăng nhập tự upload ảnh đại diện, cùng rule 2MB / png-jpg-webp-gif với endpoint doctor). Không breaking change.
 - **Changelog 1.7 → 1.8 (2026-08-24):** Food Log + compliance dùng ngày lịch **Asia/Ho_Chi_Minh** — `GET /food-log?date=` lọc theo cửa sổ UTC của ngày VN; `POST /food-log` upsert 1 log / user / ngày VN / slot; `FoodLogEntry.logged_at` serialize timezone-aware (naive DB = UTC). `GET /compliance/me` và `GET /doctor/patients/{id}/compliance` lấy `today` + gán food-log vào ngày VN (không còn `date.today()` UTC của container). Không đổi request shape / enum slot.

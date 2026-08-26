@@ -94,7 +94,7 @@ export function buildReviewHref(
 }
 
 export function buildHistoryHref(patientId: string, startsOn?: string | null): string {
-  const base = `/doctor/history/${encodeURIComponent(patientId)}`;
+  const base = `/doctor/patients/${encodeURIComponent(patientId)}/history`;
   if (!startsOn) return base;
   return `${base}?week=${encodeURIComponent(normalizeDate(startsOn))}`;
 }

@@ -389,6 +389,12 @@ export interface MetricsHistoryPoint {
   weight?: number | null;
   height?: number | null;
   bmi?: number | null;
+  waist_cm?: number | null;
+  systolic?: number | null;
+  diastolic?: number | null;
+  glucose_fasting?: number | null;
+  glucose_postprandial?: number | null;
+  hba1c?: number | null;
   blood_pressure?: string | null;
   blood_glucose?: string | null;
   note?: string;
@@ -396,12 +402,29 @@ export interface MetricsHistoryPoint {
   recorded_at: string;
 }
 
+export interface MetricsDeltaAdviceOut {
+  message: string;
+  changed_fields: string[];
+  citations: string[];
+  ask_doctor: boolean;
+}
+
 export interface MetricsLogCreate {
   weight?: number | null;
   height?: number | null;
+  waist_cm?: number | null;
+  systolic?: number | null;
+  diastolic?: number | null;
+  glucose_fasting?: number | null;
+  glucose_postprandial?: number | null;
+  hba1c?: number | null;
   blood_pressure?: string | null;
   blood_glucose?: string | null;
   note?: string;
+}
+
+export interface MetricsLogResult extends MetricsHistoryPoint {
+  delta_advice?: MetricsDeltaAdviceOut | null;
 }
 
 export interface GoalsOut {
@@ -508,6 +531,7 @@ export interface AgentRunOutput {
   guardrail_triggered: boolean;
   weekly_compliance?: WeeklyComplianceOut | null;
   doctor_note?: DoctorNoteOut | null;
+  metrics_delta_advice?: MetricsDeltaAdviceOut | null;
 }
 
 export type ChatStreamEvent =
@@ -536,6 +560,7 @@ export interface ChatMessageOut {
   meal_preview?: MealPreviewOut | null;
   weekly_compliance?: WeeklyComplianceOut | null;
   doctor_note?: DoctorNoteOut | null;
+  metrics_delta_advice?: MetricsDeltaAdviceOut | null;
   meal_plan_week?: MealPlanOutput | null;
   show_weekly_plan?: boolean;
   thinking_steps?: ChatThinkingStepOut[];

@@ -657,7 +657,7 @@ export default function PatientsListPage() {
               Danh sách bệnh nhân
             </h2>
             <p className="font-caption text-caption text-on-surface-variant mt-1 text-xs">
-              Dữ liệu từ hệ thống — hồ sơ, trạng thái thực đơn và cảnh báo tương tác
+              Danh bạ duy nhất — tìm, thêm bệnh nhân và mở hồ sơ để duyệt thực đơn, ràng buộc, tuân thủ
             </p>
           </div>
 

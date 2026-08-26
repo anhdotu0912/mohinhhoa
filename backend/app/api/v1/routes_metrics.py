@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from app.core.errors import APIError
 from app.core.security import require_roles
 from app.db.session import get_db
-from app.models.body_metrics import BodyMetricsEntry
 from app.models.user import User
-from app.schemas.body_metrics import MetricsHistoryPoint, MetricsLogCreate
+from app.schemas.body_metrics import MetricsHistoryPoint, MetricsLogCreate, MetricsLogResult
+from app.services.metrics_delta_advice import build_metrics_delta_advice, snapshot_from_entry
 from app.services.metrics_service import (
     delete_metrics_entry,
     list_metrics_history,
@@ -20,16 +20,19 @@ from app.services.metrics_service import (
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 
-@router.post("", response_model=MetricsHistoryPoint)
+@router.post("", response_model=MetricsLogResult)
 def post_metrics(
     payload: MetricsLogCreate,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
-) -> BodyMetricsEntry:
+) -> MetricsLogResult:
     try:
-        return record_patient_metrics(db, user.id, payload)
+        entry, previous = record_patient_metrics(db, user.id, payload)
     except ValueError as exc:
         raise APIError(400, "METRICS_EMPTY", str(exc)) from exc
+    current = snapshot_from_entry(entry)
+    advice = build_metrics_delta_advice(previous, current, require_threshold=True)
+    return MetricsLogResult.model_validate(entry).model_copy(update={"delta_advice": advice})
 
 
 @router.get("/history", response_model=list[MetricsHistoryPoint])
@@ -37,7 +40,7 @@ def get_metrics_history(
     days: int = 90,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
-) -> list[BodyMetricsEntry]:
+) -> list[MetricsHistoryPoint]:
     return list_metrics_history(db, user.id, days=days)
 
 

@@ -237,7 +237,7 @@ export function GenerationProgressPanel({
           )}
           {isDone && !planId && (
             <Link
-              href={`/doctor/reviews/${job.patientId}`}
+              href={`/doctor/patients/${job.patientId}/meals`}
               className="bg-emerald-700 text-white font-body-bold px-lg py-sm rounded-lg hover:bg-emerald-800 transition-colors text-xs font-bold flex items-center gap-xs shadow-xs"
             >
               <span>So sánh & Duyệt</span>

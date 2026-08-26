@@ -65,9 +65,9 @@ export function QueueDrawer() {
     if (patientId && planId) {
       router.push(buildReviewHref(patientId, planId, job?.slotIntent));
     } else if (patientId) {
-      router.push(`/doctor/reviews/${patientId}`);
+      router.push(`/doctor/patients/${patientId}/meals`);
     } else {
-      router.push("/doctor/reviews");
+      router.push("/doctor/inbox?type=plan_review");
     }
   };
 

@@ -23,6 +23,7 @@ VALID_INTENTS = {
     "unknown",
     "weekly_compliance",
     "doctor_note",
+    "metrics_delta_advice",
 }
 
 # Keyword patterns for rule-based fallback (refuse patterns shared with guardrails.rules)
@@ -91,6 +92,13 @@ _INTENT_PATTERNS = {
         r"lời khuyên.*bác sĩ",
 
     ],
+    "metrics_delta_advice": [
+        r"chỉ số.*(sức khỏe|cơ thể|của tôi|thế nào)",
+        r"(cân nặng|đường huyết|huyết áp|bmi|hb\s*a1c|vòng eo).*(thế nào|xu hướng|tăng|giảm)",
+        r"xu hướng.*(cân|đường huyết|huyết áp|chỉ số)",
+        r"(theo dõi|dự đoán).*(cân|chỉ số)",
+        r"chỉ số mới",
+    ],
 }
 
 # Shopping/grocery queries — FE-only mock card; not a backend intent.
@@ -151,6 +159,7 @@ def _classify_by_llm(message: str) -> str:
 - food_log: ghi lại bữa ăn đã ăn
 - weekly_compliance: hỏi tỉ lệ/báo cáo tuân thủ tuần, tuân thủ gần đây
 - doctor_note: hỏi lời dặn/lời nhắc/ghi chú từ bác sĩ
+- metrics_delta_advice: hỏi chỉ số sức khỏe đang thế nào, xu hướng cân nặng/đường huyết/huyết áp/BMI/HbA1c
 - rag_qa: câu hỏi KIẾN THỨC chung về dinh dưỡng (calo, chỉ số GI, so sánh thực phẩm), KHÔNG phải hỏi "được không" hay "có nên không"
 - refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
 - unknown: không rõ ý định

@@ -303,7 +303,7 @@ export default function DoctorDashboardPage() {
 
           {/* Card 2 */}
           <Link
-            href="/doctor/reviews"
+            href="/doctor/inbox?type=plan_review"
             className="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-amber-500/40 group cursor-pointer relative overflow-hidden"
           >
             <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
@@ -365,10 +365,10 @@ export default function DoctorDashboardPage() {
                 </p>
               </div>
               <Link
-                href="/doctor/patients"
+                href="/doctor/inbox?type=generate_request"
                 className="text-primary font-body-bold hover:underline text-xs cursor-pointer flex items-center gap-0.5 font-semibold"
               >
-                <span>Xem danh sách</span>
+                <span>Xem hàng việc</span>
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
               </Link>
             </div>
@@ -732,10 +732,10 @@ export default function DoctorDashboardPage() {
               </div>
 
               <Link
-                href="/doctor/patients/compliance"
+                href="/doctor/patients"
                 className="w-full py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-on-surface font-body-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 font-semibold"
               >
-                <span>Xem báo cáo tuân thủ chi tiết</span>
+                <span>Mở hồ sơ bệnh nhân để xem tuân thủ</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
@@ -759,7 +759,7 @@ export default function DoctorDashboardPage() {
               </div>
 
               <Link
-                href="/doctor/reviews"
+                href="/doctor/inbox?type=plan_review"
                 className="text-primary text-xs font-bold hover:underline flex items-center gap-0.5"
               >
                 <span>Xem tất cả ({pendingPlans.length})</span>

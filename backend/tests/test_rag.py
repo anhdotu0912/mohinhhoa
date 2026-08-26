@@ -248,6 +248,7 @@ class TestGraphCompilation:
             "profile_loader", "intent_classifier",
             "rag_qa", "meal_plan", "interaction_check",
             "food_log", "weekly_compliance", "doctor_note",
+            "metrics_delta_advice",
             "refuse", "unknown", "apply_guardrails",
         ]
         for node_name in expected_nodes:

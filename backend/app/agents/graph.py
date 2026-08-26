@@ -30,6 +30,7 @@ from app.schemas.meal_plan import (
     DoctorNoteOut,
     InteractionCheckInput,
     MealPreviewOut,
+    MetricsDeltaAdviceOut,
     WeeklyComplianceOut,
 )
 from app.schemas.profile import PatientProfile
@@ -475,6 +476,39 @@ def doctor_note_node(state: AgentState) -> AgentState:
     }
 
 
+def metrics_delta_advice_node(state: AgentState) -> AgentState:
+    """Observational comment when body metrics change — HITL, no diagnosis."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Không thể đọc chỉ số lúc này. Vui lòng thử lại sau.",
+            "metrics_delta_advice": None,
+        }
+
+    from app.services.metrics_delta_advice import advice_from_latest_entries
+
+    advice = advice_from_latest_entries(db, user_id)
+    if advice is None:
+        return {
+            **state,
+            "answer": (
+                "Bạn chưa có đủ dữ liệu chỉ số để nhận xét xu hướng. "
+                "Hãy ghi nhận chỉ số trong mục Chỉ số sức khỏe."
+            ),
+            "metrics_delta_advice": None,
+        }
+
+    extra = " Hãy trao đổi với bác sĩ nếu bạn lo ngại." if advice.ask_doctor else ""
+    return {
+        **state,
+        "answer": advice.message + extra,
+        "citations": list(advice.citations),
+        "metrics_delta_advice": advice.model_dump(mode="json"),
+    }
+
+
 def refuse_node(state: AgentState) -> AgentState:
     """Handle requests outside scope (e.g. change medication, prescribe)."""
     return {
@@ -575,6 +609,7 @@ def route_intent(state: AgentState) -> Literal[
     "food_log",
     "weekly_compliance",
     "doctor_note",
+    "metrics_delta_advice",
     "refuse",
     "unknown",
 
@@ -590,6 +625,7 @@ def route_intent(state: AgentState) -> Literal[
         "food_log",
         "weekly_compliance",
         "doctor_note",
+        "metrics_delta_advice",
         "refuse",
     ):
 
@@ -613,6 +649,7 @@ def build_graph() -> StateGraph:
     graph.add_node("food_log", food_log_node)
     graph.add_node("weekly_compliance", weekly_compliance_node)
     graph.add_node("doctor_note", doctor_note_node)
+    graph.add_node("metrics_delta_advice", metrics_delta_advice_node)
     graph.add_node("refuse", refuse_node)
     graph.add_node("unknown", unknown_node)
     graph.add_node("apply_guardrails", apply_guardrails)
@@ -631,6 +668,7 @@ def build_graph() -> StateGraph:
             "food_log": "food_log",
             "weekly_compliance": "weekly_compliance",
             "doctor_note": "doctor_note",
+            "metrics_delta_advice": "metrics_delta_advice",
             "refuse": "refuse",
             "unknown": "unknown",
         },
@@ -643,6 +681,7 @@ def build_graph() -> StateGraph:
     graph.add_edge("food_log", "apply_guardrails")
     graph.add_edge("weekly_compliance", "apply_guardrails")
     graph.add_edge("doctor_note", "apply_guardrails")
+    graph.add_edge("metrics_delta_advice", "apply_guardrails")
     graph.add_edge("refuse", "apply_guardrails")
     graph.add_edge("unknown", "apply_guardrails")
     graph.add_edge("apply_guardrails", END)
@@ -693,6 +732,11 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
     if doctor_note_raw:
         doctor_note = DoctorNoteOut(**doctor_note_raw)
 
+    metrics_advice_raw = final_state.get("metrics_delta_advice")
+    metrics_delta_advice = None
+    if metrics_advice_raw:
+        metrics_delta_advice = MetricsDeltaAdviceOut(**metrics_advice_raw)
+
     return AgentRunOutput(
         intent=final_state.get("intent", "unknown"),
         secondary_intents=final_state.get("secondary_intents", []),
@@ -705,6 +749,7 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
         guardrail_triggered=bool(final_state.get("guardrail_flags")),
         weekly_compliance=weekly_compliance,
         doctor_note=doctor_note,
+        metrics_delta_advice=metrics_delta_advice,
     )
 
 
@@ -737,6 +782,7 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         "interactions": None,
         "weekly_compliance": None,
         "doctor_note": None,
+        "metrics_delta_advice": None,
         "answer": None,
         "citations": [],
         "guardrail_flags": [],

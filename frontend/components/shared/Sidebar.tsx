@@ -13,6 +13,8 @@ import { useMobileMenu } from "@/components/shared/MobileMenuContext";
 import { NotificationBadge } from "@/components/shared/NotificationBadge";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { buildInboxJobs } from "@/lib/doctor-inbox";
+import type { MealPlanOutput } from "@/lib/types";
 
 type SidebarProps = {
   role: AppRole;
@@ -31,12 +33,12 @@ function NavLinks({
   role,
   activeId,
   onNavigate,
-  mealPlanRequestCount = 0,
+  inboxCount = 0,
 }: {
   role: AppRole;
   activeId: string;
   onNavigate?: () => void;
-  mealPlanRequestCount?: number;
+  inboxCount?: number;
 }) {
   const items = NAV_BY_ROLE[role];
 
@@ -44,7 +46,7 @@ function NavLinks({
     <div className="flex-1 flex flex-col gap-xs">
       {items.map((item) => {
         const isActive = item.id === activeId;
-        const showRequestBadge = role === "doctor" && item.id === "patients" && mealPlanRequestCount > 0;
+        const showInboxBadge = role === "doctor" && item.id === "inbox" && inboxCount > 0;
         return (
           <Link
             key={item.id}
@@ -62,7 +64,7 @@ function NavLinks({
               >
                 {item.icon}
               </span>
-              {showRequestBadge && <NotificationBadge count={mealPlanRequestCount} />}
+              {showInboxBadge && <NotificationBadge count={inboxCount} />}
             </span>
             <span className="text-body font-body">{item.label}</span>
           </Link>
@@ -170,21 +172,23 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
   const activeId = resolveActiveNavId(role, pathname, activeItem);
   const token = useAuthStore((s) => s.token);
   const authRole = useAuthStore((s) => s.role);
-  const [mealPlanRequestCount, setMealPlanRequestCount] = useState(0);
+  const [inboxCount, setInboxCount] = useState(0);
 
   useEffect(() => {
     if (role !== "doctor" || authRole !== "doctor" || !token) {
-      setMealPlanRequestCount(0);
+      setInboxCount(0);
       return;
     }
     let cancelled = false;
-    api
-      .listDoctorPatients({ meal_plan_request: "pending" })
-      .then((rows) => {
-        if (!cancelled) setMealPlanRequestCount(rows.length);
+    Promise.all([
+      api.listDoctorPatients(),
+      api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
+    ])
+      .then(([patients, plans]) => {
+        if (!cancelled) setInboxCount(buildInboxJobs(patients, plans).length);
       })
       .catch(() => {
-        if (!cancelled) setMealPlanRequestCount(0);
+        if (!cancelled) setInboxCount(0);
       });
     return () => {
       cancelled = true;
@@ -206,7 +210,7 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
           </Link>
         </div>
 
-        <NavLinks role={role} activeId={activeId} mealPlanRequestCount={mealPlanRequestCount} />
+        <NavLinks role={role} activeId={activeId} inboxCount={inboxCount} />
         <SidebarFooter role={role} />
       </nav>
 
@@ -238,7 +242,7 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
               role={role}
               activeId={activeId}
               onNavigate={closeMobileMenu}
-              mealPlanRequestCount={mealPlanRequestCount}
+              inboxCount={inboxCount}
             />
             <SidebarFooter role={role} onNavigate={closeMobileMenu} />
           </nav>

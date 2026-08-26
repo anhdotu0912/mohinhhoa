@@ -28,6 +28,7 @@ _PAYLOAD_FIELDS = (
     "meal_preview",
     "weekly_compliance",
     "doctor_note",
+    "metrics_delta_advice",
     "meal_plan_week",
     "show_weekly_plan",
     "thinking_steps",

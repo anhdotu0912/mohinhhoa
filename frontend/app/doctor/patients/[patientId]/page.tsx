@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { asRouteId } from "@/lib/route-params";
-import { TopBar } from "@/components/shared/TopBar";
+import { PatientRecordId } from "@/components/doctor/chart/PatientRecordId";
 import { PatientMetricsCard } from "@/components/doctor/PatientMetricsCard";
 import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { api, assetUrl } from "@/lib/api";
@@ -60,10 +60,6 @@ interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
   preferences: string[];
 }
 
-function truncateId(id: string): string {
-  return id.length > 6 ? `...${id.slice(-4)}` : id;
-}
-
 /** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -111,7 +107,7 @@ function buildDetail(summary: DoctorPatientSummary): PatientDetailData {
     latestPlanId: summary.latest_plan_id,
     latestPlanStatus: summary.latest_plan_status,
     alertCount: summary.alert_count,
-    patientCode: truncateId(summary.id),
+    patientCode: summary.id,
     doctorInCharge: "",
     diagnoses: summary.condition_label ? summary.condition_label.split(", ") : [],
     vitals: {
@@ -552,10 +548,10 @@ export default function PatientDetailPage() {
     !previewAvatarUrl.startsWith("https://api.dicebear.com")
       ? assetUrl(previewAvatarUrl)
       : "";
+  const hasGenerateRequest = summary?.meal_plan_request_status === "pending";
 
   return (
     <>
-      <TopBar title="Chi tiết bệnh nhân" />
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-background font-body">
         {/* Toast Notification */}
         {toastMessage && (
@@ -565,22 +561,8 @@ export default function PatientDetailPage() {
           </div>
         )}
 
-        {/* Dynamic Sub-header / Navigation Header */}
-        <header className="bg-surface-container-lowest border-b border-outline-variant/40 px-6 md:px-8 py-3.5 flex justify-between items-center sticky top-16 z-10 shadow-2xs">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/doctor/patients"
-              className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:scale-95 font-bold text-xs"
-              title="Quay lại danh sách"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              <span className="uppercase tracking-wider hidden sm:inline">
-                Danh sách bệnh nhân
-              </span>
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-3">
+        <main className="p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsDeleteModalOpen(true)}
@@ -597,19 +579,17 @@ export default function PatientDetailPage() {
               <span className="material-symbols-outlined text-[18px]">edit</span>
               Chỉnh sửa hồ sơ
             </button>
-            <Link
-              href={`/doctor/patients/${patientId}/generate`}
-              className="bg-primary text-on-primary px-4 py-2 rounded-xl font-body-bold text-xs hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold"
-            >
-              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-              Tạo thực đơn bằng AI
-            </Link>
+            {!hasGenerateRequest && (
+              <Link
+                href={`/doctor/patients/${patientId}/generate`}
+                className="bg-primary text-on-primary px-4 py-2 rounded-xl font-body-bold text-xs hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 font-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                Tạo thực đơn bằng AI
+              </Link>
+            )}
           </div>
-        </header>
-
-        {/* Main Container */}
-        <main className="p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
-          {summary?.meal_plan_request_status === "pending" && (
+          {hasGenerateRequest && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-emerald-900 flex items-center gap-2">
@@ -661,8 +641,7 @@ export default function PatientDetailPage() {
                   {patient.name}
                 </h3>
                 <p className="font-body text-body text-on-surface-variant mb-4 text-xs font-medium">
-                  {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender} •{" "}
-                  <span className="font-mono text-primary font-bold">{patient.patientCode}</span>
+                  {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender}
                 </p>
 
                 <div className="w-full text-left pt-3 border-t border-outline-variant/40">
@@ -697,6 +676,17 @@ export default function PatientDetailPage() {
                   </span>
                 </h4>
                 <ul className="space-y-3 text-on-surface-variant font-body text-body text-xs">
+                  <li className="flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-outline text-[18px] mt-0.5">
+                      fingerprint
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-0.5">
+                        Mã hồ sơ
+                      </p>
+                      <PatientRecordId id={patient.patientCode} />
+                    </div>
+                  </li>
                   <li className="flex items-center gap-2.5">
                     <span className="material-symbols-outlined text-outline text-[18px]">
                       phone
@@ -967,10 +957,10 @@ export default function PatientDetailPage() {
                     Lịch sử thực đơn gần đây
                   </h4>
                   <Link
-                    href={`/doctor/history/${patientId}`}
+                    href={`/doctor/patients/${patientId}/history`}
                     className="text-primary hover:text-primary/80 transition-colors text-xs font-body-bold flex items-center gap-1 cursor-pointer font-bold"
                   >
-                    <span>Xem đầy đủ lịch sử</span>
+                    <span>Xem lịch sử theo tuần</span>
                     <span className="material-symbols-outlined text-[16px]">
                       arrow_forward
                     </span>
@@ -1068,7 +1058,7 @@ export default function PatientDetailPage() {
 
                 <div className="px-5 py-3 bg-surface-container-low/40 border-t border-outline-variant/40 flex justify-end">
                   <Link
-                    href={`/doctor/history/${patientId}`}
+                    href={`/doctor/patients/${patientId}/history`}
                     className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
                   >
                     <span>
