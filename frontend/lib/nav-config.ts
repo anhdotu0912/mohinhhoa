@@ -11,30 +11,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
   doctor: [
     { id: "dashboard", label: "Dashboard", href: "/doctor", icon: "dashboard" },
     { id: "patients", label: "Bệnh nhân", href: "/doctor/patients", icon: "group" },
-    {
-      id: "reviews",
-      label: "Thực đơn",
-      href: "/doctor/reviews",
-      icon: "assignment_turned_in",
-    },
-    {
-      id: "compliance",
-      label: "Tuân thủ",
-      href: "/doctor/patients/compliance",
-      icon: "verified_user",
-    },
-    {
-      id: "constraints",
-      label: "Ràng buộc lâm sàng",
-      href: "/doctor/patients/constraints",
-      icon: "clinical_notes",
-    },
-    {
-      id: "history",
-      label: "Lịch sử",
-      href: "/doctor/history",
-      icon: "history",
-    },
+    { id: "inbox", label: "Hàng việc", href: "/doctor/inbox", icon: "inbox" },
   ],
   patient: [
     { id: "home", label: "Trang chủ", href: "/patient", icon: "dashboard" },
@@ -65,6 +42,11 @@ export function resolveActiveNavId(
 
   const items = NAV_BY_ROLE[role];
   const home = ROLE_HOME[role];
+
+  if (role === "doctor") {
+    if (pathname.startsWith("/doctor/reviews/")) return "patients";
+    if (pathname.startsWith("/doctor/inbox")) return "inbox";
+  }
 
   const matches = items.filter((item) => {
     if (item.href === home) {

@@ -377,7 +377,7 @@ export default function QueuePage() {
                                         planId,
                                         job.slotIntent
                                       )
-                                    : `/doctor/reviews/${job.patientId}`
+                                    : `/doctor/patients/${job.patientId}/meals`
                                 );
                               }}
                               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold rounded-xl transition-all text-xs cursor-pointer active:scale-95 shadow-2xs"

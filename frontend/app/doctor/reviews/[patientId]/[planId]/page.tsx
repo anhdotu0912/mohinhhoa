@@ -545,7 +545,7 @@ export default function PlanReviewDetailPage() {
       setRejectModalOpen(false);
       showToast("Đã từ chối thực đơn.");
       setTimeout(() => {
-        router.push("/doctor/reviews");
+        router.push(`/doctor/patients/${patientId}/meals`);
       }, 1200);
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Không từ chối được thực đơn.");
@@ -969,7 +969,7 @@ export default function PlanReviewDetailPage() {
       <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 pb-28">
         <div className="flex items-center justify-between">
           <Link
-            href={`/doctor/reviews/${patientId}`}
+            href={`/doctor/patients/${patientId}/meals`}
             className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
@@ -1110,7 +1110,7 @@ export default function PlanReviewDetailPage() {
                   router.push(
                     slotIntent
                       ? buildHistoryHref(patientId, slotIntent.startsOn)
-                      : "/doctor/reviews"
+                      : `/doctor/patients/${patientId}/meals`
                   );
                 }}
                 className="px-4 py-2 rounded-xl border border-outline-variant/60 text-xs font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"

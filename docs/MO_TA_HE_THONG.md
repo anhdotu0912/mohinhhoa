@@ -1,8 +1,8 @@
 # Mô tả chức năng — VMEC-10 (P-014)
 
-> Tài liệu này chuyển hoá sơ đồ Use Case + bảng tác nhân trong `UML_VinMec_10.docx` thành đặc tả chức năng chi tiết, có luồng hoạt động (step-by-step) cho từng use case, để AI coding agent hoặc dev đọc và triển khai trực tiếp.
-> Đối chiếu với repo hiện tại: `CLAUDE.md` (nguồn sự thật stack + MoSCoW), `specs/01-13` (đặc tả nghiệp vụ, mỗi file có Status), `contracts/api-v1.md` + `agent-io-schema.md`.
-> Quy ước Status mỗi use case: `New` (chưa có trong specs hiện tại — cần agent thiết kế mới) · `Đã có spec` (trỏ tới file spec tương ứng, dùng tài liệu này để bổ sung góc nhìn use-case) · `Ngoài MVP` (không làm ở bản demo này, giữ nav ẩn / stub).
+> Tài liệu **as-built** (cập nhật 2026-08-25): chuyển hoá sơ đồ Use Case + bảng tác nhân trong `UML_VinMec_10.docx` thành đặc tả chức năng khớp **code đang chạy**, không còn là brief triển khai cho các mục đã Done.
+> Đối chiếu: `CLAUDE.md` (stack + MoSCoW), `specs/01-13` (Status từng spec), `contracts/api-v1.md` + `agent-io-schema.md`, backlog còn lại tại `tasks/roadmap-mvp.md`.
+> Quy ước Status mỗi use case: **Done** (BE + FE chính đã nối API) · **Partial** (BE Done, FE còn gap / mock) · **Planned** (chưa có trong code) · **Ngoài MVP** (Could/Won't Have — giữ trên UML, không làm bản demo này).
 
 ---
 
@@ -10,12 +10,50 @@
 
 | Tác nhân | Vai trò |
 |---|---|
-| **Bác sĩ / Chuyên gia dinh dưỡng** (`role=doctor`) | Quản lý bệnh nhân, duyệt thực đơn AI sinh ra, theo dõi tuân thủ, quản lý ràng buộc lâm sàng |
-| **Bệnh nhân** (`role=patient`) | Khai báo hồ sơ, tương tác với AI để nhận thực đơn/tư vấn, ghi nhận chỉ số & tuân thủ |
-| **AI** (tác nhân hệ thống, không phải actor login) | LangGraph Agent: RAG, sinh thực đơn, kiểm tra tương tác thuốc–thực phẩm, tính toán dinh dưỡng, cảnh báo, guardrails HITL |
-| **Chức năng dùng chung** | Đăng nhập, Đăng ký, Liên hệ — không phân role |
+| **Bác sĩ / Chuyên gia dinh dưỡng** (`role=doctor`) | Quản lý bệnh nhân, sinh & duyệt thực đơn AI, áp dụng vào tuần, theo dõi tuân thủ, quản lý ràng buộc lâm sàng |
+| **Bệnh nhân** (`role=patient`) | Khai báo hồ sơ, chat với AI, xem thực đơn, ghi nhật ký ăn uống, ghi nhận chỉ số, nhận nhắc tuân thủ |
+| **AI** (tác nhân hệ thống, không phải actor login) | LangGraph Agent: RAG Q&A, đọc thực đơn, kiểm tra tương tác thuốc–thực phẩm, tóm tắt food log / tuân thủ / ghi chú bác sĩ, guardrails HITL. **Sinh thực đơn 7 ngày** chạy qua `meal_planner_agent` trên HTTP generate, không persist qua chat |
+| **Chức năng dùng chung** | Đăng ký, Đăng nhập, Quên/đặt lại mật khẩu, Liên hệ (landing tĩnh) |
 
-**Nguyên tắc HITL bắt buộc (từ đề bài, khớp CLAUDE §7):** AI không được tự chẩn đoán bệnh, không tự ý khuyến nghị đổi thuốc/liều lượng. Mọi kế hoạch dinh dưỡng cho bệnh nhân **phải** qua bác sĩ/chuyên gia duyệt trước khi coi là chính thức. Mọi số liệu AI trả về phải grounded + có citation từ RAG, không hallucinate.
+**Nguyên tắc HITL bắt buộc (khớp `CLAUDE.md` §7):** AI không tự chẩn đoán bệnh, không khuyến nghị đổi thuốc/liều lượng. Mọi kế hoạch dinh dưỡng phải qua bác sĩ duyệt **rồi áp dụng** (`approve` → `apply`) trước khi materialize nhắc nhở. Mọi số liệu AI trả về phải grounded + có citation từ RAG, không hallucinate.
+
+---
+
+## 0.1 Bản đồ màn hình as-built
+
+### Bệnh nhân — chat-home (không còn sidebar nhiều trang)
+
+Shell: `PatientChatShell` tại `/patient`. Thực đơn, nhật ký ăn, thông báo, chỉ số mở bằng **dock panel** bên phải, không phải route riêng.
+
+| Route / surface | Việc |
+|---|---|
+| `/patient` | Chat-home: `POST /chat/stream` (SSE), session sidebar (`/chat/sessions`), card generative (thực đơn ngày/tuần, tuân thủ, ghi chú bác sĩ) |
+| Dock **Thực đơn & Nhật ký** (`MealLogPanel`) | Xem plan đang áp dụng + ghi food log 3-slot (`POST/GET /food-log`) |
+| Dock **Thông báo** (`NotificationsPanel`) | `GET /notifications` + read/dismiss/done |
+| Dock **Chỉ số sức khỏe** (`HealthMetricsPanel`) | `GET /metrics/history`, `GET /compliance/me`, form `POST /metrics` |
+| `/patient/onboarding` | Form nhiều bước → `POST /profile` → redirect `/patient` |
+| `/patient/profile` | Sửa hồ sơ, avatar (`POST /auth/me/avatar`), chỉ số snapshot |
+
+Route cũ `/patient/meals`, `/patient/history`, `/patient/notifications`, `/patient/assistant`, `/patient/home` **đã gỡ** — `nav-config.ts` còn href cũ nhưng shell bệnh nhân không dùng sidebar đó.
+
+### Bác sĩ — roster + chart + inbox
+
+Nav chính: Dashboard · Bệnh nhân · Hàng việc.
+
+| Route | Việc |
+|---|---|
+| `/doctor` | Dashboard (danh sách BN + compliance — pha trộn API thật và fallback mock khi thiếu dữ liệu) |
+| `/doctor/patients` | Danh sách BN, thêm BN (`POST /auth/register` + `PUT .../profile`) |
+| `/doctor/inbox` | Hàng việc: chờ duyệt · ràng buộc pending · yêu cầu tạo TD · plan hết hạn |
+| `/doctor/patients/{id}` | Hồ sơ (overview) |
+| `/doctor/patients/{id}/meals` | Danh sách thực đơn của BN |
+| `/doctor/patients/{id}/constraints` | Calo / muối / đường + nút xác nhận HITL |
+| `/doctor/patients/{id}/compliance` | Biểu đồ tuân thủ + gửi nhắc |
+| `/doctor/patients/{id}/history` | Lịch tuần 7 ngày (ADR-012) + apply/replace slot |
+| `/doctor/patients/{id}/generate` | Sinh thực đơn AI (hàng đợi `QueueDrawer`) |
+| `/doctor/reviews/{patientId}/{planId}` | Duyệt (approve/edit/reject) rồi **áp dụng** (`POST .../apply`) |
+
+Redirect (IA cũ → mới): `/doctor/reviews` → inbox `plan_review`; `/doctor/patients/constraints` → inbox `constraints`; `/doctor/patients/compliance` → `/doctor`; `/doctor/history` → danh sách BN; `/doctor/messages` → `/doctor` (không có backend messaging).
 
 ---
 
@@ -26,6 +64,7 @@ flowchart TB
   subgraph Shared[Chức năng dùng chung]
     Register[Đăng ký]
     Login[Đăng nhập]
+    Forgot[Quên mật khẩu]
     Contact[Liên hệ]
   end
 
@@ -40,19 +79,21 @@ flowchart TB
   subgraph Patient[Bệnh nhân]
     P1[Đăng ký hồ sơ ban đầu]
     P2[Cập nhật & theo dõi chỉ số]
-    P3[Quản lý nhật ký ăn uống *]
+    P3[Quản lý nhật ký ăn uống]
     P4[Xem thực đơn]
     P5[Tương tác với AI]
+    P6[Yêu cầu tạo thực đơn]
   end
 
   subgraph AI[AI Agent]
     A1[Cảnh báo dị ứng & tương tác]
-    A2[Sinh/duyệt thực đơn]
+    A2[Sinh thực đơn]
   end
 
   Login --> D1 & D2 & D3 & D4 & D5
-  Login --> P2 & P3 & P4 & P5
+  Login --> P2 & P3 & P4 & P5 & P6
   Register --> P1
+  P6 -->|inbox generate_request| D2
   D2 -->|include| A2
   P5 -->|include| A1
   D2 -->|include| A1
@@ -60,241 +101,249 @@ flowchart TB
   P4 -->|include| A1
 ```
 
-*`Quản lý nhật ký ăn uống` (Food Log) đã implement (Should Have, Done core 2026-08-17, ADR-009) — structured manual entry 3-slot, modal trong `/patient/meals`.*
+North Star as-built: hồ sơ → (BN yêu cầu **hoặc** BS generate) → plan `pending_review` → BS duyệt → **apply** tuần → BN xem/ghi nhật ký/nhận nhắc → BS xem tuân thủ.
 
 ---
 
 ## 2. Nhóm chức năng: Bác sĩ / Chuyên gia dinh dưỡng
 
 ### 2.1 Quản lý bệnh nhân
-**Status:** Đã có spec → `specs/02-patient-profile-onboarding.md` (khai báo hồ sơ bệnh nhân) + `specs/03-doctor-patient-management.md` (góc nhìn bác sĩ quản lý danh sách).
+**Status:** Done → `specs/02-patient-profile-onboarding.md` + `specs/03-doctor-patient-management.md`.
 
 | Use case | Mô tả |
 |---|---|
-| Thêm bệnh nhân | Bác sĩ tạo hồ sơ bệnh nhân mới, nhập: thông tin tài khoản cơ bản, hồ sơ bệnh lý (disease, medications), dị ứng & không dung nạp, mục tiêu cân nặng/dinh dưỡng |
-| Cập nhật thông tin bệnh nhân | Sửa hồ sơ đã có |
-| Điều chỉnh mục tiêu dinh dưỡng | Sửa `target_kcal`, `restrictions` — qua endpoint constraints riêng (`specs/04`), không qua `PUT .../profile` |
+| Thêm bệnh nhân | Bác sĩ tạo tài khoản + hồ sơ trên `/doctor/patients` |
+| Cập nhật thông tin bệnh nhân | Sửa trên chart `/doctor/patients/{id}` |
+| Điều chỉnh mục tiêu dinh dưỡng | `target_kcal` / muối / đường qua tab Ràng buộc (`specs/04`), **không** qua `PUT .../profile` |
+| Xóa bệnh nhân | `DELETE /doctor/patients/{id}` — xóa cascade dữ liệu liên quan |
 
 **Luồng chính — Thêm bệnh nhân:**
-1. Bác sĩ vào `/doctor/patients` → bấm "Thêm bệnh nhân".
-2. Nhập tài khoản cơ bản (email, họ tên) → hệ thống gọi `POST /api/v1/auth/register` với `role=patient`, sau đó `PUT /doctor/patients/{id}/profile` để bổ sung chi tiết — **đã chốt không làm** endpoint riêng `POST /api/v1/doctor/patients` (`specs/03` rule 2).
-3. Nhập hồ sơ bệnh lý + dị ứng + mục tiêu → map vào schema Profile chuẩn (CLAUDE §8: `disease`, `medications`, `allergies`, `bmi`, `target_kcal`, `restrictions`, `preferences`). Lưu ý: `target_kcal`/`restrictions` chỉ sửa qua endpoint constraints (`specs/04`), không qua `PUT .../profile`.
-4. Lưu → Profile persist, patient xuất hiện trong danh sách `GET /api/v1/doctor/patients`.
+1. Bác sĩ vào `/doctor/patients` → "Thêm bệnh nhân".
+2. FE gọi `POST /api/v1/auth/register` với `role=patient`, sau đó `PUT /doctor/patients/{id}/profile` để bổ sung chi tiết. **Không** có endpoint `POST /api/v1/doctor/patients` (`specs/03` rule 2).
+3. Hồ sơ map schema Profile: `disease`, `medications`, `allergies`, `bmi`/`weight`/`height`, `preferences`, `treatment_goals`. `target_kcal`/`restrictions` chỉ sửa qua endpoint constraints.
+4. Lưu → BN xuất hiện trong `GET /api/v1/doctor/patients` (filter `q`, `status`, `plan_usage`, `meal_plan_request`).
 
 **Edge case:**
-- Trùng email khi đăng ký → trả lỗi rõ ràng, không tạo bản ghi trùng.
-- Thiếu trường bắt buộc (disease/medications) → cho phép lưu nháp nhưng cảnh báo "chưa đủ dữ liệu để sinh thực đơn an toàn" (chặn ở bước generate, không chặn ở bước tạo hồ sơ).
+- Trùng email → `409 EMAIL_EXISTS`.
+- Thiếu disease/medications → cho lưu hồ sơ; generate plan vẫn chạy nhưng kém an toàn lâm sàng (cảnh báo ở bước generate, không chặn tạo hồ sơ).
+- `PUT .../metrics` bắt buộc đủ cặp `weight` + `height` → `400 METRICS_INCOMPLETE`.
 
 ### 2.2 Quản lý thực đơn
-**Status:** Đã có spec → `specs/05-meal-plan-generation.md` (sinh thực đơn) + `specs/06-meal-plan-review.md` (duyệt). Dùng use-case dưới đây làm lớp mô tả luồng nghiệp vụ, chi tiết kỹ thuật xem 2 spec gốc.
+**Status:** Done → `specs/05-meal-plan-generation.md` + `specs/06-meal-plan-review.md` + ADR-011/012. FE gap: nút "Yêu cầu điều chỉnh" phía bệnh nhân chưa gắn `POST /meal-plans/{id}/request-adjustment` (BE đã Done).
 
 | Use case | Include | Mô tả |
 |---|---|---|
-| Tạo thực đơn bằng AI | `<<include>> A2 Sinh thực đơn` | Bác sĩ generate hộ bệnh nhân qua `/doctor/patients/{id}/generate` |
-| Cập nhật thực đơn | | Sửa món/ngày trong plan trước khi duyệt |
-| Tạo lại thực đơn | | Yêu cầu AI sinh lại toàn bộ 7 ngày (khi bác sĩ từ chối) |
-| Duyệt/Từ chối thực đơn | | `approve` / `reject` (có ghi chú) |
-| Cảnh báo dị ứng và tương tác | `<<include>> A1` | Hiển thị các cảnh báo AI phát hiện trước khi bác sĩ quyết định duyệt |
-| Phản hồi và điều chỉnh | | Bác sĩ để lại feedback → dùng làm dữ liệu tinh chỉnh lần generate sau (Should Have — "Adaptive feedback") |
+| Tạo thực đơn bằng AI | `<<include>> A2` | BS generate hộ BN tại `/doctor/patients/{id}/generate` |
+| Tiếp nhận yêu cầu tạo TD | | BN gọi `POST /meal-plans/request` → job inbox `generate_request` |
+| Cập nhật thực đơn | | `action=edit` + `edited_plan` full-replace khi duyệt; tra cứu món `GET /doctor/foods` |
+| Tạo lại thực đơn | | Generate lại sau reject / hết hạn slot |
+| Duyệt / Từ chối / Áp dụng | | `approve` / `reject` / `edit` rồi `POST .../apply` gán tuần |
+| Cảnh báo dị ứng và tương tác | `<<include>> A1` | Agent swap món "Nguy hiểm", gắn cảnh báo "Cần chú ý" |
+| Phản hồi và điều chỉnh | Partial | BE `request-adjustment` Done; FE bệnh nhân chưa có nút. Adaptive feedback Should Have — chưa pipeline tinh chỉnh generate |
 
-**Luồng chính — Tạo & duyệt thực đơn (North Star flow, khớp `tasks/roadmap-mvp.md` demo flow):**
-1. Bác sĩ vào `/doctor/patients/{id}/generate` → bấm "Tạo thực đơn AI".
-2. FE gọi `POST /api/v1/doctor/patients/{id}/meal-plans/generate`.
-3. BE load Profile bệnh nhân → gọi `meal_planner_agent` (luôn chạy, không rẽ nhánh `DEMO_MOCK`) → sinh 7 ngày, mỗi món có citation.
-4. Agent tự động chạy `InteractionCheckerAgent` trên các món trong plan → nếu phát hiện cặp thuốc–thực phẩm mức "Nguy hiểm" → tự swap món + ghi `swaps[]`; mức "Cần chú ý" → gắn cảnh báo hiển thị, không swap.
-5. Plan persist với `status=pending_review`.
-6. Bác sĩ xem danh sách `GET /api/v1/doctor/meal-plans?status=pending_review` → mở chi tiết → xem cảnh báo dị ứng/tương tác đính kèm.
+**Luồng chính — Tạo, duyệt, áp dụng (North Star):**
+1. Nguồn việc: inbox "Yêu cầu tạo TD", hoặc BS mở `/doctor/patients/{id}/generate`.
+2. FE gọi `POST /api/v1/doctor/patients/{id}/meal-plans/generate` (hàng đợi `QueueDrawer`). Generate **không** nhận ngày áp dụng.
+3. BE load Profile → `meal_planner_agent` (luôn chạy, không nhánh `DEMO_MOCK`) → 7 ngày, mỗi món có citation.
+4. Agent chạy `interaction_checker_agent` trên món trong plan (KB `drug_food_interactions.json`, ~28 cặp): "Nguy hiểm" → swap + `swaps[]`; "Cần chú ý" → cảnh báo, không swap. Cặp không có trong KB → `unmatched_pairs[]`.
+5. Plan persist `status=pending_review`. Cờ `meal_plan_request_status` của BN reset về `"none"`.
+6. Inbox `plan_review` / `GET /doctor/meal-plans?status=pending_review` → mở `/doctor/reviews/{patientId}/{planId}`.
 7. Bác sĩ chọn:
-   - **Duyệt** → `POST /doctor/meal-plans/{id}/review` `{action: approve}` → plan chuyển `approved` → tạo Notification `plan_approved` cho bệnh nhân + materialize `meal_reminder`/`adherence_checkin`.
-   - **Từ chối** → `{action: reject, note}` → plan chuyển `rejected`, bệnh nhân/bác sĩ có thể trigger "Tạo lại thực đơn" (lặp lại bước 2–5, giữ note làm ngữ cảnh bổ sung cho lần sinh sau).
-   - **Sửa tay** → `POST /doctor/meal-plans/{id}/review` `{action: edit, edited_plan: ...}` — full-replace toàn bộ plan trước khi approve; **không có** PUT cấp món riêng lẻ (`specs/06` §6 Out of scope).
+   - **Duyệt** → `POST /doctor/meal-plans/{id}/review` `{action: approve}` → `approved` + `Notification(type=plan_approved)`. **Chưa** tạo `meal_reminder` / `adherence_checkin`.
+   - **Từ chối** → `{action: reject, notes}` → `rejected`; hủy notification `pending` gắn plan.
+   - **Sửa tay** → `{action: edit, edited_plan}` full-replace → `edited`. **Không** có PUT cấp món riêng (`specs/06` §6).
+   - Review lần 2 khi không còn `pending_review` → `409 PLAN_ALREADY_REVIEWED`.
+8. **Áp dụng** → `POST /doctor/meal-plans/{id}/apply` `{start_date, replace_active, slot_key}` (tab Lịch sử hoặc ngay sau duyệt). Side-effect: stamp `starts_on`/`ends_on`, materialize `meal_reminder`/`adherence_checkin` (bỏ slot đã qua). `replace_active: true` cắt `ends_on` plan cũ = `start_date - 1`.
 
 ### 2.3 Xem tuân thủ
-**Status:** Đã có spec → `specs/10-doctor-compliance-view.md` (Done core) + `specs/11-compliance-notification-delivery.md` (nguồn dữ liệu notification).
+**Status:** Done (core) → `specs/10-doctor-compliance-view.md` + `specs/11-compliance-notification-delivery.md`.
 
 | Use case | Mô tả |
 |---|---|
-| Xem biểu đồ tuân thủ bệnh nhân | Bác sĩ xem % tuân thủ meal plan / thuốc theo thời gian |
-| Cảnh báo tuân thủ | Hệ thống nổi cảnh báo khi bệnh nhân tuân thủ thấp (VD <60% trong 7 ngày) |
-| Cảnh báo/nhắc nhở bệnh nhân | Bác sĩ chủ động gửi nhắc nhở thủ công |
-| Xem nhật ký ăn uống của bệnh nhân | Tóm tắt từ `GET /food-log` trên `/patient/history` (patient self-view); doctor chưa có trang riêng xem food log chi tiết |
-
-**Luồng chính — Xem biểu đồ tuân thủ:**
-1. Bác sĩ vào `/doctor/patients/compliance` (route FE thật; trang `/doctor/history` dùng nguồn khác — `meal-logs-store`, không phải compliance API).
-2. FE gọi `GET /api/v1/doctor/patients/{id}/compliance?days=14` — on-the-fly aggregation từ `adherence_checkin` notifications (`adrs/008`, `specs/10`).
-3. FE vẽ biểu đồ (line/bar theo ngày) từ `daily_series` + `weekly_rate`.
-4. Nếu `weekly_rate < ngưỡng` (config `COMPLIANCE_LOW_THRESHOLD_PCT`, VD 60%) → hiển thị badge cảnh báo; bác sĩ có thể gửi nhắc thủ công qua `POST /api/v1/doctor/patients/{id}/compliance/remind`.
-
-### 2.4 Quản lý ràng buộc lâm sàng
-**Status:** Đã có spec (Partial) → `specs/04-clinical-constraints.md`. UI tại `frontend/app/doctor/patients/constraints/page.tsx` — **đã nối** `PUT /doctor/patients/{id}/constraints` qua `api.updateDoctorConstraints`. Workflow HITL (`constraints_status` + `POST .../approve`) vẫn Planned.
-
-| Use case | Mô tả |
-|---|---|
-| Xem ràng buộc lâm sàng | Xem danh sách ràng buộc áp dụng cho bệnh nhân (giới hạn carb/bữa, sodium/ngày — đã có trong Profile.restrictions theo CLAUDE §8) |
-| Cập nhật ràng buộc lâm sàng | Sửa `restrictions.carb_per_meal`, `restrictions.sodium_daily`, hoặc thêm ràng buộc theo bệnh lý cụ thể (VD purine cho gout) |
-
-**Luồng chính (as-built + Planned):**
-1. Bác sĩ mở `/doctor/patients/constraints` (tab "Ràng buộc lâm sàng" trong nav doctor).
-2. Hiển thị `target_kcal` + `restrictions` hiện tại từ Profile (`specs/02`, `specs/04`).
-3. Sửa → gọi `PUT /api/v1/doctor/patients/{id}/constraints` — **Done** (partial update kcal/salt/sugar).
-4. Ràng buộc mới có hiệu lực ngay từ lần generate thực đơn tiếp theo (Agent đọc `restrictions` khi build prompt/filter).
-5. **[Planned]** Patient tự sửa ràng buộc → `constraints_status=pending_doctor_review` → doctor approve qua `POST .../constraints/approve`.
-
-**As-built hiện tại:** PUT constraints hoạt động; ghi chú lâm sàng trên UI vẫn local state; approve flow chưa có.
-
-**Lưu ý dữ liệu gap đã biết (memory dự án):** bảng "serving-size conversion" và "purine content" cho gout còn thiếu trong KB — cần bổ sung trước khi ràng buộc lâm sàng cho bệnh gout hoạt động chính xác.
-
-### 2.5 Cập nhật và theo dõi chỉ số (góc nhìn bác sĩ)
-**Status:** Đã có spec → `specs/12-patient-metrics-tracking.md` (Done core — snapshot + time-series ADR-013; phân tích xu hướng nâng cao Planned).
-
-| Use case | Mô tả |
-|---|---|
-| Theo dõi chỉ số bệnh nhân | Xem lịch sử cân nặng/chiều cao/huyết áp theo thời gian |
-| Phân tích xu hướng dinh dưỡng | So sánh chỉ số theo tuần/tháng, phát hiện xu hướng bất thường (VD BMI tăng liên tục) |
+| Xem biểu đồ tuân thủ | Tab `/doctor/patients/{id}/compliance` — `GET /doctor/patients/{id}/compliance?days=14` |
+| Cảnh báo tuân thủ | Badge khi `overall_adherence_pct` < `COMPLIANCE_LOW_THRESHOLD_PCT` (default **50**, không phải 60) |
+| Nhắc nhở bệnh nhân | `POST /doctor/patients/{id}/compliance/remind` → `Notification(type=manual_reminder)` |
+| Xem nhật ký ăn uống | BS không có trang food-log chi tiết; tuân thủ suy từ check-in + food log (ngày lịch Asia/Ho_Chi_Minh) |
 
 **Luồng chính:**
-1. Bác sĩ xem/cập nhật `PatientMetrics` qua `PUT /doctor/patients/{id}/metrics` — snapshot mới nhất trên `profiles`, BE tự tính BMI; mỗi lần ghi cũng append `body_metrics_history` (ADR-013).
-2. Patient xem lịch sử time-series trên `/patient/history` (`GET /metrics/history`, chart inline SVG).
-3. "Phân tích xu hướng dinh dưỡng" nâng cao (so sánh tuần/tháng, AI advice khi chỉ số đổi) — **Planned**, không chặn North Star.
+1. Mở tab Tuân thủ trên chart BN (danh sách cũ `/doctor/patients/compliance` redirect dashboard).
+2. FE gọi compliance API — aggregation on-the-fly từ `adherence_checkin` done + Alert mức Nguy hiểm/Cần chú ý (ADR-008). **Không** có bảng summary riêng.
+3. Vẽ `daily_series` + `overall_adherence_pct`. Ngày không có check-in done → `adherence_pct: null`.
+4. Tuân thủ thấp → gửi nhắc thủ công.
+
+### 2.4 Quản lý ràng buộc lâm sàng
+**Status:** Done → `specs/04-clinical-constraints.md`. UI tab `/doctor/patients/{id}/constraints`. Ghi chú lâm sàng trên UI (nếu còn) là local state — **không** có endpoint persist.
+
+| Use case | Mô tả |
+|---|---|
+| Xem ràng buộc | `target_kcal`, `salt_daily_g`, `sugar_daily_g` (schema `Restrictions` còn song song `carb_per_meal`/`sodium_daily` phía patient) |
+| Cập nhật ràng buộc | `PUT /doctor/patients/{id}/constraints` — partial, áp dụng ngay lần generate sau. Meal planner: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị |
+| Xác nhận thay đổi BN tự sửa | HITL: patient `POST /profile` đổi kcal/restrictions → `constraints_status=pending_doctor_review` (giá trị **vẫn dùng ngay**). Doctor `POST .../constraints/approve` → `confirmed`. `400 NOTHING_TO_APPROVE` nếu đã confirmed |
+
+**Luồng chính:**
+1. Inbox filter `constraints` hoặc tab Ràng buộc trên chart.
+2. Sửa Calo · Muối · Đường → PUT constraints (doctor tự sửa cũng reset status về `confirmed`).
+3. Badge "Chờ bác sĩ xác nhận" + nút Xác nhận khi `pending_doctor_review`.
+4. `protein_daily_g` **Won't Have** — không nằm trong form bác sĩ.
+
+### 2.5 Cập nhật và theo dõi chỉ số (góc nhìn bác sĩ)
+**Status:** Done (core) → `specs/12-patient-metrics-tracking.md` (ADR-013). Phân tích xu hướng / intent `metric_feedback` — **Planned**.
+
+| Use case | Mô tả |
+|---|---|
+| Theo dõi chỉ số | Chart overview + `PUT /doctor/patients/{id}/metrics` — snapshot `profiles` + append `body_metrics_history` |
+| Phân tích xu hướng | Planned — chưa có so sánh tuần/tháng hay advice AI khi chỉ số đổi |
+
+**Luồng chính:**
+1. BS cập nhật cân/cao trên hồ sơ BN; BMI tính server-side (ngưỡng châu Á).
+2. BN tự xem/ghi trên dock Chỉ số (`GET /metrics/history`, `POST /metrics` upsert 1 bản ghi/ngày VN).
+3. Lời khuyên khi delta vượt ngưỡng — **chưa có** node/intent.
 
 ---
 
 ## 3. Nhóm chức năng: Bệnh nhân
 
 ### 3.1 Đăng ký hồ sơ ban đầu (Onboarding)
-**Status:** Đã có spec → `specs/02-patient-profile-onboarding.md` + `specs/01-account-auth.md` (đăng ký/đăng nhập).
+**Status:** Done → `specs/02-patient-profile-onboarding.md` + `specs/01-account-auth.md`.
 
 | Use case | Mô tả |
 |---|---|
-| Khai báo thông tin cơ bản | Họ tên, tuổi, giới tính |
+| Khai báo thông tin cơ bản | Họ tên (register), tuổi, giới tính, SĐT, địa chỉ |
 | Khai báo hồ sơ bệnh lý | `disease[]`, `medications[]` |
-| Khai báo dị ứng & không dung nạp | `allergies[]` |
-| Đặt mục tiêu cân nặng/dinh dưỡng | `target_kcal`, mục tiêu cân nặng |
+| Khai báo dị ứng | `allergies[]` (hard filter khi generate) |
+| Đặt mục tiêu | `target_kcal`, `treatment_goals`, `preferences` (5 pattern: bò/chay/hải sản/heo/gà) |
 
-**Luồng chính:** Đăng ký (`POST /auth/register`) → login → `/patient/onboarding` → điền form nhiều bước → `POST /api/v1/profile` (upsert) → redirect `/patient/home`.
+**Luồng chính:** `POST /auth/register` → login → `/patient/onboarding` (3 bước) → `POST /api/v1/profile` (upsert) → `/patient`. Nếu BN tự sửa kcal/restrictions sau này → `constraints_status=pending_doctor_review`.
 
 ### 3.2 Cập nhật và theo dõi chỉ số
-**Status:** Đã có spec → `specs/12-patient-metrics-tracking.md` (Done core — ghi nhận + lịch sử time-series Done; "lời khuyên khi chỉ số đổi" Planned).
+**Status:** Done (ghi nhận + lịch sử). "Lời khuyên khi chỉ số đổi" — Planned (`specs/12` §6).
 
 | Use case | Mô tả |
 |---|---|
-| Ghi nhận chỉ số mới | Cân nặng, huyết áp định kỳ |
-| Theo dõi chỉ số | Xem lại lịch sử đã ghi |
-| Nhận lời khuyên theo thay đổi chỉ số | AI đưa gợi ý ngắn khi chỉ số thay đổi bất thường (VD cân nặng tăng nhanh) |
-
-**Luồng chính — Ghi nhận & theo dõi (Done):**
-1. Bệnh nhân mở `/patient/history` → form ghi cân nặng, huyết áp, đường huyết → `POST /metrics`.
-2. Xem biểu đồ multi-metric (7 điểm gần nhất) từ `GET /metrics/history?days=90`.
-3. Doctor cập nhật snapshot qua `PUT /doctor/patients/{id}/metrics` trên trang chi tiết BN.
-
-**Luồng chính — Nhận lời khuyên theo thay đổi chỉ số (Planned):**
-1. Bệnh nhân cập nhật cân nặng mới trong `/patient/profile`.
-2. BE so sánh với giá trị cũ → nếu delta vượt ngưỡng (VD >2kg/tuần) → gọi Agent với intent `metric_feedback` (node mới — **chưa có** trong graph; xem `specs/12` §6 Out of scope / Planned).
-3. Agent trả lời ngắn (grounded, có citation nếu liên quan dinh dưỡng) → hiển thị dạng notification/toast trong `/patient`.
-4. Guardrails: nếu câu trả lời chạm tới thay đổi thuốc → redirect bác sĩ (không tự khuyến nghị).
+| Ghi nhận chỉ số mới | Dock Chỉ số / profile → `POST /metrics` (ít nhất 1 trong weight / huyết áp / đường huyết); upsert theo ngày Asia/Ho_Chi_Minh |
+| Theo dõi chỉ số | `GET /metrics/history?days=90` — sparkline đường huyết + vòng tuân thủ `GET /compliance/me` |
+| Xóa bản ghi | `DELETE /metrics/{id}` |
+| Lời khuyên theo thay đổi | Planned — chưa có intent `metric_feedback` |
 
 ### 3.3 Quản lý nhật ký ăn uống (Food Log)
-**Status:** Done (core) — `specs/09-food-log-adherence.md`, ADR-009. Structured manual entry 3-slot (`morning|noon|evening`), không NLP/ảnh.
+**Status:** Done (core) — `specs/09-food-log-adherence.md`, ADR-009. Structured 3-slot `morning\|noon\|evening`, `as_planned\|custom`. Không NLP, không ảnh.
 
 | Use case | Mô tả |
 |---|---|
-| Ghi nhận tuân thủ bữa ăn | Modal `FoodLogModal` trên `/patient/meals` — chọn `as_planned` hoặc `custom` (+ ghi chú) theo slot |
-| Xem tóm tắt đã ăn | `/patient/history` aggregate từ `GET /food-log` |
-| Cảnh báo tương tác khi log custom | BE tạo `Alert` + link `food_log_id` nếu ghi chú khớp cặp thuốc–thực phẩm nguy hiểm |
+| Ghi nhận tuân thủ bữa | Dock Thực đơn (`MealLogPanel`) — không còn modal trên `/patient/meals` |
+| Xem tóm tắt đã ăn | Cùng panel + chart adherence tuần; chat intent `food_log` chỉ **đọc** 3 log gần nhất |
+| Cảnh báo khi log custom | BE tạo `Alert` + `alert_ids[]` nếu ghi chú khớp cặp thuốc–thực phẩm nguy hiểm |
 
-Chat intent `food_log` chỉ **tóm tắt** 3 log gần nhất từ DB — không tạo log mới qua chat.
+Một user / một ngày VN / một slot = một log (upsert). `logged_at` timezone-aware.
 
 ### 3.4 Xem thực đơn
-**Status:** Đã có spec → `specs/07-patient-meal-plan-view.md` (xem chi tiết + swaps Done; đi chợ/gợi ý khu vực Could Have).
+**Status:** Done (Must/Should) → `specs/07-patient-meal-plan-view.md`. Đi chợ / gợi ý khu vực — Ngoài MVP.
 
 | Use case | Include | Mô tả |
 |---|---|---|
-| Xem chi tiết thực đơn | | `GET /api/v1/meal-plans/me` — xem 7 ngày, từng món kèm citation |
-| Xem thực đơn thay thế | | Khi 1 món bị swap do tương tác nguy hiểm, hiển thị lý do + món thay thế |
-| Tạo danh sách đi chợ | | **Ngoài MVP hiện tại** — nằm ở "Could Have" trong CLAUDE §2 (đã có Stitch prompt thiết kế UI theo memory dự án, nhưng backend chưa build) |
-| Phản hồi và điều chỉnh | | Bệnh nhân feedback món không thích → dùng cho lần generate sau (Should Have — "Adaptive feedback") |
-| Gợi ý khu vực bán nguyên liệu | | **Could Have**, cần tích hợp map (đã có Stitch prompt "shopping location map" theo memory dự án) — chưa có backend |
+| Xem chi tiết thực đơn | | Chat card + dock menu: plan đang apply (`GET /meal-plans/me`, schedule `GET /meal-plans/schedule`) |
+| Xem món thay thế | `<<include>> A1` | `swaps[]` / `alternatives[]` trên món bị đổi |
+| Yêu cầu tạo thực đơn | | Khi chưa có plan apply / plan hết hạn: `POST /meal-plans/request` (không tự gọi AI generate trên UI) |
+| Tạo danh sách đi chợ | | **Ngoài MVP** — không có `GET .../shopping-list` |
+| Phản hồi và điều chỉnh | Partial | BE `request-adjustment` Done; FE chưa có nút. Chat `meal_plan` **read-only**, không persist plan mới |
+| Gợi ý khu vực bán | | **Ngoài MVP** |
 
-**Luồng chính — Xem thực đơn thay thế:**
-1. Bệnh nhân mở plan detail → thấy badge "⚠️ Đã thay thế" trên món bị swap.
-2. Bấm vào → hiển thị: món gốc, lý do (`mechanism` + `severity` từ format tương tác thuốc–thực phẩm CLAUDE §8), món thay thế, nguồn trích dẫn.
-3. Đây chính là dữ liệu `swaps[]` sinh ra ở bước 4, mục 2.2 — FE chỉ cần render, không cần logic mới ở BE.
+**Luồng xem swap:**
+1. BN mở card/dock → badge món đã thay thế.
+2. Hiện món gốc, `mechanism` + `severity`, món thay, citation — dữ liệu `swaps[]` từ bước generate.
+
+**Lazy notification hết hạn:** `GET /meal-plans/me` materialize một lần `plan_expiring` / `plan_expired` khi bucket ADR-011 tương ứng.
 
 ### 3.5 Tương tác với AI
-**Status:** Đã có spec → `specs/13-ai-chat-assistant.md`.
+**Status:** Done (core) → `specs/13-ai-chat-assistant.md`. Planned: hybrid RAG, wire `validate_interaction_output`/`sanitize_recommendation`, dual-provider LLM.
 
 | Use case | Mô tả |
 |---|---|
-| Yêu cầu xem thực đơn | Chat: "cho tôi xem thực đơn hôm nay" → route intent `meal_plan` |
-| Yêu cầu xem thực đơn thay thế | Chat hỏi vì sao món bị đổi |
-| Yêu cầu tạo danh sách đi chợ | Ngoài MVP (như 3.4) |
-| Gợi ý khu vực bán nguyên liệu | Ngoài MVP |
-| Tra cứu thông tin thực phẩm | Chat RAG Q&A — route intent `rag_qa`, luôn kèm citation |
-| Phân tích nhu cầu dinh dưỡng | Chat hỏi "tôi cần bao nhiêu kcal/ngày" → NutritionCalculator + trả lời có căn cứ |
+| Xem / hỏi thực đơn | Intent `meal_plan` — đọc plan DB, card `MealSuggestionCard` / `WeeklyMealPlanCard` |
+| Hỏi tương tác thuốc–thực phẩm | Intent `interaction_check` — `interaction_checker_agent` + KB đầy đủ |
+| Tra cứu thực phẩm / guideline | Intent `rag_qa` — dense retrieval (chưa `retrieve_hybrid`) + citation |
+| Tóm tắt nhật ký ăn | Intent `food_log` — đọc DB, không tạo log |
+| Tuân thủ tuần | Intent `weekly_compliance` — cùng `ComplianceService` với `GET /compliance/me` |
+| Ghi chú bác sĩ | Intent `doctor_note` — `manual_reminder` mới nhất hoặc `adjustment_note` của plan |
+| Từ chối phạm vi y khoa | Intent `refuse` — `get_refuse_message()` |
+| Greeting / unknown | Intent `greeting` / `unknown` |
+| Đi chợ / map bán | Ngoài MVP |
 
-**Luồng chính (đã khớp `POST /api/v1/chat` hiện có trong `lib/api.ts`):**
-1. Bệnh nhân gõ câu hỏi tự do trong `/patient/assistant`.
-2. `POST /api/v1/chat {message}` → LangGraph: `profile_loader` (DB profile trước, fallback demo) → `intent_classifier` → route tới 1 trong các node: `meal_plan`, `interaction_check`, `rag_qa`, `refuse`, `food_log`, `unknown`.
-3. Guardrails: node `apply_guardrails` gọi `enforce_citation_guardrail` (RAG thiếu citation → redact) và `enforce_output_safety` (chặn khuyến nghị đổi thuốc). `refuse_node` dùng `get_refuse_message` từ `rules.py`. Helpers `validate_interaction_output`/`sanitize_recommendation` **chưa** wired runtime.
-4. Nếu không bị chặn → trả `AgentRunOutput` gồm câu trả lời + `citations[]`.
-5. FE render trong chat UI.
+**Luồng chính (`/patient`):**
+1. BN gõ câu hoặc bấm chip; session lưu qua `/chat/sessions` (transcript UI, **không** đưa vào `run_agent` — mỗi lượt stateless).
+2. `POST /api/v1/chat/stream` (ưu tiên) hoặc `POST /chat`: `profile_loader` (DB) → `intent_classifier` → node tương ứng → `apply_guardrails`.
+3. Intent: `greeting` \| `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` \| `weekly_compliance` \| `doctor_note`. Câu ghép → `secondary_intents[]` (gợi ý hỏi lại, không chạy song song).
+4. Guardrails: `enforce_citation_guardrail` (RAG thiếu citation → redact) + `enforce_output_safety` (chặn đổi thuốc). SSE có thể emit `correction`. Helpers `validate_interaction_output` / `sanitize_recommendation` **chưa** gọi runtime.
+5. FE render text + citations + card (`meal_preview`, `weekly_compliance`, `doctor_note`, `meal_plan_week`).
 
 ---
 
 ## 4. Nhóm chức năng: Chức năng dùng chung
 
-| Use case | Mô tả | API hiện có |
+| Use case | Status | API / surface |
 |---|---|---|
-| Đăng ký | Tạo tài khoản `patient` hoặc `doctor` | `POST /api/v1/auth/register` |
-| Đăng nhập | Cấp JWT | `POST /api/v1/auth/login` |
-| Liên hệ | Form liên hệ (hỗ trợ/feedback) — chưa thấy endpoint trong `api-v1.md`, nếu cần cho demo có thể làm form gửi email tĩnh phía FE, không cần backend riêng |
+| Đăng ký | Done | `POST /api/v1/auth/register` — `role` ∈ `{patient, doctor}` |
+| Đăng nhập | Done | `POST /api/v1/auth/login` — JWT; rate-limit 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS` |
+| Quên mật khẩu | Done | FE `/forgot-password` → `POST /auth/forgot-password` (SMTP mật khẩu mới, luôn 200); `/reset-password` nếu dùng token |
+| Ảnh đại diện | Done | `POST /auth/me/avatar` (BN); `POST /doctor/patients/{id}/avatar` (BS hộ) |
+| Liên hệ | Ngoài MVP API | Landing `/` mục `#lien-he` — form tĩnh, không endpoint |
 
 ---
 
-## 5. Ghi chú đối chiếu với hiện trạng codebase (quan trọng cho agent trước khi code)
+## 5. Đối chiếu codebase (cho agent trước khi code)
 
-### 5.1 Use case đã có backend/API sẵn — chỉ cần nối luồng
-Quản lý bệnh nhân (đọc/tạo qua register), sinh thực đơn, duyệt thực đơn, chat RAG, cập nhật chỉ số + time-series, Food Log (`POST/GET /food-log`), notifications, **Doctor Compliance View** (`GET/POST .../compliance*`), **Clinical Constraints** (`PUT .../constraints`).
+### 5.1 Đã Done — không làm lại
 
-### 5.2 Use case còn gap thật (ưu tiên theo `tasks/roadmap-mvp.md`)
-- **`DEMO_MOCK=false` cho interaction check HTTP** — wire agent thật vào `POST /interactions/check` (hiện trả 501 khi false; agent thật chỉ chạy qua chat graph) (`specs/08`) — **P0**.
-- **`constraints_status` + `POST .../constraints/approve`** — HITL approve flow còn thiếu (`specs/04`) — **P1** (`PUT .../constraints` đã Done).
-- **Optimistic lock review** — 409 khi plan không còn `pending_review` (`specs/06`) — **P1**.
-- **Persist meal plan qua `/chat`** — `meal_plan_node` read-only preview; generation qua HTTP only (`specs/05`) — **P1**.
-- **Guardrails bổ sung** — wire `validate_interaction_output`/`sanitize_recommendation` (`specs/13`) — **P2** (citation+safety đã wired).
-- **Hybrid RAG trong chat** — `rag_qa_node` dùng dense-only; `retrieve_hybrid()` đã có — **P2**.
-- **Node `metric_feedback`** — "lời khuyên theo thay đổi chỉ số" (`specs/12` §6 Planned) — **P2/Should Have**.
+Auth (kể cả quên MK + rate-limit), profile onboarding, doctor roster/chart, generate meal plan, review + optimistic lock, **apply tuần** (ADR-011/012), interaction HTTP + chat (1 KB), Food Log, metrics time-series, notifications event-driven + `demo/simulate` idempotent, Doctor Compliance + `GET /compliance/me`, HITL constraints approve, chat SSE + sessions + `secondary_intents`, `unmatched_pairs[]`, `PUT .../constraints`, Gemini embedding + Qdrant, Postgres only.
 
-**Đã chốt/đã code — không còn là gap:**
-- `POST /api/v1/doctor/patients` — **không làm**; dùng `POST /auth/register` + `PUT /doctor/patients/{id}/profile` (`specs/03` rule 2).
-- `GET .../compliance-summary` — **đã có** dưới tên `GET /doctor/patients/{id}/compliance` + `POST .../compliance/remind` (`specs/10` Done core).
-- `PUT` cấp món trong plan — **không làm**; dùng `action=edit` với `edited_plan` full-replace (`specs/06` §6 Out of scope).
+### 5.2 Gap thật còn lại (khớp `tasks/roadmap-mvp.md`)
 
-### 5.3 Lệch pha giữa đề bài gốc và as-built hiện tại
-Đề bài/UML có một số tính năng ngoài phạm vi đã implement:
+Không còn P0 interaction-501, HITL constraints, hay optimistic lock — các mục đó đã as-built.
+
+| Ưu tiên | Việc | Ghi chú |
+|---|---|---|
+| Should / P1 | Wire `validate_interaction_output` / `sanitize_recommendation` vào runtime | Đã viết ở `guardrails/rules.py`, chưa gọi |
+| Should / P1 | `rag_qa_node` dùng `retrieve_hybrid()` | BM25+dense đã có trong `retriever.py`, chat vẫn dense-only |
+| Should | Corpus guideline RAG (`data/guidelines/*.md` trừ `patient_faq.md`) | Nhiều file còn placeholder |
+| Should | Intent lời khuyên khi chỉ số đổi | `specs/12` §6 |
+| Should | Dual-provider LLM OpenAI↔DeepSeek | ADR-004 Planned; as-built `LLM_PROVIDER` single |
+| Partial FE | Nút `request-adjustment` trên UI BN | BE Done, `api.requestMealPlanAdjustment` chưa gắn màn |
+| Could | Dashboard `/doctor` dọn mock còn lại | `THIS_WEEK_DATA` fallback |
+| Could | Đi chợ / PDF / messaging | Chưa có backend; `/doctor/messages` redirect |
+| Could | Persist ghi chú lâm sàng | Local state, chưa có API |
+| Could | Alembic thay `_migrate_add_*` | Không gấp cho demo |
+
+**Đã chốt không làm:** `POST /doctor/patients`; PUT cấp món; persist meal plan qua `/chat` (read-only by design); NLP/ảnh food log; `protein_daily_g` ràng buộc doctor.
+
+### 5.3 Lệch pha UML / đề bài vs as-built
 
 | Tính năng UML/đề bài | Trạng thái repo |
 |---|---|
-| Food Log structured manual | **Done** (2026-08-17, ADR-009) — không còn Won't Have |
-| Patient metrics time-series | **Done** (ADR-013; ADR-010 superseded) |
-| Danh sách đi chợ / gợi ý khu vực | **Could Have** — chưa có backend/UI |
-| NLP parse ảnh món ăn | **Won't Have** — ngoài ADR-009 |
-| Patient/doctor messaging | UI mock — chưa có API |
+| Food Log structured | **Done** (ADR-009) |
+| Metrics time-series | **Done** (ADR-013) |
+| BN tự generate thực đơn trên UI | API `POST /meal-plans/generate` còn; **UI chính** là yêu cầu bác sĩ tạo |
+| Chat-home thay dashboard BN | **Done** — `/patient` là assistant + dock |
+| Danh sách đi chợ / map bán | **Could Have** — chưa có |
+| NLP / ảnh món ăn | **Won't Have** |
+| Patient/doctor messaging | UI cũ redirect; **chưa có spec/API** |
+| Duyệt 1 bước = có nhắc nhở | **Không** — phải `apply` mới materialize reminder |
 
-Khi trình bày UML nộp bài: giữ các use case trên diagram, ghi chú scope cắt giảm có chủ đích cho prototype.
+Khi nộp UML: giữ use case trên diagram, ghi chú cắt scope có chủ đích cho prototype.
 
-### 5.4 Use case "Cảnh báo dị ứng và tương tác" (A1) — đã có, đóng vai trò include dùng chung
-Đây là use case được nhiều luồng khác `<<include>>` (sinh thực đơn, xem thực đơn, chat). Về code, nó tương ứng 1 service dùng chung: `InteractionCheckerAgent` + KB `drug_food_interactions.json` (`specs/08-drug-food-interaction-check.md`). Khi implement bất kỳ use case nào ở trên có include A1, **tái dùng service này**, không viết logic tương tác thuốc–thực phẩm riêng lẻ ở nơi khác.
+### 5.4 Use case A1 — include dùng chung
+
+Mọi luồng sinh plan, xem plan, food log custom, chat tương tác **tái dùng** `interaction_checker_agent` + KB `data/drug_food_interactions.json` (Postgres `drug_products`/`drug_rules` hoặc fallback JSON). Không viết logic tương tác thuốc–thực phẩm rời.
 
 ---
 
-## 6. Thứ tự triển khai đề xuất
+## 6. Thứ tự việc còn lại
 
-Xem chi tiết đầy đủ tại **[`tasks/roadmap-mvp.md`](../tasks/roadmap-mvp.md)** mục "Thứ tự triển khai đề xuất" — đây là nguồn ưu tiên chính (SSOT), tránh lệch pha với tài liệu này.
+SSOT ưu tiên: **[`tasks/roadmap-mvp.md`](../tasks/roadmap-mvp.md)**.
 
-**Tóm tắt cấp cao:**
-- **P0:** `DEMO_MOCK=false` interaction check HTTP (501 → agent thật).
-- **P1:** HITL constraints approve (`specs/04`), optimistic lock review (`specs/06`), persist meal plan qua chat (`specs/05`).
-- **P2/P3:** Guardrails bổ sung, hybrid RAG, preferences, embedding re-index ops, LLM dual-provider fallback, metric_feedback — không chặn North Star demo.
-- **Done (2026-08-17+):** Food Log, Patient Metrics time-series, Doctor Compliance View, `profile_loader` DB, guardrails citation+safety, Gemini embedding, `PUT .../constraints`.
-- **Won't Have (giữ nguyên):** Danh sách đi chợ/gợi ý khu vực, NLP/ảnh food log, patient/doctor messaging API.
+1. Guardrails runtime bổ sung (B1) và hybrid RAG chat (B2).
+2. Chất lượng corpus guideline (B5) — ảnh hưởng demo RAG Q&A.
+3. FE: `request-adjustment`, dọn mock dashboard bác sĩ (B6).
+4. Dual-provider LLM (B3) — không chặn North Star.
+5. Could Have: metric_feedback, đi chợ/PDF, Alembic, messaging, lint debt FE.
+
+**Không còn trên backlog triển khai:** `DEMO_MOCK` interaction 501, HITL constraints, optimistic lock review, persist plan qua chat, Food Log, metrics history, compliance view, `profile_loader` DB, citation+safety guardrails, Gemini embedding.

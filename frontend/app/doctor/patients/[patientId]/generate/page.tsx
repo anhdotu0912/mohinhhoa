@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { TopBar } from "@/components/shared/TopBar";
 import { PatientCard, truncatePatientId } from "@/components/doctor/PatientCard";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { api, assetUrl } from "@/lib/api";
@@ -241,33 +240,25 @@ export default function DoctorGenerateMealPlanPage() {
 
   if (loading) {
     return (
-      <>
-        <TopBar title="Tạo thực đơn mới bằng AI" />
-        <main className="p-lg max-w-[1400px] text-sm text-on-surface-variant">
-          Đang tải hồ sơ bệnh nhân…
-        </main>
-      </>
+      <main className="p-6 md:p-8 text-sm text-on-surface-variant max-w-7xl mx-auto">
+        Đang tải hồ sơ bệnh nhân…
+      </main>
     );
   }
 
   if (loadError || !patient) {
     return (
-      <>
-        <TopBar title="Tạo thực đơn mới bằng AI" />
-        <main className="p-lg max-w-[1400px]">
-          <p className="text-sm text-error mb-md">{loadError || "Không tìm thấy bệnh nhân."}</p>
-          <Link href="/doctor/patients" className="text-xs font-semibold text-primary hover:underline">
+      <main className="p-6 md:p-8 max-w-7xl mx-auto">
+        <p className="text-sm text-error mb-3">{loadError || "Không tìm thấy bệnh nhân."}</p>
+        <Link href="/doctor/patients" className="text-xs font-semibold text-primary hover:underline">
             Quay lại danh sách bệnh nhân
-          </Link>
-        </main>
-      </>
+        </Link>
+      </main>
     );
   }
 
   return (
     <>
-      <TopBar title="Tạo thực đơn mới bằng AI" />
-
       <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
         {slotIntentLabel && (
           <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 text-sm text-on-surface font-medium shadow-2xs">
@@ -277,19 +268,17 @@ export default function DoctorGenerateMealPlanPage() {
             {slotIntentLabel}
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <Link
-            href={
-              slotIntent
-                ? `/doctor/history/${patient.id}`
-                : `/doctor/patients/${patient.id}`
-            }
-            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            {slotIntent ? "Quay lại Lịch sử tuần" : "Quay lại Hồ sơ bệnh nhân"}
-          </Link>
-        </div>
+        {slotIntent && (
+          <div className="flex items-center justify-between">
+            <Link
+              href={`/doctor/patients/${patient.id}/history`}
+              className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Quay lại Lịch sử tuần
+            </Link>
+          </div>
+        )}
 
         {activeJob && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border border-primary/30 bg-primary/5 shadow-2xs">
