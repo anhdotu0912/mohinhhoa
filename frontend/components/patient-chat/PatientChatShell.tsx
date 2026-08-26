@@ -1,6 +1,7 @@
 "use client";
 
-import React, { type ReactNode, useEffect } from "react";
+import React, { type ReactNode, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { PatientPanelProvider, usePatientPanel, type PatientPanelKey } from "./PatientPanelProvider";
 
 // Side Panels
@@ -18,6 +19,13 @@ function ShellInner({ children }: { children: ReactNode }) {
   const isSidebarOpen = usePatientChatHistoryStore((s) => s.isSidebarOpen);
   const hydrateSessions = usePatientChatHistoryStore((s) => s.hydrateSessions);
   const isHydrated = usePatientChatHistoryStore((s) => s.isHydrated);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("panel") === "health") {
+      openPanel("health");
+    }
+  }, [searchParams, openPanel]);
 
   useEffect(() => {
     if (!token) {
@@ -189,7 +197,9 @@ function ShellInner({ children }: { children: ReactNode }) {
 export function PatientChatShell({ children }: { children: ReactNode }) {
   return (
     <PatientPanelProvider>
-      <ShellInner>{children}</ShellInner>
+      <Suspense fallback={null}>
+        <ShellInner>{children}</ShellInner>
+      </Suspense>
     </PatientPanelProvider>
   );
 }

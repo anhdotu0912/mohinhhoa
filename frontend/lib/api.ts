@@ -22,6 +22,7 @@ import {
   type MealPlanRequestOut,
   type MetricsHistoryPoint,
   type MetricsLogCreate,
+  type MetricsLogResult,
   type NotificationOut,
   type PatientMetrics,
   type PatientProfile,
@@ -207,7 +208,7 @@ export const api = {
     return request(`/api/v1/food-log${q}`);
   },
 
-  recordMetrics(payload: MetricsLogCreate): Promise<MetricsHistoryPoint> {
+  recordMetrics(payload: MetricsLogCreate): Promise<MetricsLogResult> {
     return request("/api/v1/metrics", {
       method: "POST",
       body: payload,

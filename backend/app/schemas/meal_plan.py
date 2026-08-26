@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.body_metrics import MetricsDeltaAdviceOut
+
 # --- Shared types ---
 
 class Macros(BaseModel):
@@ -224,6 +226,7 @@ class AgentRunOutput(BaseModel):
     guardrail_triggered: bool = False
     weekly_compliance: WeeklyComplianceOut | None = None
     doctor_note: DoctorNoteOut | None = None
+    metrics_delta_advice: MetricsDeltaAdviceOut | None = None
 
 
 FoodItem.model_rebuild()

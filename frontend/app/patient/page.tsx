@@ -43,10 +43,10 @@ const SAMPLE_CHIPS = [
   {
     id: "metrics",
     title: "Chỉ số của tôi thế nào?",
-    subtitle: "Xem nhịp tim & đường huyết",
+    subtitle: "Cân nặng, đường huyết, huyết áp",
     icon: "monitoring",
     colorClass: "bg-blue-50 text-blue-600",
-    prompt: "Tuân thủ của tôi tuần này thế nào?",
+    prompt: "Chỉ số sức khỏe của tôi đang thế nào?",
   },
   {
     id: "doctor",

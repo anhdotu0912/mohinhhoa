@@ -137,3 +137,44 @@ def test_delete_metrics_entry_not_found(client):
     assert response.status_code == 404
     body = response.json()
     assert body["code"] == "METRICS_NOT_FOUND"
+
+
+def test_record_metrics_clinical_fields_and_derived(client):
+    headers = _login(client, PATIENT)
+    response = client.post(
+        "/api/v1/metrics",
+        json={
+            "weight": 71.0,
+            "waist_cm": 92,
+            "systolic": 128,
+            "diastolic": 78,
+            "glucose_fasting": 6.2,
+            "glucose_postprandial": 8.4,
+            "hba1c": 6.8,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["waist_cm"] == 92
+    assert body["systolic"] == 128
+    assert body["diastolic"] == 78
+    assert body["glucose_fasting"] == 6.2
+    assert body["glucose_postprandial"] == 8.4
+    assert body["hba1c"] == 6.8
+    assert body["blood_pressure"] == "128/78 mmHg"
+    assert "6.2" in body["blood_glucose"]
+    assert body.get("delta_advice") is None
+
+
+def test_record_metrics_delta_advice_when_weight_jumps(client):
+    headers = _login(client, PATIENT)
+    first = client.post("/api/v1/metrics", json={"weight": 70.0}, headers=headers)
+    assert first.status_code == 200, first.text
+    second = client.post("/api/v1/metrics", json={"weight": 72.0}, headers=headers)
+    assert second.status_code == 200, second.text
+    advice = second.json().get("delta_advice")
+    assert advice is not None
+    assert "weight" in advice["changed_fields"]
+    assert advice["message"]
+

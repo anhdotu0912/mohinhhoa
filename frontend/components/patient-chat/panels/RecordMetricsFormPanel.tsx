@@ -1,22 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
-import { ApiError } from "@/lib/types";
+import { ApiError, type MetricsDeltaAdviceOut } from "@/lib/types";
+import { calcBmi } from "@/lib/metrics-series";
 import {
   firstFieldError,
-  sanitizeBloodPressureInput,
-  validateBloodPressure,
+  validatePositiveInt,
   validatePositiveNumber,
 } from "@/lib/profile-validation";
 
 interface RecordMetricsFormPanelProps {
   onBack: () => void;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (advice?: MetricsDeltaAdviceOut | null) => void;
 }
 
-type FieldName = "weight" | "bloodPressure" | "bloodGlucose";
+type FieldName =
+  | "weight"
+  | "waist"
+  | "systolic"
+  | "diastolic"
+  | "glucoseFasting"
+  | "glucosePost"
+  | "hba1c";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 function FieldHint({ id, message }: { id: string; message?: string }) {
@@ -42,11 +50,38 @@ export function RecordMetricsFormPanel({
   onSaved,
 }: RecordMetricsFormPanelProps) {
   const [weight, setWeight] = useState("");
-  const [bloodPressure, setBloodPressure] = useState("");
-  const [bloodGlucose, setBloodGlucose] = useState("");
+  const [waist, setWaist] = useState("");
+  const [systolic, setSystolic] = useState("");
+  const [diastolic, setDiastolic] = useState("");
+  const [glucoseFasting, setGlucoseFasting] = useState("");
+  const [glucosePost, setGlucosePost] = useState("");
+  const [hba1c, setHba1c] = useState("");
+  const [heightCm, setHeightCm] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getProfile()
+      .then((profile) => {
+        if (cancelled) return;
+        setHeightCm(profile.height ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setHeightCm(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const bmiPreview = useMemo(() => {
+    const w = parseFloat(weight.replace(",", "."));
+    if (!Number.isFinite(w) || !heightCm || heightCm <= 0) return null;
+    return calcBmi(w, heightCm);
+  }, [weight, heightCm]);
 
   const setFieldError = (name: FieldName, message: string | null) => {
     setFieldErrors((prev) => {
@@ -60,26 +95,58 @@ export function RecordMetricsFormPanel({
   const collectErrors = (): FieldErrors => {
     const next: FieldErrors = {};
     if (weight.trim()) {
-      const weightErr = validatePositiveNumber(weight, 20, 300, "Cân nặng");
-      if (weightErr) next.weight = weightErr;
+      const err = validatePositiveNumber(weight, 20, 300, "Cân nặng");
+      if (err) next.weight = err;
     }
-    const bpErr = validateBloodPressure(bloodPressure);
-    if (bpErr) next.bloodPressure = bpErr;
-    if (bloodGlucose.trim()) {
-      const glucoseErr = validatePositiveNumber(
-        bloodGlucose,
-        2,
-        33,
-        "Đường huyết"
-      );
-      if (glucoseErr) next.bloodGlucose = glucoseErr;
+    if (waist.trim()) {
+      const err = validatePositiveNumber(waist, 50, 200, "Vòng eo");
+      if (err) next.waist = err;
+    }
+    if (systolic.trim()) {
+      const err = validatePositiveInt(systolic, 70, 250, "Huyết áp tâm thu");
+      if (err) next.systolic = err;
+    }
+    if (diastolic.trim()) {
+      const err = validatePositiveInt(diastolic, 40, 150, "Huyết áp tâm trương");
+      if (err) next.diastolic = err;
+    }
+    if (systolic.trim() && !diastolic.trim()) {
+      next.diastolic = "Nhập cả tâm trương.";
+    }
+    if (diastolic.trim() && !systolic.trim()) {
+      next.systolic = "Nhập cả tâm thu.";
+    }
+    if (systolic.trim() && diastolic.trim() && !next.systolic && !next.diastolic) {
+      if (Number(systolic) <= Number(diastolic)) {
+        next.systolic = "Tâm thu phải lớn hơn tâm trương.";
+      }
+    }
+    if (glucoseFasting.trim()) {
+      const err = validatePositiveNumber(glucoseFasting, 2, 33, "Đường huyết lúc đói");
+      if (err) next.glucoseFasting = err;
+    }
+    if (glucosePost.trim()) {
+      const err = validatePositiveNumber(glucosePost, 2, 33, "Đường huyết sau ăn");
+      if (err) next.glucosePost = err;
+    }
+    if (hba1c.trim()) {
+      const err = validatePositiveNumber(hba1c, 4, 15, "HbA1c");
+      if (err) next.hba1c = err;
     }
     return next;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!weight.trim() && !bloodPressure.trim() && !bloodGlucose.trim()) {
+    const hasAny =
+      weight.trim() ||
+      waist.trim() ||
+      systolic.trim() ||
+      diastolic.trim() ||
+      glucoseFasting.trim() ||
+      glucosePost.trim() ||
+      hba1c.trim();
+    if (!hasAny) {
       setFieldErrors({});
       setError("Vui lòng nhập ít nhất một chỉ số sức khỏe.");
       return;
@@ -96,12 +163,20 @@ export function RecordMetricsFormPanel({
     setSaving(true);
     setError(null);
     try {
-      await api.recordMetrics({
+      const result = await api.recordMetrics({
         weight: weight.trim() ? parseFloat(weight.replace(",", ".")) : undefined,
-        blood_pressure: bloodPressure.trim() || undefined,
-        blood_glucose: bloodGlucose.trim() || undefined,
+        waist_cm: waist.trim() ? parseFloat(waist.replace(",", ".")) : undefined,
+        systolic: systolic.trim() ? parseInt(systolic, 10) : undefined,
+        diastolic: diastolic.trim() ? parseInt(diastolic, 10) : undefined,
+        glucose_fasting: glucoseFasting.trim()
+          ? parseFloat(glucoseFasting.replace(",", "."))
+          : undefined,
+        glucose_postprandial: glucosePost.trim()
+          ? parseFloat(glucosePost.replace(",", "."))
+          : undefined,
+        hba1c: hba1c.trim() ? parseFloat(hba1c.replace(",", ".")) : undefined,
       });
-      onSaved();
+      onSaved(result.delta_advice ?? null);
       onBack();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không thể lưu chỉ số.");
@@ -111,9 +186,8 @@ export function RecordMetricsFormPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white/95 backdrop-blur-2xl overflow-hidden">
-      {/* Fixed Header */}
-      <div className="px-6 md:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
+    <div className="flex flex-col h-full bg-white overflow-hidden">
+      <div className="px-6 md:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -125,13 +199,11 @@ export function RecordMetricsFormPanel({
           </button>
           <div>
             <h2 className="font-bold text-lg text-slate-900">Ghi nhận chỉ số</h2>
-            <p className="text-xs text-slate-500 font-medium">Nhập thông số lâm sàng mới</p>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Hôm nay đã ghi thì lần sau sẽ cập nhật bản ghi hiện có.
+            <p className="text-xs text-slate-500 font-medium">
+              Không bắt buộc đủ bộ — hôm nay đã ghi thì lần sau cập nhật bản ghi hiện có.
             </p>
           </div>
         </div>
-
         <button
           type="button"
           onClick={onClose}
@@ -142,7 +214,6 @@ export function RecordMetricsFormPanel({
         </button>
       </div>
 
-      {/* Form Content */}
       <form
         onSubmit={handleSubmit}
         noValidate
@@ -150,121 +221,189 @@ export function RecordMetricsFormPanel({
       >
         <div className="space-y-5">
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 animate-in fade-in duration-200">
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
               {error}
             </div>
           )}
 
-          {/* Cân nặng */}
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Cân nặng (kg)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min={20}
+                max={300}
+                inputMode="decimal"
+                value={weight}
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  setFieldError("weight", null);
+                }}
+                placeholder="68.5"
+                aria-invalid={Boolean(fieldErrors.weight)}
+                aria-describedby={fieldErrors.weight ? "record-weight-error" : undefined}
+                className={inputClass(Boolean(fieldErrors.weight))}
+              />
+              <FieldHint id="record-weight-error" message={fieldErrors.weight} />
+            </div>
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                BMI
+              </label>
+              <div className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-sm text-slate-900 tabular-nums">
+                {bmiPreview != null ? bmiPreview : "—"}
+              </div>
+              <p className="text-[11px] text-slate-500 leading-snug">
+                {heightCm
+                  ? "Tự tính từ cân nặng và chiều cao hồ sơ."
+                  : (
+                    <>
+                      Cần chiều cao trong{" "}
+                      <Link href="/patient/profile" className="text-[#006857] font-semibold underline-offset-2 hover:underline">
+                        hồ sơ
+                      </Link>{" "}
+                      để có BMI.
+                    </>
+                  )}
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-blue-600">
-                monitor_weight
-              </span>
-              Cân nặng (kg)
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Vòng eo (cm)
             </label>
             <input
               type="number"
               step="0.1"
-              min={20}
-              max={300}
+              min={50}
+              max={200}
               inputMode="decimal"
-              value={weight}
+              value={waist}
               onChange={(e) => {
-                setWeight(e.target.value);
-                setFieldError("weight", null);
+                setWaist(e.target.value);
+                setFieldError("waist", null);
               }}
-              onBlur={(e) => {
-                if (!e.target.value.trim()) {
-                  setFieldError("weight", null);
-                  return;
-                }
-                setFieldError(
-                  "weight",
-                  validatePositiveNumber(e.target.value, 20, 300, "Cân nặng")
-                );
-              }}
-              placeholder="Ví dụ: 68.5"
-              aria-invalid={Boolean(fieldErrors.weight)}
-              aria-describedby={fieldErrors.weight ? "record-weight-error" : undefined}
-              className={inputClass(Boolean(fieldErrors.weight))}
+              placeholder="92"
+              aria-invalid={Boolean(fieldErrors.waist)}
+              className={inputClass(Boolean(fieldErrors.waist))}
             />
-            <FieldHint id="record-weight-error" message={fieldErrors.weight} />
+            <FieldHint id="record-waist-error" message={fieldErrors.waist} />
           </div>
 
-          {/* Huyết áp */}
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Tâm thu
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={70}
+                max={250}
+                value={systolic}
+                onChange={(e) => {
+                  setSystolic(e.target.value);
+                  setFieldError("systolic", null);
+                }}
+                placeholder="128"
+                aria-invalid={Boolean(fieldErrors.systolic)}
+                className={inputClass(Boolean(fieldErrors.systolic))}
+              />
+              <FieldHint id="record-sys-error" message={fieldErrors.systolic} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Tâm trương
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={40}
+                max={150}
+                value={diastolic}
+                onChange={(e) => {
+                  setDiastolic(e.target.value);
+                  setFieldError("diastolic", null);
+                }}
+                placeholder="78"
+                aria-invalid={Boolean(fieldErrors.diastolic)}
+                className={inputClass(Boolean(fieldErrors.diastolic))}
+              />
+              <FieldHint id="record-dia-error" message={fieldErrors.diastolic} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Đường lúc đói
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={glucoseFasting}
+                onChange={(e) => {
+                  setGlucoseFasting(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8));
+                  setFieldError("glucoseFasting", null);
+                }}
+                placeholder="5.6"
+                aria-invalid={Boolean(fieldErrors.glucoseFasting)}
+                className={inputClass(Boolean(fieldErrors.glucoseFasting))}
+              />
+              <p className="text-[11px] text-slate-500">mmol/L · 4.4–7.2</p>
+              <FieldHint id="record-gf-error" message={fieldErrors.glucoseFasting} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Đường sau ăn
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={glucosePost}
+                onChange={(e) => {
+                  setGlucosePost(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8));
+                  setFieldError("glucosePost", null);
+                }}
+                placeholder="8.4"
+                aria-invalid={Boolean(fieldErrors.glucosePost)}
+                className={inputClass(Boolean(fieldErrors.glucosePost))}
+              />
+              <p className="text-[11px] text-slate-500">mmol/L · dưới 10</p>
+              <FieldHint id="record-gp-error" message={fieldErrors.glucosePost} />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-rose-600">
-                favorite
-              </span>
-              Huyết áp (mmHg)
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              HbA1c (%)
             </label>
             <input
               type="text"
-              value={bloodPressure}
-              onChange={(e) => {
-                setBloodPressure(sanitizeBloodPressureInput(e.target.value));
-                setFieldError("bloodPressure", null);
-              }}
-              onBlur={(e) =>
-                setFieldError("bloodPressure", validateBloodPressure(e.target.value))
-              }
-              maxLength={20}
-              placeholder="Ví dụ: 120/80"
-              aria-invalid={Boolean(fieldErrors.bloodPressure)}
-              aria-describedby={
-                fieldErrors.bloodPressure ? "record-bp-error" : undefined
-              }
-              className={inputClass(Boolean(fieldErrors.bloodPressure))}
-            />
-            <FieldHint id="record-bp-error" message={fieldErrors.bloodPressure} />
-          </div>
-
-          {/* Đường huyết */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">
-                water_drop
-              </span>
-              Đường huyết (mmol/L)
-            </label>
-            <input
-              type="text"
               inputMode="decimal"
-              value={bloodGlucose}
+              value={hba1c}
               onChange={(e) => {
-                setBloodGlucose(e.target.value.replace(/[^\d.,]/g, "").slice(0, 8));
-                setFieldError("bloodGlucose", null);
+                setHba1c(e.target.value.replace(/[^\d.,]/g, "").slice(0, 6));
+                setFieldError("hba1c", null);
               }}
-              onBlur={(e) => {
-                if (!e.target.value.trim()) {
-                  setFieldError("bloodGlucose", null);
-                  return;
-                }
-                setFieldError(
-                  "bloodGlucose",
-                  validatePositiveNumber(e.target.value, 2, 33, "Đường huyết")
-                );
-              }}
-              maxLength={8}
-              placeholder="Ví dụ: 5.6"
-              aria-invalid={Boolean(fieldErrors.bloodGlucose)}
-              aria-describedby={
-                fieldErrors.bloodGlucose ? "record-glucose-error" : undefined
-              }
-              className={inputClass(Boolean(fieldErrors.bloodGlucose))}
+              placeholder="6.8"
+              aria-invalid={Boolean(fieldErrors.hba1c)}
+              className={inputClass(Boolean(fieldErrors.hba1c))}
             />
-            <FieldHint id="record-glucose-error" message={fieldErrors.bloodGlucose} />
+            <p className="text-[11px] text-slate-500">Thường đo mỗi 3 tháng · mục tiêu dưới 7%</p>
+            <FieldHint id="record-hba1c-error" message={fieldErrors.hba1c} />
           </div>
         </div>
 
-        {/* Submit Action */}
         <div className="pt-6 border-t border-slate-100 mt-6">
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-gradient-to-r from-[#006857] to-emerald-600 hover:from-[#005245] hover:to-emerald-700 text-white font-bold text-sm py-3 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-emerald-700/20"
+            className="w-full bg-[#006857] hover:bg-[#005245] text-white font-bold text-sm py-3 rounded-xl shadow-[0_8px_18px_rgba(0,104,87,0.22)] transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">
               {saving ? "progress_activity" : "save"}

@@ -216,14 +216,14 @@ North Star as-built: hồ sơ → (BN yêu cầu **hoặc** BS generate) → pla
 **Luồng chính:** `POST /auth/register` → login → `/patient/onboarding` (3 bước) → `POST /api/v1/profile` (upsert) → `/patient`. Nếu BN tự sửa kcal/restrictions sau này → `constraints_status=pending_doctor_review`.
 
 ### 3.2 Cập nhật và theo dõi chỉ số
-**Status:** Done (ghi nhận + lịch sử). "Lời khuyên khi chỉ số đổi" — Planned (`specs/12` §6).
+**Status:** Done (ghi nhận + lịch sử + overlay đa chỉ số + `metrics_delta_advice`).
 
 | Use case | Mô tả |
 |---|---|
-| Ghi nhận chỉ số mới | Dock Chỉ số / profile → `POST /metrics` (ít nhất 1 trong weight / huyết áp / đường huyết); upsert theo ngày Asia/Ho_Chi_Minh |
-| Theo dõi chỉ số | `GET /metrics/history?days=90` — sparkline đường huyết + vòng tuân thủ `GET /compliance/me` |
+| Ghi nhận chỉ số mới | Dock Chỉ số → `POST /metrics` (cân, HA tâm thu/trương, đường lúc đói/sau ăn, vòng eo, HbA1c); upsert theo ngày Asia/Ho_Chi_Minh |
+| Theo dõi chỉ số | `GET /metrics/history?days=90` — overlay nhiều đường + forecast nét đứt; vòng tuân thủ `GET /compliance/me` |
 | Xóa bản ghi | `DELETE /metrics/{id}` |
-| Lời khuyên theo thay đổi | Planned — chưa có intent `metric_feedback` |
+| Lời khuyên theo thay đổi | Intent `metrics_delta_advice` + `delta_advice` trên `POST /metrics` khi vượt ngưỡng |
 
 ### 3.3 Quản lý nhật ký ăn uống (Food Log)
 **Status:** Done (core) — `specs/09-food-log-adherence.md`, ADR-009. Structured 3-slot `morning\|noon\|evening`, `as_planned\|custom`. Không NLP, không ảnh.

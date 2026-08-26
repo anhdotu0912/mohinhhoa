@@ -1,7 +1,7 @@
 # Spec: Theo dõi Chỉ số Cơ thể (Weight/Height/BMI)
 
 ## Status
-Done (patient self-tracking) — snapshot Done; time-series Done (ADR-013); "lời khuyên khi chỉ số đổi" Planned.
+Done (patient self-tracking) — snapshot Done; time-series Done (ADR-013); overlay đa chỉ số + `metrics_delta_advice` Done (dock).
 
 ## 1. Mục tiêu (Why)
 Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` phù hợp và theo dõi tiến triển điều trị (ví dụ giảm cân cho bệnh nhân tiểu đường/tăng huyết áp). Bệnh nhân và bác sĩ cả hai cần ghi nhận được, nhưng theo 2 cơ chế tính BMI khác nhau (xem rule 2).
@@ -16,7 +16,7 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
    - Patient tự nhập qua `POST /profile` → `bmi` là **giá trị patient tự khai tay**, BE **không tự tính lại**, không có validation chéo với `weight`/`height` đã nhập (patient có thể nhập bmi không khớp).
    - Doctor nhập qua `PUT /doctor/patients/{id}/metrics` → BE **tự tính lại `bmi`** từ `weight`/`height` gửi lên, kèm tự gán `bmi_category` (`Thiếu cân | Bình thường | Thừa cân nhẹ | Béo phì`, theo ngưỡng BMI **châu Á** 18.5/23/25 — không phải ngưỡng WHO chuẩn quốc tế 18.5/25/30, cần lưu ý khi so sánh với tài liệu y khoa quốc tế khác).
 3. Không có validation chặn giá trị bất thường (ví dụ `weight=0` hoặc `height=300`) ở cả 2 endpoint — trách nhiệm nhập đúng thuộc về người dùng (patient/doctor), hệ thống hiện không tự phát hiện outlier.
-4. **`POST /metrics` (patient self-tracking):** upsert 1 entry/ngày VN vào `body_metrics_history` — lần đầu insert, lần sau merge field vào cùng row (field không gửi giữ nguyên); ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có; `bmi` tự tính từ `weight` + `height` (height từ payload, entry hiện tại, hoặc snapshot cũ).
+4. **`POST /metrics` (patient self-tracking):** upsert 1 entry/ngày VN vào `body_metrics_history` — lần đầu insert, lần sau merge field vào cùng row (field không gửi giữ nguyên); ít nhất 1 field đo được (`weight` / HA / đường huyết / `waist_cm` / `hba1c`); `bmi` tự tính từ `weight` + `height`. Field lâm sàng optional: `waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`. `blood_pressure`/`blood_glucose` là derived. Response có `delta_advice` khi delta vượt ngưỡng.
 5. **`PUT /doctor/patients/{id}/metrics` (as-built):** phải gửi **đầy đủ cả `weight` và `height`** trong cùng 1 request (không cho cập nhật riêng lẻ 1 trong 2, tránh tính BMI sai do dùng giá trị cũ/thiếu ngữ cảnh) — thiếu 1 trong 2 → `400 METRICS_INCOMPLETE`.
 
 ## 4. Luồng chính (happy path)
@@ -42,9 +42,9 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
 - Doctor cập nhật metrics nhưng chỉ gửi 1 trong 2 field (`weight` hoặc `height`) → theo rule 5, BE trả `400 METRICS_INCOMPLETE`, không cố suy ra từ giá trị cũ trong `profiles`.
 
 ## 6. Ngoài phạm vi (Out of scope)
-- **"Lời khuyên khi chỉ số đổi"** (Should Have theo brief) — **Status: Planned**, cần 1 intent Agent mới (chưa có trong `VALID_INTENTS` hiện tại: `meal_plan | interaction_check | food_log | rag_qa | refuse | unknown`) để AI chủ động tư vấn khi phát hiện thay đổi đáng kể giữa 2 lần cập nhật snapshot. Vì chỉ lưu snapshot (không có lịch sử), thiết kế thật cho intent này cần thêm cơ chế lưu "giá trị lần trước" tạm thời để so sánh — chưa thiết kế cụ thể trong tài liệu này, để dành cho khi feature được ưu tiên.
-- **"Xu hướng dài hạn"** — **Done** (ADR-013): `GET /metrics/history` + UI `/patient/history`.
-- Đo chỉ số khác ngoài weight/height/bmi (ví dụ vòng eo, mỡ cơ thể) — không có field, không nằm trong yêu cầu MVP.
+- **"Lời khuyên khi chỉ số đổi"** — **Done (core, 2026-08-26):** intent `metrics_delta_advice`; caption trên dock + `POST /metrics.delta_advice`. AI chỉ nhận xét quan sát (HITL: không chẩn đoán, không đổi thuốc).
+- **"Xu hướng dài hạn"** — **Done** (ADR-013): `GET /metrics/history` + overlay đa chỉ số trên dock Chỉ số sức khỏe (không có trang `/patient/history` đầy đủ).
+- Mỡ cơ thể / đo liên tục nhiều timestamp/ngày — không nằm trong vòng này (vẫn 1 row/ngày VN). Vòng eo và HbA1c đã thêm vào form ghi nhận.
 
 ## 7. Schema tham chiếu
 - `PatientProfile.weight/height/bmi` — `contracts/agent-io-schema.md` §1.

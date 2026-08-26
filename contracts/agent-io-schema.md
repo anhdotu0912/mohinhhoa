@@ -186,8 +186,14 @@ Nguồn: `backend/app/models/body_metrics.py`, `backend/app/schemas/body_metrics
   "weight": 72,
   "height": 170,
   "bmi": 24.9,
-  "blood_pressure": "130/80 mmHg",
-  "blood_glucose": "135 mg/dL",
+  "waist_cm": 92,
+  "systolic": 128,
+  "diastolic": 78,
+  "glucose_fasting": 6.2,
+  "glucose_postprandial": 8.4,
+  "hba1c": 6.8,
+  "blood_pressure": "128/78 mmHg",
+  "blood_glucose": "6.2 mmol/L",
   "note": "",
   "recorded_by": "patient",
   "recorded_at": "2026-08-17T08:00:00+07:00"
@@ -195,9 +201,11 @@ Nguồn: `backend/app/models/body_metrics.py`, `backend/app/schemas/body_metrics
 ```
 
 - `recorded_by`: `"patient" | "doctor"`.
-- Ít nhất 1 trong `weight`/`blood_pressure`/`blood_glucose` phải có khi ghi qua `POST /metrics`.
+- Field mới (optional, default `null`): `waist_cm`, `systolic`, `diastolic`, `glucose_fasting` (mmol/L), `glucose_postprandial` (mmol/L), `hba1c` (%).
+- `blood_pressure` / `blood_glucose` **derived** để client cũ không gãy: `blood_pressure` = `"{systolic}/{diastolic} mmHg"` khi có cặp HA; `blood_glucose` ưu tiên `glucose_fasting` (mmol/L). Request cũ gửi `blood_pressure` / `blood_glucose` string vẫn được parse vào field cấu trúc.
+- Ít nhất 1 trong `weight` / `blood_pressure` / `blood_glucose` / `waist_cm` / `systolic` / `glucose_fasting` / `glucose_postprandial` / `hba1c` phải có khi ghi qua `POST /metrics`.
 - **`POST /metrics` upsert theo ngày VN (Asia/Ho_Chi_Minh):** tối đa 1 entry `recorded_by=patient` / user / ngày; lần ghi sau cập nhật cùng `id`, merge field (field không gửi giữ nguyên). Doctor metrics vẫn insert entry mới mỗi lần.
-- Snapshot `profiles` vẫn cập nhật song song mỗi lần ghi.
+- Snapshot `profiles` vẫn cập nhật song song mỗi lần ghi (`weight`/`height`/`bmi`/`blood_pressure`/`blood_glucose`).
 
 ---
 
@@ -234,7 +242,8 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
   "citations": ["byt_vn_notes.md"],
   "guardrail_triggered": false,
   "weekly_compliance": null,
-  "doctor_note": null
+  "doctor_note": null,
+  "metrics_delta_advice": null
 }
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
@@ -289,7 +298,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 
 **Danh sách intent hợp lệ (`VALID_INTENTS`, `nodes/intent_classifier.py`):**
 ```
-meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note
+meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note | metrics_delta_advice
 ```
 
 **`weekly_compliance` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi tuân thủ tuần của bệnh nhân. Node gọi `ComplianceService.get_patient_compliance(user_id, days=7)` và map sang `WeeklyComplianceOut` (subset của `PatientComplianceOut` §10 `contracts/api-v1.md`). Field `weekly_compliance` populated khi intent khớp; `null` khi intent khác. Không sinh dữ liệu giả — nếu chưa có check-in, `overall_adherence_pct` có thể `null`, `daily_series[].adherence_pct` có thể `null` theo ngày.
@@ -298,7 +307,17 @@ meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_co
 
 **`WeeklyMealPlanCard` (FE, không intent mới):** câu "thực đơn tuần / xem thực đơn / lịch ăn 7 ngày" vẫn classify về `meal_plan` (mở rộng pattern classifier hiện có). FE gọi `GET /meal-plans/me` khi render card — **không** thêm intent riêng.
 
-Đề xuất intent "lời khuyên khi chỉ số cơ thể đổi" ở `specs/12-patient-metrics-tracking.md` vẫn **Planned**, chưa thêm vào enum.
+**`metrics_delta_advice` — as-built (2026-08-26):** intent "lời khuyên khi chỉ số cơ thể đổi" (`specs/12`). Node so sánh 2 bản ghi gần nhất; nếu delta vượt ngưỡng (cân ≥1 kg, glucose ≥1 mmol/L, tâm thu ≥10 mmHg, vòng eo ≥2 cm, HbA1c ≥0.3 điểm) thì soạn 1–2 câu nhận xét quan sát + citation RAG nếu có. **HITL:** không chẩn đoán, không đổi thuốc/liều; `ask_doctor=true` khi chỉ số ngoài ngưỡng guideline T2DM hoặc câu trả lời bị guardrail. Field `metrics_delta_advice` populated khi intent khớp; `null` khi intent khác. Cùng schema được `POST /metrics` trả về optional `delta_advice` khi lần ghi vừa rồi vượt ngưỡng.
+
+```json
+// MetricsDeltaAdviceOut
+{
+  "message": "Cân nặng tăng 1.2 kg so với lần ghi trước. Đây là diễn biến cần theo dõi cùng bác sĩ — không phải chẩn đoán.",
+  "changed_fields": ["weight"],
+  "citations": [],
+  "ask_doctor": false
+}
+```
 
 **`meal_preview` — optional:** populated khi intent = `meal_plan` và patient có thực đơn trong DB để hiển thị. FE dùng field này render UI bữa ăn trong chat. `null` khi không có plan hoặc intent khác.
 
@@ -323,7 +342,7 @@ Nguồn Pydantic dự kiến: `backend/app/schemas/meal_plan.py` (`WeeklyComplia
   "message": "string",
   "force_intent": "string | null",
   "profile": {"...": "PatientProfile as dict"},
-  "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note",
+  "intent": "meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note | metrics_delta_advice",
   "rag_context": [{"chunk_id": "string", "text": "string", "source": "string", "score": 0.0}],
   "meal_plan": {"...": "MealPlanOutput | null"},
   "food_log": {"...": "null (stub, chưa dùng)"},
@@ -374,7 +393,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.7**.
+- Version hiện tại của contract này: **1.8**.
+- **Changelog 1.7 → 1.8 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.11.
 - **Changelog 1.6 → 1.7 (2026-08-24):** `FoodLogEntry.logged_at` chốt timezone-aware; ngày tuân thủ / filter food-log theo Asia/Ho_Chi_Minh; upsert 1 log / user / ngày VN / slot. Đồng bộ `contracts/api-v1.md` v1.8. Không đổi enum `slot`.
 - **Changelog 1.5 → 1.6 (2026-08-23):** `BodyMetricsEntry` §3.5 — `POST /metrics` upsert 1 entry patient/ngày VN (merge field, giữ `id`); đồng bộ `contracts/api-v1.md` v1.7. Không đổi JSON shape.
 - **Changelog 1.4 → 1.5 (2026-08-23):** thêm 2 intent `weekly_compliance` | `doctor_note` vào `VALID_INTENTS` (patient chat redesign Phase 2); mở rộng `AgentRunOutput` với field optional `weekly_compliance: WeeklyComplianceOut | null`, `doctor_note: DoctorNoteOut | null`; mở rộng `AgentState` với state trung gian tương ứng. Quyết định nguồn dữ liệu: compliance từ `ComplianceService.get_patient_compliance(days=7)`; doctor note từ `manual_reminder` notification hoặc fallback `adjustment_note` meal plan — không hallucinate tên bác sĩ. `WeeklyMealPlanCard` không thêm intent mới (vẫn `meal_plan`). Không breaking change — field mới default `null`.

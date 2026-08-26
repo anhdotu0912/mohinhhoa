@@ -438,6 +438,34 @@ def _migrate_add_meal_plan_request_fields(db: Session) -> None:
         logger.info("Added profiles.meal_plan_requested_at column")
 
 
+def _migrate_add_metrics_clinical_fields(db: Session) -> None:
+    """Add clinical metric columns on body_metrics_history (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    try:
+        table_names = inspect(engine).get_table_names()
+    except Exception:
+        return
+    if "body_metrics_history" not in table_names:
+        return
+    columns = [c["name"] for c in inspect(engine).get_columns("body_metrics_history")]
+    new_columns = {
+        "waist_cm": "FLOAT",
+        "systolic": "INTEGER",
+        "diastolic": "INTEGER",
+        "glucose_fasting": "FLOAT",
+        "glucose_postprandial": "FLOAT",
+        "hba1c": "FLOAT",
+    }
+    missing = {col: dtype for col, dtype in new_columns.items() if col not in columns}
+    if not missing:
+        return
+    for col, dtype in missing.items():
+        db.execute(text(f"ALTER TABLE body_metrics_history ADD COLUMN {col} {dtype}"))
+    db.commit()
+    logger.info("Added body_metrics_history columns: %s", ", ".join(missing))
+
+
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     from app.db.seed_nutrition_catalog import default_data_dir, seed_nutrition_catalog
@@ -450,6 +478,7 @@ def init_db() -> None:
         _migrate_add_profile_detail(db)
         _migrate_add_constraints_status(db)
         _migrate_add_meal_plan_request_fields(db)
+        _migrate_add_metrics_clinical_fields(db)
         _migrate_widen_alert_severity(db)
         _migrate_add_alert_food_log_id(db)
         # Column ALTERs must run before any ORM query on MealPlan (e.g. reconcile).

@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.meal_plan import DoctorNoteOut, MealPlanOutput, MealPreviewOut, WeeklyComplianceOut
+from app.schemas.body_metrics import MetricsDeltaAdviceOut
 
 
 class ChatMessageOut(BaseModel):
@@ -22,6 +23,7 @@ class ChatMessageOut(BaseModel):
     meal_preview: MealPreviewOut | None = None
     weekly_compliance: WeeklyComplianceOut | None = None
     doctor_note: DoctorNoteOut | None = None
+    metrics_delta_advice: MetricsDeltaAdviceOut | None = None
     meal_plan_week: MealPlanOutput | None = None
     show_weekly_plan: bool = False
     thinking_steps: list[dict[str, Any]] = Field(default_factory=list)
@@ -41,6 +43,7 @@ class ChatMessageIn(BaseModel):
     meal_preview: MealPreviewOut | None = None
     weekly_compliance: WeeklyComplianceOut | None = None
     doctor_note: DoctorNoteOut | None = None
+    metrics_delta_advice: MetricsDeltaAdviceOut | None = None
     meal_plan_week: MealPlanOutput | None = None
     show_weekly_plan: bool = False
     thinking_steps: list[dict[str, Any]] = Field(default_factory=list)
