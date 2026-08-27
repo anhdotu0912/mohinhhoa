@@ -31,7 +31,7 @@ _DEMO_PROFILES: dict[str, dict] = {
     "demo_patient_2": {
         "id": "profile_2",
         "user_id": "demo_patient_2",
-        "disease": ["diabetes_t2", "diabetic_neuropathy", "dyslipidemia"],
+        "disease": ["diabetes_t2", "diabetic_neuropathy"],
         "medications": ["metformin", "atorvastatin", "alpha-lipoic acid"],
         "allergies": [],
         "bmi": 22.1,
@@ -49,7 +49,7 @@ _DEMO_PROFILES: dict[str, dict] = {
     "demo_patient_3": {
         "id": "profile_3",
         "user_id": "demo_patient_3",
-        "disease": ["diabetes_t2", "hypertension", "diabetic_neuropathy"],
+        "disease": ["diabetes_t2", "diabetic_neuropathy"],
         "medications": ["glipizide", "lisinopril"],
         "allergies": [],
         "bmi": 26.8,

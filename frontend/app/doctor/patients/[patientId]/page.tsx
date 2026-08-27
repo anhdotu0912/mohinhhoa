@@ -25,15 +25,7 @@ import {
   isReviewedPlanStatus,
   patientUsageLabel,
 } from "@/lib/plan-expiry";
-
-const DISEASE_OPTIONS: { code: string; label: string }[] = [
-  { code: "diabetes_t2", label: "Tiểu đường type 2" },
-  { code: "hypertension", label: "Tăng huyết áp" },
-  { code: "ckd", label: "Suy thận mạn" },
-  { code: "gout", label: "Gout" },
-  { code: "dyslipidemia", label: "Rối loạn lipid máu" },
-  { code: "nafld", label: "Gan nhiễm mỡ" },
-];
+import { DISEASE_OPTIONS } from "@/lib/profile-mappers";
 
 interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
   patientCode: string;

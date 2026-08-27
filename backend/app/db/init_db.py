@@ -52,7 +52,7 @@ DEMO_ACCOUNTS = [
         "role": "patient",
         "full_name": "Trần Thị B",
         "profile": {
-            "disease": ["diabetes_t2", "diabetic_neuropathy", "dyslipidemia"],
+            "disease": ["diabetes_t2", "diabetic_neuropathy"],
             "medications": ["metformin", "atorvastatin", "alpha-lipoic acid"],
             "allergies": [],
             "bmi": 22.1,
@@ -80,7 +80,7 @@ DEMO_ACCOUNTS = [
         "role": "patient",
         "full_name": "Lê Văn C",
         "profile": {
-            "disease": ["diabetes_t2", "hypertension", "diabetic_neuropathy"],
+            "disease": ["diabetes_t2", "diabetic_neuropathy"],
             "medications": ["glipizide", "lisinopril"],
             "allergies": [],
             "bmi": 26.8,
@@ -211,14 +211,8 @@ CATALOG_DIAGNOSES = [
     ("diabetes_gestational", "Đái tháo đường thai kỳ"),
     ("diabetic_neuropathy", "Bệnh thần kinh đái tháo đường"),
     ("prediabetes", "Tiền đái tháo đường"),
-    ("hypertension", "Tăng huyết áp"),
-    ("ckd", "Suy thận mạn"),
-    ("gout", "Gout"),
-    ("dyslipidemia", "Rối loạn lipid máu"),
-    ("nafld", "Gan nhiễm mỡ"),
-    ("obesity", "Béo phì"),
-    ("asthma", "Hen phế quản"),
 ]
+ALLOWED_DIAGNOSIS_CODES = {code for code, _ in CATALOG_DIAGNOSES}
 
 
 def _migrate_legacy_dietitian(db: Session) -> None:
@@ -385,15 +379,43 @@ def seed_catalog(db: Session) -> None:
         if db.query(Allergy).filter(Allergy.name == name).first() is None:
             db.add(Allergy(name=name))
     for code, label in CATALOG_DIAGNOSES:
-        if db.query(Diagnosis).filter(Diagnosis.code == code).first() is None:
+        row = db.query(Diagnosis).filter(Diagnosis.code == code).first()
+        if row is None:
             db.add(Diagnosis(code=code, name=label))
+        elif row.name != label:
+            row.name = label
+    stale = (
+        db.query(Diagnosis)
+        .filter(Diagnosis.code.notin_(list(ALLOWED_DIAGNOSIS_CODES)))
+        .all()
+    )
+    for row in stale:
+        db.delete(row)
+    _prune_profile_diseases(db)
     db.commit()
     logger.info(
-        "Seeded catalog: %d medicines, %d allergies, %d diagnoses",
+        "Seeded catalog: %d medicines, %d allergies, %d diagnoses (removed %d stale)",
         len(CATALOG_MEDICINES),
         len(CATALOG_ALLERGIES),
         len(CATALOG_DIAGNOSES),
+        len(stale),
     )
+
+
+def _prune_profile_diseases(db: Session) -> None:
+    """Drop non-diabetes codes from profiles.disease (JSON list)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    changed = 0
+    for profile in db.query(Profile).all():
+        current = list(profile.disease or [])
+        filtered = [code for code in current if code in ALLOWED_DIAGNOSIS_CODES]
+        if filtered != current:
+            profile.disease = filtered
+            flag_modified(profile, "disease")
+            changed += 1
+    if changed:
+        logger.info("Pruned non-diabetes disease codes from %d profiles", changed)
 
 
 def _migrate_add_meal_plan_dates(db: Session) -> None:

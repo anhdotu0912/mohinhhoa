@@ -468,7 +468,14 @@ def test_doctor_catalog(client):
     data = response.json()
     assert len(data["medicines"]) >= 10
     assert len(data["allergies"]) >= 5
-    assert len(data["diagnoses"]) >= 5
+    codes = {d["code"] for d in data["diagnoses"]}
+    assert codes == {
+        "diabetes_t1",
+        "diabetes_t2",
+        "diabetes_gestational",
+        "diabetic_neuropathy",
+        "prediabetes",
+    }
     assert any(m["name"] == "Metformin 500mg" for m in data["medicines"])
     assert any(d["code"] == "diabetes_t2" for d in data["diagnoses"])
 

@@ -18,33 +18,8 @@ export function truncatePatientId(id: string): string {
   return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id;
 }
 
-/**
-  Tự động phân loại màu sắc Tag bệnh lý theo nhóm / mức độ y khoa:
-  - Cảnh báo nặng / cấp tính (Gout, Suy thận): Đỏ nhạt (bg-red-50 text-red-700)
-  - Bệnh đi kèm (Tăng huyết áp, Lipid): Cam nhạt (bg-orange-50 text-orange-700)
-  - Mãn tính chính (Tiểu đường, Đường huyết): Vàng nhạt (bg-amber-50 text-amber-700)
-  - Mặc định: Emerald / Teal nhạt (bg-emerald-50 text-emerald-800)
- */
-function getConditionTagStyle(conditionName: string): string {
-  const name = conditionName.toLowerCase();
-  if (name.includes("suy thận") || name.includes("gout") || name.includes("cấp")) {
-    return "bg-rose-50 text-rose-700 border-rose-200/70";
-  }
-  if (
-    name.includes("huyết áp") ||
-    name.includes("lipid") ||
-    name.includes("mỡ máu") ||
-    name.includes("tim mạch")
-  ) {
-    return "bg-amber-50 text-amber-800 border-amber-200/70";
-  }
-  if (
-    name.includes("tiểu đường") ||
-    name.includes("đường huyết") ||
-    name.includes("đái tháo đường")
-  ) {
-    return "bg-slate-100 text-slate-700 border-slate-200/70";
-  }
+/** Tag bệnh lý — catalog chỉ còn nhóm đái tháo đường. */
+function getConditionTagStyle(_conditionName: string): string {
   return "bg-slate-100 text-slate-700 border-slate-200/70";
 }
 

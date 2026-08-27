@@ -148,8 +148,8 @@ export const MOCK_PATIENTS: Patient[] = [
     name: "Trần Thị B",
     age: 52,
     gender: "Nữ",
-    condition: "Tiểu đường type 2, Thần kinh ĐTĐ, Rối loạn lipid máu",
-    disease: ["diabetes_t2", "diabetic_neuropathy", "dyslipidemia"],
+    condition: "Tiểu đường type 2, Thần kinh ĐTĐ",
+    disease: ["diabetes_t2", "diabetic_neuropathy"],
     medications: ["Metformin 500mg", "Atorvastatin 10mg", "Alpha-lipoic acid 600mg"],
     allergies: [],
     treatmentGoals: [
@@ -178,8 +178,8 @@ export const MOCK_PATIENTS: Patient[] = [
     name: "Lê Văn C",
     age: 60,
     gender: "Nam",
-    condition: "Tiểu đường type 2, Thần kinh tiêu hóa (Liệt dạ dày), Tăng huyết áp",
-    disease: ["diabetes_t2", "hypertension", "diabetic_neuropathy"],
+    condition: "Tiểu đường type 2, Thần kinh tiêu hóa (Liệt dạ dày)",
+    disease: ["diabetes_t2", "diabetic_neuropathy"],
     medications: ["Glipizide 2mg", "Lisinopril 5mg"],
     allergies: [],
     treatmentGoals: [

@@ -17,7 +17,10 @@ class PatientProfile(BaseModel):
     """Patient medical & dietary profile."""
     id: str = ""
     user_id: str = ""
-    disease: list[str] = Field(default_factory=list, description="e.g. diabetes_t2, hypertension, gout")
+    disease: list[str] = Field(
+        default_factory=list,
+        description="e.g. diabetes_t1, diabetes_t2, diabetes_gestational, diabetic_neuropathy, prediabetes",
+    )
     medications: list[str] = Field(default_factory=list, description="e.g. metformin, warfarin")
     allergies: list[str] = Field(default_factory=list, description="e.g. hải sản, đậu phộng")
     bmi: float | None = None

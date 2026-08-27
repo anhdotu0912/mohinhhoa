@@ -26,31 +26,6 @@ export const DISEASE_OPTIONS: { label: string; code: string; hint: string }[] = 
     code: "prediabetes",
     hint: "Lối sống lành mạnh phòng tiến triển ĐTĐ",
   },
-  {
-    label: "Tăng huyết áp",
-    code: "hypertension",
-    hint: "Hạn chế natri / muối",
-  },
-  {
-    label: "Suy thận mạn",
-    code: "ckd",
-    hint: "Giới hạn protein, muối, phốt pho",
-  },
-  {
-    label: "Gout",
-    code: "gout",
-    hint: "Hạn chế purin cao",
-  },
-  {
-    label: "Rối loạn lipid máu",
-    code: "dyslipidemia",
-    hint: "Hạn chế chất béo bão hòa",
-  },
-  {
-    label: "Gan nhiễm mỡ",
-    code: "nafld",
-    hint: "Giảm kcal, hạn chế đường",
-  },
 ];
 
 export const COMMON_ALLERGIES = [
@@ -70,8 +45,6 @@ export const TREATMENT_GOAL_OPTIONS = [
   "Duy trì huyết áp dưới 130/80 mmHg.",
   "Giảm natri trong khẩu phần ăn dưới 2000mg/ngày.",
   "Giảm cân nhẹ qua chế độ ăn và vận động.",
-  "Duy trì acid uric dưới 360 µmol/L.",
-  "Hạ triglyceride máu xuống dưới 1.7 mmol/L.",
 ];
 
 export function diseaseLabelsToCodes(labels: string[]): string[] {
@@ -121,7 +94,6 @@ export function suggestTargetKcal(bmi: number | null, diseases: string[]): numbe
   if (diseases.includes("diabetes_t1")) return 2100;
   if (bmi != null && bmi >= 25) base = 1600;
   if (bmi != null && bmi < 18.5) base = 2000;
-  if (diseases.includes("gout")) base = Math.max(base, 1800);
   return base;
 }
 
@@ -132,14 +104,13 @@ export function suggestRestrictions(diseaseCodes: string[]): {
   const hasDiabetesT1 = diseaseCodes.includes("diabetes_t1");
   const hasDiabetesT2 = diseaseCodes.includes("diabetes_t2") || diseaseCodes.includes("prediabetes");
   const hasGestational = diseaseCodes.includes("diabetes_gestational");
-  const hasHtn = diseaseCodes.includes("hypertension") || diseaseCodes.includes("ckd");
-  
+
   let carbLimit: number | null = null;
   if (hasDiabetesT1) carbLimit = 60;
   else if (hasDiabetesT2 || hasGestational) carbLimit = 45;
 
   return {
     carb_per_meal: carbLimit,
-    sodium_daily: hasHtn ? 1500 : null,
+    sodium_daily: null,
   };
 }

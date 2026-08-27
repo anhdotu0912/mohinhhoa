@@ -61,12 +61,11 @@ from app.services.plan_schedule import build_meal_plan_schedule, validate_slot_s
 router = APIRouter(prefix="/doctor", tags=["doctor"])
 
 _DISEASE_LABELS = {
+    "diabetes_t1": "Tiểu đường type 1",
     "diabetes_t2": "Tiểu đường type 2",
-    "hypertension": "Tăng huyết áp",
-    "ckd": "Suy thận mạn",
-    "gout": "Gout",
-    "dyslipidemia": "Rối loạn lipid máu",
-    "nafld": "Gan nhiễm mỡ",
+    "diabetes_gestational": "Đái tháo đường thai kỳ",
+    "diabetic_neuropathy": "Bệnh thần kinh đái tháo đường",
+    "prediabetes": "Tiền đái tháo đường",
 }
 
 _DEMO_META: dict[str, tuple[str, int, str]] = {

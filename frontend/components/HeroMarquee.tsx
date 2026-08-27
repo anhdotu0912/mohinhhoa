@@ -1,7 +1,7 @@
 "use client";
 
 const col1 = [
-    { icon: "🥗", title: "Dinh dưỡng đúng bệnh lý", text: "Thực đơn cá nhân hóa cho tiểu đường, tăng huyết áp, gout, CKD." },
+    { icon: "🥗", title: "Dinh dưỡng đúng bệnh lý", text: "Thực đơn cá nhân hóa cho đái tháo đường típ 1, típ 2, thai kỳ và biến chứng thần kinh." },
     { icon: "🩺", title: "Bác sĩ phê duyệt (HITL)", text: "Mọi kế hoạch đều được chuyên gia y tế kiểm duyệt trước khi áp dụng." },
     { icon: "📚", title: "RAG Groundedness", text: "Khuyến nghị dựa trên Bảng thành phần thực phẩm VN & guideline lâm sàng." },
     { icon: "⚠️", title: "Cảnh báo tương tác", text: "Tự động kiểm tra dị ứng và tương tác thực phẩm với thuốc." },
