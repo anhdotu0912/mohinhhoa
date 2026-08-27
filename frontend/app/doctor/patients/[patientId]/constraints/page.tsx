@@ -107,7 +107,7 @@ export default function PatientConstraintsTabPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant max-w-3xl mx-auto">
+      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
         Đang tải ràng buộc lâm sàng…
       </main>
     );
@@ -115,7 +115,7 @@ export default function PatientConstraintsTabPage() {
 
   if (!patient) {
     return (
-      <main className="p-6 md:p-8 max-w-3xl mx-auto text-sm text-error">
+      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto text-sm text-error flex-1">
         {error || "Không tìm thấy bệnh nhân."}
       </main>
     );
@@ -124,7 +124,7 @@ export default function PatientConstraintsTabPage() {
   const pending = patient.constraints_status === "pending_doctor_review";
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto space-y-6">
+    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
       {toast && (
         <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-xl border border-emerald-600 flex items-center gap-2 animate-in fade-in duration-200">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">check_circle</span>
@@ -167,19 +167,21 @@ export default function PatientConstraintsTabPage() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
         {/* Calo Card */}
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3">
-          <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-[18px]">local_fire_department</span>
-              <span>Mục tiêu năng lượng (Calo)</span>
-            </label>
-            <span className="font-mono text-xs font-bold bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-md tabular-nums">
-              {form.targetKcal} kcal/ngày
-            </span>
+        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-primary text-[18px]">local_fire_department</span>
+                <span>Năng lượng (Calo)</span>
+              </label>
+              <span className="font-mono text-xs font-bold bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-md tabular-nums">
+                {form.targetKcal} kcal
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">Khuyến nghị điều trị: 1500–2000 kcal/ngày tùy thể trạng</p>
           </div>
-          <p className="text-[11px] text-on-surface-variant font-medium">Khuyến nghị điều trị: 1500–2000 kcal/ngày tùy thể trạng và mức độ hoạt động</p>
           <input
             type="range"
             min="800"
@@ -195,17 +197,19 @@ export default function PatientConstraintsTabPage() {
         </div>
 
         {/* Salt / Natri Card */}
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3">
-          <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-amber-600 text-[18px]">grain</span>
-              <span>Giới hạn Natri (Muối ăn)</span>
-            </label>
-            <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 px-3 py-1 rounded-md tabular-nums">
-              {form.salt} g/ngày
-            </span>
+        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-amber-600 text-[18px]">grain</span>
+                <span>Natri (Muối ăn)</span>
+              </label>
+              <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 px-2.5 py-0.5 rounded-md tabular-nums">
+                {form.salt} g/ngày
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">Khuyến nghị tim mạch/huyết áp: ≤ 5.0g muối/ngày</p>
           </div>
-          <p className="text-[11px] text-on-surface-variant font-medium">Khuyến nghị tim mạch/huyết áp: ≤ 5.0g muối/ngày (Chế độ DASH nghiêm ngặt ≤ 3.0g)</p>
           <input
             type="range"
             min="0"
@@ -221,17 +225,19 @@ export default function PatientConstraintsTabPage() {
         </div>
 
         {/* Sugar Card */}
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3">
-          <div className="flex justify-between items-center">
-            <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-sky-600 text-[18px]">nutrition</span>
-              <span>Giới hạn đường tự do</span>
-            </label>
-            <span className="font-mono text-xs font-bold bg-sky-500/10 text-sky-900 border border-sky-500/20 px-3 py-1 rounded-md tabular-nums">
-              {form.sugar} g/ngày
-            </span>
+        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sky-600 text-[18px]">nutrition</span>
+                <span>Đường tự do</span>
+              </label>
+              <span className="font-mono text-xs font-bold bg-sky-500/10 text-sky-900 border border-sky-500/20 px-2.5 py-0.5 rounded-md tabular-nums">
+                {form.sugar} g/ngày
+              </span>
+            </div>
+            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">Khuyến nghị ĐTĐ: ≤ 25g/ngày để ổn định đường huyết</p>
           </div>
-          <p className="text-[11px] text-on-surface-variant font-medium">Khuyến nghị đái tháo đường: ≤ 25g/ngày để kiểm soát đường huyết sau ăn</p>
           <input
             type="range"
             min="0"

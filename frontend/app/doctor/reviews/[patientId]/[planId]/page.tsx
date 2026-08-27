@@ -869,7 +869,7 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 pb-28">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 pb-28 flex-1">
         <div className="flex items-center justify-between">
           <Link
             href={`/doctor/patients/${patientId}/meals`}
@@ -1128,7 +1128,7 @@ export default function PlanReviewDetailPage() {
 
       {isReviewable && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] py-3 px-6 md:px-8">
-          <div className="max-w-7xl w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-3">
+          <div className="max-w-[1600px] w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-3">
             {editingSlot ? (
               <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
                 Đang chỉnh sửa bữa — bấm «Xong» hoặc «Lưu» trên bữa đó rồi mới duyệt /

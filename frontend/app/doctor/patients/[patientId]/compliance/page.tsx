@@ -186,7 +186,7 @@ export default function PatientComplianceTabPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
+      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex items-center justify-center min-h-[400px] flex-1">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-[24px] animate-spin">
             progress_activity
@@ -202,7 +202,7 @@ export default function PatientComplianceTabPage() {
   const rate = complianceData?.overall_adherence_pct ?? null;
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
       {/* Top Header & Patient Context */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

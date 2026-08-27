@@ -111,7 +111,7 @@ export default function QueuePage() {
     <>
       <TopBar title="Hàng đợi tạo thực đơn AI" />
 
-      <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
         {/* Back link */}
         <div>
           <Link

@@ -150,7 +150,7 @@ export default function PatientMealPlansListPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant max-w-7xl mx-auto">
+      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
         Đang tải thực đơn của bệnh nhân…
       </main>
     );
@@ -158,7 +158,7 @@ export default function PatientMealPlansListPage() {
 
   if (loadError || !patient) {
     return (
-      <main className="p-6 md:p-8 max-w-7xl mx-auto">
+      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
         <p className="text-sm text-error mb-3">
           {loadError || "Không tìm thấy bệnh nhân."}
         </p>
@@ -167,7 +167,7 @@ export default function PatientMealPlansListPage() {
   }
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-on-surface font-black text-2xl tracking-tight">

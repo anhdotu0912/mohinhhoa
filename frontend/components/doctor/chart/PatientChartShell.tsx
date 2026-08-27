@@ -95,7 +95,7 @@ export function PatientChartShell({
 
       {/* Modern EHR 2-Tier Sticky Header Bar */}
       <div className="bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/60 sticky top-16 z-20 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex flex-col">
+        <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 md:px-8 flex flex-col">
           {/* TIER 1: Patient Clinical Identity & Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             {/* Left Section: Back link + Avatar + Patient Info */}
@@ -191,14 +191,12 @@ export function PatientChartShell({
             </div>
           </div>
 
-          {/* TIER 2: Clinical Navigation Tabs */}
           {!compact && routeId && (
-            <div className="flex items-center justify-between gap-4 border-t border-outline-variant/40">
-              {/* Tab List */}
+            <div className="pb-3">
               <div
                 role="tablist"
                 aria-label="Phần hồ sơ bệnh nhân"
-                className="flex items-center gap-1 overflow-x-auto scrollbar-none"
+                className="flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto p-1 rounded-xl bg-surface-container-low border border-outline-variant/50 custom-scrollbar"
               >
                 {CHART_TABS.map((tab) => {
                   const selected = activeTab === tab.id;
@@ -207,17 +205,21 @@ export function PatientChartShell({
                       key={tab.id}
                       role="tab"
                       aria-selected={selected}
+                      aria-current={selected ? "page" : undefined}
                       href={doctorChartHref(routeId, tab.id)}
-                      className={`px-3 py-2 text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 border-b-2 -mb-[1px] cursor-pointer ${
+                      className={`flex flex-1 min-w-[9rem] items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                         selected
-                          ? "border-primary text-primary font-bold bg-primary/[0.04]"
-                          : "border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low/60"
+                          ? "bg-primary text-on-primary font-bold shadow-[0_1px_2px_rgba(18,28,42,0.18)]"
+                          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest/80"
                       }`}
                     >
                       <span
-                        className={`material-symbols-outlined text-[16px] transition-colors ${
-                          selected ? "text-primary font-bold" : "text-on-surface-variant/80"
-                        }`}
+                        className="material-symbols-outlined text-[16px] shrink-0"
+                        style={{
+                          fontVariationSettings: selected
+                            ? "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20"
+                            : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+                        }}
                       >
                         {tabIcon(tab.id)}
                       </span>
@@ -225,12 +227,6 @@ export function PatientChartShell({
                     </Link>
                   );
                 })}
-              </div>
-
-              {/* Right Contextual Status Indicator */}
-              <div className="hidden md:flex items-center gap-2 text-[11px] text-on-surface-variant/80 py-1.5 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="font-medium">Hồ sơ sẵn sàng</span>
               </div>
             </div>
           )}

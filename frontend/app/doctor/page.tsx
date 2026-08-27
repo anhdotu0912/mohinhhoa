@@ -275,7 +275,7 @@ export default function DoctorDashboardPage() {
         </div>
       )}
 
-      <main className="p-6 md:p-8 w-full max-w-7xl mx-auto space-y-8">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-8 flex-1">
         {/* Summary Cards (3 columns) */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Card 1 */}

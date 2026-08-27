@@ -224,7 +224,7 @@ export default function DoctorGenerateMealPlanPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant max-w-7xl mx-auto">
+      <main className="p-4 sm:p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
         Đang tải hồ sơ bệnh nhân…
       </main>
     );
@@ -232,7 +232,7 @@ export default function DoctorGenerateMealPlanPage() {
 
   if (loadError || !patient) {
     return (
-      <main className="p-6 md:p-8 max-w-7xl mx-auto">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
         <p className="text-sm text-error mb-3">{loadError || "Không tìm thấy bệnh nhân."}</p>
         <Link href="/doctor/patients" className="text-xs font-semibold text-primary hover:underline">
           Quay lại danh sách bệnh nhân
@@ -243,7 +243,7 @@ export default function DoctorGenerateMealPlanPage() {
 
   return (
     <>
-      <main className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
 
 
         {generateBlocked && (

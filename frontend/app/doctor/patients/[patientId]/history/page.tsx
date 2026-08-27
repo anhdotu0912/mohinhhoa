@@ -339,7 +339,7 @@ export default function DoctorPatientHistoryPage() {
 
   if (loading) {
     return (
-      <main className="p-6 text-sm text-on-surface-variant max-w-[1440px] mx-auto">
+      <main className="p-4 sm:p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
         Đang tải lịch sử thực đơn…
       </main>
     );
@@ -347,7 +347,7 @@ export default function DoctorPatientHistoryPage() {
 
   if (loadError || !patient || !summary) {
     return (
-      <main className="p-6 max-w-[1440px] mx-auto">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-rose-800 text-sm">
           {loadError || "Không tìm thấy bệnh nhân."}
         </div>
@@ -367,7 +367,7 @@ export default function DoctorPatientHistoryPage() {
   const currentWeekDayMeta = weekDays[selectedDayIdx - 1];
 
   return (
-      <main className="p-6 max-w-[1440px] mx-auto space-y-6">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             {selectedEntry && (

@@ -54,8 +54,8 @@ export function AppShell({
     <MobileMenuContext.Provider value={value}>
       <div className="bg-[#F7F8FA] text-on-surface flex font-body text-body min-h-screen">
         <Sidebar role={role} />
-        <div className="md:ml-[240px] flex-1 flex flex-col w-full min-h-screen">
-          <div className="flex-1 w-full flex flex-col overflow-hidden">{children}</div>
+        <div className="md:ml-[240px] flex-1 flex flex-col w-full min-h-screen min-w-0">
+          <div className="flex-1 w-full flex flex-col min-w-0">{children}</div>
         </div>
       </div>
     </MobileMenuContext.Provider>

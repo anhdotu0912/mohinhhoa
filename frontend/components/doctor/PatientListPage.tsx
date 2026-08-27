@@ -80,7 +80,7 @@ export function PatientListPage({
     <>
       <TopBar title={topBarTitle} />
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto pb-24 space-y-6 flex-1">
         {/* Page Header & Search */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-md mb-section-gap">
           <div>

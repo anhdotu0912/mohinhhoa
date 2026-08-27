@@ -553,7 +553,7 @@ export default function PatientDetailPage() {
           </div>
         )}
 
-        <main className="p-4 sm:p-6 md:p-8 flex-1 max-w-7xl mx-auto w-full space-y-6">
+        <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
           {/* Top Quick Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
 

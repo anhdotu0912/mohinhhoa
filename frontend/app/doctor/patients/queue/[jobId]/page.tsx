@@ -16,7 +16,7 @@ export default function QueueJobDetailPage() {
     <>
       <TopBar title="Chi tiết quy trình tạo thực đơn AI" />
 
-      <main className="p-lg max-w-[1400px]">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
 
         {!jobId || !job ? (
           <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl text-center max-w-[640px] mx-auto">

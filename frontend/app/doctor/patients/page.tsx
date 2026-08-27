@@ -663,7 +663,7 @@ export default function PatientsListPage() {
         </div>
       )}
 
-      <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto pb-24 space-y-6">
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto pb-24 space-y-6 flex-1">
         {/* Header Title & CTA */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
