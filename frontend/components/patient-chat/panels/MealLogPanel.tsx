@@ -99,7 +99,7 @@ export function MealLogPanel() {
       const [plan, logs, complianceData] = await Promise.all([
         api.getMyMealPlan().catch(() => null),
         api.listFoodLogs().catch(() => []),
-        api.getMyCompliance(7).catch(() => null),
+        api.getMyCompliance(14).catch(() => null),
       ]);
       setMealPlan(plan);
       setFoodLogs(logs);

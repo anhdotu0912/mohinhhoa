@@ -40,55 +40,74 @@ interface ChatThinkingStepsProps {
   steps: ThinkingStep[];
   intentLabel?: string;
   defaultExpanded?: boolean;
+  isStreaming?: boolean;
 }
 
 export function ChatThinkingSteps({
   steps,
   intentLabel,
   defaultExpanded = false,
+  isStreaming = false,
 }: ChatThinkingStepsProps) {
   const isAllDone = steps.every((s) => s.status === "done");
-  const [isOpen, setIsOpen] = useState(defaultExpanded);
+  const [prevStreaming, setPrevStreaming] = useState(isStreaming);
+  const [userToggledOpen, setUserToggledOpen] = useState<boolean | null>(null);
+
+  // When streaming state transitions, reset manual toggle override
+  if (prevStreaming !== isStreaming) {
+    setPrevStreaming(isStreaming);
+    setUserToggledOpen(null);
+  }
+
+  const isOpen =
+    userToggledOpen !== null ? userToggledOpen : Boolean(isStreaming || defaultExpanded);
 
   if (steps.length === 0) return null;
 
   const activeStep = steps.find((s) => s.status === "active");
+  const doneCount = steps.filter((s) => s.status === "done").length;
+  const isGenerating = isStreaming || !isAllDone;
 
   return (
     <div className="w-full my-0.5 text-slate-700 animate-in fade-in duration-200">
-      {/* Minimalist Gemini-style Trigger */}
+      {/* Header Trigger */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 py-1 transition-colors cursor-pointer group select-none"
+        onClick={() => setUserToggledOpen(!isOpen)}
+        className={`inline-flex items-center gap-1.5 text-xs font-medium py-1 px-1.5 rounded-md transition-all duration-200 cursor-pointer group select-none ${
+          isGenerating
+            ? "text-emerald-800 hover:text-emerald-950 bg-emerald-50/60 hover:bg-emerald-100/60"
+            : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
+        }`}
       >
         <span
-          className={`material-symbols-outlined text-[16px] text-emerald-600 ${
-            !isAllDone
-              ? "animate-spin"
-              : "group-hover:scale-110 transition-transform"
+          className={`material-symbols-outlined text-[15px] ${
+            isGenerating
+              ? "text-[#006857] animate-spin"
+              : "text-emerald-700 group-hover:scale-110 transition-transform"
           }`}
         >
-          {isAllDone ? "psychology" : "progress_activity"}
+          {isGenerating ? "progress_activity" : "psychology"}
         </span>
-        <span className="font-medium">
-          {activeStep
-            ? activeStep.message
-            : intentLabel ||
-              `Quá trình suy nghĩ (${steps.filter((s) => s.status === "done").length}/${steps.length} bước)`}
+
+        <span className="truncate max-w-[280px] sm:max-w-md">
+          {isGenerating
+            ? activeStep?.message || "Đang phân tích dữ liệu lâm sàng..."
+            : intentLabel || `Quá trình suy nghĩ (${doneCount}/${steps.length} bước)`}
         </span>
+
         <span
-          className={`material-symbols-outlined text-[16px] text-slate-400 group-hover:text-slate-600 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
+            isGenerating ? "text-emerald-700" : "text-slate-400 group-hover:text-slate-600"
+          } ${isOpen ? "rotate-180" : "rotate-0"}`}
         >
           expand_more
         </span>
       </button>
 
-      {/* Indented subtle bullet list (Gemini style) */}
+      {/* Expanded Step List */}
       {isOpen && (
-        <div className="border-l-2 border-slate-200 pl-3.5 my-1.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="pl-2 my-1.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
           {steps.map((step, idx) => (
             <div
               key={`${step.node}-${step.message}-${idx}`}

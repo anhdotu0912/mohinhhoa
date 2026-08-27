@@ -544,11 +544,14 @@ export default function PatientChatHomePage() {
                     <div className="flex-1 min-w-0 flex flex-col gap-2">
                       {/* Thinking Steps (Gemini Minimalist Reasoning Trigger) */}
                       {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
-                        <ChatThinkingSteps steps={msg.thinkingSteps} />
+                        <ChatThinkingSteps
+                          steps={msg.thinkingSteps}
+                          isStreaming={msg.isStreaming}
+                        />
                       )}
 
                       {/* Typing indicator */}
-                      {msg.isStreaming && !msg.text && (
+                      {msg.isStreaming && !msg.text && (!msg.thinkingSteps || msg.thinkingSteps.length === 0) && (
                         <div className="py-0.5">
                           <ChatTypingDots />
                         </div>

@@ -26,12 +26,12 @@ const DAY_FULL = [
   "Chủ Nhật",
 ] as const;
 
-const TARGET_PCT = 85;
-const FILL_HIGH = "#006857";
-const FILL_HIGH_SELECTED = "#005245";
-const FILL_LOW = "#d97706";
-const FILL_LOW_SELECTED = "#b45309";
-const FILL_EMPTY = "#cbd5e1";
+export const TARGET_PCT = 85;
+export const FILL_HIGH = "#006857";
+export const FILL_HIGH_SELECTED = "#005245";
+export const FILL_LOW = "#d97706";
+export const FILL_LOW_SELECTED = "#b45309";
+export const FILL_EMPTY = "#cbd5e1";
 
 export interface WeeklyAdherencePoint {
   dayIndex: number;
@@ -56,7 +56,7 @@ interface WeeklyAdherenceChartProps {
   targetPct?: number;
 }
 
-interface TooltipProps {
+export interface TooltipProps {
   active?: boolean;
   payload?: Array<{ payload: WeeklyAdherencePoint }>;
   targetPct: number;
@@ -64,39 +64,39 @@ interface TooltipProps {
 
 const emptySubscribe = () => () => {};
 
-function parseLocalDate(iso: string): Date | null {
+export function parseLocalDate(iso: string): Date | null {
   const [year, month, day] = iso.split("-").map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
 }
 
-function toIsoDate(d: Date): string {
+export function toIsoDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function mondayOfWeek(today: Date): Date {
+export function mondayOfWeek(today: Date): Date {
   const monday = new Date(today);
   monday.setHours(0, 0, 0, 0);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   return monday;
 }
 
-function formatWeekRange(start: Date, end: Date): string {
+export function formatWeekRange(start: Date, end: Date): string {
   const fmt = (d: Date) => `${d.getDate()}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
-function barFill(row: WeeklyAdherencePoint, targetPct: number): string {
+export function barFill(row: WeeklyAdherencePoint, targetPct: number): string {
   if (!row.hasData) return FILL_EMPTY;
   const high = (row.pct ?? 0) >= targetPct;
   if (row.isSelected) return high ? FILL_HIGH_SELECTED : FILL_LOW_SELECTED;
   return high ? FILL_HIGH : FILL_LOW;
 }
 
-function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
+export function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
 
@@ -118,7 +118,7 @@ function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
     : "text-slate-300";
 
   return (
-    <div className="bg-slate-900 text-white px-3 py-2.5 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.28)] border border-slate-700 text-xs flex flex-col gap-1 z-50 pointer-events-none">
+    <div className="bg-slate-900 text-white px-3 py-2.5 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.28)] border border-slate-700 text-xs flex flex-col gap-1 z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
       <div className="flex items-center justify-between gap-4 border-b border-slate-700/80 pb-1">
         <span className="font-semibold text-slate-200">
           {row.full}
@@ -136,7 +136,7 @@ function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
   );
 }
 
-interface PctLabelProps {
+export interface PctLabelProps {
   x?: number;
   y?: number;
   width?: number;
@@ -145,7 +145,7 @@ interface PctLabelProps {
   targetPct: number;
 }
 
-function PctLabel({ x = 0, y = 0, width = 0, index = 0, chartData, targetPct }: PctLabelProps) {
+export function PctLabel({ x = 0, y = 0, width = 0, index = 0, chartData, targetPct }: PctLabelProps) {
   const row = chartData[index];
   if (!row?.hasData || row.pct == null) return null;
   const fill = row.pct >= targetPct ? FILL_HIGH_SELECTED : FILL_LOW_SELECTED;
@@ -165,14 +165,14 @@ function PctLabel({ x = 0, y = 0, width = 0, index = 0, chartData, targetPct }: 
   );
 }
 
-interface DayTickProps {
+export interface DayTickProps {
   x?: number;
   y?: number;
   payload?: { value: string; index: number };
   chartData: WeeklyAdherencePoint[];
 }
 
-function DayTick({ x = 0, y = 0, payload, chartData }: DayTickProps) {
+export function DayTick({ x = 0, y = 0, payload, chartData }: DayTickProps) {
   const row = chartData[payload?.index ?? -1];
   if (!row) return null;
   const active = row.isSelected || row.isToday;

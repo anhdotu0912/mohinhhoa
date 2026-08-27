@@ -7,28 +7,16 @@ import {
   ApiError,
   type MetricsDeltaAdviceOut,
   type MetricsHistoryPoint,
-  type PatientComplianceOut,
 } from "@/lib/types";
 import { parseBpPair, parseGlucoseMmol } from "@/lib/metrics-series";
 import { MetricsOverlayChart } from "@/components/patient/MetricsOverlayChart";
 import { RecordMetricsFormPanel } from "./RecordMetricsFormPanel";
-
-const COMPLIANCE_RING_RADIUS = 40;
-const COMPLIANCE_RING_CIRCUMFERENCE = 2 * Math.PI * COMPLIANCE_RING_RADIUS;
-const DAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-
-function complianceRingOffset(pct: number | null | undefined): number {
-  if (pct == null || Number.isNaN(pct)) return COMPLIANCE_RING_CIRCUMFERENCE;
-  const clamped = Math.max(0, Math.min(100, pct));
-  return COMPLIANCE_RING_CIRCUMFERENCE * (1 - clamped / 100);
-}
 
 export function HealthMetricsPanel() {
   const { closePanel, healthView, goToRecordMetricsForm, backToHealthDock } =
     usePatientPanel();
 
   const [history, setHistory] = useState<MetricsHistoryPoint[]>([]);
-  const [compliance, setCompliance] = useState<PatientComplianceOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deltaAdvice, setDeltaAdvice] = useState<MetricsDeltaAdviceOut | null>(null);
@@ -37,12 +25,8 @@ export function HealthMetricsPanel() {
     setError(null);
     setLoading(true);
     try {
-      const [metricsData, complianceData] = await Promise.all([
-        api.getMetricsHistory(90),
-        api.getMyCompliance(7).catch(() => null),
-      ]);
+      const metricsData = await api.getMetricsHistory(90);
       setHistory(metricsData);
-      setCompliance(complianceData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không tải được chỉ số.");
     } finally {
@@ -92,11 +76,6 @@ export function HealthMetricsPanel() {
     day: "numeric",
     month: "long",
   });
-
-  const adherencePct = compliance?.overall_adherence_pct ?? null;
-  const adherenceLabel =
-    adherencePct != null ? `${Math.round(adherencePct)}%` : "—";
-  const complianceSeries = compliance?.daily_series?.slice(0, 7) ?? [];
 
   const handleSaved = (advice?: MetricsDeltaAdviceOut | null) => {
     setDeltaAdvice(advice ?? null);
@@ -197,76 +176,6 @@ export function HealthMetricsPanel() {
                     <VitalTile icon="favorite" tone="rose" label="Huyết áp" value={latestBP} unit="mmHg" />
                     <VitalTile icon="water_drop" tone="amber" label="Đường lúc đói" value={latestGlucose} unit="mmol/L" />
                     <VitalTile icon="straighten" tone="indigo" label="BMI" value={latestBmi} unit="" />
-                  </section>
-
-                  <section className="bg-slate-50/90 rounded-xl p-4 border border-slate-200/80 flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold text-sm text-slate-900">Mức độ tuân thủ</h4>
-                        <p className="text-xs text-slate-500 font-medium">
-                          Tuần này — cùng nguồn với báo cáo chat
-                        </p>
-                      </div>
-                      <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
-                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r={COMPLIANCE_RING_RADIUS}
-                            fill="none"
-                            stroke="#e2e8f0"
-                            strokeWidth="8"
-                          />
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r={COMPLIANCE_RING_RADIUS}
-                            fill="none"
-                            stroke="#006857"
-                            strokeWidth="8"
-                            strokeDasharray={COMPLIANCE_RING_CIRCUMFERENCE}
-                            strokeDashoffset={complianceRingOffset(adherencePct)}
-                            strokeLinecap="round"
-                            className="transition-all duration-1000"
-                          />
-                        </svg>
-                        <span className="absolute font-extrabold text-base text-[#006857]">
-                          {adherenceLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    {complianceSeries.length > 0 && (
-                      <div className="flex items-end justify-between gap-1 h-10 pt-1 border-t border-slate-200/70">
-                        {complianceSeries.map((point, index) => {
-                          const barHeight =
-                            point.adherence_pct != null
-                              ? Math.max(4, Math.round((point.adherence_pct / 100) * 32))
-                              : 4;
-                          return (
-                            <div
-                              key={point.date}
-                              className="flex-1 flex flex-col items-center gap-1 min-w-0"
-                              title={
-                                point.adherence_pct != null
-                                  ? `${DAY_LABELS[index] ?? point.date}: ${point.adherence_pct}%`
-                                  : `${DAY_LABELS[index] ?? point.date}: chưa có dữ liệu`
-                              }
-                            >
-                              <div
-                                className={`w-full max-w-[18px] rounded-sm ${
-                                  point.adherence_pct != null ? "bg-[#006857]/80" : "bg-slate-200"
-                                }`}
-                                style={{ height: `${barHeight}px` }}
-                              />
-                              <span className="text-[9px] font-semibold text-slate-400 truncate w-full text-center">
-                                {DAY_LABELS[index] ?? ""}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                   </section>
 
                   <div className="pt-1">
