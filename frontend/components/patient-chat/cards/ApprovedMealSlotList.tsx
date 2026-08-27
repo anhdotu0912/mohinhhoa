@@ -58,27 +58,27 @@ export function ApprovedMealSlotList({
         return (
           <div
             key={`${meal.slot}-${mealIdx}`}
-            className="p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3.5"
+            className="p-3 sm:p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3 sm:gap-3.5"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
-                  <span className="material-symbols-outlined text-[16px]">{meta.icon}</span>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{meta.icon}</span>
                 </div>
-                <span className="text-sm font-bold text-slate-900">{meta.label}</span>
+                <span className="text-xs sm:text-sm font-bold text-slate-900">{meta.label}</span>
                 {nutrition.kcal > 0 && (
-                  <span className="text-xs font-extrabold text-[#006857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80">
+                  <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
                     {nutrition.kcal} kcal
                   </span>
                 )}
               </div>
-              <span className="text-[11px] font-semibold text-slate-500 px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-50 rounded-md border border-slate-200/60">
                 Kế hoạch thực đơn
               </span>
             </div>
 
-            <div className="flex items-start gap-3.5">
-              <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs">
+            <div className="flex items-start gap-2.5 sm:gap-3.5">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageSrc} alt={meta.label} className="w-full h-full object-cover" />
               </div>

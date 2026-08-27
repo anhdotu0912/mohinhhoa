@@ -448,7 +448,7 @@ export default function PatientChatHomePage() {
         className="w-full flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar"
       >
         {/* Centered Chat Stream Column */}
-        <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pt-4 pb-36 flex flex-col gap-6">
+        <div className="w-full max-w-3xl mx-auto px-3 sm:px-6 md:px-8 pt-3 sm:pt-4 pb-28 sm:pb-32 flex flex-col gap-5 sm:gap-6">
           {/* Welcome State when no messages */}
           {!hasConversation && (
             <div className="flex flex-col items-center text-center space-y-6 w-full my-auto animate-in fade-in duration-300 max-w-2xl mx-auto pt-6">
@@ -605,7 +605,7 @@ export default function PatientChatHomePage() {
       </div>
 
       {/* Bottom Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 pb-16 md:pb-6 z-30 pointer-events-none flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent pt-8">
+      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-4 md:p-6 pb-3 sm:pb-4 md:pb-6 z-30 pointer-events-none flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent pt-6 sm:pt-8">
         <form
           onSubmit={(e) => {
             e.preventDefault();

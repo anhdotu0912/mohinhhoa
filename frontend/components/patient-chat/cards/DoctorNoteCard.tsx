@@ -34,20 +34,20 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
   const tags = data.tags ?? [];
 
   return (
-    <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-4.5 sm:p-5 shadow-xs flex flex-col gap-4 relative overflow-hidden mt-1">
+    <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-xs flex flex-col gap-3.5 sm:gap-4 relative overflow-hidden mt-1">
       <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/8 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex flex-wrap items-start justify-between gap-3 relative z-10">
-        <div className="flex items-center gap-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 relative z-10">
+        <div className="flex items-center gap-3">
           <div className="relative shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt={data.doctor_name}
-              className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/40 shadow-xs"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-emerald-500/40 shadow-xs"
               src={DEFAULT_AVATAR}
             />
             <span
-              className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#006857] border-2 border-white rounded-full flex items-center justify-center text-[9px] text-white shadow-2xs"
+              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-[#006857] border-2 border-white rounded-full flex items-center justify-center text-[8px] sm:text-[9px] text-white shadow-2xs"
               title="Bác sĩ đã xác thực"
             >
               ✓
@@ -55,16 +55,16 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
           </div>
 
           <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-extrabold text-sm sm:text-base text-slate-900">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h4 className="font-extrabold text-sm sm:text-base text-slate-900 truncate">
                 {data.doctor_name}
               </h4>
-              <span className="text-[10px] bg-emerald-50 text-[#006857] border border-emerald-200/80 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                Bác sĩ phụ trách điều trị
+              <span className="text-[9px] sm:text-[10px] bg-emerald-50 text-[#006857] border border-emerald-200/80 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                Bác sĩ điều trị
               </span>
             </div>
-            <p className="text-xs text-slate-600 font-medium flex items-center gap-1 mt-0.5 truncate">
-              <span className="material-symbols-outlined text-[15px] text-[#006857] shrink-0">
+            <p className="text-[11px] sm:text-xs text-slate-600 font-medium flex items-center gap-1 mt-0.5 truncate">
+              <span className="material-symbols-outlined text-[14px] sm:text-[15px] text-[#006857] shrink-0">
                 stethoscope
               </span>
               <span>VMEC-10 Clinical Nutrition</span>
@@ -72,22 +72,22 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-full shadow-2xs shrink-0">
-          <span className="material-symbols-outlined text-[14px] text-slate-400">schedule</span>
+        <div className="self-start sm:self-auto inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200/80 px-2.5 py-0.5 sm:py-1 rounded-full shadow-2xs shrink-0">
+          <span className="material-symbols-outlined text-[13px] sm:text-[14px] text-slate-400">schedule</span>
           <span>{formatTimestamp(data.created_at)}</span>
         </div>
       </div>
 
-      <div className="bg-slate-50/90 rounded-xl p-4 border border-slate-200/80 relative z-10 shadow-2xs">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200/60">
-            <span className="material-symbols-outlined text-[20px]">format_quote</span>
+      <div className="bg-slate-50/90 rounded-xl p-3 sm:p-4 border border-slate-200/80 relative z-10 shadow-2xs">
+        <div className="flex items-start gap-2.5 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200/60">
+            <span className="material-symbols-outlined text-[18px] sm:text-[20px]">format_quote</span>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold text-[#006857] uppercase tracking-wider">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#006857] uppercase tracking-wider">
               Lời dặn điều trị &amp; Lối sống
             </span>
-            <p className="text-sm sm:text-[14.5px] text-slate-800 italic font-medium leading-relaxed">
+            <p className="text-xs sm:text-[14.5px] text-slate-800 italic font-medium leading-relaxed">
               &ldquo;{data.note}&rdquo;
             </p>
           </div>
@@ -95,17 +95,17 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
       </div>
 
       {tags.length > 0 && (
-        <div className="flex flex-col gap-2 relative z-10">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="flex flex-col gap-1.5 sm:gap-2 relative z-10">
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             Chỉ định quan trọng cần lưu ý:
           </span>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {tags.map((text, index) => {
               const style = TAG_STYLES[index % TAG_STYLES.length];
               return (
                 <div
                   key={`${text}-${index}`}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-2xs transition-all ${
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold shadow-2xs transition-all ${
                     style.type === "warning"
                       ? "bg-rose-50 text-rose-800 border border-rose-200/90"
                       : style.type === "info"
@@ -113,7 +113,7 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
                       : "bg-emerald-50 text-[#006857] border border-emerald-200/90"
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[16px] shrink-0">
+                  <span className="material-symbols-outlined text-[14px] sm:text-[16px] shrink-0">
                     {style.icon}
                   </span>
                   <span>{text}</span>
@@ -124,19 +124,19 @@ export function DoctorNoteCard({ data }: DoctorNoteCardProps) {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-3 border-t border-slate-100 text-xs relative z-10">
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 pt-2.5 sm:pt-3 border-t border-slate-100 text-xs relative z-10">
+        <div className="flex items-center gap-1.5 text-slate-500 text-[11px] sm:text-xs">
+          <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-emerald-600">verified</span>
           <span>Xác thực bởi Hệ thống Y khoa VMEC-10</span>
         </div>
 
         <button
           type="button"
           onClick={() => openPanel("menu")}
-          className="inline-flex items-center gap-1.5 text-[#006857] hover:text-[#005245] font-bold cursor-pointer transition-colors group"
+          className="inline-flex items-center gap-1.5 text-[#006857] hover:text-[#005245] font-bold cursor-pointer transition-colors group text-xs"
         >
           <span>Xem phác đồ thực đơn</span>
-          <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">
+          <span className="material-symbols-outlined text-[15px] sm:text-[16px] group-hover:translate-x-0.5 transition-transform">
             arrow_forward
           </span>
         </button>

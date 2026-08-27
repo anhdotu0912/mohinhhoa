@@ -104,7 +104,7 @@ export function HealthMetricsPanel() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
       <div
         role="button"
         tabIndex={0}
@@ -116,7 +116,7 @@ export function HealthMetricsPanel() {
         className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity cursor-pointer"
       />
 
-      <div className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 overflow-hidden my-auto">
+      <div className="relative w-full max-w-3xl max-h-[94vh] sm:max-h-[90vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 overflow-hidden my-auto m-2 sm:m-0">
         {healthView === "record" ? (
           <RecordMetricsFormPanel
             onBack={backToHealthDock}
@@ -125,18 +125,18 @@ export function HealthMetricsPanel() {
           />
         ) : (
           <div className="flex flex-col h-full overflow-hidden">
-            <div className="px-6 sm:px-8 py-4 sm:py-5 min-h-[72px] border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shrink-0">
-                  <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
+            <div className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 min-h-[64px] sm:min-h-[72px] border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shrink-0">
+                  <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
                     vital_signs
                   </span>
                 </div>
-                <div className="flex flex-col">
-                  <h2 className="font-bold text-lg sm:text-xl text-slate-900 leading-tight">
+                <div className="flex flex-col min-w-0">
+                  <h2 className="font-bold text-base sm:text-xl text-slate-900 leading-tight truncate">
                     Chỉ số sức khỏe
                   </h2>
-                  <p className="text-xs sm:text-[13px] text-slate-500 font-medium capitalize mt-0.5">
+                  <p className="text-[11px] sm:text-[13px] text-slate-500 font-medium capitalize mt-0.5 truncate">
                     {formattedDate}
                   </p>
                 </div>
@@ -151,7 +151,7 @@ export function HealthMetricsPanel() {
               </button>
             </div>
 
-            <div className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+            <div className="p-3.5 sm:p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-6">
               {loading && (
                 <div className="py-12 text-center text-xs text-slate-500">
                   <span className="material-symbols-outlined animate-spin text-[24px] text-[#006857] mb-2">

@@ -51,7 +51,7 @@ export function NotificationDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         role="button"
@@ -69,27 +69,27 @@ export function NotificationDetailModal({
         <div className="h-1.5 w-full bg-gradient-to-r from-[#006857] to-emerald-500" />
 
         {/* Modal Header */}
-        <div className="px-6 sm:px-8 py-4 sm:py-5 min-h-[72px] sm:min-h-[78px] border-b border-slate-100 flex items-start justify-between gap-3.5 bg-white/95 backdrop-blur-md shrink-0">
-          <div className="flex items-start gap-3.5 min-w-0">
+        <div className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 min-h-[64px] sm:min-h-[78px] border-b border-slate-100 flex items-start justify-between gap-3 bg-white/95 backdrop-blur-md shrink-0">
+          <div className="flex items-start gap-3 min-w-0">
             <div
-              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-2xs border ${
+              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-2xs border ${
                 isManualReminder
                   ? "bg-amber-50 text-amber-700 border-amber-200"
                   : "bg-emerald-50 text-[#006857] border-emerald-200"
               }`}
             >
-              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
                 {notificationIcon(notification.type)}
               </span>
             </div>
             <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 {isManualReminder ? "Lời nhắc từ bác sĩ" : "Chi tiết thông báo"}
               </span>
-              <h3 className="font-bold text-base sm:text-lg text-slate-900 leading-snug break-words">
+              <h3 className="font-bold text-sm sm:text-lg text-slate-900 leading-snug break-words">
                 {notification.title}
               </h3>
-              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pt-0.5">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-500 font-medium pt-0.5">
                 <span className="font-semibold text-emerald-800 truncate">
                   {isManualReminder ? "Bác sĩ điều trị" : "Hệ thống y tế VMEC-10"}
                 </span>
@@ -110,7 +110,7 @@ export function NotificationDetailModal({
         </div>
 
         {/* Modal Body - Semantic Text Block without faux input styling */}
-        <div className="p-5 sm:p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        <div className="p-3.5 sm:p-5 md:p-6 space-y-3.5 max-h-[60vh] overflow-y-auto custom-scrollbar">
           <div className="bg-slate-50/80 rounded-xl p-4 sm:p-4.5 border border-slate-200/70 shadow-2xs space-y-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#006857]">
               <span className="material-symbols-outlined text-[16px]">notes</span>

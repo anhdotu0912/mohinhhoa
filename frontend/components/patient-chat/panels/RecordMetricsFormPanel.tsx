@@ -187,27 +187,27 @@ export function RecordMetricsFormPanel({
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
-      <div className="px-6 md:px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 min-h-[64px] border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             type="button"
             onClick={onBack}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer shrink-0"
             title="Quay lại"
           >
-            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+            <span className="material-symbols-outlined text-[20px] sm:text-[22px]">arrow_back</span>
           </button>
-          <div>
-            <h2 className="font-bold text-lg text-slate-900">Ghi nhận chỉ số</h2>
-            <p className="text-xs text-slate-500 font-medium">
-              Không bắt buộc đủ bộ — hôm nay đã ghi thì lần sau cập nhật bản ghi hiện có.
+          <div className="min-w-0">
+            <h2 className="font-bold text-base sm:text-lg text-slate-900 truncate">Ghi nhận chỉ số</h2>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+              Không bắt buộc đủ bộ — hôm nay đã ghi thì sẽ cập nhật.
             </p>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer shrink-0"
           title="Đóng (ESC)"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>
@@ -217,7 +217,7 @@ export function RecordMetricsFormPanel({
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between"
+        className="p-3.5 sm:p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between gap-6"
       >
         <div className="space-y-5">
           {error && (

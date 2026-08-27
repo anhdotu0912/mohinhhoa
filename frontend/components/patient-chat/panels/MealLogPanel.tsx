@@ -222,18 +222,18 @@ export function MealLogPanel() {
       />
 
       {/* Centered Modal Card Dialog */}
-      <div className="relative w-full max-w-2xl max-h-[88vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto">
+      <div className="relative w-full max-w-2xl max-h-[94vh] sm:max-h-[88vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto m-2 sm:m-0">
         {/* Fixed Header */}
-        <div className="px-6 sm:px-8 py-4 sm:py-5 min-h-[72px] sm:min-h-[78px] border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shadow-2xs shrink-0">
-              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
+        <div className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 min-h-[64px] sm:min-h-[78px] border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shadow-2xs shrink-0">
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
                 restaurant_menu
               </span>
             </div>
-            <div className="flex flex-col">
-              <h2 className="font-bold text-lg sm:text-xl text-slate-900 leading-tight">Thực đơn &amp; Ghi nhận tuân thủ</h2>
-              <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-0.5">Kế hoạch dinh dưỡng cá nhân hóa được bác sĩ phê duyệt</p>
+            <div className="flex flex-col min-w-0">
+              <h2 className="font-bold text-base sm:text-xl text-slate-900 leading-tight truncate">Thực đơn &amp; Ghi nhận</h2>
+              <p className="text-[11px] sm:text-[13px] text-slate-500 font-medium mt-0.5 truncate">Kế hoạch dinh dưỡng cá nhân hóa</p>
             </div>
           </div>
           <button
@@ -247,7 +247,7 @@ export function MealLogPanel() {
         </div>
 
         {/* 7-Day Selector Bar */}
-        <div className="px-6 md:px-8 pt-3.5 pb-2.5 bg-slate-50/80 border-b border-slate-200/70 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        <div className="px-3 sm:px-6 md:px-8 pt-2.5 sm:pt-3.5 pb-2 sm:pb-2.5 bg-slate-50/80 border-b border-slate-200/70 flex items-center justify-between gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar shrink-0">
           {DAY_LABELS.map((day) => {
             const isSelected = selectedDayIndex === day.index;
             const isCurrentDay = todayDayOfWeek === day.index;
@@ -260,21 +260,21 @@ export function MealLogPanel() {
                   setSelectedDayIndex(day.index);
                   setCustomSlot(null);
                 }}
-                className={`flex-1 min-w-[52px] py-2 px-1.5 rounded-xl text-center flex flex-col items-center transition-all cursor-pointer ${
+                className={`flex-1 min-w-[42px] sm:min-w-[52px] py-1.5 sm:py-2 px-1 sm:px-1.5 rounded-xl text-center flex flex-col items-center transition-all cursor-pointer ${
                   isSelected
                     ? "bg-[#006857] text-white shadow-md font-bold scale-[1.02]"
                     : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 font-medium shadow-2xs"
                 }`}
               >
-                <span className="text-[10px] uppercase tracking-wider opacity-80">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-80">
                   {day.short}
                 </span>
-                <span className="text-xs font-extrabold mt-0.5">
+                <span className="text-[11px] sm:text-xs font-extrabold mt-0.5">
                   {day.full.replace("Thứ ", "T")}
                 </span>
                 {isCurrentDay && (
                   <span
-                    className={`w-1.5 h-1.5 rounded-full mt-1 ${
+                    className={`w-1.5 h-1.5 rounded-full mt-0.5 sm:mt-1 ${
                       isSelected ? "bg-amber-300 ring-2 ring-emerald-700" : "bg-emerald-600"
                     }`}
                     title="Hôm nay"
@@ -286,7 +286,7 @@ export function MealLogPanel() {
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-5 md:p-7 flex-1 overflow-y-auto custom-scrollbar space-y-5">
+        <div className="p-3.5 sm:p-5 md:p-7 flex-1 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-5">
           <WeeklyAdherenceChart
             series={compliance?.daily_series ?? []}
             todayDateStr={todayDateStr}

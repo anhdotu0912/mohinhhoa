@@ -15,19 +15,26 @@ function AlternativesPanel({
   anchor,
   panelRef,
   onSelect,
+  onClose,
 }: {
   id: string;
   alternatives: FoodItem[];
   anchor: HTMLElement;
   panelRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (alt: FoodItem) => void;
+  onClose?: () => void;
 }) {
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 420 });
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 420, isMobile: false });
 
   useLayoutEffect(() => {
     const place = () => {
+      const isMobile = window.innerWidth < 640;
+      if (isMobile) {
+        setPos({ top: 0, left: 0, width: 0, isMobile: true });
+        return;
+      }
       const rect = anchor.getBoundingClientRect();
-      const width = Math.min(480, Math.max(360, window.innerWidth - 32));
+      const width = Math.min(460, Math.max(340, window.innerWidth - 32));
       const left = Math.min(Math.max(16, rect.left), window.innerWidth - width - 16);
       const below = rect.bottom + 10;
       const estimated = Math.min(alternatives.length * 88 + 72, 420);
@@ -35,7 +42,7 @@ function AlternativesPanel({
         below + estimated > window.innerHeight - 16
           ? Math.max(16, rect.top - estimated - 10)
           : below;
-      setPos({ top, left, width });
+      setPos({ top, left, width, isMobile: false });
     };
     place();
     window.addEventListener("resize", place);
@@ -43,62 +50,89 @@ function AlternativesPanel({
   }, [anchor, alternatives.length]);
 
   return createPortal(
-    <div
-      ref={panelRef}
-      id={id}
-      role="dialog"
-      aria-label="Lựa chọn thay thế"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
-      className="fixed z-[80] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.16)]"
-    >
-      <p className="px-0.5 pb-3 text-sm font-extrabold text-slate-900">
-        {alternatives.length} lựa chọn thay thế
-      </p>
-      <ul className="max-h-[22rem] space-y-2 overflow-y-auto custom-scrollbar">
-        {alternatives.map((alt, i) => (
-          <li key={`${alt.food_id || alt.name}-${i}`}>
+    <>
+      {pos.isMobile && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[75] animate-in fade-in duration-150"
+        />
+      )}
+      <div
+        ref={panelRef}
+        id={id}
+        role="dialog"
+        aria-label="Lựa chọn thay thế"
+        style={
+          pos.isMobile
+            ? undefined
+            : { top: pos.top, left: pos.left, width: pos.width }
+        }
+        className={
+          pos.isMobile
+            ? "fixed bottom-3 inset-x-3 max-h-[80vh] z-[80] rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200"
+            : "fixed z-[80] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.16)]"
+        }
+      >
+        <div className="flex items-center justify-between px-0.5 pb-2.5 sm:pb-3 border-b border-slate-100 mb-2">
+          <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+            {alternatives.length} lựa chọn thay thế món
+          </p>
+          {pos.isMobile && (
             <button
               type="button"
-              onClick={() => onSelect(alt)}
-              className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-left transition-colors hover:border-teal-300 hover:bg-teal-50/70 cursor-pointer sm:flex-row sm:items-center sm:justify-between"
+              onClick={onClose}
+              className="p-1 rounded-full text-slate-400 hover:text-slate-700 transition-colors"
             >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-800">
-                  <span className="material-symbols-outlined text-[18px]" aria-hidden>
-                    restaurant
-                  </span>
-                </span>
-                <span className="text-sm font-bold leading-snug text-slate-900">
-                  {alt.portion ? `${alt.name} (${alt.portion})` : alt.name}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-                {alt.kcal > 0 && (
-                  <span className="tabular-nums text-sm font-extrabold text-emerald-800">
-                    {alt.kcal} kcal
-                  </span>
-                )}
-                {alt.macros?.protein_g > 0 && (
-                  <span className="rounded-md border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                    Đạm: {Math.round(alt.macros.protein_g)}g
-                  </span>
-                )}
-                {alt.macros?.carb_g > 0 && (
-                  <span className="rounded-md border border-blue-200/70 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">
-                    Carb: {Math.round(alt.macros.carb_g)}g
-                  </span>
-                )}
-                {alt.macros?.fat_g > 0 && (
-                  <span className="rounded-md border border-amber-200/70 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                    Béo: {Math.round(alt.macros.fat_g)}g
-                  </span>
-                )}
-              </div>
+              <span className="material-symbols-outlined text-[18px]">close</span>
             </button>
-          </li>
-        ))}
-      </ul>
-    </div>,
+          )}
+        </div>
+        <ul className="max-h-[60vh] sm:max-h-[22rem] space-y-2 overflow-y-auto custom-scrollbar">
+          {alternatives.map((alt, i) => (
+            <li key={`${alt.food_id || alt.name}-${i}`}>
+              <button
+                type="button"
+                onClick={() => onSelect(alt)}
+                className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:px-3.5 sm:py-3 text-left transition-colors hover:border-teal-300 hover:bg-teal-50/70 cursor-pointer sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+                  <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-800">
+                    <span className="material-symbols-outlined text-[16px] sm:text-[18px]" aria-hidden>
+                      restaurant
+                    </span>
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold leading-snug text-slate-900 truncate">
+                    {alt.portion ? `${alt.name} (${alt.portion})` : alt.name}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 sm:justify-end text-[11px] sm:text-xs">
+                  {alt.kcal > 0 && (
+                    <span className="tabular-nums font-extrabold text-emerald-800">
+                      {alt.kcal} kcal
+                    </span>
+                  )}
+                  {alt.macros?.protein_g > 0 && (
+                    <span className="rounded-md border border-emerald-200/70 bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-800">
+                      Đạm: {Math.round(alt.macros.protein_g)}g
+                    </span>
+                  )}
+                  {alt.macros?.carb_g > 0 && (
+                    <span className="rounded-md border border-blue-200/70 bg-blue-50 px-1.5 py-0.5 font-semibold text-blue-800">
+                      Carb: {Math.round(alt.macros.carb_g)}g
+                    </span>
+                  )}
+                  {alt.macros?.fat_g > 0 && (
+                    <span className="rounded-md border border-amber-200/70 bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-800">
+                      Béo: {Math.round(alt.macros.fat_g)}g
+                    </span>
+                  )}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>,
     document.body
   );
 }
@@ -207,6 +241,7 @@ export function MealItemRow({
           anchor={btnRef.current}
           panelRef={panelRef}
           onSelect={applySwap}
+          onClose={() => setOpen(false)}
         />
       )}
     </div>

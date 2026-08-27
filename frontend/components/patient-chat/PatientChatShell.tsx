@@ -52,12 +52,84 @@ function ShellInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="bg-[#f8fafc] text-slate-900 h-screen h-[100dvh] w-full overflow-hidden flex flex-col font-body antialiased relative">
-      {/* Floating Hamburger to open sidebar when closed (Gemini Style) */}
+      {/* Mobile Top Header Bar (Mobile Navigation & Quick Actions) */}
+      <header className="md:hidden flex items-center justify-between px-3.5 py-2.5 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs z-30 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
+            title="Mở lịch sử trò chuyện"
+            aria-label="Mở menu"
+          >
+            <span className="material-symbols-outlined text-[22px]">menu</span>
+          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="font-extrabold text-base text-[#006857] tracking-tight">
+              VMEC-10
+            </span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200/60">
+              AI
+            </span>
+          </div>
+        </div>
+
+        {/* Mobile Quick Action Buttons in Top Bar */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleDockClick("menu")}
+            className={`p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
+              activePanel === "menu"
+                ? "bg-[#006857] text-white shadow-xs"
+                : "text-slate-700 hover:text-[#006857] hover:bg-emerald-50"
+            }`}
+            title="Thực đơn & Nhật ký"
+          >
+            <span className="material-symbols-outlined text-[20px]">restaurant_menu</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDockClick("notifications")}
+            className={`relative p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
+              activePanel === "notifications"
+                ? "bg-[#006857] text-white shadow-xs"
+                : "text-slate-700 hover:text-[#006857] hover:bg-emerald-50"
+            }`}
+            title="Thông báo y tế"
+            aria-label={hasUnseenBadge ? "Thông báo y tế — có thông báo mới" : "Thông báo y tế"}
+          >
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            {hasUnseenBadge && (
+              <span
+                className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 border border-white shadow-xs pointer-events-none"
+                aria-hidden="true"
+              />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDockClick("health")}
+            className={`p-1.5 rounded-lg transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
+              activePanel === "health"
+                ? "bg-[#006857] text-white shadow-xs"
+                : "text-slate-700 hover:text-[#006857] hover:bg-emerald-50"
+            }`}
+            title="Chỉ số sức khỏe"
+          >
+            <span className="material-symbols-outlined text-[20px]">vital_signs</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Floating Hamburger for Desktop when sidebar is closed (Gemini Style) */}
       {!isSidebarOpen && (
         <button
           type="button"
           onClick={toggleSidebar}
-          className="fixed top-3.5 left-3.5 z-40 p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-slate-950 shadow-md border border-slate-200/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center"
+          className="hidden md:flex fixed top-3.5 left-3.5 z-40 p-2 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-slate-950 shadow-md border border-slate-200/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer items-center justify-center"
           title="Mở lịch sử trò chuyện"
         >
           <span className="material-symbols-outlined text-[22px]">menu</span>
@@ -127,54 +199,6 @@ function ShellInner({ children }: { children: ReactNode }) {
           <span className="absolute right-full mr-3.5 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-1 group-hover:translate-x-0 whitespace-nowrap pointer-events-none shadow-lg font-medium">
             Chỉ số sức khỏe
           </span>
-        </button>
-      </nav>
-
-      {/* Bottom Nav Bar (Mobile) */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="md:hidden fixed bottom-3 left-3 right-3 rounded-xl backdrop-blur-2xl border border-white/70 shadow-[0_8px_30px_rgba(0,104,87,0.15)] bg-white/90 z-40 flex justify-around items-center py-2 px-2.5"
-      >
-        <button
-          type="button"
-          onClick={() => handleDockClick("menu")}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-lg transition-colors ${
-            activePanel === "menu" ? "text-emerald-950 font-bold bg-emerald-100/80" : "text-emerald-800 hover:bg-emerald-50"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[22px]">restaurant_menu</span>
-          <span className="text-[11px] mt-0.5">Thực đơn</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleDockClick("notifications")}
-          className={`relative flex-1 py-1.5 flex flex-col items-center justify-center rounded-lg transition-colors ${
-            activePanel === "notifications" ? "text-emerald-950 font-bold bg-emerald-100/80" : "text-emerald-800 hover:bg-emerald-50"
-          }`}
-          aria-label={
-            hasUnseenBadge ? "Thông báo — có thông báo mới" : "Thông báo"
-          }
-        >
-          <span className="material-symbols-outlined text-[22px]">notifications</span>
-          {hasUnseenBadge && (
-            <span
-              className="absolute top-1 right-[calc(50%-18px)] w-2 h-2 rounded-full bg-rose-500 border border-white shadow-xs pointer-events-none"
-              aria-hidden="true"
-            />
-          )}
-          <span className="text-[11px] mt-0.5">Thông báo</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleDockClick("health")}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center rounded-lg transition-colors ${
-            activePanel === "health" ? "text-emerald-950 font-bold bg-emerald-100/80" : "text-emerald-800 hover:bg-emerald-50"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[22px]">vital_signs</span>
-          <span className="text-[11px] mt-0.5">Chỉ số</span>
         </button>
       </nav>
 

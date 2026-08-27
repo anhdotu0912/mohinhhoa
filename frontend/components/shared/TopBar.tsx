@@ -92,7 +92,6 @@ export function TopBar({
                 )}
               </button>
             )}
-
             <div className="relative w-[32px] h-[32px] rounded-full md:hidden border border-outline-variant overflow-hidden bg-primary/15 shrink-0">
               <div
                 translate="no"

@@ -141,15 +141,24 @@ function CustomTooltip({ active, payload, viewMode }: CustomTooltipProps) {
 interface CustomDotProps {
   cx?: number;
   cy?: number;
-  value?: number;
+  value?: number | number[];
+  payload?: { pct?: number; day?: string };
   index?: number;
   dataLength: number;
 }
 
-function CustomizedDot({ cx, cy, value, index, dataLength }: CustomDotProps) {
+function CustomizedDot({ cx, cy, value, payload, index, dataLength }: CustomDotProps) {
   if (cx === undefined || cy === undefined) return null;
 
   const isLatest = index === dataLength - 1;
+  const numValue =
+    payload?.pct != null
+      ? payload.pct
+      : Array.isArray(value)
+      ? value[1] ?? value[0]
+      : typeof value === "number"
+      ? value
+      : 0;
 
   return (
     <g>
@@ -174,7 +183,7 @@ function CustomizedDot({ cx, cy, value, index, dataLength }: CustomDotProps) {
         fontWeight={700}
         fontFamily="inherit"
       >
-        {value}%
+        {numValue}%
       </text>
     </g>
   );
@@ -221,53 +230,53 @@ export function WeeklyComplianceCard({ data }: WeeklyComplianceCardProps) {
   }, [overallPct]);
 
   return (
-    <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-4.5 sm:p-5 shadow-xs flex flex-col gap-4 mt-1">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-xs flex flex-col gap-3.5 sm:gap-4 mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-3xl sm:text-4xl font-extrabold text-[#006857] tracking-tight">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-4xl font-extrabold text-[#006857] tracking-tight">
               {overallPct}%
             </span>
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Tỷ lệ tuân thủ tuần này
+              <span className="text-[11px] sm:text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Tỷ lệ tuân thủ tuần
               </span>
-              <span className="text-[11px] text-slate-500 font-medium">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
                 (Trung bình 7 ngày gần nhất)
               </span>
             </div>
           </div>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5">
             {overallPct >= 85
               ? "Bạn đang duy trì thói quen dinh dưỡng rất tốt theo phác đồ điều trị."
               : "Hãy tiếp tục bám sát thực đơn đề xuất để tối ưu hiệu quả kiểm soát bệnh lý."}
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${statusBadge.style}`}
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[11px] sm:text-xs font-bold border shadow-2xs ${statusBadge.style}`}
           >
-            <span className="material-symbols-outlined text-[16px]">{statusBadge.icon}</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{statusBadge.icon}</span>
             <span>{statusBadge.label}</span>
           </div>
 
-          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200/80 text-[11px] font-semibold text-slate-600">
+          <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200/80 text-[10px] sm:text-[11px] font-semibold text-slate-600">
             <button
               type="button"
               onClick={() => setViewMode("trend")}
-              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+              className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
                 viewMode === "trend"
                   ? "bg-white text-[#006857] font-bold shadow-2xs"
                   : "hover:text-slate-900"
               }`}
             >
-              Đường xu hướng
+              Xu hướng
             </button>
             <button
               type="button"
               onClick={() => setViewMode("breakdown")}
-              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+              className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
                 viewMode === "breakdown"
                   ? "bg-white text-[#006857] font-bold shadow-2xs"
                   : "hover:text-slate-900"
@@ -279,7 +288,7 @@ export function WeeklyComplianceCard({ data }: WeeklyComplianceCardProps) {
         </div>
       </div>
 
-      <div className="w-full h-44 sm:h-48 pt-3 pb-1 relative">
+      <div className="w-full h-40 sm:h-48 pt-2 pb-1 relative min-w-0">
         {!mounted || chartData.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center bg-slate-50/60 rounded-xl animate-pulse text-xs text-slate-400">
             {chartData.length === 0

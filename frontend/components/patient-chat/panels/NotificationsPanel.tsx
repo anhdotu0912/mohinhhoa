@@ -130,25 +130,25 @@ export function NotificationsPanel() {
       />
 
       {/* Centered Modal Card Dialog */}
-      <div className="relative w-full max-w-2xl max-h-[88vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto">
+      <div className="relative w-full max-w-2xl max-h-[94vh] sm:max-h-[88vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 animate-in fade-in zoom-in-95 duration-200 overflow-hidden my-auto m-2 sm:m-0">
         {/* Fixed Header */}
-        <div className="px-6 sm:px-8 py-4 sm:py-5 min-h-[72px] sm:min-h-[78px] border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shadow-2xs shrink-0">
-              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
+        <div className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-5 min-h-[64px] sm:min-h-[78px] border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200 shadow-2xs shrink-0">
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
                 notifications
               </span>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-lg sm:text-xl text-slate-900 leading-tight">Thông báo y tế</h2>
+                <h2 className="font-bold text-base sm:text-xl text-slate-900 leading-tight truncate">Thông báo y tế</h2>
                 {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold border border-emerald-200 shadow-2xs">
+                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] sm:text-[11px] font-extrabold border border-emerald-200 shadow-2xs shrink-0">
                     {unreadCount} MỚI
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-0.5">Cập nhật kế hoạch &amp; nhắc nhở từ bác sĩ</p>
+              <p className="text-[11px] sm:text-[13px] text-slate-500 font-medium mt-0.5 truncate">Cập nhật kế hoạch &amp; nhắc nhở từ bác sĩ</p>
             </div>
           </div>
           <button
@@ -162,7 +162,7 @@ export function NotificationsPanel() {
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar space-y-3.5">
+        <div className="p-3.5 sm:p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar space-y-3">
           {loading && (
             <div className="py-12 text-center text-xs text-slate-500">
               <span className="material-symbols-outlined animate-spin text-[24px] text-[#006857] mb-2">
