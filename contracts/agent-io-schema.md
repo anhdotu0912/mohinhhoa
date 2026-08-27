@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.7 (2026-08-24 — `FoodLogEntry.logged_at` timezone-aware; ngày tuân thủ food-log theo Asia/Ho_Chi_Minh. Xem changelog ở §7 Versioning.)
+**Version:** 1.9 (2026-08-26 — `BodyMetricsEntry` thêm field lâm sàng optional `waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`; Intent `metrics_delta_advice`; Mở rộng phân loại bệnh đái tháo đường: `diabetes_t1`, `diabetes_gestational`, `diabetic_neuropathy`, `prediabetes` theo 4 QĐ Bộ Y Tế. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -9,7 +9,7 @@
 ## 0. Conventions chung
 
 - **Timestamp:** ISO-8601 (`YYYY-MM-DDTHH:MM:SS±HH:MM` hoặc có hậu tố `Z`). Field kiểu `datetime` ở DB serialize theo chuẩn này khi trả HTTP.
-- **ID:** UUID v4 dạng string (`String(36)`), sinh bằng `uuid.uuid4()`. Ngoại lệ: `demo_patient_1/2/3`, `demo_doctor` là ID cố định cho tài khoản demo (không phải UUID).
+- **ID:** UUID v4 dạng string (`String(36)`), sinh bằng `uuid.uuid4()`. Ngoại lệ: `demo_patient_1/2/3/4/5`, `demo_doctor` là ID cố định cho tài khoản demo (không phải UUID).
 - **Error envelope** (dùng chung mọi endpoint, `backend/app/core/errors.py::APIError`):
   ```json
   { "code": "EMAIL_EXISTS", "detail": "Email đã được đăng ký." }
@@ -17,6 +17,7 @@
   HTTP status đi kèm theo ngữ cảnh (400/401/403/404/409/413/415/422/501/503).
 - **Severity enum** (dùng chung `Alert`, `InteractionItem`): `"Nguy hiểm" | "Cần chú ý" | "An toàn"` — đúng 3 mức, tiếng Việt, không viết tắt.
 - **Meal slot enum:** `"breakfast" | "lunch" | "dinner" | "snack"` — dùng cho `Meal.slot`, `Swap.slot`, `NotificationService.SLOT_TIMES`. **Lưu ý:** UI Food Log hiện chỉ có 3 slot (sáng/trưa/tối) — xem `adrs/009-food-log-scope-strategy.md`, [CẦN XÁC NHẬN] khi implement.
+- **Disease code enum:** `"diabetes_t1" | "diabetes_t2" | "diabetes_gestational" | "diabetic_neuropathy" | "prediabetes" | "hypertension" | "ckd" | "gout" | "dyslipidemia" | "nafld" | "obesity" | "asthma"`.
 - Field không bắt buộc trong Pydantic đều có default rõ ràng (không dùng `Optional` trần không default trừ khi cố ý cho phép `null`).
 
 ---
@@ -55,6 +56,12 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
 ```
 
 **Ghi chú field:**
+- `disease`: Danh sách mã bệnh nhân (JSON list). Hỗ trợ đầy đủ các phân nhóm đái tháo đường theo hướng dẫn Bộ Y Tế:
+  - `diabetes_t1`: Đái tháo đường type 1 (QĐ 1760/QĐ-BYT) — yêu cầu đếm carb (carb counting), insulin basal-bolus / CSII.
+  - `diabetes_t2`: Đái tháo đường type 2 (QĐ 5481/QĐ-BYT) — kiểm soát carb, giảm cân nếu thừa cân, dùng thuốc uống / insulin.
+  - `diabetes_gestational`: Đái tháo đường thai kỳ (QĐ 1470/QĐ-BYT) — chia 3 bữa chính + 2-4 bữa phụ (bữa phụ đêm bắt buộc), carb ≥ 175g/ngày.
+  - `diabetic_neuropathy`: Bệnh thần kinh đái tháo đường (QĐ 3510/QĐ-BYT) — Alpha-lipoic acid, chế độ ăn mềm dễ tiêu chia nhỏ nếu có liệt dạ dày.
+  - `prediabetes`: Tiền đái tháo đường (QĐ 5481/QĐ-BYT) — can thiệp lối sống tích cực phòng ngừa tiến triển.
 - Không có field nào bị Pydantic validate "required" cứng (mọi field có default) — nhưng về nghiệp vụ, `disease/medications/allergies/bmi/target_kcal` nên coi là "cần điền" để `meal_plan`/`interaction_check` có ý nghĩa lâm sàng (business rule, không phải schema validation — xem `specs/02-patient-profile-onboarding.md`).
 - `allergies` = **hard filter** (loại tuyệt đối khỏi thực đơn, không có ngoại lệ) — dùng trong `meal_planner_agent._is_allergic`.
 - `preferences` = **soft filter** — as-built hiện chỉ match đúng 1 pattern hard-code (`"không ăn thịt bò"`). **[Planned, quyết định 2026-08-15]** mở rộng thêm danh sách pattern phổ biến khác (ví dụ `"ăn chay"`, `"không ăn hải sản"`, `"không ăn heo/lợn"`, `"không ăn gà"`) — danh sách cụ thể do BE1 chốt khi implement, xem `specs/02` §3 rule 4 và `tasks/be1-ai-core.md`.
@@ -393,8 +400,9 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.8**.
-- **Changelog 1.7 → 1.8 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.11.
+- Version hiện tại của contract này: **1.9**.
+- **Changelog 1.8 → 1.9 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.12.
+- **Changelog 1.7 → 1.8 (2026-08-25):** Mở rộng danh mục phân loại bệnh đái tháo đường: `diabetes_t1` (ĐTĐ Tuýp 1 theo QĐ 1760/QĐ-BYT), `diabetes_gestational` (ĐTĐ Thai kỳ theo QĐ 1470/QĐ-BYT), `diabetic_neuropathy` (Bệnh thần kinh ĐTĐ theo QĐ 3510/QĐ-BYT), `prediabetes` (Tiền ĐTĐ theo QĐ 5481/QĐ-BYT); tích hợp 4 tài liệu chuyên môn chính thức Bộ Y Tế vào RAG Knowledge Base (`byt_qd_1760_t1d.md`, `byt_qd_1470_gdm.md`, `byt_qd_3510_neuropathy.md`, `byt_qd_5481_t2d.md`); mở rộng `demo_patient_4` (Thai kỳ) và `demo_patient_5` (Tuýp 1); bổ sung tương tác thuốc cho Alpha-lipoic acid, Insulin, Pregabalin, Gabapentin, Duloxetine; đồng bộ `contracts/api-v1.md` v1.11.
 - **Changelog 1.6 → 1.7 (2026-08-24):** `FoodLogEntry.logged_at` chốt timezone-aware; ngày tuân thủ / filter food-log theo Asia/Ho_Chi_Minh; upsert 1 log / user / ngày VN / slot. Đồng bộ `contracts/api-v1.md` v1.8. Không đổi enum `slot`.
 - **Changelog 1.5 → 1.6 (2026-08-23):** `BodyMetricsEntry` §3.5 — `POST /metrics` upsert 1 entry patient/ngày VN (merge field, giữ `id`); đồng bộ `contracts/api-v1.md` v1.7. Không đổi JSON shape.
 - **Changelog 1.4 → 1.5 (2026-08-23):** thêm 2 intent `weekly_compliance` | `doctor_note` vào `VALID_INTENTS` (patient chat redesign Phase 2); mở rộng `AgentRunOutput` với field optional `weekly_compliance: WeeklyComplianceOut | null`, `doctor_note: DoctorNoteOut | null`; mở rộng `AgentState` với state trung gian tương ứng. Quyết định nguồn dữ liệu: compliance từ `ComplianceService.get_patient_compliance(days=7)`; doctor note từ `manual_reminder` notification hoặc fallback `adjustment_note` meal plan — không hallucinate tên bác sĩ. `WeeklyMealPlanCard` không thêm intent mới (vẫn `meal_plan`). Không breaking change — field mới default `null`.

@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.8 (2026-08-24 — Food Log/`GET /compliance*` dùng ngày lịch Asia/Ho_Chi_Minh; `logged_at` timezone-aware. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.12 (2026-08-26 — `POST /metrics` nhận field lâm sàng optional `waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`; Intent `metrics_delta_advice`; Mở rộng danh mục phân loại bệnh đái tháo đường đa tầng theo 4 tài liệu chuyên môn Bộ Y Tế. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -807,8 +807,9 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.11**.
-- **Changelog 1.10 → 1.11 (2026-08-26):** `POST /metrics` nhận field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); response thêm `delta_advice` optional. Intent chat `metrics_delta_advice`. Không breaking — field mới default `null`. Đồng bộ `contracts/agent-io-schema.md` v1.8.
+- Version hiện tại: **1.12**.
+- **Changelog 1.11 → 1.12 (2026-08-26):** `POST /metrics` nhận field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); response thêm `delta_advice` optional. Intent chat `metrics_delta_advice`. Không breaking — field mới default `null`. Đồng bộ `contracts/agent-io-schema.md` v1.9.
+- **Changelog 1.10 → 1.11 (2026-08-25):** Mở rộng danh mục phân loại bệnh lý đái tháo đường (`diabetes_t1`, `diabetes_t2`, `diabetes_gestational`, `diabetic_neuropathy`, `prediabetes`) theo 4 tài liệu hướng dẫn chuyên môn Bộ Y Tế (QĐ 1760/QĐ-BYT, QĐ 1470/QĐ-BYT, QĐ 3510/QĐ-BYT, QĐ 5481/QĐ-BYT); mở rộng tài khoản demo (`demo_patient_4` cho ĐTĐ Thai kỳ, `demo_patient_5` cho ĐTĐ Tuýp 1); bổ sung tương tác thuốc đặc thù (Alpha-lipoic acid, Insulin, Pregabalin, Gabapentin, Duloxetine). Đồng bộ `contracts/agent-io-schema.md` v1.8.
 - **Changelog 1.9 → 1.10 (2026-08-24):** thêm `POST /meal-plans/request` + `GET /meal-plans/request` (patient yêu cầu bác sĩ tạo thực đơn, cờ trên `profiles`, không dùng bảng `notifications`); `DoctorPatientSummary` thêm `meal_plan_request_status`, `meal_plan_request_note`, `meal_plan_requested_at`; filter `GET /doctor/patients?meal_plan_request=pending`. Không breaking change (field mới optional/default).
 - **Changelog 1.8 → 1.9 (2026-08-24):** thêm `POST /auth/me/avatar` (user đã đăng nhập tự upload ảnh đại diện, cùng rule 2MB / png-jpg-webp-gif với endpoint doctor). Không breaking change.
 - **Changelog 1.7 → 1.8 (2026-08-24):** Food Log + compliance dùng ngày lịch **Asia/Ho_Chi_Minh** — `GET /food-log?date=` lọc theo cửa sổ UTC của ngày VN; `POST /food-log` upsert 1 log / user / ngày VN / slot; `FoodLogEntry.logged_at` serialize timezone-aware (naive DB = UTC). `GET /compliance/me` và `GET /doctor/patients/{id}/compliance` lấy `today` + gán food-log vào ngày VN (không còn `date.today()` UTC của container). Không đổi request shape / enum slot.

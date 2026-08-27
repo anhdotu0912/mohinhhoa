@@ -379,10 +379,17 @@ def _protein_pool(safe_foods: dict[str, list[dict]]) -> list[dict]:
 
 def _guideline_citations(diseases: list[str]) -> list[str]:
     citations = ["byt_vn_notes.md"]
-    if any("diabetes" in d for d in diseases):
+    if any("t1" in d for d in diseases):
+        citations.append("byt_qd_1760_t1d.md")
+    if any("gestational" in d for d in diseases):
+        citations.append("byt_qd_1470_gdm.md")
+    if any("neuropathy" in d for d in diseases):
+        citations.append("byt_qd_3510_neuropathy.md")
+    if any("t2" in d or "diabetes" in d for d in diseases):
+        citations.append("byt_qd_5481_t2d.md")
         citations.append("ada_diabetes.md")
         citations.append("dinh_duong_thuc_hanh.md")
-    return citations
+    return list(dict.fromkeys(citations))
 
 
 def _pick(seq: list[dict], index: int) -> dict | None:
@@ -1006,7 +1013,7 @@ def _pools_from_safe(
     if not proteins:
         proteins = all_foods[:4]
 
-    if "diabetes_t2" in diseases:
+    if any("diabetes" in d or "t1" in d or "t2" in d or "gestational" in d for d in diseases):
         pref_starch = [f for f in starch if "diabetes-friendly" in f.get("tags", [])] + starch
     else:
         pref_starch = starch

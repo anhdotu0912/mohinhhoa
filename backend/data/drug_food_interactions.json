@@ -278,5 +278,45 @@
     "severity": "Cần chú ý",
     "recommendation": "Không tự ý ăn thêm nhiều thực phẩm giàu kali khi đang bổ sung kali.",
     "sources": ["drug_food_interactions#kcl_banana"]
+  },
+  {
+    "drug": "alpha-lipoic acid",
+    "drug_aliases": ["thioctic acid", "ala", "thioctacid", "neurolit"],
+    "food": "sữa",
+    "food_aliases": ["sua", "milk", "chế phẩm sữa", "pho mai", "sữa chua", "canxi"],
+    "mechanism": "Kim loại hoá trị 2 như Canxi, Magie, Sắt trong sữa và chế phẩm sữa tạo phức chelate làm giảm đáng kể hấp thu của Alpha-lipoic acid.",
+    "severity": "Cần chú ý",
+    "recommendation": "Uống Alpha-lipoic acid khi bụng đói (trước ăn sáng 30-60 phút); uống cách xa sữa và chế phẩm giàu canxi ít nhất 2 giờ theo QĐ 3510/QĐ-BYT.",
+    "sources": ["byt_qd_3510_neuropathy#ala_milk"]
+  },
+  {
+    "drug": "insulin",
+    "drug_aliases": ["insulin glargine", "insulin aspart", "insulin lispro", "insulin detemir", "insulin nph", "lantus", "novorapid", "humalog"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia", "beer", "wine"],
+    "mechanism": "Rượu ức chế tạo glucose ở gan trong khi insulin vẫn kích thích thu nạp glucose mô ngoại biên, gây hạ đường huyết nghiêm trọng và muộn sau 6-12h (thường trong giấc ngủ).",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tránh uống rượu khi đói; luôn ăn kèm tinh bột phức hợp nếu có dùng đồ uống có cồn; theo dõi sát đường huyết trước khi đi ngủ theo QĐ 1760/QĐ-BYT và QĐ 5481/QĐ-BYT.",
+    "sources": ["byt_qd_1760_t1d#insulin_alcohol"]
+  },
+  {
+    "drug": "pregabalin",
+    "drug_aliases": ["lyrica", "gabapentin", "neurontin"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia", "beer"],
+    "mechanism": "Rượu cộng hưởng làm tăng tác dụng an thần, ức chế thần kinh trung ương của Pregabalin/Gabapentin, gây chóng mặt, ngủ gà và nguy cơ té ngã cao.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Tuyệt đối tránh uống rượu bia trong thời gian điều trị giảm đau thần kinh đái tháo đường bằng thuốc nhóm Gabapentinoid theo QĐ 3510/QĐ-BYT.",
+    "sources": ["byt_qd_3510_neuropathy#pregabalin_alcohol"]
+  },
+  {
+    "drug": "duloxetine",
+    "drug_aliases": ["cymbalta"],
+    "food": "rượu",
+    "food_aliases": ["ruou", "alcohol", "bia"],
+    "mechanism": "Kết hợp Duloxetine với rượu làm tăng nguy cơ tổn thương gan nặng và tăng tác dụng ức chế hệ thần kinh trung ương.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Không sử dụng rượu bia khi đang dùng Duloxetine để điều trị đau thần kinh đái tháo đường.",
+    "sources": ["byt_qd_3510_neuropathy#duloxetine_alcohol"]
   }
 ]
