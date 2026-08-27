@@ -226,7 +226,7 @@ function ChangePasswordCard() {
           error={fieldErrors.current}
           placeholder="Nhập mật khẩu đang dùng"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 gap-3.5">
           <PasswordField
             id="profile-new-password"
             label="Mật khẩu mới"
@@ -347,59 +347,64 @@ function profileToForm(
 function getBmiCategory(bmi: number | null): {
   label: string;
   status: "underweight" | "normal" | "overweight" | "obese";
-  colorClass: string;
-  bgClass: string;
-  borderClass: string;
   badgeClass: string;
+  markerClass: string;
 } {
   if (bmi === null || bmi <= 0) {
     return {
       label: "Chưa có dữ liệu",
       status: "normal",
-      colorClass: "text-slate-500",
-      bgClass: "bg-slate-50",
-      borderClass: "border-slate-200",
-      badgeClass: "bg-slate-100 text-slate-700",
+      badgeClass: "bg-surface-container-low text-on-surface-variant border-outline-variant",
+      markerClass: "bg-on-surface-variant",
     };
   }
   if (bmi < 18.5) {
     return {
       label: "Thiếu cân",
       status: "underweight",
-      colorClass: "text-sky-600",
-      bgClass: "bg-sky-50/70",
-      borderClass: "border-sky-200",
-      badgeClass: "bg-sky-100 text-sky-800 border-sky-200",
+      badgeClass: "bg-slate-100 text-slate-800 border-slate-200",
+      markerClass: "bg-slate-500",
     };
   }
   if (bmi <= 22.9) {
     return {
       label: "Chuẩn sức khỏe (WPRO)",
       status: "normal",
-      colorClass: "text-emerald-700",
-      bgClass: "bg-emerald-50/70",
-      borderClass: "border-emerald-200",
-      badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+      badgeClass: "bg-primary/10 text-primary border-primary/25",
+      markerClass: "bg-primary",
     };
   }
   if (bmi <= 24.9) {
     return {
       label: "Tiền béo phì",
       status: "overweight",
-      colorClass: "text-amber-700",
-      bgClass: "bg-amber-50/70",
-      borderClass: "border-amber-200",
-      badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
+      badgeClass: "bg-amber-50 text-amber-900 border-amber-200/70",
+      markerClass: "bg-amber-600",
     };
   }
   return {
     label: "Béo phì",
     status: "obese",
-    colorClass: "text-rose-700",
-    bgClass: "bg-rose-50/70",
-    borderClass: "border-rose-200",
-    badgeClass: "bg-rose-100 text-rose-800 border-rose-300",
+    badgeClass: "bg-rose-50 text-rose-800 border-rose-200/70",
+    markerClass: "bg-rose-600",
   };
+}
+
+/** Map WPRO BMI bands onto a 0–100 track (12–35 scale). */
+function bmiMarkerPercent(bmi: number | null): number | null {
+  if (bmi == null || bmi <= 0) return null;
+  let pct: number;
+  if (bmi < 18.5) {
+    pct = (Math.max(bmi, 12) / 18.5) * 30;
+  } else if (bmi <= 22.9) {
+    pct = 30 + ((bmi - 18.5) / (22.9 - 18.5)) * 35;
+  } else if (bmi <= 24.9) {
+    pct = 65 + ((bmi - 23) / (24.9 - 23)) * 15;
+  } else {
+    const capped = Math.min(bmi, 35);
+    pct = 80 + ((capped - 25) / 10) * 20;
+  }
+  return Math.min(100, Math.max(2, pct));
 }
 
 export default function PatientProfilePage() {
@@ -515,6 +520,8 @@ export default function PatientProfilePage() {
   const bmiCategory = useMemo(() => {
     return getBmiCategory(previewBmi);
   }, [previewBmi]);
+
+  const bmiMarkerPct = useMemo(() => bmiMarkerPercent(previewBmi), [previewBmi]);
 
   // Suggested Kcal based on BMI & Diseases
   const suggestedKcal = useMemo(() => {
@@ -935,9 +942,11 @@ export default function PatientProfilePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4">
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-white border border-outline-variant rounded-2xl p-6 h-80 animate-pulse" />
-              <div className="bg-white border border-outline-variant rounded-2xl p-6 h-60 animate-pulse" />
+              <div className="bg-white border border-outline-variant rounded-2xl p-6 h-40 animate-pulse" />
+              <div className="bg-white border border-outline-variant rounded-2xl p-6 h-52 animate-pulse" />
             </div>
             <div className="lg:col-span-8 space-y-6">
+              <div className="bg-white border border-outline-variant rounded-2xl p-6 h-64 animate-pulse" />
               <div className="bg-white border border-outline-variant rounded-2xl p-6 h-72 animate-pulse" />
               <div className="bg-white border border-outline-variant rounded-2xl p-6 h-72 animate-pulse" />
             </div>
@@ -964,7 +973,7 @@ export default function PatientProfilePage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ======================================================== */}
-            {/* LEFT COLUMN: HERO IDENTITY & VITALS PASSPORT (4 COLS)     */}
+            {/* LEFT COLUMN: IDENTITY, CONTACT & SECURITY (4 COLS)     */}
             {/* ======================================================== */}
             <div className="lg:col-span-4 space-y-6">
               {/* Profile Identity Card */}
@@ -1058,47 +1067,123 @@ export default function PatientProfilePage() {
                 </div>
               </div>
 
-              {/* Vitals & Health Gauge Card */}
-              <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-teal-50 text-primary flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[20px]">
-                        monitor_heart
-                      </span>
-                    </div>
+              {/* CARD 3: CONTACT & ACCOUNT INFO */}
+              <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 border-b border-outline-variant/50 pb-3">
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[22px]">
+                      contact_phone
+                    </span>
+                  </div>
+                  <div>
                     <h3 className="text-base font-bold text-on-surface">
-                      Chỉ số Thể trạng & Sinh hiệu
+                      Thông tin Liên hệ & Hành chính
                     </h3>
+                    <p className="text-xs text-on-surface-variant">
+                      Số điện thoại và địa chỉ nhận hỗ trợ y tế.
+                    </p>
                   </div>
                 </div>
 
-                {/* Visual BMI Gauge */}
-                <div className={`p-4 rounded-xl border ${bmiCategory.bgClass} ${bmiCategory.borderClass} space-y-3`}>
-                  <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Phone */}
+                  <div>
+                    <label className="text-xs font-bold text-on-surface-variant mb-1 block">
+                      Số điện thoại
+                    </label>
+                    {editing && form ? (
+                      <input
+                        type="tel"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        placeholder="0912 345 678"
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    ) : (
+                      <p className="text-sm font-semibold text-on-surface">
+                        {profile.phone || "—"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <label className="text-xs font-bold text-on-surface-variant mb-1 block">
+                      Địa chỉ cư trú
+                    </label>
+                    {editing && form ? (
+                      <input
+                        type="text"
+                        value={form.address}
+                        onChange={(e) => setForm({ ...form, address: e.target.value })}
+                        placeholder="Quận/Huyện, Tỉnh/Thành phố..."
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    ) : (
+                      <p className="text-sm font-semibold text-on-surface">
+                        {profile.address || "—"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <ChangePasswordCard />
+            </div>
+
+            {/* ======================================================== */}
+            {/* RIGHT COLUMN: VITALS, CLINICAL & NUTRITION (8 COLS)     */}
+            {/* ======================================================== */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Vitals & Health Gauge Card */}
+              <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-5">
+                <div className="flex items-center gap-2 border-b border-outline-variant/50 pb-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-surface-container-low text-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[22px]">
+                      monitor_heart
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-on-surface">
+                    Chỉ số Thể trạng & Sinh hiệu
+                  </h3>
+                </div>
+
+                {/* BMI readout + quiet track */}
+                <div className="p-4 rounded-xl border border-outline-variant bg-surface-container-low space-y-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
+                      <p className="text-xs font-semibold text-on-surface-variant">
                         Chỉ số khối cơ thể (BMI)
                       </p>
                       <div className="flex items-baseline gap-2 mt-0.5">
-                        <span className="text-3xl font-extrabold text-on-surface">
+                        <span className="text-3xl font-extrabold text-on-surface tabular-nums">
                           {previewBmi != null ? previewBmi : "—"}
                         </span>
                         <span className="text-xs text-on-surface-variant">kg/m²</span>
                       </div>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${bmiCategory.badgeClass}`}>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shrink-0 ${bmiCategory.badgeClass}`}>
                       {bmiCategory.label}
                     </span>
                   </div>
 
-                  {/* Segmented Color Gauge */}
                   <div className="space-y-1.5">
-                    <div className="relative h-3 w-full rounded-full bg-slate-200 overflow-hidden flex">
-                      <div className="w-[30%] bg-sky-400" title="Thiếu cân (<18.5)" />
-                      <div className="w-[35%] bg-emerald-500" title="Chuẩn (18.5-22.9)" />
-                      <div className="w-[15%] bg-amber-400" title="Tiền béo phì (23-24.9)" />
-                      <div className="w-[20%] bg-rose-500" title="Béo phì (≥25)" />
+                    <div
+                      className="relative h-2 w-full rounded-full bg-outline-variant/50"
+                      role="meter"
+                      aria-label="BMI trên thang WPRO"
+                      aria-valuemin={12}
+                      aria-valuemax={35}
+                      aria-valuenow={previewBmi ?? undefined}
+                      aria-valuetext={bmiCategory.label}
+                    >
+                      {bmiMarkerPct != null ? (
+                        <span
+                          className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-xs ${bmiCategory.markerClass}`}
+                          style={{ left: `${bmiMarkerPct}%` }}
+                          aria-hidden
+                        />
+                      ) : null}
                     </div>
                     <div className="flex justify-between text-[10px] text-on-surface-variant font-medium">
                       <span>&lt;18.5</span>
@@ -1109,8 +1194,8 @@ export default function PatientProfilePage() {
                   </div>
                 </div>
 
-                {/* 2x2 Mini Vitals Grid */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Vitals fields */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Weight */}
                   <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
                     <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-1">
@@ -1218,7 +1303,7 @@ export default function PatientProfilePage() {
                   {/* Blood Pressure */}
                   <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
                     <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-1">
-                      <span className="material-symbols-outlined text-[16px] text-rose-600">
+                      <span className="material-symbols-outlined text-[16px] text-primary">
                         cardiology
                       </span>
                       <span>Huyết áp</span>
@@ -1268,7 +1353,7 @@ export default function PatientProfilePage() {
                   {/* Blood Glucose */}
                   <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
                     <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-1">
-                      <span className="material-symbols-outlined text-[16px] text-amber-600">
+                      <span className="material-symbols-outlined text-[16px] text-primary">
                         bloodtype
                       </span>
                       <span>Đường huyết</span>
@@ -1318,12 +1403,7 @@ export default function PatientProfilePage() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* ======================================================== */}
-            {/* RIGHT COLUMN: BENTO CARDS (8 COLS)                        */}
-            {/* ======================================================== */}
-            <div className="lg:col-span-8 space-y-6">
               {/* CARD 1: CLINICAL PROFILE & MEDICATION SAFETY */}
               <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-5">
                 <div className="flex items-center gap-2 border-b border-outline-variant/50 pb-3.5">
@@ -1899,69 +1979,6 @@ export default function PatientProfilePage() {
                   </div>
                 </div>
               </div>
-
-              {/* CARD 3: CONTACT & ACCOUNT INFO */}
-              <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-2 border-b border-outline-variant/50 pb-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[22px]">
-                      contact_phone
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-on-surface">
-                      Thông tin Liên hệ & Hành chính
-                    </h3>
-                    <p className="text-xs text-on-surface-variant">
-                      Số điện thoại và địa chỉ nhận hỗ trợ y tế.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Phone */}
-                  <div>
-                    <label className="text-xs font-bold text-on-surface-variant mb-1 block">
-                      Số điện thoại
-                    </label>
-                    {editing && form ? (
-                      <input
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        placeholder="0912 345 678"
-                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
-                      />
-                    ) : (
-                      <p className="text-sm font-semibold text-on-surface">
-                        {profile.phone || "—"}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Address */}
-                  <div>
-                    <label className="text-xs font-bold text-on-surface-variant mb-1 block">
-                      Địa chỉ cư trú
-                    </label>
-                    {editing && form ? (
-                      <input
-                        type="text"
-                        value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        placeholder="Quận/Huyện, Tỉnh/Thành phố..."
-                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
-                      />
-                    ) : (
-                      <p className="text-sm font-semibold text-on-surface">
-                        {profile.address || "—"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <ChangePasswordCard />
             </div>
           </div>
         )}

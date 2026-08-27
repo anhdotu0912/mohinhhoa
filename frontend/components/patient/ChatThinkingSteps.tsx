@@ -48,7 +48,7 @@ export function ChatThinkingSteps({
   defaultExpanded = false,
 }: ChatThinkingStepsProps) {
   const isAllDone = steps.every((s) => s.status === "done");
-  const [isOpen, setIsOpen] = useState(defaultExpanded || !isAllDone);
+  const [isOpen, setIsOpen] = useState(defaultExpanded);
 
   if (steps.length === 0) return null;
 

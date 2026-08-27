@@ -300,21 +300,21 @@ export function MealLogPanel() {
 
           {/* Meals for Selected Day Section */}
           <div className="space-y-3.5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span>Thực đơn chi tiết {DAY_LABELS[selectedDayIndex]?.full}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5 sm:gap-2">
+                <span>Thực đơn {DAY_LABELS[selectedDayIndex]?.full}</span>
                 {isToday && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
                     Hôm nay
                   </span>
                 )}
               </h3>
               {activeDayPlan?.totals?.kcal ? (
-                <span className="text-xs font-bold text-[#006857] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <span className="text-[11px] sm:text-xs font-bold text-[#006857] bg-emerald-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-emerald-200">
                   Tổng ngày: {Math.round(activeDayPlan.totals.kcal)} kcal
                 </span>
               ) : activeDayPlan?.meals && activeDayPlan.meals.length > 0 ? (
-                <span className="text-xs font-bold text-[#006857]">
+                <span className="text-[11px] sm:text-xs font-bold text-[#006857]">
                   {activeDayPlan.meals.length} bữa ăn chuẩn y khoa
                 </span>
               ) : null}
@@ -372,42 +372,42 @@ export function MealLogPanel() {
                 return (
                   <div
                     key={slotKey}
-                    className="p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3.5"
+                    className="p-3 sm:p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3 sm:gap-3.5"
                   >
                     {/* Top Row: Slot Header + Nutrition Badges + Logging Action */}
-                    <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80">
-                          <span className="material-symbols-outlined text-[16px]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
+                          <span className="material-symbols-outlined text-[15px] sm:text-[16px]">
                             {slotMeta.icon}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-slate-900">
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
                           {slotMeta.label}
                         </span>
                         {totalKcal > 0 && (
-                          <span className="text-xs font-extrabold text-[#006857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 ml-1">
+                          <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
                             {totalKcal} kcal
                           </span>
                         )}
                       </div>
 
                       {/* Action / Logging Buttons */}
-                      <div>
+                      <div className="shrink-0">
                         {isLogged ? (
-                          <div className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold shrink-0 border border-emerald-200 shadow-2xs">
-                            <span className="material-symbols-outlined text-[15px] text-[#006857]">check_circle</span>
+                          <div className="flex items-center gap-1 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-emerald-50 text-emerald-800 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-200 shadow-2xs">
+                            <span className="material-symbols-outlined text-[13px] sm:text-[15px] text-[#006857]">check_circle</span>
                             <span>Đã ghi nhận</span>
                           </div>
                         ) : isToday && canLogSlot ? (
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1 sm:gap-1.5">
                             <button
                               type="button"
                               disabled={isSaving}
                               onClick={() => void handleLogPlanned(slotKey)}
-                              className="px-3 py-1.5 bg-[#006857] hover:bg-[#005245] text-white rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-[#006857] hover:bg-[#005245] text-white rounded-lg text-[11px] sm:text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
                             >
-                              <span className="material-symbols-outlined text-[14px]">done</span>
+                              <span className="material-symbols-outlined text-[13px] sm:text-[14px]">done</span>
                               <span>{isSaving ? "Đang lưu..." : "Ăn đúng"}</span>
                             </button>
                             <button
@@ -417,14 +417,14 @@ export function MealLogPanel() {
                                 setCustomSlot(isCustomOpen ? null : slotKey);
                                 setCustomNote("");
                               }}
-                              className="px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 sm:px-3 sm:py-1.5 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-[11px] sm:text-xs font-semibold hover:bg-slate-50 transition-colors active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
                             >
-                              <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                              <span className="material-symbols-outlined text-[13px] sm:text-[14px]">edit_note</span>
                               <span>Ăn khác</span>
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] font-semibold text-slate-400 px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-200/60">
+                          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-50 rounded-md sm:rounded-lg border border-slate-200/60">
                             Kế hoạch thực đơn
                           </span>
                         )}
@@ -432,8 +432,8 @@ export function MealLogPanel() {
                     </div>
 
                     {/* Middle Row: Image Thumbnail + Full Dishes List */}
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs">
+                    <div className="flex items-start gap-2.5 sm:gap-3.5">
+                      <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs aspect-square">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imageSrc}
@@ -462,17 +462,17 @@ export function MealLogPanel() {
                         {(totalProtein > 0 || totalCarbs > 0 || totalFat > 0) && (
                           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] font-semibold text-slate-500">
                             {totalProtein > 0 && (
-                              <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200/70">
+                              <span className="bg-emerald-50 text-emerald-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/70">
                                 Đạm: {totalProtein}g
                               </span>
                             )}
                             {totalCarbs > 0 && (
-                              <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200/70">
+                              <span className="bg-blue-50 text-blue-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-blue-200/70">
                                 Carb: {totalCarbs}g
                               </span>
                             )}
                             {totalFat > 0 && (
-                              <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200/70">
+                              <span className="bg-amber-50 text-amber-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-amber-200/70">
                                 Béo: {totalFat}g
                               </span>
                             )}

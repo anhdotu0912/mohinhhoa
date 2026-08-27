@@ -605,7 +605,7 @@ export default function PatientChatHomePage() {
       </div>
 
       {/* Bottom Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-4 md:p-6 pb-3 sm:pb-4 md:pb-6 z-30 pointer-events-none flex justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent pt-6 sm:pt-8">
+      <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-4 md:p-6 pb-2.5 sm:pb-3 md:pb-4 z-30 pointer-events-none flex flex-col items-center justify-center bg-gradient-to-t from-[#f8fafc] via-[#f8fafc]/95 to-transparent pt-6 sm:pt-8">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -631,6 +631,11 @@ export default function PatientChatHomePage() {
             <span className="material-symbols-outlined text-[20px]">send</span>
           </button>
         </form>
+
+        {/* Medical AI Disclaimer */}
+        <p className="text-[10.5px] sm:text-xs text-slate-400 text-center mt-1.5 sm:mt-2 px-3 font-medium pointer-events-auto leading-tight select-none">
+          Thông tin từ trợ lý AI chỉ mang tính tham khảo dinh dưỡng, không thay thế cho chẩn đoán và chỉ định trực tiếp từ bác sĩ điều trị.
+        </p>
       </div>
     </div>
   );
