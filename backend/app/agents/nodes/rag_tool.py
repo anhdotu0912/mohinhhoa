@@ -16,6 +16,45 @@ def retrieve_rag_context(message: str, profile: dict) -> tuple[list[dict], list[
     return _build_rag_context(message, profile)
 
 
+def _disease_search_keywords(diseases: list[str]) -> str:
+    """Expand disease codes into rich medical keywords for vector retrieval."""
+    keywords = []
+    for d in diseases:
+        d_lower = d.lower()
+        if "t1" in d_lower or "tuyp_1" in d_lower:
+            keywords.append("đái tháo đường típ 1 insulin carb counting hạ đường huyết DKA QĐ 1760")
+        elif "gestational" in d_lower or "thai" in d_lower:
+            keywords.append("đái tháo đường thai kỳ mang thai bữa phụ thai nhi OGTT QĐ 1470")
+        elif "neuropathy" in d_lower or "than_kinh" in d_lower:
+            keywords.append("bệnh thần kinh đái tháo đường liệt dạ dày tê bì alpha lipoic acid QĐ 3510")
+        elif "t2" in d_lower or "prediabetes" in d_lower or "diabetes" in d_lower:
+            keywords.append("đái tháo đường típ 2 metformin mục tiêu đường huyết QĐ 5481")
+        else:
+            keywords.append(d)
+    return " ".join(keywords)
+
+
+def _determine_guideline_authority(diseases: list[str]) -> str:
+    """Return specific Ministry of Health decisions based on patient profile."""
+    authorities = []
+    for d in diseases:
+        d_lower = d.lower()
+        if "t1" in d_lower or "tuyp_1" in d_lower:
+            authorities.append("ĐTĐ Típ 1 (QĐ 1760/QĐ-BYT)")
+        elif "gestational" in d_lower or "thai" in d_lower:
+            authorities.append("ĐTĐ Thai kỳ (QĐ 1470/QĐ-BYT)")
+        elif "neuropathy" in d_lower or "than_kinh" in d_lower:
+            authorities.append("Bệnh thần kinh ĐTĐ (QĐ 3510/QĐ-BYT)")
+        elif "t2" in d_lower or "prediabetes" in d_lower:
+            authorities.append("ĐTĐ Típ 2 (QĐ 5481/QĐ-BYT)")
+
+    if not authorities:
+        authorities.append("ĐTĐ Típ 2 (QĐ 5481/QĐ-BYT)")
+
+    auth_str = ", ".join(dict.fromkeys(authorities))
+    return f"Bộ Y Tế Việt Nam ({auth_str}) và Hiệp Hội Đái Tháo Đường Hoa Kỳ (ADA)"
+
+
 def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[str]]:
     """Retrieve relevant context from both food DB and guidelines.
 
@@ -23,11 +62,11 @@ def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[st
     """
     diseases = profile.get("disease", [])
 
-    # Retrieve guidelines relevant to the question + diseases
-    disease_query = " ".join(diseases) if diseases else ""
-    combined_query = f"{message} {disease_query}".strip()
+    # Retrieve guidelines relevant to the question + expanded disease context
+    disease_expanded = _disease_search_keywords(diseases)
+    combined_query = f"{message} {disease_expanded}".strip()
 
-    guideline_chunks = retrieve_guidelines(combined_query, top_k=5)
+    guideline_chunks = retrieve_guidelines(combined_query, top_k=6)
     food_chunks = retrieve_foods(message, top_k=5)
 
     rag_context = []
@@ -64,11 +103,13 @@ def _build_rag_prompt(message: str, rag_context: list[dict], profile: dict) -> s
     context_texts = [c["text"] for c in rag_context[:6]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
-    diseases = ", ".join(profile.get("disease", [])) or "chưa rõ (mặc định ĐTĐ type 2)"
+    diseases_list = profile.get("disease", [])
+    diseases = ", ".join(diseases_list) or "chưa rõ (mặc định ĐTĐ type 2)"
     medications = ", ".join(profile.get("medications", [])) or "chưa rõ"
     allergies = ", ".join(profile.get("allergies", [])) or "không có"
+    authority_str = _determine_guideline_authority(diseases_list)
 
-    return f"""Bạn là Trợ lý Dinh dưỡng Y khoa Chuyên nghiệp (Clinical Nutrition AI Assistant) chuyên về Đái tháo đường Type 2 và bệnh mạn tính, tuân thủ hướng dẫn của Bộ Y Tế Việt Nam (QĐ 5481/QĐ-BYT) và Hiệp Hội Đái Tháo Đường Hoa Kỳ (ADA).
+    return f"""Bạn là Trợ lý Dinh dưỡng Y khoa Chuyên nghiệp (Clinical Nutrition AI Assistant) chuyên về Đái tháo đường và bệnh mạn tính, tuân thủ hướng dẫn chính thức của {authority_str}.
 
 HỒ SƠ BỆNH NHÂN:
 - Bệnh nền: {diseases}
@@ -89,12 +130,12 @@ Khi câu hỏi có nhiều ý hoặc hỏi về thực phẩm/dinh dưỡng, hã
    • Chỉ số đường huyết (GI/GL) và ảnh hưởng đến đường huyết sau ăn.
    • Thành phần cốt lõi: Tinh bột (Carb), Chất đạm (Protein), Chất béo tốt/xấu, Chất xơ và vi chất.
 3. 💡 **Khuyến nghị khẩu phần & Cách chế biến chuẩn y khoa:**
-   • Khẩu phần hợp lý theo bữa/ngày.
+   • Khẩu phần hợp lý theo bữa/ngày (nếu ĐTĐ thai kỳ: lưu ý phân bổ 3 chính + 2-3 phụ; nếu ĐTĐ tuýp 1: nhấn mạnh đếm lượng Carb; nếu biến chứng thần kinh/liệt dạ dày: chia nhỏ bữa mềm dễ tiêu).
    • Phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế chiên xào, sốt ngọt, nêm nhiều muối).
 4. ⚠️ **Lưu ý an toàn theo bệnh nền & thuốc đang dùng:**
    • Lưu ý cụ thể cho bệnh nhân theo thuốc và bệnh nền (nếu có nguy cơ tương tác hay hạ/tăng đường huyết).
    • KHÔNG tự ý kê đơn, thay đổi thuốc, hoặc điều chỉnh liều thuốc/insulin.
-5. 📚 **Nguồn tham khảo:** Ghi rõ tài liệu y khoa chính thống (Bộ Y Tế Việt Nam / ADA / NIN)."""
+5. 📚 **Nguồn tham khảo:** Ghi rõ tài liệu y khoa chính thống áp dụng ({authority_str})."""
 
 
 def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:

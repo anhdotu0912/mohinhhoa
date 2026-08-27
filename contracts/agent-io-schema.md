@@ -9,7 +9,7 @@
 ## 0. Conventions chung
 
 - **Timestamp:** ISO-8601 (`YYYY-MM-DDTHH:MM:SS±HH:MM` hoặc có hậu tố `Z`). Field kiểu `datetime` ở DB serialize theo chuẩn này khi trả HTTP.
-- **ID:** UUID v4 dạng string (`String(36)`), sinh bằng `uuid.uuid4()`. Ngoại lệ: `demo_patient_1/2/3`, `demo_doctor` là ID cố định cho tài khoản demo (không phải UUID).
+- **ID:** UUID v4 dạng string (`String(36)`), sinh bằng `uuid.uuid4()`. Ngoại lệ: `demo_patient_1/2/3/4/5`, `demo_doctor` là ID cố định cho tài khoản demo (không phải UUID).
 - **Error envelope** (dùng chung mọi endpoint, `backend/app/core/errors.py::APIError`):
   ```json
   { "code": "EMAIL_EXISTS", "detail": "Email đã được đăng ký." }
@@ -56,6 +56,12 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
 ```
 
 **Ghi chú field:**
+- `disease`: Danh sách mã bệnh nhân (JSON list). Hỗ trợ đầy đủ các phân nhóm đái tháo đường theo hướng dẫn Bộ Y Tế:
+  - `diabetes_t1`: Đái tháo đường type 1 (QĐ 1760/QĐ-BYT) — yêu cầu đếm carb (carb counting), insulin basal-bolus / CSII.
+  - `diabetes_t2`: Đái tháo đường type 2 (QĐ 5481/QĐ-BYT) — kiểm soát carb, giảm cân nếu thừa cân, dùng thuốc uống / insulin.
+  - `diabetes_gestational`: Đái tháo đường thai kỳ (QĐ 1470/QĐ-BYT) — chia 3 bữa chính + 2-4 bữa phụ (bữa phụ đêm bắt buộc), carb ≥ 175g/ngày.
+  - `diabetic_neuropathy`: Bệnh thần kinh đái tháo đường (QĐ 3510/QĐ-BYT) — Alpha-lipoic acid, chế độ ăn mềm dễ tiêu chia nhỏ nếu có liệt dạ dày.
+  - `prediabetes`: Tiền đái tháo đường (QĐ 5481/QĐ-BYT) — can thiệp lối sống tích cực phòng ngừa tiến triển.
 - Không có field nào bị Pydantic validate "required" cứng (mọi field có default) — nhưng về nghiệp vụ, `disease/medications/allergies/bmi/target_kcal` nên coi là "cần điền" để `meal_plan`/`interaction_check` có ý nghĩa lâm sàng (business rule, không phải schema validation — xem `specs/02-patient-profile-onboarding.md`).
 - `allergies` = **hard filter** (loại tuyệt đối khỏi thực đơn, không có ngoại lệ) — dùng trong `meal_planner_agent._is_allergic`.
 - `preferences` = **soft filter** — as-built hiện chỉ match đúng 1 pattern hard-code (`"không ăn thịt bò"`). **[Planned, quyết định 2026-08-15]** mở rộng thêm danh sách pattern phổ biến khác (ví dụ `"ăn chay"`, `"không ăn hải sản"`, `"không ăn heo/lợn"`, `"không ăn gà"`) — danh sách cụ thể do BE1 chốt khi implement, xem `specs/02` §3 rule 4 và `tasks/be1-ai-core.md`.
