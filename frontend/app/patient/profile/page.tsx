@@ -33,6 +33,7 @@ import {
   type ProfileUpsert,
   type UserMeResponse,
 } from "@/lib/types";
+import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
 
 type MetricField = "weight" | "height" | "bloodPressure" | "bloodGlucose";
 type MetricFieldErrors = Partial<Record<MetricField, string>>;
@@ -457,6 +458,7 @@ export default function PatientProfilePage() {
       setUserProfile({
         avatar: userData.avatar ?? null,
         displayName: userData.full_name?.trim() || userData.email,
+        assignedDoctor: userData.assigned_doctor ?? null,
       });
     } catch (err) {
       setError(
@@ -1023,6 +1025,12 @@ export default function PatientProfilePage() {
                   <p className="text-xs text-on-surface-variant mt-0.5 truncate max-w-full">
                     {user?.email ?? email}
                   </p>
+                  <div className="mt-3">
+                    <AssignedDoctorStatus
+                      doctor={user?.assigned_doctor}
+                      loaded={Boolean(user)}
+                    />
+                  </div>
 
                   {/* Demographic Badges */}
                   <div className="flex flex-wrap items-center justify-center gap-2 mt-3.5">

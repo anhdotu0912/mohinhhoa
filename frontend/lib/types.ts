@@ -16,12 +16,19 @@ export interface RegisterResponse {
   full_name?: string | null;
 }
 
+export interface AssignedDoctor {
+  id: string;
+  full_name?: string | null;
+  avatar?: string | null;
+}
+
 export interface UserMeResponse {
   id: string;
   email: string;
   role: UserRole;
   full_name?: string | null;
   avatar?: string | null;
+  assigned_doctor?: AssignedDoctor | null;
 }
 
 export interface Restrictions {
@@ -300,6 +307,45 @@ export interface DoctorPatientSummary {
   meal_plan_request_status?: "none" | "pending";
   meal_plan_request_note?: string | null;
   meal_plan_requested_at?: string | null;
+  pending_transfer?: PendingTransferOut | null;
+}
+
+export interface PendingTransferOut {
+  id: string;
+  to_doctor_id: string;
+  to_doctor_name?: string | null;
+  created_at: string;
+}
+
+export interface DoctorColleague {
+  id: string;
+  full_name?: string | null;
+  email: string;
+  avatar?: string | null;
+}
+
+export interface TransferOut {
+  id: string;
+  patient_id: string;
+  from_doctor_id: string;
+  to_doctor_id: string;
+  status: "pending" | "accepted" | "cancelled";
+  to_doctor_name?: string | null;
+  created_at: string;
+}
+
+export type ClaimQueueKind = "unassigned" | "transfer";
+export type ClaimQueueSource = "self_register" | "unassigned_pool" | "transfer";
+
+export interface ClaimQueueItem {
+  kind: ClaimQueueKind;
+  source: ClaimQueueSource;
+  patient_id: string;
+  patient: DoctorPatientSummary;
+  transfer_id?: string | null;
+  from_doctor_id?: string | null;
+  from_doctor_name?: string | null;
+  created_at: string;
 }
 
 export interface MealPlanRequestOut {

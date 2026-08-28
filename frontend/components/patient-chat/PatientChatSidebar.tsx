@@ -72,6 +72,7 @@ export function PatientChatSidebar({
         setUserProfile({
           displayName: user.full_name?.trim() || user.email,
           avatar: user.avatar ?? null,
+          assignedDoctor: user.assigned_doctor ?? null,
         });
       })
       .catch(() => {

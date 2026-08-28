@@ -53,12 +53,17 @@ def test_register_login_flow(client):
     assert response.status_code == 200, response.text
     assert response.json()["role"] == "patient"
 
-    # Doctor list shows the full_name provided at registration
+    # Self-register stays in the claim queue, not the doctor's roster
     headers = _login(client, DOCTOR)
     response = client.get("/api/v1/doctor/patients", headers=headers)
     assert response.status_code == 200, response.text
     names = [p["name"] for p in response.json()]
-    assert "Nguyễn Văn Test" in names
+    assert "Nguyễn Văn Test" not in names
+
+    queue = client.get("/api/v1/doctor/claim-queue", headers=headers)
+    assert queue.status_code == 200, queue.text
+    queue_names = [item["patient"]["name"] for item in queue.json()]
+    assert "Nguyễn Văn Test" in queue_names
 
     response = client.post(
         "/api/v1/auth/register",

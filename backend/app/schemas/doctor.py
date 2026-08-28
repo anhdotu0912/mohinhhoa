@@ -69,6 +69,52 @@ class DoctorPatientSummary(BaseModel):
     meal_plan_request_status: Literal["none", "pending"] = "none"
     meal_plan_request_note: str | None = None
     meal_plan_requested_at: str | None = None
+    pending_transfer: PendingTransferOut | None = None
+
+
+class PendingTransferOut(BaseModel):
+    id: str
+    to_doctor_id: str
+    to_doctor_name: str | None = None
+    created_at: str
+
+
+class CreateDoctorPatientRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str | None = Field(default=None, max_length=255)
+
+
+class TransferRequest(BaseModel):
+    to_doctor_id: str = Field(min_length=1, max_length=36)
+
+
+class TransferOut(BaseModel):
+    id: str
+    patient_id: str
+    from_doctor_id: str
+    to_doctor_id: str
+    status: Literal["pending", "accepted", "cancelled"]
+    to_doctor_name: str | None = None
+    created_at: str
+
+
+class DoctorColleague(BaseModel):
+    id: str
+    full_name: str | None = None
+    email: str
+    avatar: str | None = None
+
+
+class ClaimQueueItem(BaseModel):
+    kind: Literal["unassigned", "transfer"]
+    source: Literal["self_register", "unassigned_pool", "transfer"]
+    patient_id: str
+    patient: DoctorPatientSummary
+    transfer_id: str | None = None
+    from_doctor_id: str | None = None
+    from_doctor_name: str | None = None
+    created_at: str
 
 
 class MetricsUpdateRequest(BaseModel):

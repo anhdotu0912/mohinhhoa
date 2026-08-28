@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.schemas.auth import (
+    AssignedDoctorOut,
     ChangePasswordRequest,
     ChangePasswordResponse,
     ForgotPasswordRequest,
@@ -56,6 +57,7 @@ def register(
         hashed_password=hash_password(payload.password),
         role="patient",
         full_name=(payload.full_name or "").strip() or None,
+        signup_channel="self",
     )
     db.add(user)
     db.commit()
@@ -220,13 +222,26 @@ def change_password(
 
 
 @router.get("/me", response_model=UserMeResponse)
-def get_me(user: User = Depends(get_current_user)) -> UserMeResponse:
+def get_me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserMeResponse:
+    assigned = None
+    if user.role == "patient" and user.assigned_doctor_id:
+        doctor = db.get(User, user.assigned_doctor_id)
+        if doctor is not None:
+            assigned = AssignedDoctorOut(
+                id=doctor.id,
+                full_name=doctor.full_name,
+                avatar=doctor.avatar,
+            )
     return UserMeResponse(
         id=user.id,
         email=user.email,
         role=user.role,
         full_name=user.full_name,
         avatar=user.avatar,
+        assigned_doctor=assigned,
     )
 
 

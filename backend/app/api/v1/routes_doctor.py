@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models.alert import Alert
 from app.models.catalog import Allergy, Diagnosis, Medicine
 from app.models.meal_plan import MealPlan
+from app.models.patient_transfer import PatientTransfer
 from app.models.profile import Profile
 from app.models.user import User
 from app.schemas.body_metrics import MetricsHistoryPoint
@@ -22,8 +23,11 @@ from app.schemas.doctor import (
     AvatarOut,
     CatalogItem,
     CatalogOut,
+    ClaimQueueItem,
     ComplianceRemindRequest,
+    CreateDoctorPatientRequest,
     DiagnosisItem,
+    DoctorColleague,
     DoctorPatientSummary,
     DoctorPatientUpdate,
     DoctorConstraintsUpdate,
@@ -36,14 +40,18 @@ from app.schemas.doctor import (
     MetricsUpdateRequest,
     PatientComplianceOut,
     PatientMetricsOut,
+    PendingTransferOut,
     PlanExpiryDemoOut,
     PlanExpiryDemoRequest,
     ReviewRequest,
     ReviewResponse,
+    TransferOut,
+    TransferRequest,
 )
 from app.schemas.meal_plan import ApplyMealPlanRequest, GenerateMealPlanRequest, MealPlanOutput
 from app.schemas.profile import PatientProfile
 from app.schemas.notification import NotificationOut
+from app.services import assignment as assignment_service
 from app.services import plan_expiry
 from app.services.avatar_service import save_user_avatar
 from app.services.compliance import ComplianceService
@@ -124,6 +132,38 @@ def _format_dt(value: datetime | None) -> str:
     if value is None:
         return ""
     return value.strftime("%d/%m/%Y")
+
+
+def _format_iso(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    return value.isoformat()
+
+
+def _transfer_out(db: Session, row: PatientTransfer) -> TransferOut:
+    target = db.get(User, row.to_doctor_id)
+    return TransferOut(
+        id=row.id,
+        patient_id=row.patient_id,
+        from_doctor_id=row.from_doctor_id,
+        to_doctor_id=row.to_doctor_id,
+        status=row.status,  # type: ignore[arg-type]
+        to_doctor_name=assignment_service.display_doctor_name(target),
+        created_at=_format_iso(row.created_at),
+    )
+
+
+def _pending_transfer_out(db: Session, patient_id: str) -> PendingTransferOut | None:
+    row = assignment_service.pending_transfer_for_patient(db, patient_id)
+    if row is None:
+        return None
+    target = db.get(User, row.to_doctor_id)
+    return PendingTransferOut(
+        id=row.id,
+        to_doctor_id=row.to_doctor_id,
+        to_doctor_name=assignment_service.display_doctor_name(target),
+        created_at=_format_iso(row.created_at),
+    )
 
 
 def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
@@ -282,6 +322,7 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         meal_plan_requested_at=_format_request_dt(
             getattr(profile, "meal_plan_requested_at", None) if profile else None
         ),
+        pending_transfer=_pending_transfer_out(db, user.id),
     )
 
 
@@ -294,13 +335,7 @@ def list_patients(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[DoctorPatientSummary]:
-    del user  # auth only
-    patients = (
-        db.query(User)
-        .filter(User.role == "patient")
-        .order_by(User.created_at.desc())
-        .all()
-    )
+    patients = assignment_service.list_assigned_patients(db, user.id)
     rows = [_patient_summary(db, p) for p in patients]
 
     if q:
@@ -328,16 +363,98 @@ def list_patients(
     return rows
 
 
+@router.post("/patients", response_model=DoctorPatientSummary, status_code=201)
+def create_patient(
+    payload: CreateDoctorPatientRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorPatientSummary:
+    patient = assignment_service.create_patient_for_doctor(
+        db,
+        user,
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+    )
+    return _patient_summary(db, patient)
+
+
+@router.get("/claim-queue", response_model=list[ClaimQueueItem])
+def get_claim_queue(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> list[ClaimQueueItem]:
+    items: list[ClaimQueueItem] = []
+    for row in assignment_service.list_claim_queue(db, user):
+        items.append(
+            ClaimQueueItem(
+                kind=row.kind,  # type: ignore[arg-type]
+                source=row.source,  # type: ignore[arg-type]
+                patient_id=row.patient.id,
+                patient=_patient_summary(db, row.patient),
+                transfer_id=row.transfer.id if row.transfer else None,
+                from_doctor_id=row.from_doctor.id if row.from_doctor else None,
+                from_doctor_name=assignment_service.display_doctor_name(row.from_doctor),
+                created_at=_format_iso(row.created_at),
+            )
+        )
+    return items
+
+
+@router.get("/colleagues", response_model=list[DoctorColleague])
+def get_colleagues(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> list[DoctorColleague]:
+    return [
+        DoctorColleague(
+            id=doc.id,
+            full_name=doc.full_name,
+            email=doc.email,
+            avatar=doc.avatar,
+        )
+        for doc in assignment_service.list_colleagues(db, user.id)
+    ]
+
+
+@router.post("/patients/{patient_id}/claim", response_model=DoctorPatientSummary)
+def claim_patient(
+    patient_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorPatientSummary:
+    patient = assignment_service.claim_patient(db, user, patient_id)
+    return _patient_summary(db, patient)
+
+
+@router.post("/patients/{patient_id}/transfer", response_model=TransferOut)
+def transfer_patient(
+    patient_id: str,
+    payload: TransferRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> TransferOut:
+    row = assignment_service.request_transfer(db, user, patient_id, payload.to_doctor_id)
+    return _transfer_out(db, row)
+
+
+@router.post("/transfers/{transfer_id}/accept", response_model=DoctorPatientSummary)
+def accept_transfer(
+    transfer_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorPatientSummary:
+    patient = assignment_service.accept_transfer(db, user, transfer_id)
+    return _patient_summary(db, patient)
+
+
 @router.get("/patients/{patient_id}", response_model=DoctorPatientSummary)
 def get_patient(
     patient_id: str,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> DoctorPatientSummary:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     return _patient_summary(db, patient)
 
 
@@ -348,10 +465,7 @@ def get_patient_compliance(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> PatientComplianceOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     return ComplianceService(db).get_patient_compliance(patient_id, days=days)
 
 
@@ -365,10 +479,7 @@ def remind_patient_compliance(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> NotificationOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     notification = NotificationService(db).create_manual_reminder(
         patient.id,
         payload.message,
@@ -385,10 +496,7 @@ def update_patient_metrics(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> PatientMetricsOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
     if profile is None:
@@ -433,10 +541,7 @@ def get_doctor_patient_metrics_history(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[MetricsHistoryPoint]:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     from app.services.metrics_service import list_metrics_history
     entries = list_metrics_history(db, patient.id, days=days)
     return [MetricsHistoryPoint.model_validate(e) for e in entries]
@@ -449,10 +554,7 @@ def update_patient_goals(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> GoalsOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
     if profile is None:
@@ -470,10 +572,7 @@ def update_patient_profile(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> DoctorPatientSummary:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     provided = payload.model_fields_set
     if "email" in provided:
@@ -524,10 +623,7 @@ def update_patient_constraints(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> DoctorPatientSummary:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
     if profile is None:
@@ -556,10 +652,7 @@ def approve_patient_constraints(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> PatientProfile:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     profile = db.query(Profile).filter(Profile.user_id == patient.id).first()
     if profile is None:
@@ -654,10 +747,7 @@ async def upload_patient_avatar(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> AvatarOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
 
     content = await file.read()
     avatar = save_user_avatar(
@@ -679,10 +769,7 @@ def generate_plan_for_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> MealPlanOutput:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     req = payload or GenerateMealPlanRequest()
     return generate_meal_plan(db, patient, notes=req.notes, priorities=req.priorities)
 
@@ -693,8 +780,10 @@ def list_meal_plans(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[MealPlanOutput]:
-    del user
-    query = db.query(MealPlan)
+    ids = assignment_service.assigned_patient_ids(db, user.id)
+    if not ids:
+        return []
+    query = db.query(MealPlan).filter(MealPlan.user_id.in_(ids))
     if status != "all":
         query = query.filter(MealPlan.status == status)
     rows = query.order_by(MealPlan.created_at.desc()).all()
@@ -711,10 +800,7 @@ def list_patient_meal_plans(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[MealPlanOutput]:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     query = db.query(MealPlan).filter(MealPlan.user_id == patient_id)
     if status != "all":
         query = query.filter(MealPlan.status == status)
@@ -731,10 +817,7 @@ def get_patient_meal_plan_schedule(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> MealPlanScheduleOut:
-    del user
-    patient = db.get(User, patient_id)
-    if patient is None or patient.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    patient = assignment_service.require_assigned_patient(db, user, patient_id)
     data = build_meal_plan_schedule(db, patient_id)
     return MealPlanScheduleOut(**data)
 
@@ -749,6 +832,7 @@ def review_meal_plan(
     row = db.get(MealPlan, meal_plan_id)
     if row is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+    assignment_service.require_assigned_patient(db, user, row.user_id)
 
     if row.status != "pending_review":
         raise APIError(
@@ -807,10 +891,10 @@ def apply_plan_validity(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> MealPlanOutput:
-    del user
     row = db.get(MealPlan, meal_plan_id)
     if row is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+    assignment_service.require_assigned_patient(db, user, row.user_id)
     start_date, replace_active = resolve_apply_request(
         db,
         row.user_id,
@@ -849,7 +933,6 @@ def simulate_plan_expiry(
 
     Chỉ khả dụng ngoài production (giống /demo/simulate).
     """
-    del user
     if settings.APP_ENV == "production":
         raise APIError(
             403,
@@ -861,7 +944,7 @@ def simulate_plan_expiry(
     skipped: list[str] = []
     today = date.today()
 
-    patients = db.query(User).filter(User.role == "patient").all()
+    patients = assignment_service.list_assigned_patients(db, user.id)
     for patient in patients:
         plan = find_active_plan(db, patient.id, today)
         if plan is None:
@@ -902,10 +985,10 @@ def delete_doctor_meal_plan(
     user: User = Depends(require_roles("doctor")),
 ) -> None:
     """Xóa một thực đơn đã tạo (chờ duyệt, đã duyệt, hoặc đã áp dụng)."""
-    del user
     plan = db.get(MealPlan, meal_plan_id)
     if plan is None:
         raise APIError(404, "MEAL_PLAN_NOT_FOUND", "Không tìm thấy thực đơn.")
+    assignment_service.require_assigned_patient(db, user, plan.user_id)
 
     from app.services.plan_limits import delete_meal_plan_cascade
 
@@ -921,10 +1004,7 @@ def delete_doctor_patient(
     user: User = Depends(require_roles("doctor")),
 ) -> None:
     """Xóa hoàn toàn một bệnh nhân và toàn bộ dữ liệu phụ thuộc liên quan."""
-    del user
-    target_user = db.get(User, patient_id)
-    if target_user is None or target_user.role != "patient":
-        raise APIError(404, "PATIENT_NOT_FOUND", "Không tìm thấy bệnh nhân.")
+    target_user = assignment_service.require_assigned_patient(db, user, patient_id)
 
     from app.models.body_metrics import BodyMetricsEntry
     from app.models.chat_session import ChatMessage, ChatSession
@@ -943,6 +1023,7 @@ def delete_doctor_patient(
     db.query(MealPlan).filter(MealPlan.user_id == patient_id).delete(synchronize_session=False)
     db.query(BodyMetricsEntry).filter(BodyMetricsEntry.user_id == patient_id).delete(synchronize_session=False)
     db.query(PasswordResetToken).filter(PasswordResetToken.user_id == patient_id).delete(synchronize_session=False)
+    db.query(PatientTransfer).filter(PatientTransfer.patient_id == patient_id).delete(synchronize_session=False)
     db.query(Profile).filter(Profile.user_id == patient_id).delete(synchronize_session=False)
     db.delete(target_user)
     db.commit()

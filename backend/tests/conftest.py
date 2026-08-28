@@ -53,14 +53,26 @@ def _stub_outbound_email(monkeypatch):
     )
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "no_auto_claim: do not auto-claim demo patients (assignment tests)",
+    )
+
+
 @pytest.fixture()
 def db_session():
     with TestingSessionLocal() as db:
         yield db
 
 
+DEMO_PATIENT_IDS = tuple(f"demo_patient_{i}" for i in range(1, 6))
+DEMO_DOCTOR_EMAIL = "demo_doctor@example.com"
+DEMO_PASSWORD = "demo1234"
+
+
 @pytest.fixture()
-def client():
+def client(request):
     # Isolate each test: wipe rows then reseed demo accounts.
     with TestingSessionLocal() as db:
         for table in reversed(Base.metadata.sorted_tables):
@@ -77,5 +89,19 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    test_client = TestClient(app)
+    if request.node.get_closest_marker("no_auto_claim") is None:
+        login = test_client.post(
+            "/api/v1/auth/login",
+            json={"email": DEMO_DOCTOR_EMAIL, "password": DEMO_PASSWORD},
+        )
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        for pid in DEMO_PATIENT_IDS:
+            claimed = test_client.post(
+                f"/api/v1/doctor/patients/{pid}/claim",
+                headers=headers,
+            )
+            assert claimed.status_code == 200, claimed.text
+    yield test_client
     app.dependency_overrides.clear()

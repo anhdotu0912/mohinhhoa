@@ -25,6 +25,7 @@ const FILTERS: { id: "all" | InboxJobType; label: string; icon: string }[] = [
   { id: "constraints", label: "Ràng buộc", icon: "clinical_notes" },
   { id: "generate_request", label: "Yêu cầu tạo TD", icon: "restaurant_menu" },
   { id: "plan_expiry", label: "Hết hạn", icon: "event_busy" },
+  { id: "patient_claim", label: "Chờ nhận", icon: "person_add" },
 ];
 
 function isInboxType(value: string | null): value is InboxJobType {
@@ -32,7 +33,8 @@ function isInboxType(value: string | null): value is InboxJobType {
     value === "plan_review" ||
     value === "constraints" ||
     value === "generate_request" ||
-    value === "plan_expiry"
+    value === "plan_expiry" ||
+    value === "patient_claim"
   );
 }
 
@@ -75,6 +77,8 @@ function InboxContent() {
   const [jobs, setJobs] = useState<InboxJob[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const typeParam = searchParams.get("type");
   const urgencyFilter = searchParams.get("urgency") === "soon";
@@ -91,11 +95,12 @@ function InboxContent() {
       else setLoading(true);
       setError(null);
       try {
-        const [patients, plans] = await Promise.all([
+        const [patients, plans, claimQueue] = await Promise.all([
           api.listDoctorPatients(),
           api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
+          api.listClaimQueue().catch(() => []),
         ]);
-        setJobs(buildInboxJobs(patients, plans));
+        setJobs(buildInboxJobs(patients, plans, claimQueue));
       } catch (err) {
         setJobs([]);
         setError(
@@ -107,6 +112,37 @@ function InboxContent() {
       }
     },
     [token, role]
+  );
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(null), 3200);
+  }, []);
+
+  const handleClaim = useCallback(
+    async (job: InboxJob) => {
+      if (claimingId) return;
+      setClaimingId(job.id);
+      try {
+        if (job.claimKind === "transfer" && job.transferId) {
+          await api.acceptTransfer(job.transferId);
+        } else {
+          await api.claimPatient(job.patientId);
+        }
+        showToast(`Đã nhận ${job.patientName}`);
+        router.push(doctorChartHref(job.patientId));
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : "Không nhận được bệnh nhân. Tải lại hàng việc.";
+        showToast(message);
+        void load(true);
+      } finally {
+        setClaimingId(null);
+      }
+    },
+    [claimingId, load, router, showToast]
   );
 
   useEffect(() => {
@@ -130,6 +166,7 @@ function InboxContent() {
       constraints: 0,
       generate_request: 0,
       plan_expiry: 0,
+      patient_claim: 0,
     };
     for (const job of jobs) next[job.type] += 1;
     return next;
@@ -170,6 +207,12 @@ function InboxContent() {
   return (
     <>
       <TopBar title="Hàng việc y khoa" />
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-4 py-2.5 rounded-lg shadow-xl border border-emerald-600 flex items-center gap-2 font-medium text-sm">
+          <span className="material-symbols-outlined text-[20px] text-emerald-300">info</span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
       <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto pb-24 space-y-6 flex-1">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -178,7 +221,7 @@ function InboxContent() {
               Việc cần xử lý
             </h1>
             <p className="text-xs md:text-sm text-on-surface-variant mt-1 font-medium">
-              Quản lý tập trung các công việc duyệt thực đơn, xác nhận ràng buộc và xử lý cảnh báo y khoa
+              Duyệt thực đơn, xác nhận ràng buộc, nhận bệnh nhân mới và xử lý chuyển tiếp
             </p>
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
@@ -207,8 +250,8 @@ function InboxContent() {
           </div>
         </div>
 
-        {/* 4 Clinical KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 5 Clinical KPI Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Card 1: Khẩn cấp / Ưu tiên */}
           <button
             type="button"
@@ -326,6 +369,33 @@ function InboxContent() {
               </div>
             </div>
           </button>
+
+          <button
+            type="button"
+            onClick={() => router.push(doctorInboxHref("patient_claim"))}
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+              activeType === "patient_claim"
+                ? "border-violet-400 ring-2 ring-violet-400/20 bg-violet-50/20"
+                : "border-outline-variant/60 hover:border-violet-300"
+            }`}
+          >
+            <div className="w-11 h-11 rounded-lg bg-violet-500/10 text-violet-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[22px]">person_add</span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                Chờ nhận
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-2xl font-black text-violet-900 tabular-nums">
+                  {counts.patient_claim}
+                </span>
+                <span className="text-[11px] text-on-surface-variant/80 font-medium">
+                  bệnh nhân
+                </span>
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* Search & Filter Toolbar */}
@@ -429,6 +499,8 @@ function InboxContent() {
                   ? "Không có việc cần xử lý sớm"
                   : activeType === "all"
                   ? "Không còn việc chờ xử lý"
+                  : activeType === "patient_claim"
+                  ? "Không có bệnh nhân đang chờ nhận"
                   : "Không có công việc trong danh mục này"}
               </p>
               <p className="text-xs text-on-surface-variant mt-1 max-w-md mx-auto">
@@ -438,6 +510,8 @@ function InboxContent() {
                   ? "Không có thực đơn hết hạn hay việc ưu tiên. Chọn “Tất cả” để xem toàn bộ hàng việc."
                   : activeType === "all"
                   ? "Tất cả thực đơn, ràng buộc dinh dưỡng và chu kỳ điều trị của bệnh nhân đang ở trạng thái ổn định."
+                  : activeType === "patient_claim"
+                  ? "Khi bệnh nhân tự đăng ký hoặc đồng nghiệp chuyển hồ sơ, việc nhận sẽ hiện ở đây."
                   : "Chọn tab “Tất cả” hoặc chọn danh mục khác để kiểm tra công việc còn lại."}
               </p>
             </div>
@@ -472,6 +546,8 @@ function InboxContent() {
               {pagedJobs.map((job) => {
                 const meta = INBOX_TYPE_META[job.type];
                 const avatarSrc = resolveUserAvatar(job.patientAvatar);
+                const isClaim = job.type === "patient_claim";
+                const busy = claimingId === job.id;
 
                 return (
                   <li key={job.id}>
@@ -529,12 +605,18 @@ function InboxContent() {
 
                           {/* Row 2: Patient Name + Task Title */}
                           <div className="flex items-baseline gap-2 flex-wrap">
-                            <Link
-                              href={doctorChartHref(job.patientId)}
-                              className="font-bold text-sm text-on-surface hover:text-primary hover:underline transition-colors"
-                            >
-                              {job.patientName}
-                            </Link>
+                            {isClaim ? (
+                              <span className="font-bold text-sm text-on-surface">
+                                {job.patientName}
+                              </span>
+                            ) : (
+                              <Link
+                                href={doctorChartHref(job.patientId)}
+                                className="font-bold text-sm text-on-surface hover:text-primary hover:underline transition-colors"
+                              >
+                                {job.patientName}
+                              </Link>
+                            )}
                             {job.patientAge != null && (
                               <span className="text-xs text-on-surface-variant font-medium">
                                 ({job.patientAge} tuổi
@@ -581,25 +663,40 @@ function InboxContent() {
 
                       {/* Right: Actions */}
                       <div className="flex items-center justify-end sm:justify-start md:flex-col md:items-end gap-2 shrink-0 pt-2 sm:pt-0 border-t border-outline-variant/30 md:border-none">
-                        <Link
-                          href={job.href}
-                          className="inline-flex items-center justify-center gap-1.5 h-9 md:h-10 px-4 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 shrink-0"
-                        >
-                          <span>{job.cta}</span>
-                          <span className="material-symbols-outlined text-[16px]">
-                            arrow_forward
-                          </span>
-                        </Link>
-
-                        <Link
-                          href={doctorChartHref(job.patientId)}
-                          className="text-[11px] font-semibold text-on-surface-variant hover:text-primary hover:underline transition-colors px-1 py-0.5 inline-flex items-center gap-1"
-                        >
-                          <span>Hồ sơ bệnh án</span>
-                          <span className="material-symbols-outlined text-[12px]">
-                            open_in_new
-                          </span>
-                        </Link>
+                        {isClaim ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleClaim(job)}
+                            disabled={busy || Boolean(claimingId)}
+                            className="inline-flex items-center justify-center gap-1.5 h-9 md:h-10 px-4 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 shrink-0 cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
+                          >
+                            <span>{busy ? "Đang nhận..." : job.cta}</span>
+                            <span className={`material-symbols-outlined text-[16px] ${busy ? "animate-spin" : ""}`}>
+                              {busy ? "progress_activity" : "handshake"}
+                            </span>
+                          </button>
+                        ) : (
+                          <>
+                            <Link
+                              href={job.href}
+                              className="inline-flex items-center justify-center gap-1.5 h-9 md:h-10 px-4 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 shrink-0"
+                            >
+                              <span>{job.cta}</span>
+                              <span className="material-symbols-outlined text-[16px]">
+                                arrow_forward
+                              </span>
+                            </Link>
+                            <Link
+                              href={doctorChartHref(job.patientId)}
+                              className="text-[11px] font-semibold text-on-surface-variant hover:text-primary hover:underline transition-colors px-1 py-0.5 inline-flex items-center gap-1"
+                            >
+                              <span>Hồ sơ bệnh án</span>
+                              <span className="material-symbols-outlined text-[12px]">
+                                open_in_new
+                              </span>
+                            </Link>
+                          </>
+                        )}
                       </div>
                     </div>
                   </li>

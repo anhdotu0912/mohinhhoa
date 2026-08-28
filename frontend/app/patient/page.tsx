@@ -20,6 +20,7 @@ import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComp
 import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
 import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
 import { FormattedMessage } from "@/components/patient/FormattedMessage";
+import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
 
 export type { Message };
 
@@ -116,6 +117,7 @@ export default function PatientChatHomePage() {
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
   const displayName = useAuthStore((s) => s.displayName);
+  const assignedDoctor = useAuthStore((s) => s.assignedDoctor);
 
   const { openPanel } = usePatientPanel();
 
@@ -532,6 +534,11 @@ export default function PatientChatHomePage() {
                 <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
                   {getGreeting(userName)}
                 </h1>
+                {role === "patient" ? (
+                  <div className="pt-1">
+                    <AssignedDoctorStatus doctor={assignedDoctor} />
+                  </div>
+                ) : null}
                 <p className="text-sm md:text-base text-slate-600 max-w-md mx-auto leading-relaxed">
                   Tôi có thể hỗ trợ gì cho bữa ăn &amp; kế hoạch sức khỏe của bạn hôm nay?
                 </p>

@@ -24,4 +24,6 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="patient")
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     avatar: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    assigned_doctor_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    signup_channel: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

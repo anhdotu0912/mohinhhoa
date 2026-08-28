@@ -273,6 +273,12 @@ def test_doctor_delete_patient(client):
     assert reg_res.status_code == 201
     user_id = reg_res.json()["id"]
 
+    claim = client.post(
+        f"/api/v1/doctor/patients/{user_id}/claim",
+        headers=doctor_headers,
+    )
+    assert claim.status_code == 200, claim.text
+
     # Delete the patient
     response = client.delete(f"/api/v1/doctor/patients/{user_id}", headers=doctor_headers)
     assert response.status_code == 204, response.text

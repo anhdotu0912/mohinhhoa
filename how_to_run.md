@@ -98,13 +98,19 @@ Nếu bạn muốn chạy cả Frontend và Backend cùng lúc thông qua Docker
 
 **Deploy lên VPS:** xem tài liệu đầy đủ [`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md) (Postgres + Nginx + HTTPS hoặc IP-only).
 
-BÁC SĨ
+BÁC SĨ 1
 Email: demo_doctor@example.com
+Mật khẩu: demo1234
+
+BÁC SĨ 2
+Email: demo_doctor_2@example.com
 Mật khẩu: demo1234
 
 Bệnh nhân 1: demo_patient_1@example.com / demo1234 (Nguyễn Văn A)
 Bệnh nhân 2: demo_patient_2@example.com / demo1234 (Trần Thị B)
 Bệnh nhân 3: demo_patient_3@example.com / demo1234 (Lê Văn C)
+
+Bệnh nhân demo ban đầu chưa gắn bác sĩ — đăng nhập bác sĩ, vào **Hàng việc → Chờ nhận** rồi bấm **Nhận**. Bệnh nhân do bác sĩ thêm hộ thì gắn ngay vào bác sĩ đó.
 
 ### Quên mật khẩu (gửi mật khẩu mới qua email)
 

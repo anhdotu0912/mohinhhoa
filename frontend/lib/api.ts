@@ -9,6 +9,8 @@ import {
   type ChatSessionOut,
   type ChatSessionSummaryOut,
   type ChatStreamEvent,
+  type ClaimQueueItem,
+  type DoctorColleague,
   type DoctorPatientSummary,
   type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
@@ -35,6 +37,7 @@ import {
   type ReviewRequest,
   type ReviewResponse,
   type TokenResponse,
+  type TransferOut,
   type UserMeResponse,
   type UserRole,
 } from "./types";
@@ -342,6 +345,56 @@ export const api = {
     if (params?.meal_plan_request) search.set("meal_plan_request", params.meal_plan_request);
     const qs = search.toString() ? `?${search}` : "";
     return request(`/api/v1/doctor/patients${qs}`);
+  },
+
+  createDoctorPatient(payload: {
+    email: string;
+    password: string;
+    full_name?: string | null;
+  }): Promise<DoctorPatientSummary> {
+    return request("/api/v1/doctor/patients", {
+      method: "POST",
+      body: {
+        email: payload.email,
+        password: payload.password,
+        full_name: payload.full_name ?? null,
+      },
+    });
+  },
+
+  listClaimQueue(): Promise<ClaimQueueItem[]> {
+    return request("/api/v1/doctor/claim-queue");
+  },
+
+  listDoctorColleagues(): Promise<DoctorColleague[]> {
+    return request("/api/v1/doctor/colleagues");
+  },
+
+  claimPatient(patientId: string): Promise<DoctorPatientSummary> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}/claim`, {
+      method: "POST",
+    });
+  },
+
+  transferPatient(patientId: string, toDoctorId: string): Promise<TransferOut> {
+    const id = asRouteId(patientId);
+    if (!id) {
+      return Promise.reject(new ApiError(400, "INVALID_PATIENT_ID", "Thiếu mã bệnh nhân."));
+    }
+    return request(`/api/v1/doctor/patients/${encodeURIComponent(id)}/transfer`, {
+      method: "POST",
+      body: { to_doctor_id: toDoctorId },
+    });
+  },
+
+  acceptTransfer(transferId: string): Promise<DoctorPatientSummary> {
+    return request(`/api/v1/doctor/transfers/${encodeURIComponent(transferId)}/accept`, {
+      method: "POST",
+    });
   },
 
   getDoctorPatient(patientId: string): Promise<DoctorPatientSummary> {

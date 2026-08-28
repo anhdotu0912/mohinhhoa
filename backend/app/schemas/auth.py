@@ -36,6 +36,13 @@ class UserMeResponse(BaseModel):
     role: str
     full_name: str | None = None
     avatar: str | None = None
+    assigned_doctor: AssignedDoctorOut | None = None
+
+
+class AssignedDoctorOut(BaseModel):
+    id: str
+    full_name: str | None = None
+    avatar: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):

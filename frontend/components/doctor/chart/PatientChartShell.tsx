@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { TopBar } from "@/components/shared/TopBar";
 import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
+import { TransferDoctorControl } from "@/components/doctor/TransferDoctorControl";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { PatientRecordId } from "@/components/doctor/chart/PatientRecordId";
@@ -177,6 +178,10 @@ export function PatientChartShell({
                   }}
                 />
               )}
+
+              {patient && !compact ? (
+                <TransferDoctorControl patient={patient} onTransferred={() => void load()} />
+              ) : null}
 
               {!compact && routeId && (
                 <Link

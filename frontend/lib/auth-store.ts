@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { UserRole } from "./types";
+import type { AssignedDoctor, UserRole } from "./types";
 
 export type AuthState = {
   token: string | null;
@@ -11,6 +11,7 @@ export type AuthState = {
   email: string | null;
   displayName: string | null;
   avatar: string | null;
+  assignedDoctor: AssignedDoctor | null;
   setSession: (session: {
     token: string;
     role: UserRole;
@@ -18,10 +19,12 @@ export type AuthState = {
     email: string;
     displayName?: string | null;
     avatar?: string | null;
+    assignedDoctor?: AssignedDoctor | null;
   }) => void;
   setUserProfile: (profile: {
     displayName?: string | null;
     avatar?: string | null;
+    assignedDoctor?: AssignedDoctor | null;
   }) => void;
   setDisplayName: (name: string) => void;
   logout: () => void;
@@ -37,7 +40,8 @@ export const useAuthStore = create<AuthState>()(
       email: null,
       displayName: null,
       avatar: null,
-      setSession: ({ token, role, userId, email, displayName, avatar }) =>
+      assignedDoctor: null,
+      setSession: ({ token, role, userId, email, displayName, avatar, assignedDoctor }) =>
         set({
           token,
           role,
@@ -45,11 +49,15 @@ export const useAuthStore = create<AuthState>()(
           email,
           displayName: displayName ?? get().displayName,
           avatar: avatar ?? get().avatar,
+          assignedDoctor:
+            assignedDoctor !== undefined ? assignedDoctor : get().assignedDoctor,
         }),
-      setUserProfile: ({ displayName, avatar }) =>
+      setUserProfile: ({ displayName, avatar, assignedDoctor }) =>
         set((state) => ({
           displayName: displayName !== undefined ? displayName : state.displayName,
           avatar: avatar !== undefined ? avatar : state.avatar,
+          assignedDoctor:
+            assignedDoctor !== undefined ? assignedDoctor : state.assignedDoctor,
         })),
       setDisplayName: (displayName) => set({ displayName }),
       logout: () =>
@@ -60,6 +68,7 @@ export const useAuthStore = create<AuthState>()(
           email: null,
           displayName: null,
           avatar: null,
+          assignedDoctor: null,
         }),
       isAuthenticated: () => Boolean(get().token),
     }),

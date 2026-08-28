@@ -1,4 +1,8 @@
-import type { DoctorPatientSummary, MealPlanOutput } from "@/lib/types";
+import type {
+  ClaimQueueItem,
+  DoctorPatientSummary,
+  MealPlanOutput,
+} from "@/lib/types";
 import {
   doctorChartHref,
   doctorGenerateHref,
@@ -22,6 +26,8 @@ export type InboxJob = {
   cta: string;
   urgency: "urgent" | "soon" | "normal";
   sortAt: string;
+  claimKind?: "unassigned" | "transfer";
+  transferId?: string | null;
 };
 
 export const INBOX_TYPE_META: Record<
@@ -52,6 +58,12 @@ export const INBOX_TYPE_META: Record<
     chipClass: "bg-rose-50 text-rose-800 border-rose-200/70",
     iconWrap: "bg-rose-500/10 text-rose-700",
   },
+  patient_claim: {
+    label: "Chờ nhận",
+    icon: "person_add",
+    chipClass: "bg-violet-50 text-violet-800 border-violet-200/70",
+    iconWrap: "bg-violet-500/10 text-violet-700",
+  },
 };
 
 function isPendingPlan(status: string | null | undefined): boolean {
@@ -65,7 +77,8 @@ function planTitle(plan: MealPlanOutput): string {
 
 export function buildInboxJobs(
   patients: DoctorPatientSummary[],
-  plans: MealPlanOutput[]
+  plans: MealPlanOutput[],
+  claimQueue: ClaimQueueItem[] = []
 ): InboxJob[] {
   const byId = new Map(patients.map((p) => [p.id, p]));
   const jobs: InboxJob[] = [];
@@ -165,6 +178,36 @@ export function buildInboxJobs(
         sortAt: patient.plan_end_date || patient.last_update || "",
       });
     }
+  }
+
+  for (const item of claimQueue) {
+    const p = item.patient;
+    const isTransfer = item.kind === "transfer";
+    const sourceLabel =
+      item.source === "self_register"
+        ? "Tự đăng ký"
+        : item.source === "transfer"
+          ? `Chuyển từ ${item.from_doctor_name || "bác sĩ khác"}`
+          : "Chưa phân công";
+    jobs.push({
+      id: isTransfer ? `claim-xfer:${item.transfer_id}` : `claim:${item.patient_id}`,
+      type: "patient_claim",
+      patientId: item.patient_id,
+      patientName: p.name,
+      patientAvatar: p.avatar || null,
+      patientCondition: p.condition_label || "",
+      patientDisease: p.disease || [],
+      patientAge: p.age,
+      patientGender: p.gender,
+      title: isTransfer ? "Đề xuất tiếp nhận bệnh nhân" : "Bệnh nhân chờ nhận",
+      subtitle: sourceLabel,
+      href: "",
+      cta: "Nhận",
+      urgency: isTransfer ? "soon" : "normal",
+      sortAt: item.created_at || "",
+      claimKind: item.kind,
+      transferId: item.transfer_id ?? null,
+    });
   }
 
   const urgencyRank = { urgent: 0, soon: 1, normal: 2 };

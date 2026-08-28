@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.13 (2026-08-27 — `POST /auth/change-password`. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.14 (2026-08-28 — phân công bác sĩ ↔ bệnh nhân 1–1. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -36,10 +36,19 @@
 ### `GET /auth/me`
 **Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`).
 ```json
-// Response 200
-{ "id": "user_uuid", "email": "demo_doctor@example.com", "role": "doctor", "full_name": "BS. Minh", "avatar": "/static/avatars/demo_doctor.jpg" }
+// Response 200 (doctor)
+{ "id": "user_uuid", "email": "demo_doctor@example.com", "role": "doctor", "full_name": "BS. Minh", "avatar": "/static/avatars/demo_doctor.jpg", "assigned_doctor": null }
+// Response 200 (patient đã được nhận)
+{
+  "id": "user_uuid",
+  "email": "patient1@example.com",
+  "role": "patient",
+  "full_name": "Nguyễn Văn A",
+  "avatar": null,
+  "assigned_doctor": { "id": "demo_doctor", "full_name": "BS. Minh", "avatar": null }
+}
 ```
-`full_name` / `avatar` có thể `null`.
+`full_name` / `avatar` có thể `null`. `assigned_doctor` luôn `null` với role `doctor`; với patient chưa ai nhận cũng `null` (FE hiện “Đang chờ bác sĩ nhận”). Trong lúc chuyển bác sĩ chưa được nhận, `assigned_doctor` vẫn là bác sĩ cũ.
 
 ### `POST /auth/me/avatar`
 **Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`). Multipart form upload (`file`), ảnh ≤ 2MB, mime `image/*` (png/jpg/webp/gif — kiểm tra magic bytes). Bệnh nhân tự tải ảnh đại diện trên `/patient/profile`; bác sĩ tải hộ bệnh nhân vẫn dùng `POST /doctor/patients/{id}/avatar`.
@@ -302,12 +311,79 @@ GET /notifications?status=pending&type=meal_reminder
 
 ## 8. Doctor Patient Management
 
+**Phân công 1–1 (1.14):** mỗi bệnh nhân có tối đa một `assigned_doctor_id`. Bác sĩ chỉ xem/sửa bệnh nhân đang gắn với mình. Bệnh nhân tự `POST /auth/register` → chưa gắn (hàng chờ nhận). Bác sĩ `POST /doctor/patients` → gắn ngay vào bác sĩ đó. Chuyển bác sĩ = tạo `patient_transfers` pending; quyền chỉ đổi khi bác sĩ đích `POST /doctor/transfers/{id}/accept`.
+
 ### `GET /doctor/patients`
 **Role:** `doctor`. Query optional: `q`, `status` (`status_key`), `plan_usage` (`none` \| `active` \| `finished`), `meal_plan_request` (`pending` \| `all`, default `all`).
+Chỉ trả bệnh nhân `assigned_doctor_id` = bác sĩ đang đăng nhập — **không** còn trả toàn bộ `role=patient`.
 ```json
 // Response 200 → list[DoctorPatientSummary]
 // DoctorPatientSummary thêm: active_plan_id, active_plan_status, plan_starts_on, plan_usage,
-//   meal_plan_request_status ("none" | "pending"), meal_plan_request_note, meal_plan_requested_at
+//   meal_plan_request_status ("none" | "pending"), meal_plan_request_note, meal_plan_requested_at,
+//   pending_transfer (null | { id, to_doctor_id, to_doctor_name, created_at })
+```
+
+### `POST /doctor/patients`
+**Role:** `doctor`. Tạo tài khoản bệnh nhân hộ và **gắn ngay** vào bác sĩ đang đăng nhập (`signup_channel=doctor`). Không tạo việc chờ nhận.
+```json
+// Request
+{ "email": "new.patient@example.com", "password": "matkhau123", "full_name": "Nguyễn Văn A" }
+// Response 201 → DoctorPatientSummary
+// Error 409 { "code": "EMAIL_EXISTS", "detail": "Email đã được đăng ký." }
+```
+`full_name` optional. `password` min 8. Sau 201 bác sĩ có thể gọi tiếp `PUT .../profile` / `metrics` / `avatar` như luồng thêm hộ hiện có.
+
+### `GET /doctor/claim-queue`
+**Role:** `doctor`. Hàng chờ nhận: bệnh nhân chưa gắn (tự đăng ký + pool cũ) **và** đề xuất chuyển tới bác sĩ này.
+```json
+// Response 200 → list[ClaimQueueItem]
+{
+  "kind": "unassigned",
+  "source": "self_register",
+  "patient_id": "user_uuid",
+  "patient": { /* DoctorPatientSummary */ },
+  "transfer_id": null,
+  "from_doctor_id": null,
+  "from_doctor_name": null,
+  "created_at": "2026-08-28T05:00:00"
+}
+```
+`kind` ∈ `{unassigned, transfer}`. `source` ∈ `{self_register, unassigned_pool, transfer}`. Item `transfer` có `transfer_id` + `from_doctor_*`. Không cấp quyền hồ sơ cho đến khi nhận thành công.
+
+### `POST /doctor/patients/{patient_id}/claim`
+**Role:** `doctor`. Nhận bệnh nhân **chưa gắn**. Ai gọi trước thì nhận.
+```json
+// Response 200 → DoctorPatientSummary (đã gắn vào caller)
+// Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
+// Error 409 { "code": "ALREADY_ASSIGNED", "detail": "Bệnh nhân đã được bác sĩ khác nhận." }
+```
+Gọi lại khi đã là bác sĩ quản lý → 200 idempotent.
+
+### `GET /doctor/colleagues`
+**Role:** `doctor`. Danh sách bác sĩ khác (để chọn khi chuyển). Không gồm chính mình.
+```json
+// Response 200
+[{ "id": "demo_doctor_2", "full_name": "BS. Lan", "email": "demo_doctor_2@example.com", "avatar": null }]
+```
+
+### `POST /doctor/patients/{patient_id}/transfer`
+**Role:** `doctor` đang quản lý bệnh nhân. Gửi đề xuất chuyển; quyền chưa đổi cho đến khi bác sĩ đích nhận.
+```json
+// Request
+{ "to_doctor_id": "demo_doctor_2" }
+// Response 200
+{ "id": "xfer_uuid", "patient_id": "...", "from_doctor_id": "...", "to_doctor_id": "demo_doctor_2", "status": "pending", "to_doctor_name": "BS. Lan", "created_at": "..." }
+// Error 400 { "code": "INVALID_TRANSFER", "detail": "Không thể chuyển cho chính mình." }
+// Error 404 PATIENT_NOT_FOUND | DOCTOR_NOT_FOUND
+```
+Một bệnh nhân chỉ có **một** transfer `pending` — gửi mới sẽ huỷ pending cũ.
+
+### `POST /doctor/transfers/{transfer_id}/accept`
+**Role:** `doctor` = `to_doctor_id` của transfer pending.
+```json
+// Response 200 → DoctorPatientSummary (bệnh nhân đã gắn vào caller)
+// Error 404 { "code": "TRANSFER_NOT_FOUND", "detail": "Không tìm thấy đề xuất chuyển." }
+// Error 409 { "code": "TRANSFER_NOT_PENDING", "detail": "Đề xuất chuyển không còn hiệu lực." }
 ```
 
 ### `GET /doctor/patients/{patient_id}/meal-plans`
@@ -350,7 +426,7 @@ GET /notifications?status=pending&type=meal_reminder
 - Plan đã apply mà `ends_on` < hôm nay xuất hiện với `occupancy="past"` (dùng cho điều hướng tuần trước).
 
 ### `GET /doctor/patients/{patient_id}`
-**Role:** `doctor`. Response 200 → `DoctorPatientSummary`. Error 404 `PATIENT_NOT_FOUND`.
+**Role:** `doctor` đang quản lý bệnh nhân đó. Response 200 → `DoctorPatientSummary`. Error 404 `PATIENT_NOT_FOUND` (cả khi bệnh nhân tồn tại nhưng thuộc bác sĩ khác — không lộ sự tồn tại).
 
 ### `PUT /doctor/patients/{patient_id}/metrics`
 **Role:** `doctor`. Cập nhật weight/height, BMI tự tính lại server-side.
@@ -436,7 +512,7 @@ GET /notifications?status=pending&type=meal_reminder
 ## 9. Doctor Review
 
 ### `GET /doctor/meal-plans`
-**Role:** `doctor`. Query `status` (default `"pending_review"`, dùng `"all"` để lấy hết).
+**Role:** `doctor`. Query `status` (default `"pending_review"`, dùng `"all"` để lấy hết). Chỉ thực đơn của bệnh nhân đang gắn với bác sĩ này.
 ```json
 // Response 200 → list[MealPlanOutput]
 ```
@@ -807,6 +883,9 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | Enum | Giá trị | Nguồn |
 |---|---|---|
 | `User.role` | `patient` \| `doctor` | `models/user.py`, `schemas/auth.py::RegisterRequest.role` |
+| `User.signup_channel` | `self` \| `doctor` \| `legacy` | `models/user.py` — tự đăng ký / bác sĩ tạo hộ / seed hoặc dữ liệu cũ |
+| `User.assigned_doctor_id` | UUID bác sĩ hoặc `null` | `models/user.py` — phân công 1–1 |
+| `PatientTransfer.status` | `pending` \| `accepted` \| `cancelled` | `models/patient_transfer.py` |
 | `MealPlan.status` | `pending_review` \| `approved` \| `rejected` \| `edited` | `models/meal_plan.py`, set qua `meal_planner_agent`/`routes_doctor.review_meal_plan` |
 | `Alert.severity` / `InteractionItem.severity` | `Nguy hiểm` \| `Cần chú ý` \| `An toàn` | `data/drug_food_interactions.json`, `services/meal_plan_demo.py` |
 | `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `plan_expiring` \| `plan_expired` \| `interaction_followup` \| `manual_reminder` | `services/notification.py` |
@@ -829,7 +908,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.13**.
+- Version hiện tại: **1.14**.
+- **Changelog 1.13 → 1.14 (2026-08-28):** phân công bác sĩ ↔ bệnh nhân 1–1. `GET /doctor/patients` (và mọi endpoint doctor theo `patient_id` / meal-plan) chỉ còn phạm vi bệnh nhân đã gắn. Thêm `POST /doctor/patients`, `GET /doctor/claim-queue`, `POST /doctor/patients/{id}/claim`, `GET /doctor/colleagues`, `POST /doctor/patients/{id}/transfer`, `POST /doctor/transfers/{id}/accept`. `GET /auth/me` thêm `assigned_doctor`. `DoctorPatientSummary` thêm `pending_transfer`. **Breaking** với client giả định 1 bác sĩ thấy mọi bệnh nhân.
 - **Changelog 1.12 → 1.13 (2026-08-27):** thêm `POST /auth/change-password` (user đã đăng nhập đổi mật khẩu bằng `current_password` + `new_password`). Không breaking — endpoint mới.
 - **Changelog 1.11 → 1.12 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"`. Không breaking — client cũ vẫn gửi 3 slot. Đồng bộ `contracts/agent-io-schema.md` v1.9.
 - **Changelog 1.10 → 1.11 (2026-08-26):** `POST /metrics` nhận field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); response thêm `delta_advice` optional. Intent chat `metrics_delta_advice`. Không breaking — field mới default `null`. Đồng bộ `contracts/agent-io-schema.md` v1.8.

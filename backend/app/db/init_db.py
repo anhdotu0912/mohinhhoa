@@ -165,6 +165,13 @@ DEMO_ACCOUNTS = [
         "full_name": "BS. Minh",
         "profile": None,
     },
+    {
+        "user_id": "demo_doctor_2",
+        "email": "demo_doctor_2@example.com",
+        "role": "doctor",
+        "full_name": "BS. Lan",
+        "profile": None,
+    },
 ]
 
 DEMO_PASSWORD = "demo1234"
@@ -248,6 +255,8 @@ def seed_demo_accounts(db: Session) -> None:
             user.email = account["email"]
             if full_name:
                 user.full_name = full_name
+            if account["role"] == "patient" and not getattr(user, "signup_channel", None):
+                user.signup_channel = "legacy"
         else:
             by_email = db.query(User).filter(User.email == account["email"]).first()
             if by_email is not None:
@@ -262,6 +271,7 @@ def seed_demo_accounts(db: Session) -> None:
                     hashed_password=hash_password(DEMO_PASSWORD),
                     role=account["role"],
                     full_name=full_name,
+                    signup_channel="legacy" if account["role"] == "patient" else None,
                 )
                 db.add(user)
                 db.flush()
@@ -560,6 +570,29 @@ def _migrate_add_metrics_clinical_fields(db: Session) -> None:
     logger.info("Added body_metrics_history columns: %s", ", ".join(missing))
 
 
+def _migrate_add_assignment_fields(db: Session) -> None:
+    """Add users.assigned_doctor_id + signup_channel (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("users")]
+    changed = False
+    if "assigned_doctor_id" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN assigned_doctor_id VARCHAR(36)"))
+        changed = True
+    if "signup_channel" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN signup_channel VARCHAR(20)"))
+        db.execute(
+            text(
+                "UPDATE users SET signup_channel = 'legacy' "
+                "WHERE role = 'patient' AND signup_channel IS NULL"
+            )
+        )
+        changed = True
+    if changed:
+        db.commit()
+        logger.info("Added users assignment columns")
+
+
 def init_db() -> None:
     """Create all tables and seed demo accounts (idempotent)."""
     from app.db.seed_nutrition_catalog import default_data_dir, seed_nutrition_catalog
@@ -578,6 +611,7 @@ def init_db() -> None:
         # Column ALTERs must run before any ORM query on MealPlan (e.g. reconcile).
         _migrate_add_meal_plan_adjustment_note(db)
         _migrate_add_meal_plan_dates(db)
+        _migrate_add_assignment_fields(db)
         seed_demo_accounts(db)
         seed_catalog(db)
         if engine.dialect.name == "postgresql" and default_data_dir().exists():

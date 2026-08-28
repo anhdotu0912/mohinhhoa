@@ -2,6 +2,7 @@
 const ACCOUNTS = [
   { role: "Bệnh nhân", email: "demo_patient_1@example.com", password: "demo1234" },
   { role: "Bác sĩ", email: "demo_doctor@example.com", password: "demo1234" },
+  { role: "Bác sĩ 2", email: "demo_doctor_2@example.com", password: "demo1234" },
 ];
 
 export function DemoAccountsCard({

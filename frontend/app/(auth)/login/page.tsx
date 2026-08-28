@@ -33,6 +33,7 @@ export default function LoginPage() {
         setUserProfile({
           displayName: me.full_name?.trim() || me.email,
           avatar: me.avatar ?? null,
+          assignedDoctor: me.assigned_doctor ?? null,
         });
       } catch {
         /* Sidebar sẽ thử fetch lại sau */

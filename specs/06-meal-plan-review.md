@@ -29,7 +29,7 @@ Là **bác sĩ**, tôi muốn xem danh sách thực đơn đang chờ duyệt, v
 5. Patient thấy trạng thái mới khi mở lại `GET /meal-plans/me` hoặc nhận notification (nếu `approve`).
 
 ## 5. Edge cases
-- **Race condition 2 doctor cùng review 1 plan (đã đóng, as-built 2026-08-18):** hệ thống "1 doctor thấy toàn bộ hàng đợi" (`specs/03` rule 1) — nếu 2 doctor cùng mở 1 plan `pending_review` và cùng bấm action gần như đồng thời, request thứ 2 (khi plan không còn `pending_review`) nhận `409 PLAN_ALREADY_REVIEWED` thay vì ghi đè âm thầm (rule 8), tránh trạng thái không nhất quán (ví dụ doctor A approve xong, doctor B reject ngay sau sẽ bị chặn).
+- **Hai bác sĩ cùng lúc (as-built 2026-08-28):** phân công 1–1 (`specs/03`) — bác sĩ không thấy / không review được plan của bệnh nhân người khác (`404`). Optimistic lock `409 PLAN_ALREADY_REVIEWED` vẫn chặn hai request song song trên **cùng** plan `pending_review`.
 - Doctor review 1 plan đã ở trạng thái `approved`/`rejected`/`edited` (không còn `pending_review`) → `409 PLAN_ALREADY_REVIEWED` (rule 8).
 - `edited_plan` gửi thiếu field bắt buộc trong `DayPlan`/`FoodItem` (ví dụ thiếu `days_count=7`) → tuỳ mức validation Pydantic của `MealPlanOutput`, có thể `422` nếu field required không khớp type, nhưng **không có validation nghiệp vụ** kiểm tra đủ 7 ngày hay tổng dinh dưỡng hợp lý khi doctor tự `edit` — trách nhiệm đảm bảo tính hợp lý thuộc về doctor khi dùng `edit`.
 - Doctor review plan của patient không tồn tại/plan không tồn tại → `404 MEAL_PLAN_NOT_FOUND`.

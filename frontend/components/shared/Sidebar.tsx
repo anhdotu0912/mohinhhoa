@@ -100,6 +100,7 @@ function SidebarFooter({
         setUserProfile({
           displayName: user.full_name?.trim() || user.email,
           avatar: user.avatar ?? null,
+          assignedDoctor: user.assigned_doctor ?? null,
         });
       })
       .catch(() => {
@@ -183,9 +184,10 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
     Promise.all([
       api.listDoctorPatients(),
       api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
+      api.listClaimQueue().catch(() => []),
     ])
-      .then(([patients, plans]) => {
-        if (!cancelled) setInboxCount(buildInboxJobs(patients, plans).length);
+      .then(([patients, plans, claimQueue]) => {
+        if (!cancelled) setInboxCount(buildInboxJobs(patients, plans, claimQueue).length);
       })
       .catch(() => {
         if (!cancelled) setInboxCount(0);

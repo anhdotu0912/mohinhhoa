@@ -583,10 +583,9 @@ export default function PatientsListPage() {
     }
     setAddingPatient(true);
     try {
-      const created = await api.register({
+      const created = await api.createDoctorPatient({
         email,
         password: addForm.password,
-        role: "patient",
         full_name: addForm.fullName.trim() || undefined,
       });
 

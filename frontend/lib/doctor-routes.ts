@@ -18,7 +18,8 @@ export type InboxJobType =
   | "plan_review"
   | "constraints"
   | "generate_request"
-  | "plan_expiry";
+  | "plan_expiry"
+  | "patient_claim";
 
 export function doctorPatientsHref(): string {
   return "/doctor/patients";
