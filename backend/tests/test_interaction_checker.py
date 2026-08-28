@@ -139,3 +139,25 @@ class TestInteractionChecker:
         assert "cá hồi" in answer.lower()
         assert "hoàn toàn có thể ăn được" not in answer.lower()
 
+    def test_extract_foods_generic_question_no_fabricated_defaults(self):
+        """General questions without food names should return empty list, not default foods."""
+        message = "Những loại rau nào tôi không được ăn?"
+        foods, is_specific = extract_foods_from_message(message)
+        assert is_specific is False
+        assert foods == []
+        assert "bưởi" not in foods
+        assert "rượu" not in foods
+
+    def test_interaction_check_general_medication_query(self):
+        """General inquiry for medications should list KB interactions without fabricating user queried foods."""
+        state = {
+            "message": "Thuốc tôi đang uống cần kiêng gì?",
+            "profile": {"medications": ["metformin"]},
+        }
+        res_state = interaction_check_node(state)
+        answer = res_state.get("answer", "")
+        assert answer, "Answer must not be empty"
+        assert "metformin" in answer.lower()
+        assert "rượu" in answer.lower()
+
+

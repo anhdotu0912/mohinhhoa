@@ -89,6 +89,8 @@ def _derive_correction_reason(flags: list[str]) -> str:
         return "unsafe_recommendation"
     if "missing_citations" in flags:
         return "missing_citations"
+    if "targeted_drug_food_interaction_alert" in flags or "targeted_allergy_alert" in flags:
+        return "food_safety_alert"
     return "guardrail"
 
 

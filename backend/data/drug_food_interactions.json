@@ -30,6 +30,26 @@
     "sources": ["drug_food_interactions#warfarin_rau_ngot"]
   },
   {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin", "sintrom", "acenocoumarol"],
+    "food": "cải bó xôi",
+    "food_aliases": ["cai bo xoi", "rau bina", "spinach", "bina"],
+    "mechanism": "Cải bó xôi (rau bina) chứa hàm lượng Vitamin K rất cao, làm giảm đáng kể hiệu quả chống đông của warfarin/sintrom.",
+    "severity": "Nguy hiểm",
+    "recommendation": "Duy trì lượng ăn ổn định và theo dõi chỉ số INR; không tăng hoặc giảm đột ngột lượng cải bó xôi trong chế độ ăn.",
+    "sources": ["drug_food_interactions#warfarin_spinach"]
+  },
+  {
+    "drug": "warfarin",
+    "drug_aliases": ["coumadin", "sintrom", "acenocoumarol"],
+    "food": "cải xoăn",
+    "food_aliases": ["cai xoan", "kale"],
+    "mechanism": "Cải xoăn chứa hàm lượng Vitamin K cao, làm giảm tác dụng chống đông của thuốc.",
+    "severity": "Cần chú ý",
+    "recommendation": "Giữ lượng ăn đều đặn và tham vấn bác sĩ trước khi thay đổi khẩu phần.",
+    "sources": ["drug_food_interactions#warfarin_kale"]
+  },
+  {
     "drug": "metformin",
     "drug_aliases": ["glucophage"],
     "food": "rượu",

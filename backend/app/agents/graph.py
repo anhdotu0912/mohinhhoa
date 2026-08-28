@@ -15,6 +15,7 @@ from langgraph.graph import END, StateGraph
 
 from app.agents.interaction_checker_agent import (
     extract_foods_from_message,
+    get_medication_known_interactions,
     interaction_checker_agent,
     load_interaction_kb,
 )
@@ -135,42 +136,15 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
 
 
 def meal_plan_node(state: AgentState) -> AgentState:
-    """Read-only meal plan view — load existing plan from DB, never generate."""
-    db = state.get("db")
-    user_id = state.get("user_id", "")
-    message = state.get("message", "")
+    """Read-only meal plan view — delegated to primitive skill get_patient_meal_plan with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, get_patient_meal_plan
 
-    if db is None or not user_id:
-        return {
-            **state,
-            "answer": (
-                "Không thể tải thực đơn lúc này. "
-                "Vui lòng thử lại hoặc mở mục Thực đơn trên ứng dụng."
-            ),
-            "meal_preview": None,
-            "meal_plan_id": None,
-            "meal_plan": None,
-            "citations": [],
-        }
+    lean = get_lean_state_for_intent(state, "meal_plan")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    message = lean.get("message", "")
 
-    from app.services.meal_plan_service import (
-        _collect_citations,
-        build_meal_preview,
-        format_meal_preview_message,
-        meal_plan_from_row,
-        resolve_patient_plan_row,
-    )
-
-    preview = build_meal_preview(db, user_id, message)
-    answer = format_meal_preview_message(preview, message)
-    citations: list[str] = []
-    meal_plan_id: str | None = None
-    if preview is not None:
-        meal_plan_id = preview.meal_plan_id
-        row = resolve_patient_plan_row(db, user_id)
-        if row is not None:
-            citations = _collect_citations(meal_plan_from_row(row), preview.meals)
-
+    preview, answer, citations, meal_plan_id = get_patient_meal_plan(db, user_id, message)
     return {
         **state,
         "answer": answer,
@@ -181,229 +155,78 @@ def meal_plan_node(state: AgentState) -> AgentState:
     }
 
 
-def _check_allergy_match(allergies: list[str], foods: list[str]) -> list[str]:
-    """Check if any queried foods match patient allergies.
-
-    Returns list of allergy warnings (empty if no match).
-    Handles common Vietnamese food-allergy mappings.
-    """
-    if not allergies or not foods:
-        return []
-
-    # Mapping from allergy category → food items that belong to it
-    _ALLERGY_FOOD_MAP: dict[str, list[str]] = {
-        "hải sản": [
-            "tôm", "cua", "mực", "nghêu", "sò", "ốc", "hàu", "bạch tuộc",
-            "cá hồi", "cá thu", "cá basa", "cá rô phi", "cá lóc", "cá ngừ",
-            "cá", "hải sản", "tôm hùm", "ghẹ", "cá tra", "cá chẽm",
-        ],
-        "sữa": ["sữa", "phô mai", "bơ", "kem", "sữa chua", "whey"],
-        "đậu phộng": ["đậu phộng", "lạc", "bơ đậu phộng"],
-        "trứng": ["trứng", "trứng gà", "trứng vịt"],
-        "đậu nành": ["đậu nành", "đậu hũ", "tàu hũ", "nước tương", "miso"],
-        "gluten": ["lúa mì", "bánh mì", "mì ống", "mì", "bột mì"],
-    }
-
-    warnings: list[str] = []
-    for allergy in allergies:
-        allergy_lower = allergy.lower().strip()
-        related_foods = _ALLERGY_FOOD_MAP.get(allergy_lower, [allergy_lower])
-
-        for food in foods:
-            food_lower = food.lower().strip()
-            if food_lower in related_foods or any(rf in food_lower for rf in related_foods):
-                warnings.append(
-                    f"⚠️ **CẢNH BÁO DỊ ỨNG:** Hồ sơ của bạn ghi nhận dị ứng **{allergy}**. "
-                    f"**{food.capitalize()}** thuộc nhóm {allergy} — bạn **KHÔNG NÊN** ăn/dùng. "
-                    f"Vui lòng tham khảo bác sĩ nếu cần thay thế."
-                )
-                break  # One warning per allergy category is enough
-
-    return warnings
-
-
 def interaction_check_node(state: AgentState) -> AgentState:
-    """InteractionChecker node — checks drug-food interactions from user query or state."""
-    profile_data = state.get("profile", {})
-    profile = PatientProfile(**profile_data) if isinstance(profile_data, dict) else profile_data
-    db = state.get("db")
-    medications = profile.medications or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
-    allergies = profile.allergies or []
+    """InteractionChecker node — delegated to primitive skill check_drug_food_interaction with state pruning."""
+    from app.agents.skills import check_drug_food_interaction, get_lean_state_for_intent
 
-    message = state.get("message", "")
-    foods, is_specific_query = extract_foods_from_message(message)
-
-    # P4: Check allergy FIRST — this takes priority over interaction check
-    allergy_warnings = _check_allergy_match(allergies, foods)
-
-    check_input = InteractionCheckInput(
-        medications=medications,
-        foods=foods,
-        profile_user_id=state.get("user_id"),
-    )
+    lean = get_lean_state_for_intent(state, "interaction_check")
+    medications = lean.get("medications") or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
+    allergies = lean.get("allergies") or []
+    message = lean.get("message", "")
+    user_id = lean.get("user_id")
+    db = lean.get("db")
 
     try:
-        result = interaction_checker_agent(check_input, db=db)
-        interactions = result.interactions
-
-        if allergy_warnings:
-            # When food is matched with patient's allergy, use dedicated allergy-blocked answer
-            # to NEVER contradict by saying "it is completely safe to eat"
-            matched_allergies = [
-                a for a in allergies if any(w for w in allergy_warnings if a.lower() in w.lower())
-            ] or allergies
-            answer_text = _generate_allergy_blocked_answer(
-                message, medications, foods, matched_allergies, interactions
-            )
-        elif interactions:
-            if is_specific_query:
-                lines = [f"Phát hiện {len(interactions)} tương tác thuốc-thực phẩm cho yêu cầu của bạn:"]
-            else:
-                lines = ["Các tương tác thuốc-thực phẩm cần lưu ý đối với thuốc bạn đang dùng:"]
-
-            for item in interactions:
-                lines.append(
-                    f"• **{item.drug.capitalize()} + {item.food}** [{item.severity}]: {item.mechanism}\n"
-                    f"  💡 Khuyến nghị: {item.recommendation}"
-                )
-            answer_text = "\n\n".join(lines)
-        else:
-            if is_specific_query and foods:
-                answer_text = _generate_safe_food_answer(message, medications, foods)
-            else:
-                meds_str = ", ".join(m.capitalize() for m in medications)
-                answer_text = f"✅ Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra."
-
-        all_sources = list({src for item in interactions for src in item.sources})
-
+        res = check_drug_food_interaction(
+            message=message,
+            medications=medications,
+            allergies=allergies,
+            user_id=user_id,
+            db=db,
+        )
         return {
             **state,
-            "answer": answer_text,
-            "interactions": result,
-            "citations": all_sources,
+            "answer": res["answer"],
+            "interactions": res["interactions"],
+            "citations": res["citations"],
         }
     except Exception as e:
         logger.error("Interaction check failed: %s", e, exc_info=True)
-        # Still show allergy warnings even if interaction check fails
-        error_msg = f"Lỗi khi kiểm tra tương tác: {str(e)}"
-        if allergy_warnings:
-            error_msg = "\n\n".join(allergy_warnings) + "\n\n" + error_msg
         return {
             **state,
-            "answer": error_msg,
+            "answer": f"Lỗi khi kiểm tra tương tác: {str(e)}",
             "interactions": None,
             "errors": state.get("errors", []) + [str(e)],
         }
 
 
 def food_log_node(state: AgentState) -> AgentState:
-    """Summarize recent food logs for the patient."""
-    db = state.get("db")
-    user_id = state.get("user_id", "")
+    """Summarize recent food logs — delegated to primitive skill log_food_adherence with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, log_food_adherence
 
-    if db is None or not user_id:
-        return {
-            **state,
-            "answer": "Tính năng ghi nhận bữa ăn chưa khả dụng trong phiên bản này.",
-            "food_log": None,
-        }
-
-    from app.models.food_log import FoodLog
-
-    logs = (
-        db.query(FoodLog)
-        .filter(FoodLog.user_id == user_id)
-        .order_by(FoodLog.logged_at.desc())
-        .limit(4)
-        .all()
-    )
-    if not logs:
-        return {
-            **state,
-            "answer": (
-                "Bạn chưa có ghi nhận bữa ăn nào. "
-                "Hãy mở mục «Ghi nhận bữa ăn» trên ứng dụng để ghi lại các bữa trong ngày."
-            ),
-            "food_log": None,
-        }
-
-    slot_labels = {"morning": "Bữa sáng", "noon": "Bữa trưa", "evening": "Bữa tối", "snack": "Bữa phụ"}
-    lines = ["Ghi nhận bữa ăn gần đây của bạn:"]
-    for log in reversed(logs):
-        label = slot_labels.get(log.slot, log.slot)
-        if log.type == "as_planned":
-            lines.append(f"• {label}: Đã ăn theo kế hoạch")
-        else:
-            lines.append(f"• {label}: Ăn khác — {log.note}")
-
+    lean = get_lean_state_for_intent(state, "food_log")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, log_info = log_food_adherence(db, user_id, limit=4)
     return {
         **state,
-        "answer": "\n".join(lines),
-        "food_log": {"recent_count": len(logs)},
+        "answer": answer,
+        "food_log": log_info,
     }
 
 
 def weekly_compliance_node(state: AgentState) -> AgentState:
-    """Summarize patient weekly adherence from ComplianceService."""
-    db = state.get("db")
-    user_id = state.get("user_id", "")
+    """Summarize patient weekly adherence — delegated to primitive skill get_weekly_adherence_summary with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, get_weekly_adherence_summary
 
-    if db is None or not user_id:
-        return {
-            **state,
-            "answer": "Không thể tải dữ liệu tuân thủ lúc này. Vui lòng thử lại sau.",
-            "weekly_compliance": None,
-        }
-
-    from app.services.compliance import ComplianceService
-
-    compliance = ComplianceService(db).get_patient_compliance(user_id, days=7)
-    weekly = WeeklyComplianceOut(
-        overall_adherence_pct=compliance.overall_adherence_pct,
-        daily_series=[
-            {"date": point.date, "adherence_pct": point.adherence_pct}
-            for point in compliance.daily_series
-        ],
-    )
-    pct = compliance.overall_adherence_pct
-    if pct is not None:
-        answer = f"Tuân thủ tuần này của bạn đạt {pct}%."
-    else:
-        answer = (
-            "Bạn chưa có dữ liệu tuân thủ tuần này. "
-            "Hãy ghi nhận bữa ăn hoặc phản hồi check-in để theo dõi tiến độ."
-        )
-
+    lean = get_lean_state_for_intent(state, "weekly_compliance")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, weekly = get_weekly_adherence_summary(db, user_id, days=7)
     return {
         **state,
         "answer": answer,
-        "weekly_compliance": weekly.model_dump(mode="json"),
+        "weekly_compliance": weekly.model_dump(mode="json") if weekly else None,
     }
 
 
 def greeting_node(state: AgentState) -> AgentState:
-    """Handle greetings, introductions, thanks, and polite chit-chat."""
-    message = (state.get("message") or "").strip().lower()
+    """Handle greetings, introductions, thanks, and polite chit-chat — delegated to utility skill chit_chat_greeting."""
+    from app.agents.skills import chit_chat_greeting, get_lean_state_for_intent
 
-    if any(thanks_word in message for thanks_word in ["cảm ơn", "cám ơn", "thank", "tks"]):
-        answer = (
-            "Rất vui được hỗ trợ bạn! Chúc bạn luôn dồi dào sức khỏe và kiểm soát đường huyết ổn định. "
-            "Nếu bạn cần thêm thực đơn hay tra cứu dinh dưỡng, đừng ngần ngại nhắn tôi nhé!"
-        )
-    elif any(bye_word in message for bye_word in ["tạm biệt", "bye", "goodbye"]):
-        answer = (
-            "Tạm biệt bạn! Chúc bạn một ngày tốt lành và luôn duy trì lối sống lành mạnh."
-        )
-    else:
-        answer = (
-            "Xin chào! Tôi là Trợ lý Dinh dưỡng AI chuyên hỗ trợ bệnh nhân đái tháo đường type 2. "
-            "Tôi có thể hỗ trợ bạn:\n\n"
-            "1. 📋 **Xem & tra cứu thực đơn dinh dưỡng** phù hợp mức đường huyết\n"
-            "2. ⚠️ **Kiểm tra tương tác thuốc - thực phẩm** (ví dụ: Metformin, Sulfonylurea uống khi nào, nên kiêng gì)\n"
-            "3. 🥗 **Giải đáp dinh dưỡng & lối sống** (tinh bột, hoa quả, đếm carb, xử trí hạ đường huyết, chăm sóc bàn chân)\n\n"
-            "Hôm nay tôi có thể giúp gì cho bạn?"
-        )
-
+    lean = get_lean_state_for_intent(state, "greeting")
+    message = lean.get("message", "")
+    answer = chit_chat_greeting(message)
     return {
         **state,
         "answer": answer,
@@ -412,67 +235,17 @@ def greeting_node(state: AgentState) -> AgentState:
 
 
 def doctor_note_node(state: AgentState) -> AgentState:
-    """Load latest doctor reminder or meal-plan adjustment note for the patient."""
-    db = state.get("db")
-    user_id = state.get("user_id", "")
+    """Load latest doctor reminder or meal-plan adjustment note — delegated to primitive skill get_doctor_notes with state pruning."""
+    from app.agents.skills import get_doctor_notes, get_lean_state_for_intent
 
-    if db is None or not user_id:
-        return {
-            **state,
-            "answer": "Không thể tải ghi chú bác sĩ lúc này. Vui lòng thử lại sau.",
-            "doctor_note": None,
-        }
-
-    from app.models.notification import Notification
-    from app.services.meal_plan_service import resolve_patient_plan_row
-
-    reminder = (
-        db.query(Notification)
-        .filter(
-            Notification.user_id == user_id,
-            Notification.type == "manual_reminder",
-        )
-        .order_by(Notification.created_at.desc())
-        .first()
-    )
-
-    doctor_note: DoctorNoteOut | None = None
-    if reminder is not None:
-        note_text = (reminder.body or reminder.title or "").strip()
-        if note_text:
-            tags_raw = (reminder.payload or {}).get("tags", [])
-            tags = tags_raw if isinstance(tags_raw, list) else []
-            created_at = reminder.scheduled_at or reminder.created_at
-            doctor_note = DoctorNoteOut(
-                doctor_name="Bác sĩ điều trị",
-                note=note_text,
-                created_at=created_at,
-                tags=tags,
-            )
-
-    if doctor_note is None:
-        plan_row = resolve_patient_plan_row(db, user_id)
-        if plan_row is not None and plan_row.adjustment_note and plan_row.adjustment_note.strip():
-            created_at = plan_row.updated_at or plan_row.created_at
-            doctor_note = DoctorNoteOut(
-                doctor_name="Bác sĩ điều trị",
-                note=plan_row.adjustment_note.strip(),
-                created_at=created_at,
-                tags=[],
-            )
-
-    if doctor_note is None:
-        return {
-            **state,
-            "answer": "Bạn chưa có ghi chú nào từ bác sĩ gần đây.",
-            "doctor_note": None,
-        }
-
-    answer = f"{doctor_note.doctor_name} nhắc: {doctor_note.note}"
+    lean = get_lean_state_for_intent(state, "doctor_note")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, doctor_note = get_doctor_notes(db, user_id)
     return {
         **state,
         "answer": answer,
-        "doctor_note": doctor_note.model_dump(mode="json"),
+        "doctor_note": doctor_note.model_dump(mode="json") if doctor_note else None,
     }
 
 
@@ -510,10 +283,13 @@ def metrics_delta_advice_node(state: AgentState) -> AgentState:
 
 
 def refuse_node(state: AgentState) -> AgentState:
-    """Handle requests outside scope (e.g. change medication, prescribe)."""
+    """Handle requests outside scope — delegated to utility skill refuse_unsafe_medication."""
+    from app.agents.skills import refuse_unsafe_medication
+
+    message = state.get("message", "")
     return {
         **state,
-        "answer": get_refuse_message(),
+        "answer": refuse_unsafe_medication(message),
         "guardrail_flags": state.get("guardrail_flags", []) + ["refuse_medical_scope"],
     }
 
@@ -562,11 +338,21 @@ def _generate_dynamic_unknown_answer(message: str, profile: dict) -> str:
     )
 
 
-
 def unknown_node(state: AgentState) -> AgentState:
-    """Handle unknown/unclassified intents with empathetic dynamic guidance."""
-    message = state.get("message", "")
-    profile = state.get("profile", {})
+    """Handle unknown/unclassified intents with emergency triage check and empathetic fallback using pruned state."""
+    from app.agents.skills import emergency_triage_check, get_lean_state_for_intent
+
+    lean = get_lean_state_for_intent(state, "unknown")
+    message = lean.get("message", "")
+    triage = emergency_triage_check(message)
+    if triage is not None:
+        return {
+            **state,
+            "answer": triage["message"],
+            "guardrail_flags": state.get("guardrail_flags", []) + [f"emergency_triage_{triage['type']}"],
+        }
+
+    profile = lean.get("profile", {})
     answer = _generate_dynamic_unknown_answer(message, profile)
     return {
         **state,
@@ -576,7 +362,7 @@ def unknown_node(state: AgentState) -> AgentState:
 
 
 def apply_guardrails(state: AgentState) -> AgentState:
-    """Post-process node: citation checks and unsafe recommendation blocking."""
+    """Post-process node: citation checks, unsafe recommendation blocking, and food safety filtering."""
     intent = state.get("intent", "unknown")
     answer = state.get("answer") or ""
     citations = list(state.get("citations") or [])
@@ -589,6 +375,22 @@ def apply_guardrails(state: AgentState) -> AgentState:
     flags.extend(safety_flags)
     if force_refuse:
         intent = "refuse"
+
+    # Deterministic Food Safety & Allergy Guardrail (Tier-2 Post-Generation Filter)
+    if not force_refuse and intent not in ("greeting", "refuse"):
+        from app.guardrails.food_safety import enforce_food_safety_guardrail
+
+        profile = state.get("profile") or {}
+        medications = profile.get("medications", []) if isinstance(profile, dict) else (getattr(profile, "medications", []) or [])
+        allergies = profile.get("allergies", []) if isinstance(profile, dict) else (getattr(profile, "allergies", []) or [])
+
+        answer, food_safety_flags = enforce_food_safety_guardrail(
+            answer=answer,
+            medications=medications,
+            allergies=allergies,
+            db=state.get("db"),
+        )
+        flags.extend(food_safety_flags)
 
     return {
         **state,

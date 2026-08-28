@@ -55,9 +55,15 @@ def _determine_guideline_authority(diseases: list[str]) -> str:
     return f"Bộ Y Tế Việt Nam ({auth_str}) và Hiệp Hội Đái Tháo Đường Hoa Kỳ (ADA)"
 
 
-def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[str]]:
-    """Retrieve relevant context from both food DB and guidelines.
+def _build_rag_context(
+    message: str,
+    profile: dict,
+    top_k_guidelines: int = 2,
+    top_k_foods: int = 1,
+) -> tuple[list[dict], list[str]]:
+    """Retrieve verified clinical guidelines and targeted food knowledge with lean top_k (Zero-Bloat Context).
 
+    Reduces chunk bloat from 11 down to top-2 guidelines (+ optional top-1 food item).
     Returns (rag_context_list, citation_list).
     """
     diseases = profile.get("disease", [])
@@ -66,8 +72,8 @@ def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[st
     disease_expanded = _disease_search_keywords(diseases)
     combined_query = f"{message} {disease_expanded}".strip()
 
-    guideline_chunks = retrieve_guidelines(combined_query, top_k=6)
-    food_chunks = retrieve_foods(message, top_k=5)
+    guideline_chunks = retrieve_guidelines(combined_query, top_k=top_k_guidelines)
+    food_chunks = retrieve_foods(message, top_k=top_k_foods)
 
     rag_context = []
     citations = []
@@ -99,48 +105,37 @@ def _build_rag_context(message: str, profile: dict) -> tuple[list[dict], list[st
 
 
 def _build_rag_prompt(message: str, rag_context: list[dict], profile: dict) -> str:
-    """Build the structured clinical prompt for RAG answer generation."""
-    context_texts = [c["text"] for c in rag_context[:6]]
+    """Build the structured clinical prompt for RAG answer generation using lean context."""
+    context_texts = [c["text"] for c in rag_context[:2]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     diseases_list = profile.get("disease", [])
     diseases = ", ".join(diseases_list) or "chưa rõ (mặc định ĐTĐ type 2)"
-    medications = ", ".join(profile.get("medications", [])) or "chưa rõ"
-    allergies = ", ".join(profile.get("allergies", [])) or "không có"
     authority_str = _determine_guideline_authority(diseases_list)
 
     return f"""Bạn là Trợ lý Dinh dưỡng Y khoa Chuyên nghiệp (Clinical Nutrition AI Assistant) chuyên về Đái tháo đường và bệnh mạn tính, tuân thủ hướng dẫn chính thức của {authority_str}.
 
-HỒ SƠ BỆNH NHÂN:
-- Bệnh nền: {diseases}
-- Thuốc điều trị: {medications}
-- Dị ứng: {allergies}
+NGỮ CẢNH BỆNH NỀN: {diseases}
 
 TÀI LIỆU Y KHOA THAM KHẢO:
 {context_str}
 
 CÂU HỎI CỦA BỆNH NHÂN: {message}
 
-YÊU CẦU TRÌNH BÀY & BỐ CỤC (BẮT BUỘC TRÌNH BÀY KHOA HỌC, CHIA TỪNG PHẦN, NHIỀU DÒNG, GẠCH ĐẦU DÒNG, TUYỆT ĐỐI KHÔNG VIẾT THÀNH MỘT ĐOẠN DÀI LIỀN KHỐI):
-
-Khi câu hỏi có nhiều ý hoặc hỏi về thực phẩm/dinh dưỡng, hãy cấu trúc câu trả lời theo các phần sau:
-
-1. 🎯 **Kết luận trực diện:** Trả lời rõ ràng, cụ thể vấn đề người dùng hỏi (Có nên ăn/uống hay không, mức độ khuyến nghị).
-2. 🔬 **Phân tích dinh dưỡng & Chỉ số y khoa:**
-   • Chỉ số đường huyết (GI/GL) và ảnh hưởng đến đường huyết sau ăn.
-   • Thành phần cốt lõi: Tinh bột (Carb), Chất đạm (Protein), Chất béo tốt/xấu, Chất xơ và vi chất.
-3. 💡 **Khuyến nghị khẩu phần & Cách chế biến chuẩn y khoa:**
-   • Khẩu phần hợp lý theo bữa/ngày (nếu ĐTĐ thai kỳ: lưu ý phân bổ 3 chính + 2-3 phụ; nếu ĐTĐ tuýp 1: nhấn mạnh đếm lượng Carb; nếu biến chứng thần kinh/liệt dạ dày: chia nhỏ bữa mềm dễ tiêu).
-   • Phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế chiên xào, sốt ngọt, nêm nhiều muối).
-4. ⚠️ **Lưu ý an toàn theo bệnh nền & thuốc đang dùng:**
-   • Lưu ý cụ thể cho bệnh nhân theo thuốc và bệnh nền (nếu có nguy cơ tương tác hay hạ/tăng đường huyết).
-   • KHÔNG tự ý kê đơn, thay đổi thuốc, hoặc điều chỉnh liều thuốc/insulin.
-5. 📚 **Nguồn tham khảo:** Ghi rõ tài liệu y khoa chính thống áp dụng ({authority_str})."""
+QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ):
+1. ĐI THẲNG VÀO TRỌNG TÂM: Trả lời chính xác, súc tích câu hỏi của người dùng (độ dài phù hợp khoảng 200–350 từ).
+2. TUYỆT ĐỐI KHÔNG SUY DIỄN LAN MAN: KHÔNG tự động giải thích tác dụng phụ của thuốc, phác đồ điều trị, hoặc tiền sử dị ứng không liên quan nếu người dùng chỉ hỏi kiến thức dinh dưỡng/thực phẩm chung.
+3. CẤU TRÚC TRÌNH BÀY KHOA HỌC:
+   - 🎯 **Kết luận trực diện:** Phân loại rõ ràng (NÊN ĂN / CẦN HẠN CHẾ hoặc Có/Không).
+   - 🔬 **Phân tích dinh dưỡng & GI/GL:** Nêu ngắn gọn chỉ số đường huyết (GI/GL), tinh bột, chất xơ và lợi ích chuyển hóa.
+   - 💡 **Khuyến nghị khẩu phần & Cách chế biến:** Khẩu phần hợp lý và cách nấu lành mạnh (hấp, luộc, áp chảo ít dầu).
+   - ⚠️ **Lưu ý an toàn chung:** 1-2 lời khuyên ngắn về kiểm soát đường huyết sau ăn, không tự ý bỏ bữa hay ngưng thuốc điều trị.
+   - 📚 **Nguồn tham khảo:** {authority_str}."""
 
 
 def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:
     """Generate RAG answer using LLM or template-based fallback."""
-    context_texts = [c["text"] for c in rag_context[:6]]
+    context_texts = [c["text"] for c in rag_context[:2]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
@@ -165,7 +160,7 @@ def stream_answer_tokens(
     profile: dict,
 ) -> Iterator[str]:
     """Stream RAG answer tokens from LLM, or yield template fallback once."""
-    context_texts = [c["text"] for c in rag_context[:6]]
+    context_texts = [c["text"] for c in rag_context[:2]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
@@ -340,9 +335,12 @@ def _template_answer(message: str, context: str) -> str:
 
 
 def rag_qa_node(state: AgentState) -> AgentState:
-    """RAG Q&A node: retrieve context → generate answer with citations."""
-    message = state.get("message", "")
-    profile = state.get("profile", {})
+    """RAG Q&A node: retrieve context → generate answer with citations using pruned state."""
+    from app.agents.skills.registry import get_lean_state_for_intent
+
+    lean_state = get_lean_state_for_intent(state, "rag_qa")
+    message = lean_state.get("message", "")
+    profile = lean_state.get("profile", {})
 
     if not message:
         return {
@@ -351,7 +349,7 @@ def rag_qa_node(state: AgentState) -> AgentState:
             "citations": [],
         }
 
-    # Retrieve context
+    # Retrieve context with lean top_k
     rag_context, citations = _build_rag_context(message, profile)
 
     # Generate answer

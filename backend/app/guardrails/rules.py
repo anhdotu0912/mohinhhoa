@@ -28,13 +28,17 @@ REFUSE_REGEX_PATTERNS: list[str] = [
     r"đổi\s*thuốc",
     r"thay\s*thuốc",
     r"đổi\s*liều",
-    r"tăng\s*liều",
-    r"giảm\s*liều",
+    r"tăng\s*(?:thêm\s*)?(?:liều|\d+\s*viên)",
+    r"giảm\s*(?:bớt\s*)?(?:liều|\d+\s*viên)",
     r"ngưng\s*thuốc",
     r"ngừng\s*thuốc",
     r"bỏ\s*thuốc",
-    r"kê.*(đơn|thuốc)",
+    r"kê.*(?:đơn|thuốc)",
     r"bốc\s*thuốc",
+    r"trị\s*dứt\s*điểm",
+    r"chữa\s*dứt\s*điểm",
+    r"lơ\s*mơ.*không\s*tỉnh",
+    r"hôn\s*mê",
     r"chẩn đoán (bệnh|giúp|cho tôi|tôi bị)",
     r"tôi bị bệnh gì",
     r"stop medication",
@@ -44,46 +48,58 @@ REFUSE_REGEX_PATTERNS: list[str] = [
     r"prescribe",
 ]
 
-# Forbidden phrases that would constitute medical advice outside scope
-_FORBIDDEN_PATTERNS: list[str] = [
-    "ngưng thuốc",
-    "ngung thuoc",
-    "ngừng thuốc",
-    "ngung thuoc",
-    "bỏ thuốc",
-    "bo thuoc",
-    "đổi thuốc",
-    "doi thuoc",
-    "thay thuốc",
-    "thay thuoc",
-    "đổi liều",
-    "doi lieu",
-    "tăng liều",
-    "tang lieu",
-    "giảm liều",
-    "giam lieu",
-    "tự ý ngắt thuốc",
-    "tu y ngat thuoc",
-    "tự điều chỉnh liều",
-    "tu dieu chinh lieu",
-    "tự ý điều chỉnh liều",
-    "stop medication",
-    "change dose",
-    "increase dose",
-    "decrease dose",
-    "tôi kê đơn",
-    "toi ke don",
-    "tôi kê thuốc",
-    "toi ke thuoc",
-    "tôi chẩn đoán bạn",
-    "toi chan doan ban",
-    "tôi chẩn đoán bệnh",
-    "toi chan doan benh",
+# Action regex patterns to detect unsafe medical recommendations
+_UNSAFE_ACTION_PATTERNS: list[tuple[str, str]] = [
+    # Stop medication
+    (r"\b(?:ngưng|ngừng|bỏ|dừng)\s*thuốc\b", "ngưng thuốc"),
+    (r"\b(?:ngung|ngung|bo|dung)\s*thuoc\b", "ngung thuoc"),
+    (r"\btự\s*ý\s*ngắt\s*thuốc\b", "tự ý ngắt thuốc"),
+    (r"\btu\s*y\s*ngat\s*thuoc\b", "tu y ngat thuoc"),
+    (r"\bstop\s+medication\b", "stop medication"),
+    # Change medication
+    (r"\b(?:đổi|thay)\s*thuốc\b", "đổi thuốc"),
+    (r"\b(?:doi|thay)\s*thuoc\b", "doi thuoc"),
+    (r"\bchuyển\s+sang\s+thuốc\b", "chuyển sang thuốc"),
+    # Change dose (exclude food portion phrases like 'liều lượng tinh bột/rau/muối')
+    (r"\b(?:đổi|thay\s*đổi)\s*liều(?:\s*thuốc|\s*dùng)?\b", "đổi liều"),
+    (r"\b(?:doi|thay\s*doi)\s*lieu\b", "doi lieu"),
+    (r"\btăng\s*liều(?:\s*thuốc|\s*dùng)?(?!\s*lượng\s+(?:ăn|thực phẩm|rau|tinh bột|đường|muối|calo|chất))\b", "tăng liều"),
+    (r"\btang\s*lieu\b", "tang lieu"),
+    (r"\bgiảm\s*liều(?:\s*thuốc|\s*dùng)?(?!\s*lượng\s+(?:ăn|thực phẩm|rau|tinh bột|đường|muối|calo|chất))\b", "giảm liều"),
+    (r"\bgiam\s*lieu\b", "giam lieu"),
+    (r"\btự\s*ý\s*(?:điều\s*chỉnh)\s*liều\b", "tự ý điều chỉnh liều"),
+    (r"\btu\s*y\s*(?:dieu\s*chinh)\s*lieu\b", "tu y dieu chinh lieu"),
+    (r"\b(?:change|increase|decrease)\s+dose\b", "change dose"),
+    # Prescribe / diagnose
+    (r"\btôi\s*(?:kê\s*đơn|kê\s*thuốc)\b", "tôi kê đơn"),
+    (r"\btoi\s*(?:ke\s*don|ke\s*thuoc)\b", "toi ke don"),
+    (r"\btôi\s*chẩn\s*đoán\s*(?:bạn|bệnh)\b", "tôi chẩn đoán bạn"),
+    (r"\btoi\s*chan\s*doan\s*(?:ban|benh)\b", "toi chan doan ban"),
 ]
+
+# Negation keywords that signal a safe medical disclaimer (e.g. "Không được tự ý ngưng thuốc")
+_NEGATION_KEYWORDS = [
+    "không", "khong", "tuyệt đối không", "tuyet doi khong",
+    "đừng", "dung", "tránh", "tranh", "cấm", "cam",
+    "chưa nên", "chua nen", "chưa được", "chua duoc",
+    "không có quyền", "khong co quyen", "không được tự ý", "khong duoc tu y",
+    "không tự ý", "khong tu y", "không thay thế", "khong thay the",
+    "never", "do not", "don't", "should not", "shouldn't",
+    "must not", "cannot", "can't", "without",
+]
+
+
+def _is_match_negated(sentence: str, match_start: int) -> bool:
+    """Return True if the match in sentence is governed by a preceding negation/disclaimer word."""
+    preceding = sentence[:match_start].lower()
+    return any(neg in preceding for neg in _NEGATION_KEYWORDS)
 
 
 def check_recommendation_safety(recommendation: str) -> list[str]:
     """Check if a recommendation text contains forbidden medical advice.
+
+    Disclaimers (e.g. 'Không được tự ý ngưng thuốc') are recognized as safe.
+    Only affirmative unsafe advice (e.g. 'Bạn nên giảm liều') triggers violations.
 
     Args:
         recommendation: The recommendation string to validate.
@@ -95,11 +111,19 @@ def check_recommendation_safety(recommendation: str) -> list[str]:
         return []
 
     violations: list[str] = []
-    rec_lower = recommendation.lower()
+    # Split text into sentences/lines for precise contextual negation check
+    sentences = re.split(r"[\n.!?;•]", recommendation)
 
-    for phrase in _FORBIDDEN_PATTERNS:
-        if phrase in rec_lower:
-            violations.append(phrase)
+    for sentence in sentences:
+        sent_clean = sentence.strip()
+        if not sent_clean:
+            continue
+
+        for pattern, phrase_name in _UNSAFE_ACTION_PATTERNS:
+            for match in re.finditer(pattern, sent_clean, re.IGNORECASE):
+                if not _is_match_negated(sent_clean, match.start()):
+                    if phrase_name not in violations:
+                        violations.append(phrase_name)
 
     return violations
 
@@ -171,9 +195,9 @@ def sanitize_recommendation(recommendation: str) -> str:
         return recommendation
 
     result = recommendation
-    for phrase in _FORBIDDEN_PATTERNS:
-        pattern = re.compile(re.escape(phrase), re.IGNORECASE)
-        result = pattern.sub("trao đổi với bác sĩ về vấn đề này", result)
+    for pattern, _ in _UNSAFE_ACTION_PATTERNS:
+        regex = re.compile(pattern, re.IGNORECASE)
+        result = regex.sub("trao đổi với bác sĩ về vấn đề này", result)
 
     return result
 

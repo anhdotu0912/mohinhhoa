@@ -228,3 +228,22 @@ def test_unknown_node_generic_query():
     assert answer, "Answer must not be empty"
     assert "dinh dưỡng" in answer.lower()
 
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("những loại rau nào tôi không được ăn?", "rag_qa"),
+        ("các loại rau người tiểu đường không nên ăn", "rag_qa"),
+        ("những loại thực phẩm nào cần kiêng khi bị tiểu đường?", "rag_qa"),
+        ("hoa quả nào tốt cho người tiểu đường?", "rag_qa"),
+        ("cá hồi bao nhiêu calo?", "rag_qa"),
+        ("người tiểu đường nên kiêng gì?", "rag_qa"),
+        ("tôi ăn cá hồi được không?", "interaction_check"),
+        ("uống metformin có ăn bưởi được không?", "interaction_check"),
+        ("tương tác thuốc metformin với rượu", "interaction_check"),
+    ],
+)
+def test_intent_classifier_rag_qa_vs_interaction(message: str, expected: str):
+    assert _classify_by_keywords(message) == expected
+
+

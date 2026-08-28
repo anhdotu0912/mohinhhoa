@@ -29,13 +29,74 @@ VALID_INTENTS = {
 # Keyword patterns for rule-based fallback (refuse patterns shared with guardrails.rules)
 from app.guardrails.rules import REFUSE_REGEX_PATTERNS
 
+_RAG_QA_PATTERNS = [
+    r"(?:những|các|danh sách|top|nhóm|hoa quả ngọt|trái cây ngọt)\s+(?:loại\s+)?(?:rau|củ|quả|trái cây|hoa quả|thực phẩm|thức ăn|đồ ăn|món ăn|đồ uống|hạt|thịt|cá|chất béo)",
+    r"(?:loại|thực phẩm|rau|trái cây|hoa quả|thịt|cá|chất béo)\s+nào\s+(?:nên|không nên|không được|tốt|xấu|hạn chế|kiêng|tránh)",
+    r"(?:bao nhiêu|chỉ số)\s+(?:calo|kcal|gi|đường huyết|carb|carbohydrate|protein|đạm|chất béo|natri|muối)",
+    r"(?:tác dụng|lợi ích|ảnh hưởng|nguyên tắc)\s+(?:của|dinh dưỡng|khi bị|đối với)",
+    r"(?:tiểu đường|đái tháo đường|bệnh nhân)\s+(?:nên|không nên|cần kiêng|kiêng gì|ăn được gì)",
+    r"kiêng\s+(?:chất béo|đường|muối|tinh bột)\s+gì",
+    r"(?:xoài|sầu riêng|hoa quả|trái cây).*(?:người tiểu đường|tiểu đường).*(?:ăn được không|nên ăn không)",
+]
+
 _INTENT_PATTERNS = {
     "refuse": REFUSE_REGEX_PATTERNS,
+    "greeting": [
+        r"\b(hello|hi|hey|alo|chào|xin chào|good morning|good afternoon|good evening)\b",
+        r"(chào bạn|chào bác sĩ|chào bot|chào trợ lý|chào em|chào anh|chào chị|chào ad)",
+        r"(bạn là ai|bạn có thể làm gì|bạn giúp được gì|chức năng của bạn|giới thiệu bản thân)",
+        r"(cảm ơn|cám ơn|thank you|thanks|tks)",
+        r"(tạm biệt|goodbye|bye bye|\bbye\b)",
+    ],
+    "weekly_compliance": [
+        r"tuân thủ.*(tuần|gần đây|này|bao nhiêu)",
+        r"tuần này.*(?:tuân thủ|ăn uống có chuẩn không|kế hoạch)",
+        r"báo cáo tuân thủ",
+        r"tỉ lệ tuân thủ",
+        r"tỷ lệ tuân thủ",
+        r"tuân thủ của tôi",
+    ],
+    "food_log": [
+        r"^(?:ghi lại|ghi nhận|nhật ký|log)\b",
+        r"ghi lại", r"ghi nhận", r"nhật ký", r"log", r"vừa ăn", r"đã ăn",
+        r"hôm nay ăn rồi", r"sáng nay ăn rồi", r"tối qua.*ăn", r"đã ăn xong", r"ăn.*xong rồi",
+        r"ăn đúng theo thực đơn",
+    ],
+    "doctor_note": [
+        r"bác sĩ.*(dặn|nhắc|khuyên|lời dặn|lời nhắc|ghi chú|lưu ý)",
+        r"lời nhắc.*bác sĩ",
+        r"lời dặn.*bác sĩ",
+        r"ghi chú.*bác sĩ",
+        r"lời khuyên.*bác sĩ",
+    ],
+    "metrics_delta_advice": [
+        r"chỉ số.*(sức khỏe|cơ thể|của tôi|thế nào|dạo này)",
+        r"(cân nặng|đường huyết|huyết áp|bmi|hb\s*a1c|vòng eo).*(thế nào|xu hướng|tăng|giảm|nguy hiểm|theo dõi)",
+        r"xu hướng.*(cân|đường huyết|huyết áp|chỉ số)",
+        r"(theo dõi|dự đoán).*(cân|chỉ số)",
+        r"\bđường\s+\d+",
+        r"chỉ số mới",
+    ],
+    "unknown": [
+        r"đói cồn cào",
+        r"run lẩy bẩy",
+        r"vã mồ hôi",
+        r"muốn ngất xỉu",
+        r"mất ý thức",
+        r"nôn mửa liên tục",
+        r"hoa mắt chóng mặt",
+        r"đường huyết.*dưới 3\.0",
+        r"mệt mỏi.*chán nản",
+        r"kiêng khem nhiều quá",
+    ],
     "meal_plan": [
         r"thực đơn", r"meal\s*plan", r"lên kế hoạch ăn", r"kế hoạch dinh dưỡng",
         r"gợi ý bữa ăn", r"7 ngày", r"bữa sáng.*bữa trưa.*bữa tối",
         r"ăn gì", r"nên ăn gì", r"lập thực đơn", r"tạo thực đơn", r"chế độ ăn",
-        r"hôm nay", r"sáng nay", r"trưa nay", r"tối nay",
+        r"(?:hôm nay|sáng nay|trưa nay|tối nay)\s+(?:ăn gì|nên ăn gì|có món gì|thực đơn)",
+        r"(?:hôm nay|sáng nay|trưa nay|tối nay)\s+ăn\s+.+?(?:được không|hay|không)",
+        r"(?:thực đơn|món gì|ăn gì)\s+.*(?:hôm nay|sáng nay|trưa nay|tối nay|tuần này)",
+        r"(?:trưa nay|sáng nay|tối nay)\s+nên\s+ăn\s+gì",
         r"bữa sáng", r"bữa trưa", r"bữa tối", r"xem thực đơn",
         r"thực đơn.*(tuần|7 ngày|cả tuần|này)",
         r"(xem|cho tôi xem|lịch ăn|kế hoạch ăn|xem lại).*thực đơn",
@@ -46,58 +107,21 @@ _INTENT_PATTERNS = {
         r"món ăn.*(hôm nay|tuần này|bác sĩ)",
     ],
     "interaction_check": [
-        r"tương tác.*(thuốc|metformin|gliclazide|insulin)",
-        r"(thuốc|metformin|gliclazide|insulin).*thực phẩm",
+        r"tương tác.*(?:thuốc|metformin|gliclazide|glipizide|insulin|sitagliptin|atorvastatin|chống đông|hạ đường|thuốc mỡ máu)",
+        r"(?:thuốc|metformin|gliclazide|glipizide|insulin|sitagliptin|atorvastatin|chống đông|hạ đường|thuốc mỡ máu).*(?:thực phẩm|ăn|uống|kiêng|kỵ|kị|rượu|bia|bưởi|tỏi|gừng|rau muống)",
+        r"(?:kiêng|ăn|uống).*(?:tỏi|gừng|bưởi|rau muống|rượu|bia).*(?:khi|đang|dùng|thuốc)",
         r"drug.*food",
         r"interaction",
-        r"uống\s*(thuốc|metformin|gliclazide).*ăn",
+        r"uống\s*(?:thuốc|metformin|gliclazide|glipizide|insulin|statin|atorvastatin).*ăn",
         r"kiểm tra tương tác",
-        r"có ăn được không.*đang uống",
-        # P1: "ăn X được không" — food safety questions implying medication check
-        r"(?:tôi|em|mình)?\s*(?:có thể|có nên|có)?\s*ăn\s+\S+.*(?:được không|không ạ|chứ|hả)",
-        r"\S+\s+(?:ăn được không|có ăn được|uống được không|có uống được)",
-        r"(?:ăn|uống|dùng)\s+\S+.*(?:được không|có sao không|có tốt không|an toàn không)",
-        r"(?:tôi|em|mình)?\s*(?:có nên|nên)\s+(?:ăn|uống|dùng)\s+\S+",
-        r"\b(?:kiêng|kỵ|kị)\b",
-        # "ăn X khi uống/đang dùng thuốc Y"
-        r"(?:ăn|uống|dùng)\s+\S+.*(?:khi|đang)\s*(?:uống|dùng)",
-        r"(?:khi|đang)\s*(?:uống|dùng)\s+\S+.*(?:ăn|uống|dùng)",
-    ],
-    "food_log": [
-        r"ghi lại", r"log", r"vừa ăn", r"đã ăn", r"hôm nay ăn rồi",
-        r"sáng nay ăn rồi", r"tối qua ăn", r"bữa.*ăn.*xong",
-    ],
-    "greeting": [
-        r"\b(hello|hi|hey|alo|chào|xin chào|good morning|good afternoon|good evening)\b",
-        r"(chào bạn|chào bác sĩ|chào bot|chào trợ lý|chào em|chào anh|chào chị|chào ad)",
-        r"(bạn là ai|bạn có thể làm gì|bạn giúp được gì|chức năng của bạn|giới thiệu bản thân)",
-        r"(cảm ơn|cám ơn|thank you|thanks|tks)",
-        r"(tạm biệt|goodbye|bye bye|\bbye\b)",
-    ],
-    "weekly_compliance": [
-        r"tuân thủ.*(tuần|gần đây|này)",
-        r"tuần này.*tuân thủ",
-        r"báo cáo tuân thủ",
-        r"tỉ lệ tuân thủ",
-        r"tỷ lệ tuân thủ",
-        r"tuân thủ của tôi",
-    ],
-    "doctor_note": [
-        r"bác sĩ dặn",
-        r"lời nhắc bác sĩ",
-        r"ghi chú bác sĩ",
-        r"bác sĩ có dặn",
-        r"bác sĩ nhắc",
-        r"lời dặn.*bác sĩ",
-        r"lời khuyên.*bác sĩ",
-
-    ],
-    "metrics_delta_advice": [
-        r"chỉ số.*(sức khỏe|cơ thể|của tôi|thế nào)",
-        r"(cân nặng|đường huyết|huyết áp|bmi|hb\s*a1c|vòng eo).*(thế nào|xu hướng|tăng|giảm)",
-        r"xu hướng.*(cân|đường huyết|huyết áp|chỉ số)",
-        r"(theo dõi|dự đoán).*(cân|chỉ số)",
-        r"chỉ số mới",
+        r"có ăn được không.*đang (?:uống|dùng)",
+        r"đang (?:uống|dùng).*(?:ăn|uống)\s+.*(?:được không|có sao không)",
+        # Asking safety about a specific queried food item (e.g. "tôi ăn cá hồi được không", "uống rượu có sao không")
+        r"(?:tôi|em|mình)?\s*(?:có thể|có nên|có)?\s*ăn\s+[^?.,!]+.*(?:được không|không ạ|có sao không|an toàn không)",
+        r"[^?.,!\s]+(?:\s+[^?.,!\s]+){0,2}\s+(?:ăn được không|có ăn được không|uống được không|có uống được không)",
+        r"(?:tôi|em|mình)?\s*(?:có thể|có nên|có)?\s*ăn\s+[^?.,!]+.*(?:khi|đang)\s*(?:uống|dùng)",
+        r"(?:khi|đang)\s*(?:uống|dùng)\s+[^?.,!]+.*(?:ăn|uống|dùng)",
+        r"uống\s+[^?.,!]+.*(?:có|được)\s*(?:ăn|uống)\s+[^?.,!]+.*(?:không|sao không)",
     ],
 }
 
@@ -118,33 +142,75 @@ def _classify_by_keywords(message: str) -> str:
 
 
 def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
-    """Detect primary and secondary intents using keyword patterns."""
-    message_lower = message.lower()
+    """Detect primary and secondary intents using keyword patterns with positional disambiguation."""
+    message_lower = message.lower().strip()
+
+    # Priority 1: Refuse guardrails (unsafe medication requests must ALWAYS be refused first)
+    for pat in REFUSE_REGEX_PATTERNS:
+        if re.search(pat, message_lower):
+            return "refuse", []
 
     for pattern in _GROCERY_PATTERNS:
         if re.search(pattern, message_lower):
             return "rag_qa", []
 
-    matched: list[str] = []
+    # Priority check: If query starts with explicit action like "Ghi nhận...", prioritize food_log
+    if re.match(r"^(?:ghi lại|ghi nhận|nhật ký|log)\b", message_lower):
+        primary = "food_log"
+        secondary = []
+        for pattern in _RAG_QA_PATTERNS:
+            if re.search(pattern, message_lower):
+                secondary.append("rag_qa")
+                break
+        return primary, secondary
+
+    # Check if asking meal advice for next slot ("trưa nay nên ăn gì", "sáng nay nên ăn gì")
+    if re.search(r"(?:trưa nay|sáng nay|tối nay|hôm nay)\s+nên\s+ăn\s+gì", message_lower):
+        primary = "meal_plan"
+        secondary = []
+        if re.search(r"lỡ ăn|đã ăn", message_lower):
+            secondary.append("food_log")
+        return primary, secondary
+
+    # Check explicit general nutrition list queries first (prevent false positive interaction_check)
+    has_explicit_drug = bool(
+        re.search(r"tương tác|thuốc|metformin|gliclazide|glipizide|insulin|sitagliptin|atorvastatin|statin", message_lower)
+    )
+    if not has_explicit_drug:
+        for pattern in _RAG_QA_PATTERNS:
+            if re.search(pattern, message_lower):
+                return "rag_qa", []
+
+    matched_positions: list[tuple[int, str]] = []
 
     for intent, patterns in _INTENT_PATTERNS.items():
+        if intent == "refuse":
+            continue
         for pattern in patterns:
-            if re.search(pattern, message_lower):
-                if intent not in matched:
-                    matched.append(intent)
+            m = re.search(pattern, message_lower)
+            if m:
+                matched_positions.append((m.start(), intent))
                 break
 
-    if not matched:
+    if not matched_positions:
         return "rag_qa", []
 
-    primary = matched[0]
-    secondary = [i for i in matched[1:] if i in VALID_INTENTS and i != primary and i != "refuse"]
+    # Sort matches by appearance in text to determine primary vs secondary clause
+    matched_positions.sort(key=lambda x: x[0])
+    ordered_intents: list[str] = []
+    for _, intent in matched_positions:
+        if intent not in ordered_intents:
+            ordered_intents.append(intent)
+
+    primary = ordered_intents[0]
+    secondary = [i for i in ordered_intents[1:] if i in VALID_INTENTS and i != primary and i != "refuse"]
     return primary, secondary
 
 
 def _classify_by_llm(message: str) -> str:
-    """Classify intent using LLM (OpenAI GPT)."""
+    """Classify intent using LLM (OpenAI GPT) empowered by Description Engineering & Negative Constraints."""
     try:
+        from app.agents.skills.registry import format_intent_classification_prompt_snippet
         from app.core.llm import get_chat_llm
 
         llm = get_chat_llm(temperature=0)
@@ -152,27 +218,33 @@ def _classify_by_llm(message: str) -> str:
             logger.debug("No LLM API key, falling back to keyword classification")
             return _classify_by_keywords(message)
 
-        prompt = f"""Phân loại intent của tin nhắn bệnh nhân sau vào ĐÚNG MỘT trong các loại:
-- greeting: câu chào hỏi (hello, hi, xin chào), cảm ơn, tạm biệt, hỏi bạn là ai
-- meal_plan: yêu cầu lập thực đơn, gợi ý bữa ăn, kế hoạch dinh dưỡng, xem thực đơn tuần
-- interaction_check: hỏi về tương tác thuốc-thực phẩm, HOẶC hỏi "ăn/uống X được không" (kiểm tra an toàn thực phẩm khi đang dùng thuốc), hỏi kiêng gì, hỏi có nên ăn/uống X không
-- food_log: ghi lại bữa ăn đã ăn
-- weekly_compliance: hỏi tỉ lệ/báo cáo tuân thủ tuần, tuân thủ gần đây
-- doctor_note: hỏi lời dặn/lời nhắc/ghi chú từ bác sĩ
-- metrics_delta_advice: hỏi chỉ số sức khỏe đang thế nào, xu hướng cân nặng/đường huyết/huyết áp/BMI/HbA1c
-- rag_qa: câu hỏi KIẾN THỨC chung về dinh dưỡng (calo, chỉ số GI, so sánh thực phẩm), KHÔNG phải hỏi "được không" hay "có nên không"
-- refuse: yêu cầu đổi thuốc, kê đơn, chẩn đoán (ngoài phạm vi)
-- unknown: không rõ ý định
+        skill_descriptions_block = format_intent_classification_prompt_snippet()
+        valid_intents_list = ", ".join(sorted(VALID_INTENTS))
 
-Lưu ý phân biệt:
-- "tôi ăn cá hồi được không" → interaction_check (hỏi AN TOÀN)
-- "cá hồi bao nhiêu calo" → rag_qa (hỏi KIẾN THỨC)
-- "hôm nay ăn gì" → meal_plan (hỏi THỰC ĐƠN)
-- "ăn gì cho khỏe" → rag_qa (hỏi LỜI KHUYÊN chung)
+        prompt = f"""Bạn là bộ định tuyến ý định (Intent Classifier) chính xác cao cho Trợ lý Y tế & Dinh dưỡng Đái Tháo Đường P-014.
+Nhiệm vụ của bạn là phân loại tin nhắn của bệnh nhân vào ĐÚNG MỘT intent phù hợp nhất dựa trên các quy chuẩn Kỹ năng (Skills) và Ràng buộc Phủ định (Negative Constraints) dưới đây:
 
-Tin nhắn: "{message}"
+{skill_descriptions_block}
 
-Trả lời CHỈ tên intent, không giải thích."""
+QUY TẮC RÀNG BUỘC PHỦ ĐỊNH QUAN TRỌNG (NEGATIVE CONSTRAINTS):
+1. `rag_qa` vs `interaction_check`:
+   - "những loại rau nào tôi không được ăn?" / "hoa quả nào tốt?" → `rag_qa` (Hỏi DANH SÁCH kiến thức dinh dưỡng tổng quát)
+   - "tôi bị tiểu đường nên kiêng gì?" → `rag_qa` (Hỏi KIẾN THỨC chung về kiêng khem dinh dưỡng)
+   - "ăn bưởi có được không?" / "tôi ăn cá hồi có sao không?" → `interaction_check` (Hỏi an toàn của MỘT THỰC PHẨM CỤ THỂ)
+   - "uống metformin có uống rượu được không?" → `interaction_check` (Hỏi TƯƠNG TÁC THUỐC cụ thể)
+2. `meal_plan` vs `rag_qa`:
+   - "hôm nay ăn gì" / "thực đơn sáng nay" → `meal_plan` (Xem thực đơn bữa ăn cụ thể trong app)
+   - "ăn gì tốt cho đường huyết" → `rag_qa` (Tư vấn kiến thức nhóm thực phẩm)
+3. `food_log` vs `meal_plan`:
+   - "sáng nay tôi đã ăn phở bò" / "vừa ăn xong" → `food_log` (Ghi nhận bữa ăn ĐÃ ĂN)
+   - "sáng nay nên ăn gì" → `meal_plan` (Xem thực đơn SẼ ĂN)
+4. `emergency_triage` vs `refuse` / `metrics_delta_advice`:
+   - Dấu hiệu cấp cứu hạ đường huyết (run tay, vã mồ hôi, đói cồn cào, lơ mơ) → `unknown` (để kích hoạt triage cấp cứu)
+   - Yêu cầu kê đơn thuốc mới, đổi thuốc, chỉnh liều → `refuse` (chặn theo quy chuẩn an toàn y tế)
+
+Tin nhắn của bệnh nhân: "{message}"
+
+Trả lời CHỈ DUY NHẤT một từ là tên intent hợp lệ ({valid_intents_list}), tuyệt đối không kèm giải thích."""
 
         response = llm.invoke(prompt)
         intent = response.content.strip().lower().replace('"', '').replace("'", "")
