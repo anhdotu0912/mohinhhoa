@@ -9,8 +9,10 @@ import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { useQueueStore } from "@/lib/queue-store";
-import { ApiError, type DoctorPatientSummary } from "@/lib/types";
+import { ApiError, type DoctorPatientSummary, type MealPlanScheduleOut } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
+import { doctorChartHref, doctorReviewHref } from "@/lib/doctor-routes";
+import { visibleScheduleSlots } from "@/lib/plan-schedule-helpers";
 
 const PRIORITY_OPTIONS = [
   "Ưu tiên món quen thuộc",
@@ -19,6 +21,59 @@ const PRIORITY_OPTIONS = [
   "Món ăn mềm dễ tiêu hóa",
   "Nguyên liệu dễ tìm kiếm",
 ];
+
+type GenerateBlock = {
+  title: string;
+  body: string;
+  actionLabel: string;
+  actionHref: string;
+};
+
+function resolveGenerateBlock(
+  schedule: MealPlanScheduleOut,
+  patientId: string
+): GenerateBlock | null {
+  const filledSlots = visibleScheduleSlots(schedule).filter((slot) => slot.plan).length;
+  const unassignedCount = schedule.unassigned_plans.length;
+  const atCapacity = filledSlots + unassignedCount >= 3;
+
+  const pending = schedule.unassigned_plans.find((p) => p.status === "pending_review");
+  if (pending) {
+    return {
+      title: "Không thể tạo thực đơn mới",
+      body: atCapacity
+        ? "Bệnh nhân đã có đủ 3 thực đơn, trong đó 1 bản đang chờ duyệt. Duyệt hoặc xóa bản chờ duyệt trước khi tạo tiếp."
+        : "Bệnh nhân đã có thực đơn đang chờ duyệt. Mỗi người chỉ giữ 1 bản chờ duyệt — hãy duyệt hoặc xóa bản hiện tại trước khi tạo thêm.",
+      actionLabel: "Duyệt thực đơn",
+      actionHref: doctorReviewHref(patientId, pending.id),
+    };
+  }
+
+  const approved = schedule.unassigned_plans.find(
+    (p) => p.status === "approved" || p.status === "edited"
+  );
+  if (approved) {
+    return {
+      title: "Không thể tạo thực đơn mới",
+      body: atCapacity
+        ? "Bệnh nhân đã có đủ 3 thực đơn, trong đó 1 bản đã duyệt nhưng chưa xếp lịch. Áp dụng hoặc xóa bản đó trước khi tạo tiếp."
+        : "Bệnh nhân đã có thực đơn đã duyệt nhưng chưa xếp lịch. Hãy áp dụng hoặc xóa bản đó trước khi tạo thêm.",
+      actionLabel: "Mở lịch thực đơn",
+      actionHref: doctorChartHref(patientId, "history"),
+    };
+  }
+
+  if (filledSlots >= 3) {
+    return {
+      title: "Không thể tạo thực đơn mới",
+      body: "Bệnh nhân đã có đủ 3 thực đơn trên lịch (đã qua, đang áp dụng, xếp sẵn). Xóa một thực đơn hoặc đợi chu kỳ hiện tại kết thúc trước khi tạo tiếp.",
+      actionLabel: "Xem lịch thực đơn",
+      actionHref: doctorChartHref(patientId, "history"),
+    };
+  }
+
+  return null;
+}
 
 /** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") — khớp /doctor/patients. */
 function initials(name: string): string {
@@ -70,7 +125,8 @@ export default function DoctorGenerateMealPlanPage() {
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
   const [enqueueing, setEnqueueing] = useState(false);
-  const [generateBlocked, setGenerateBlocked] = useState<string | null>(null);
+  const [generateBlocked, setGenerateBlocked] = useState<GenerateBlock | null>(null);
+  const [scheduleChecked, setScheduleChecked] = useState(false);
 
   const openDrawer = useQueueStore((s) => s.openDrawer);
   const jobs = useQueueStore((s) => s.jobs);
@@ -135,28 +191,14 @@ export default function DoctorGenerateMealPlanPage() {
 
   useEffect(() => {
     if (!patientId || !token) return;
+    setScheduleChecked(false);
     void api
       .getPatientMealPlanSchedule(patientId)
       .then((schedule) => {
-        const pending = schedule.unassigned_plans.some(
-          (p) => p.status === "pending_review"
-        );
-        const approved = schedule.unassigned_plans.some(
-          (p) => p.status === "approved" || p.status === "edited"
-        );
-        if (pending) {
-          setGenerateBlocked(
-            "Bệnh nhân đã có thực đơn chờ duyệt. Hãy duyệt hoặc xóa trước khi tạo mới."
-          );
-        } else if (approved) {
-          setGenerateBlocked(
-            "Đã có thực đơn đã duyệt chưa áp dụng. Hãy áp dụng hoặc xóa trước khi tạo mới."
-          );
-        } else {
-          setGenerateBlocked(null);
-        }
+        setGenerateBlocked(resolveGenerateBlock(schedule, patientId));
       })
-      .catch(() => setGenerateBlocked(null));
+      .catch(() => setGenerateBlocked(null))
+      .finally(() => setScheduleChecked(true));
   }, [patientId, token]);
 
   const filteredPatients = allPatients.filter((p) => {
@@ -184,7 +226,7 @@ export default function DoctorGenerateMealPlanPage() {
 
   /** Đưa 1 bệnh nhân vào hàng đợi AI rồi chuyển sang trang theo dõi. */
   const handleStartGeneration = () => {
-    if (!patientId || !patient || enqueueing || generateBlocked) return;
+    if (!patientId || !patient || enqueueing || generateBlocked || !scheduleChecked) return;
 
     // Đã có job đang chờ/xử lý → mở bảng hàng đợi
     if (activeJob) {
@@ -247,8 +289,27 @@ export default function DoctorGenerateMealPlanPage() {
 
 
         {generateBlocked && (
-          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-950 font-medium">
-            {generateBlocked}
+          <div
+            id="generate-blocked-reason"
+            role="alert"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 shadow-xs"
+          >
+            <span className="material-symbols-outlined text-amber-800 text-[22px] shrink-0">
+              block
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-amber-950">{generateBlocked.title}</p>
+              <p className="text-xs text-amber-900 mt-1 leading-relaxed font-medium">
+                {generateBlocked.body}
+              </p>
+              <Link
+                href={generateBlocked.actionHref}
+                className="mt-3 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                {generateBlocked.actionLabel}
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            </div>
           </div>
         )}
 
@@ -344,10 +405,16 @@ export default function DoctorGenerateMealPlanPage() {
                           key={item}
                           type="button"
                           onClick={() => togglePriority(item)}
-                          className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${isSelected
-                            ? "bg-primary text-on-primary border-primary"
-                            : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
-                            }`}
+                          disabled={Boolean(generateBlocked)}
+                          className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all flex items-center gap-1 shadow-2xs ${
+                            generateBlocked
+                              ? "opacity-60 cursor-not-allowed"
+                              : "cursor-pointer active:scale-95"
+                          } ${
+                            isSelected
+                              ? "bg-primary text-on-primary border-primary"
+                              : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
+                          }`}
                         >
                           {isSelected && (
                             <span className="material-symbols-outlined text-[14px]">check</span>
@@ -359,10 +426,16 @@ export default function DoctorGenerateMealPlanPage() {
                     <button
                       type="button"
                       onClick={() => setIsCustomPriorityActive(!isCustomPriorityActive)}
-                      className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 ${isCustomPriorityActive
-                        ? "bg-primary text-on-primary border-primary"
-                        : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
-                        }`}
+                      disabled={Boolean(generateBlocked)}
+                      className={`px-3.5 py-1.5 rounded-md text-xs font-bold border transition-all flex items-center gap-1 shadow-2xs ${
+                        generateBlocked
+                          ? "opacity-60 cursor-not-allowed"
+                          : "cursor-pointer active:scale-95"
+                      } ${
+                        isCustomPriorityActive
+                          ? "bg-primary text-on-primary border-primary"
+                          : "bg-surface-container-low text-on-surface-variant border-outline-variant/60 hover:border-primary/50"
+                      }`}
                     >
                       {isCustomPriorityActive && (
                         <span className="material-symbols-outlined text-[14px]">check</span>
@@ -377,7 +450,8 @@ export default function DoctorGenerateMealPlanPage() {
                         value={customPriorityText}
                         onChange={(e) => setCustomPriorityText(e.target.value)}
                         placeholder="Nhập ưu tiên đặc biệt khác..."
-                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
+                        disabled={Boolean(generateBlocked)}
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant/60 rounded-lg text-xs font-body text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   )}
@@ -392,30 +466,55 @@ export default function DoctorGenerateMealPlanPage() {
                     onChange={(e) => setAiNotes(e.target.value)}
                     rows={3}
                     placeholder="Ví dụ: ưu tiên món hấp luộc miền Bắc, hạn chế đồ chiên xào..."
-                    className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none"
+                    disabled={Boolean(generateBlocked)}
+                    className="w-full p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg font-body text-xs text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
             </div>
 
             <div className="pt-6 border-t border-outline-variant/40 mt-6">
+              {generateBlocked && (
+                <p
+                  className="text-xs text-amber-900 font-semibold mb-3 leading-relaxed"
+                  id="generate-blocked-button-hint"
+                >
+                  Nút bị khóa — bệnh nhân đã đạt giới hạn thực đơn.
+                </p>
+              )}
               <button
                 onClick={handleStartGeneration}
-                disabled={enqueueing || Boolean(generateBlocked)}
+                disabled={enqueueing || Boolean(generateBlocked) || !scheduleChecked}
+                aria-describedby={
+                  generateBlocked
+                    ? "generate-blocked-reason generate-blocked-button-hint"
+                    : undefined
+                }
+                title={generateBlocked ? generateBlocked.title : undefined}
                 className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-on-primary font-bold py-3 px-6 rounded-lg transition-all shadow-2xs active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[20px]">
-                  {activeJob ? "queue" : "playlist_add"}
+                  {generateBlocked ? "block" : activeJob ? "queue" : "playlist_add"}
                 </span>
                 <span>
-                  {activeJob
-                    ? "Xem tiến trình trong hàng đợi"
-                    : "Thêm vào hàng đợi tạo thực đơn AI"}
+                  {generateBlocked
+                    ? "Không thể tạo thêm"
+                    : activeJob
+                      ? "Xem tiến trình trong hàng đợi"
+                      : "Thêm vào hàng đợi tạo thực đơn AI"}
                 </span>
               </button>
               <p className="text-[11px] text-on-surface-variant text-center mt-2 font-medium">
-                Vì thời gian sinh thực đơn khá lâu, job sẽ chạy trong hàng đợi — bạn có thể
-                chuyển tab / làm việc khác.
+                {generateBlocked ? (
+                  <Link
+                    href={generateBlocked.actionHref}
+                    className="text-amber-800 font-bold hover:underline"
+                  >
+                    {generateBlocked.actionLabel}
+                  </Link>
+                ) : (
+                  "Vì thời gian sinh thực đơn khá lâu, job sẽ chạy trong hàng đợi — bạn có thể chuyển tab / làm việc khác."
+                )}
               </p>
             </div>
           </div>
@@ -491,6 +590,7 @@ export default function DoctorGenerateMealPlanPage() {
               </div>
               <div className="space-y-2 text-xs text-on-surface-variant leading-relaxed font-medium">
                 <p>• 1 thực đơn 7 ngày, status chờ duyệt.</p>
+                <p>• Tối đa 3 thực đơn trên lịch: đã qua, đang áp dụng, xếp sẵn.</p>
                 <p>• Mỗi món kèm 1–2 món thay thế cùng nhóm.</p>
                 <p>• Job chạy tuần tự trong hàng đợi (FIFO).</p>
                 <p>• Tương tác thuốc nguy hiểm sẽ được đổi món và ghi vào nhật ký swap.</p>
