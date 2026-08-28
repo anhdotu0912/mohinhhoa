@@ -140,11 +140,30 @@ export default function PatientChatHomePage() {
   const isNearBottomRef = useRef(true);
   const rafScrollIdRef = useRef<number | null>(null);
   const prevActiveSessionIdRef = useRef<string | null>(null);
+  const skipSessionSyncRef = useRef(false);
+  const messagesRef = useRef(messages);
+  const appliedPlansRef = useRef(appliedPlans);
+  messagesRef.current = messages;
+  appliedPlansRef.current = appliedPlans;
 
-  // Synchronize active session messages into local component state ONLY when user changes session
+  // Keep the visible thread in sync with the selected session, including async fetches.
   useEffect(() => {
     if (!hydrated) return;
-    if (activeSessionId !== prevActiveSessionIdRef.current) {
+
+    if (skipSessionSyncRef.current) {
+      prevActiveSessionIdRef.current = activeSessionId;
+      return;
+    }
+
+    const prevId = prevActiveSessionIdRef.current;
+    if (prevId !== activeSessionId) {
+      if (prevId) {
+        const pending = messagesRef.current.filter((m) => !m.isStreaming);
+        if (pending.length > 0) {
+          void saveActiveSessionMessages(pending, appliedPlansRef.current, prevId);
+        }
+      }
+
       prevActiveSessionIdRef.current = activeSessionId;
       const currentSession = sessions.find((s) => s.id === activeSessionId);
       if (currentSession) {
@@ -154,8 +173,29 @@ export default function PatientChatHomePage() {
         setMessages([]);
         setAppliedPlans({});
       }
+      return;
     }
-  }, [activeSessionId, hydrated, sessions]);
+
+    if (isSending) return;
+
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    if (!currentSession) return;
+
+    setMessages((prev) => {
+      if (prev.some((m) => m.isStreaming)) return prev;
+      const stored = currentSession.messages || [];
+      if (stored.length === 0) return prev;
+      if (prev.length === 0 || stored.length > prev.length) return stored;
+      return prev;
+    });
+    setAppliedPlans((prev) => {
+      const stored = currentSession.appliedPlans || {};
+      if (Object.keys(prev).length === 0 && Object.keys(stored).length > 0) {
+        return stored;
+      }
+      return prev;
+    });
+  }, [activeSessionId, hydrated, sessions, isSending, saveActiveSessionMessages]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -208,8 +248,8 @@ export default function PatientChatHomePage() {
   const handleApplyMealPlan = useCallback((planId: string) => {
     const updated = { ...appliedPlans, [planId]: true };
     setAppliedPlans(updated);
-    void saveActiveSessionMessages(messages, updated);
-  }, [appliedPlans, messages, saveActiveSessionMessages]);
+    void saveActiveSessionMessages(messages, updated, activeSessionId);
+  }, [appliedPlans, messages, saveActiveSessionMessages, activeSessionId]);
 
   const mapAgentResponse = (
     response: AgentRunOutput,
@@ -288,15 +328,21 @@ export default function PatientChatHomePage() {
     let curSessionId = activeSessionId;
     if (!curSessionId) {
       try {
+        skipSessionSyncRef.current = true;
         curSessionId = await createNewSession();
         prevActiveSessionIdRef.current = curSessionId;
       } catch {
         /* fallback */
+      } finally {
+        skipSessionSyncRef.current = false;
       }
     }
     if (curSessionId) {
       void autoUpdateTitleIfFirstMessage(curSessionId, query);
     }
+
+    const stillOnSession = () =>
+      usePatientChatHistoryStore.getState().activeSessionId === curSessionId;
 
     let streamingText = "";
     let thinkingSteps: ThinkingStep[] = [
@@ -307,17 +353,27 @@ export default function PatientChatHomePage() {
       },
     ];
 
+    const persistIfNeeded = (finalMessages: Message[]) => {
+      if (curSessionId) {
+        void saveActiveSessionMessages(finalMessages, undefined, curSessionId);
+      }
+    };
+    const showIfCurrent = (next: Message[] | ((prev: Message[]) => Message[])) => {
+      if (!stillOnSession()) return;
+      setMessages(next);
+    };
+
     try {
       for await (const event of api.chatStream(query)) {
         if (event.type === "status") {
           thinkingSteps = upsertThinkingStep(thinkingSteps, event.node, event.message);
-          setMessages((prev) =>
+          showIfCurrent((prev) =>
             prev.map((m) =>
               m.id === aiMsgId ? { ...m, thinkingSteps: [...thinkingSteps] } : m
             )
           );
         } else if (event.type === "intent") {
-          setMessages((prev) =>
+          showIfCurrent((prev) =>
             prev.map((m) =>
               m.id === aiMsgId
                 ? {
@@ -330,14 +386,14 @@ export default function PatientChatHomePage() {
           );
         } else if (event.type === "token") {
           streamingText += event.content;
-          setMessages((prev) =>
+          showIfCurrent((prev) =>
             prev.map((m) =>
               m.id === aiMsgId ? { ...m, text: streamingText } : m
             )
           );
         } else if (event.type === "correction") {
           streamingText = event.message;
-          setMessages((prev) =>
+          showIfCurrent((prev) =>
             prev.map((m) =>
               m.id === aiMsgId
                 ? {
@@ -380,8 +436,8 @@ export default function PatientChatHomePage() {
                 }
               : m
           );
-          setMessages(finalMessages);
-          void saveActiveSessionMessages(finalMessages);
+          showIfCurrent(finalMessages);
+          persistIfNeeded(finalMessages);
         } else if (event.type === "error") {
           const finalMessages: Message[] = initialMessages.map((m) =>
             m.id === aiMsgId
@@ -392,8 +448,8 @@ export default function PatientChatHomePage() {
                 }
               : m
           );
-          setMessages(finalMessages);
-          void saveActiveSessionMessages(finalMessages);
+          showIfCurrent(finalMessages);
+          persistIfNeeded(finalMessages);
         }
       }
     } catch (err) {
@@ -410,8 +466,8 @@ export default function PatientChatHomePage() {
             }
           : m
       );
-      setMessages(finalMessages);
-      void saveActiveSessionMessages(finalMessages);
+      showIfCurrent(finalMessages);
+      persistIfNeeded(finalMessages);
     } finally {
       setIsSending(false);
     }

@@ -41,6 +41,7 @@ def _get_session_or_404(db: Session, user_id: str, session_id: str) -> ChatSessi
     session = (
         db.query(ChatSession)
         .options(joinedload(ChatSession.messages))
+        .populate_existing()
         .filter(ChatSession.id == session_id, ChatSession.user_id == user_id)
         .first()
     )
@@ -159,7 +160,10 @@ def replace_messages(
     db: Session, user_id: str, session_id: str, payload: ChatMessagesReplace
 ) -> ChatSessionOut:
     session = _get_session_or_404(db, user_id, session_id)
-    db.query(ChatMessage).filter(ChatMessage.session_id == session.id).delete()
+    db.query(ChatMessage).filter(ChatMessage.session_id == session.id).delete(
+        synchronize_session=False
+    )
+    db.expire(session, ["messages"])
     db.flush()
 
     for position, msg in enumerate(payload.messages):
@@ -177,6 +181,17 @@ def replace_messages(
     session.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(session)
-    # Reload messages in order
+    db.expire(session, ["messages"])
     session = _get_session_or_404(db, user_id, session_id)
+    # Identity-map can lag after bulk delete+insert; prefer the payload we just committed.
+    if len(session.messages) != len(payload.messages):
+        return ChatSessionOut(
+            id=session.id,
+            title=session.title,
+            pinned=bool(session.pinned),
+            applied_plans=session.applied_plans or {},
+            messages=[ChatMessageOut.model_validate(m.model_dump()) for m in payload.messages],
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+        )
     return _session_to_out(session)

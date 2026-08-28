@@ -104,6 +104,15 @@ function summaryToSession(summary: ChatSessionSummaryOut): ChatSession {
   };
 }
 
+const sessionSaveQueues = new Map<string, Promise<void>>();
+
+function enqueueSessionSave(sessionId: string, task: () => Promise<void>): Promise<void> {
+  const previous = sessionSaveQueues.get(sessionId) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(task);
+  sessionSaveQueues.set(sessionId, next);
+  return next;
+}
+
 function sessionOutToLocal(session: ChatSessionOut): ChatSession {
   return {
     id: session.id,
@@ -134,7 +143,8 @@ export interface PatientChatHistoryState {
   togglePinSession: (id: string) => Promise<void>;
   saveActiveSessionMessages: (
     messages: ChatMessage[],
-    appliedPlans?: Record<string, boolean>
+    appliedPlans?: Record<string, boolean>,
+    sessionId?: string | null
   ) => Promise<void>;
   autoUpdateTitleIfFirstMessage: (sessionId: string, firstQuery: string) => Promise<void>;
   clearAllSessions: () => Promise<void>;
@@ -192,14 +202,29 @@ export const usePatientChatHistoryStore = create<PatientChatHistoryState>()((set
   selectSession: async (id: string) => {
     set({ activeSessionId: id });
     const existing = get().sessions.find((s) => s.id === id);
-    if (existing && existing.messages.length > 0) {
+    const hasCachedMessages = Boolean(existing && existing.messages.length > 0);
+    if (hasCachedMessages) {
       return;
     }
     try {
       const remote = await api.getChatSession(id);
       const local = sessionOutToLocal(remote);
       set((state) => ({
-        sessions: state.sessions.map((s) => (s.id === id ? local : s)),
+        sessions: state.sessions.map((s) =>
+          s.id === id
+            ? {
+                ...local,
+                // Keep any messages saved while this fetch was in flight.
+                messages: s.messages.length > 0 ? s.messages : local.messages,
+                appliedPlans:
+                  Object.keys(s.appliedPlans || {}).length > 0
+                    ? s.appliedPlans
+                    : local.appliedPlans,
+                messageCount:
+                  s.messages.length > 0 ? s.messages.length : local.messageCount,
+              }
+            : s
+        ),
       }));
     } catch {
       /* keep cached metadata */
@@ -225,17 +250,24 @@ export const usePatientChatHistoryStore = create<PatientChatHistoryState>()((set
 
   deleteSession: async (id: string) => {
     await api.deleteChatSession(id);
+    const previousActiveId = get().activeSessionId;
+    let nextActiveId: string | null = null;
     set((state) => {
       const nextSessions = state.sessions.filter((s) => s.id !== id);
-      let nextActiveId = state.activeSessionId;
-      if (state.activeSessionId === id) {
-        nextActiveId = nextSessions.length > 0 ? nextSessions[0].id : null;
-      }
+      nextActiveId =
+        state.activeSessionId === id
+          ? nextSessions.length > 0
+            ? nextSessions[0].id
+            : null
+          : state.activeSessionId;
       return {
         sessions: nextSessions,
         activeSessionId: nextActiveId,
       };
     });
+    if (nextActiveId && previousActiveId === id) {
+      await get().selectSession(nextActiveId);
+    }
   },
 
   togglePinSession: async (id: string) => {
@@ -255,17 +287,21 @@ export const usePatientChatHistoryStore = create<PatientChatHistoryState>()((set
     }));
   },
 
-  saveActiveSessionMessages: async (messages: ChatMessage[], appliedPlans?: Record<string, boolean>) => {
-    const { activeSessionId, sessions } = get();
-    if (!activeSessionId) return;
+  saveActiveSessionMessages: async (
+    messages: ChatMessage[],
+    appliedPlans?: Record<string, boolean>,
+    sessionId?: string | null
+  ) => {
+    const targetId = sessionId ?? get().activeSessionId;
+    if (!targetId) return;
 
     const persistMessages = messages
       .filter((m) => !m.isStreaming)
       .map(localMessageToApi);
 
-    set({
-      sessions: sessions.map((s) =>
-        s.id === activeSessionId
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === targetId
           ? {
               ...s,
               messages,
@@ -275,27 +311,34 @@ export const usePatientChatHistoryStore = create<PatientChatHistoryState>()((set
             }
           : s
       ),
-    });
+    }));
 
-    try {
-      const updated = await api.replaceChatSessionMessages(activeSessionId, persistMessages);
-      if (appliedPlans) {
-        await api.patchChatSession(activeSessionId, { applied_plans: appliedPlans });
+    return enqueueSessionSave(targetId, async () => {
+      try {
+        const updated = await api.replaceChatSessionMessages(targetId, persistMessages);
+        if (appliedPlans) {
+          await api.patchChatSession(targetId, { applied_plans: appliedPlans });
+        }
+        const local = sessionOutToLocal(updated);
+        set((state) => ({
+          sessions: state.sessions.map((s) => {
+            if (s.id !== targetId) return s;
+            const messagesToKeep =
+              local.messages.length > 0 || persistMessages.length === 0
+                ? local.messages
+                : s.messages;
+            return {
+              ...local,
+              messages: messagesToKeep,
+              appliedPlans: appliedPlans ?? local.appliedPlans ?? s.appliedPlans,
+              messageCount: messagesToKeep.length,
+            };
+          }),
+        }));
+      } catch {
+        /* optimistic UI retained */
       }
-      const local = sessionOutToLocal(updated);
-      set((state) => ({
-        sessions: state.sessions.map((s) =>
-          s.id === activeSessionId
-            ? {
-                ...local,
-                appliedPlans: appliedPlans ?? local.appliedPlans,
-              }
-            : s
-        ),
-      }));
-    } catch {
-      /* optimistic UI retained */
-    }
+    });
   },
 
   autoUpdateTitleIfFirstMessage: async (sessionId: string, firstQuery: string) => {
