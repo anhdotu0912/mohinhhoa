@@ -1,4 +1,4 @@
-"""P-014 Nutrition Agent API — FastAPI entrypoint."""
+"""VinNutri API — FastAPI entrypoint."""
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="P-014 Nutrition Agent API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="VinNutri API", version="0.1.0", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

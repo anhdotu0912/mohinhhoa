@@ -4,6 +4,7 @@ import React from "react";
 import type { NotificationOut } from "@/lib/types";
 import { usePatientPanel } from "../PatientPanelProvider";
 import { useAuthStore } from "@/lib/auth-store";
+import { APP_NAME } from "@/lib/brand";
 
 interface NotificationDetailModalProps {
   notification: NotificationOut;
@@ -94,7 +95,7 @@ export function NotificationDetailModal({
               </h3>
               <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-500 font-medium pt-0.5">
                 <span className="font-semibold text-emerald-800 truncate">
-                  {isManualReminder ? doctorLabel : "Hệ thống y tế VMEC-10"}
+                  {isManualReminder ? doctorLabel : `Hệ thống y tế ${APP_NAME}`}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0" />
                 <span className="shrink-0">{formattedTime}</span>

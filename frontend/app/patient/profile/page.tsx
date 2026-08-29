@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { APP_NAME } from "@/lib/brand";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { AVATAR_PRESETS } from "@/lib/avatar-presets";
 import {
@@ -1080,7 +1081,7 @@ export default function PatientProfilePage() {
                   </div>
 
                   <h2 className="text-xl font-bold text-on-surface">
-                    {user?.full_name || displayName || "Bệnh nhân VMEC-10"}
+                    {user?.full_name || displayName || `Bệnh nhân ${APP_NAME}`}
                   </h2>
                   <p className="text-xs text-on-surface-variant mt-0.5 truncate max-w-full">
                     {user?.email ?? email}

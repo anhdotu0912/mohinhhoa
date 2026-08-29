@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { APP_NAME } from "@/lib/brand";
 
 interface Scenario {
   id: "meal" | "drug" | "compliance" | "doctor";
@@ -175,7 +176,7 @@ export function ClinicalChatLoopPreview() {
           </div>
           <div className="min-w-0">
             <div className="font-bold text-xs text-white leading-tight flex items-center gap-1.5 truncate">
-              <span>Trợ lý Dinh dưỡng VMEC-10</span>
+              <span>Trợ lý Dinh dưỡng {APP_NAME}</span>
             </div>
             <div className="text-[10px] text-teal-100/80 font-normal mt-0.5 truncate">
               Hỗ trợ cá nhân hóa 24/7
@@ -405,7 +406,7 @@ export function ClinicalChatLoopPreview() {
                         <span className="material-symbols-outlined text-[13px]">verified</span>
                         <span>Đã xác nhận y lệnh điều trị</span>
                       </span>
-                      <span className="text-slate-400">Hệ thống Y tế VMEC</span>
+                      <span className="text-slate-400">Hệ thống Y tế {APP_NAME}</span>
                     </div>
                   </div>
                 )}

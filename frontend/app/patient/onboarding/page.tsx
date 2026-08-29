@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { APP_NAME } from "@/lib/brand";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import {
@@ -372,7 +373,7 @@ export default function PatientOnboardingPage() {
             <span className="material-symbols-outlined text-[22px]">vital_signs</span>
           </div>
           <span className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
-            VMEC-10
+            {APP_NAME}
           </span>
         </div>
         <p className="font-caption text-caption text-on-surface-variant text-xs">

@@ -1,4 +1,4 @@
-# P-014 — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
+# P-014 — VinNutri — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
 
 Prototype giúp bệnh nhân đái tháo đường Type 2 nhận thực đơn 7 ngày cá nhân hoá, cảnh báo tương tác thuốc–thực phẩm, nhắc tuân thủ (compliance), và dashboard cho bác sĩ/chuyên gia dinh dưỡng duyệt thực đơn.
 

@@ -11,6 +11,7 @@ import { HealthMetricsPanel } from "./panels/HealthMetricsPanel";
 import { PatientChatSidebar } from "./PatientChatSidebar";
 import { usePatientChatHistoryStore } from "@/lib/patient-chat-history-store";
 import { useAuthStore } from "@/lib/auth-store";
+import { APP_NAME } from "@/lib/brand";
 
 function ShellInner({ children }: { children: ReactNode }) {
   const { activePanel, openPanel, closePanel, hasUnseenBadge } = usePatientPanel();
@@ -66,7 +67,7 @@ function ShellInner({ children }: { children: ReactNode }) {
           </button>
           <div className="flex items-center gap-1.5">
             <span className="font-extrabold text-base text-[#006857] tracking-tight">
-              VMEC-10
+              {APP_NAME}
             </span>
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200/60">
               AI

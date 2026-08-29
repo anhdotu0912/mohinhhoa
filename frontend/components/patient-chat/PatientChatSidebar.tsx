@@ -12,6 +12,7 @@ import {
   groupSessionsByRecency,
   type ChatSession,
 } from "@/lib/patient-chat-history-store";
+import { APP_NAME } from "@/lib/brand";
 
 interface PatientChatSidebarProps {
   onSelectSession?: (sessionId: string) => void;
@@ -303,7 +304,7 @@ export function PatientChatSidebar({
               className="flex items-center gap-1.5 hover:opacity-90 transition-opacity"
             >
               <span className="font-extrabold text-sm text-[#006857] tracking-tight">
-                VMEC-10
+                {APP_NAME}
               </span>
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200/60">
                 AI

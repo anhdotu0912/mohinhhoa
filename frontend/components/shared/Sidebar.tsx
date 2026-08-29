@@ -15,6 +15,7 @@ import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { buildInboxJobs } from "@/lib/doctor-inbox";
 import type { MealPlanOutput } from "@/lib/types";
+import { APP_NAME } from "@/lib/brand";
 
 type SidebarProps = {
   role: AppRole;
@@ -216,7 +217,7 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
         <div className="px-sm mb-lg">
           <Link href={meta.homeHref} className="block">
             <h2 className="font-h2 text-h2 text-primary font-bold tracking-tight">
-              VMEC-10
+              {APP_NAME}
             </h2>
             <p className="font-caption text-caption text-on-surface-variant">
               {meta.brandSubtitle}
@@ -238,7 +239,7 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
           <nav className="relative bg-surface-container-lowest text-primary w-[260px] h-full flex flex-col p-md shadow-xl z-10">
             <div className="flex justify-between items-center px-sm mb-lg border-b border-outline-variant/40 pb-md">
               <div>
-                <h2 className="font-h2 text-h2 text-primary font-bold">VMEC-10</h2>
+                <h2 className="font-h2 text-h2 text-primary font-bold">{APP_NAME}</h2>
                 <p className="font-caption text-caption text-on-surface-variant">
                   {meta.brandSubtitle}
                 </p>

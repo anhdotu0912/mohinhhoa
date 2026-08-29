@@ -1,4 +1,4 @@
-# API v1 Contract — VMEC-10 (FE ↔ BE)
+# API v1 Contract — VinNutri (FE ↔ BE)
 
 **Version:** 1.16 (2026-08-29 — Doctor Profile & Clinical Statistics: `GET|PUT /doctor/profile`. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.

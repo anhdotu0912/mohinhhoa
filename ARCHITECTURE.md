@@ -1,8 +1,8 @@
-# Architecture Document — VMEC-10 (P-014)
+# Architecture Document — VinNutri (P-014)
 
 ## System Overview
 
-**VMEC-10** là hệ thống AI Agent hỗ trợ tư vấn dinh dưỡng lâm sàng và quản lý lối sống cá nhân hóa cho bệnh nhân mắc các bệnh lý mãn tính (đái tháo đường, tăng huyết áp, gout, bệnh thận). Hệ thống kết hợp quy trình **Human-in-the-Loop (HITL)** bắt buộc: AI tự động phân tích hồ sơ, tìm kiếm phác đồ/guideline y văn thông qua RAG, kiểm tra tương tác thuốc - thực phẩm và sinh thực đơn 7 ngày; bác sĩ/chuyên gia dinh dưỡng giữ quyền kiểm duyệt, phê duyệt và điều chỉnh kế hoạch trước khi ban hành chính thức cho bệnh nhân.
+**VinNutri** là hệ thống AI Agent hỗ trợ tư vấn dinh dưỡng lâm sàng và quản lý lối sống cá nhân hóa cho bệnh nhân mắc các bệnh lý mãn tính (đái tháo đường, tăng huyết áp, gout, bệnh thận). Hệ thống kết hợp quy trình **Human-in-the-Loop (HITL)** bắt buộc: AI tự động phân tích hồ sơ, tìm kiếm phác đồ/guideline y văn thông qua RAG, kiểm tra tương tác thuốc - thực phẩm và sinh thực đơn 7 ngày; bác sĩ/chuyên gia dinh dưỡng giữ quyền kiểm duyệt, phê duyệt và điều chỉnh kế hoạch trước khi ban hành chính thức cho bệnh nhân.
 
 Hệ thống được thiết kế theo kiến trúc 3-Tier hiện đại: Frontend SPA/SSR phân quyền đa vai trò (Bác sĩ & Bệnh nhân), Backend RESTful API hiệu năng cao với FastAPI, và AI Orchestration Core điều phối bởi LangGraph kết hợp Vector Database Qdrant cùng cơ sở dữ liệu quan hệ PostgreSQL.
 

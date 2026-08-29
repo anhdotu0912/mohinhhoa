@@ -1,6 +1,6 @@
-# Weekly Journal — Team VMEC-10 (P-014)
+# Weekly Journal — Team VinNutri (P-014)
 
-> **Dự án:** VMEC-10 — AI Agent Trợ Lý Dinh Dưỡng Lâm Sàng & Lối Sống Theo Bệnh Lý (VinUni AI20K Build Phase)  
+> **Dự án:** VinNutri — AI Agent Trợ Lý Dinh Dưỡng Lâm Sàng & Lối Sống Theo Bệnh Lý (VinUni AI20K Build Phase)  
 > **Mục đích:** Ghi lại tiến độ hàng tuần, bài học kinh nghiệm, các quyết định kiến trúc quan trọng và kế hoạch phát triển.
 
 ---

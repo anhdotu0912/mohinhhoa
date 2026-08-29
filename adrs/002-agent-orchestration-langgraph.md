@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-VMEC-10 cần một orchestration layer cho AI agent xử lý nhiều loại yêu cầu của bệnh nhân (lập thực đơn, hỏi tương tác thuốc–thực phẩm, hỏi RAG Q&A, ghi nhận ăn uống, từ chối các yêu cầu ngoài phạm vi) qua một entry point chat duy nhất (`POST /chat`). Cần:
+VinNutri cần một orchestration layer cho AI agent xử lý nhiều loại yêu cầu của bệnh nhân (lập thực đơn, hỏi tương tác thuốc–thực phẩm, hỏi RAG Q&A, ghi nhận ăn uống, từ chối các yêu cầu ngoài phạm vi) qua một entry point chat duy nhất (`POST /chat`). Cần:
 - Một state machine rõ ràng để dễ thêm node mới (ví dụ node mới cho intent `metrics_advice` — xem `adrs/010-patient-metrics-history-strategy.md`).
 - Khả năng route theo intent được phân loại từ tin nhắn tự nhiên.
 - Một facade function đơn giản cho BE2 gọi, không cần biết chi tiết bên trong graph (đúng luật boundary BE1/BE2 trong `CLAUDE.md` Mục 5).

@@ -12,7 +12,7 @@ Bệnh nhân (đặc biệt là bệnh nhân mắc các bệnh mãn tính như �
 
 ## Product Purpose
 
-Cung cấp trợ lý dinh dưỡng lâm sàng cá nhân hoá thông minh (VMEC-10), giúp người bệnh xây dựng thực đơn an toàn, tra cứu tương tác thuốc - món ăn, ghi nhật ký ăn uống và theo dõi các chỉ số sức khoẻ một cách khoa học, trực quan và dễ tiếp cận.
+Cung cấp trợ lý dinh dưỡng lâm sàng cá nhân hoá thông minh (VinNutri), giúp người bệnh xây dựng thực đơn an toàn, tra cứu tương tác thuốc - món ăn, ghi nhật ký ăn uống và theo dõi các chỉ số sức khoẻ một cách khoa học, trực quan và dễ tiếp cận.
 
 ## Positioning
 
@@ -38,7 +38,7 @@ Trợ lý AI dinh dưỡng lâm sàng cá nhân hoá tuân thủ nghiêm ngặt 
 
 ## Brand Commitments
 
-- **Tên hệ thống**: VMEC-10 (P-014) Clinical Nutrition AI Assistant.
+- **Tên hệ thống**: VinNutri (P-014) Clinical Nutrition AI Assistant.
 - **Tone & Voice**: Chuyên nghiệp, chuẩn mực y khoa, đáng tin cậy, thấu hiểu và ân cần với người bệnh.
 - **Thiết kế**: Giao diện trực quan, rõ ràng, phân cấp thị giác tốt, dễ đọc cho người lớn tuổi / bệnh nhân mãn tính.
 
