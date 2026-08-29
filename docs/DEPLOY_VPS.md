@@ -371,14 +371,22 @@ Endpoint demo (`POST /notifications/demo/simulate`, `POST /doctor/demo/plan-expi
 
 ## 11. Tài khoản demo
 
-| Role | Email | Mật khẩu |
-|---|---|---|
-| Bác sĩ | `demo_doctor@example.com` | `demo1234` |
-| Bệnh nhân 1 | `demo_patient_1@example.com` | `demo1234` |
-| Bệnh nhân 2 | `demo_patient_2@example.com` | `demo1234` |
-| Bệnh nhân 3 | `demo_patient_3@example.com` | `demo1234` |
+Backend **không** tự tạo demo khi start (mọi `APP_ENV`). Tạo thủ công qua CLI **trong container backend** hoặc từ máy có `DATABASE_URL` trỏ Postgres VPS:
 
-Tài khoản được seed tự động lúc backend start lần đầu.
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m scripts.create_demo_accounts
+```
+
+Non-interactive:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend \
+  python -m scripts.create_demo_accounts --password 'your-secret-min-8' --reset-passwords -y
+```
+
+Mật khẩu chỉ in ra terminal lúc chạy CLI — không ghi vào repo hay log app. Khi không cần demo nữa, xóa user demo khỏi Postgres thủ công.
+
+Endpoint demo API (`POST /notifications/demo/simulate`, `POST /doctor/demo/plan-expiry`) vẫn trả **403** khi `APP_ENV=production`.
 
 ---
 

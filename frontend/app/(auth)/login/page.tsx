@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { homePathForRole, useAuthStore } from "@/lib/auth-store";
 import { ApiError } from "@/lib/types";
-import { DemoAccountsCard } from "./DemoAccountsCard";
+import { BackToHomeLink } from "../BackToHomeLink";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,7 +61,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-md font-body">
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl shadow-md max-w-md w-full">
+      <div className="max-w-md w-full">
+        <BackToHomeLink />
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-xl shadow-md w-full">
         <div className="text-center mb-lg">
           <Link href="/" className="inline-block mb-xs">
             <h1 className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
@@ -122,14 +124,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* DEMO ONLY — xóa cùng file DemoAccountsCard.tsx */}
-        <DemoAccountsCard
-          onPick={(demoEmail, demoPassword) => {
-            setEmail(demoEmail);
-            setPassword(demoPassword);
-          }}
-        />
-
         <div className="mt-lg pt-md border-t border-outline-variant/40 text-center space-y-2">
           <p className="font-caption text-caption text-on-surface-variant text-xs">
             <Link href="/forgot-password" className="text-primary font-bold hover:underline">
@@ -142,6 +136,7 @@ export default function LoginPage() {
               Đăng ký tài khoản mới
             </Link>
           </p>
+        </div>
         </div>
       </div>
     </div>

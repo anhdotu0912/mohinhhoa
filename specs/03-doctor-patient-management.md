@@ -16,7 +16,7 @@ Bác sĩ cần 1 nơi duy nhất để thêm bệnh nhân mới (gắn ngay vào
 1. **Phân công 1–1** — `users.assigned_doctor_id` (nullable). `GET /doctor/patients` chỉ trả bệnh nhân gắn với bác sĩ đang đăng nhập. Mọi endpoint doctor theo `patient_id` hoặc meal-plan của bệnh nhân không thuộc mình → `404 PATIENT_NOT_FOUND` (không lộ sự tồn tại).
 2. Thêm bệnh nhân hộ = `POST /doctor/patients` (auth doctor) — tạo user `role=patient`, `signup_channel=doctor`, gắn ngay `assigned_doctor_id`. **Không** dùng `POST /auth/register` cho luồng này (register công khai luôn để bệnh nhân tự đăng ký, không gắn bác sĩ). Sau khi có `user_id`, doctor gọi tiếp `PUT /doctor/patients/{id}/profile` để bổ sung chi tiết.
 3. Bệnh nhân tự `POST /auth/register` → `assigned_doctor_id=null`, `signup_channel=self` → xuất hiện trên `GET /doctor/claim-queue` của **mọi** bác sĩ (`source=self_register`).
-4. Dữ liệu cũ / seed demo chưa gắn → `signup_channel=legacy`, cùng hàng chờ (`source=unassigned_pool`).
+4. Dữ liệu cũ / seed demo: `demo_patient_1`–`4` gắn sẵn `demo_doctor`; `demo_patient_5` và patient legacy chưa gắn → `signup_channel=legacy`, hàng chờ (`source=unassigned_pool`).
 5. `POST /doctor/patients/{id}/claim` — chỉ khi chưa gắn; ai gọi trước thì nhận; đã là chủ → 200 idempotent; đã thuộc người khác → `409 ALREADY_ASSIGNED`.
 6. `POST /doctor/patients/{id}/transfer` — chỉ bác sĩ đang quản lý; tạo `patient_transfers` status `pending`; quyền **chưa** đổi. Một patient chỉ một pending — gửi mới huỷ pending cũ. Bác sĩ đích thấy item `kind=transfer` trên claim-queue. Bệnh nhân vẫn thấy tên bác sĩ cũ cho đến khi accept.
 7. `POST /doctor/transfers/{id}/accept` — chỉ `to_doctor_id`; gán `assigned_doctor_id` sang caller, `accepted`; huỷ pending khác (nếu có).

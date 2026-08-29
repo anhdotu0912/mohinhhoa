@@ -53,6 +53,8 @@ class Settings(BaseSettings):
 
     # App
     APP_ENV: str = "development"
+    # Optional — pytest / programmatic seed; prefer CLI `scripts.create_demo_accounts`.
+    DEMO_PASSWORD: str = ""
     CORS_ORIGINS: str = "http://localhost:3000"
     FRONTEND_URL: str = "http://localhost:3000"
 

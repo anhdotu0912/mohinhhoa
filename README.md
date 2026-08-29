@@ -129,17 +129,27 @@ Vector store duy nhất: **Qdrant** (`QDRANT_PERSIST_DIR`, mặc định `./qdra
 
 ## Demo accounts
 
-Seed mặc định khi backend khởi động (xem `backend/app/db/init_db.py`):
+Backend **không** tự tạo demo khi khởi động. Dùng CLI (local hoặc trên VPS sau khi bạn dọn DB):
 
-| Role | Email | Password |
-|---|---|---|
-| Bác sĩ 1 | `demo_doctor@example.com` | `demo1234` |
-| Bác sĩ 2 | `demo_doctor_2@example.com` | `demo1234` |
-| Bệnh nhân 1 | `demo_patient_1@example.com` | `demo1234` (Nguyễn Văn A) |
-| Bệnh nhân 2 | `demo_patient_2@example.com` | `demo1234` (Trần Thị B) |
-| Bệnh nhân 3 | `demo_patient_3@example.com` | `demo1234` (Lê Văn C) |
+```bash
+cd backend
+python -m scripts.create_demo_accounts
+```
 
-Bệnh nhân demo ban đầu **chưa gắn bác sĩ** — đăng nhập bác sĩ, vào **Hàng việc → Chờ nhận** rồi bấm **Nhận**. Bệnh nhân do bác sĩ thêm hộ thì gắn ngay vào bác sĩ đó.
+Non-interactive (CI / script):
+
+```bash
+python -m scripts.create_demo_accounts --password 'your-secret-min-8' --reset-passwords -y
+```
+
+| Role | Email |
+|---|---|
+| Bác sĩ 1 | `demo_doctor@example.com` |
+| Bác sĩ 2 | `demo_doctor_2@example.com` |
+| Bệnh nhân 1–4 | `demo_patient_1@example.com` … `demo_patient_4@example.com` (gắn sẵn BS. Minh) |
+| Bệnh nhân 5 | `demo_patient_5@example.com` (chưa gắn — demo Hàng việc) |
+
+Mật khẩu chỉ hiện trên terminal khi chạy CLI — **không** ghi vào repo. Production: chỉ chạy khi chủ đích (staging/chấm điểm); dọn account demo trên VPS bằng tay khi không cần.
 
 ---
 
