@@ -530,7 +530,7 @@ Test SSL staging (tránh hết quota Let's Encrypt khi thử):
 
 ## Tài liệu liên quan
 
-- Chạy local dev: [`how_to_run.md`](../how_to_run.md)
+- Chạy local dev: [`README.md`](../README.md)
 - Biến môi trường mẫu: [`.env.example`](../.env.example)
 - Template IP-only: [`.env.vps`](../.env.vps) (không commit secret lên git)
 - ADR database: [`adrs/005-database-choice.md`](../adrs/005-database-choice.md)

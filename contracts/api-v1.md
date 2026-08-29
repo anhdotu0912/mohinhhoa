@@ -80,7 +80,7 @@
 // Error 500 { "code": "EMAIL_SEND_FAILED", "detail": "Không gửi được email. Vui lòng thử lại sau." }
 ```
 
-Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định trong code (xem `how_to_run.md`).
+Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định trong code (xem README.md — mục Troubleshooting / Quên mật khẩu).
 
 ### `POST /auth/reset-password` (as-built 2026-08-18)
 **Role:** Không cần auth, dùng token gửi qua email ở bước trên.
