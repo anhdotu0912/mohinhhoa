@@ -209,6 +209,8 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+type QuickFilterKey = "all" | "active" | "pending" | "request";
+
 export default function PatientsListPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -221,6 +223,7 @@ export default function PatientsListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [diagnosisFilter, setDiagnosisFilter] = useState<string>("all");
   const [usageTab, setUsageTab] = useState<UsageTab>("all");
+  const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -327,13 +330,28 @@ export default function PatientsListPage() {
       if (diagnosisFilter !== "all" && !(patient.disease ?? []).includes(diagnosisFilter)) {
         return false;
       }
+
+      // Quick KPI Filter
+      if (quickFilter === "active" && patientUsageStatus(patient) !== "active") {
+        return false;
+      }
+      if (quickFilter === "pending" && (patient.planPending ?? 0) <= 0) {
+        return false;
+      }
+      if (
+        quickFilter === "request" &&
+        (patient.mealPlanRequestStatus ?? "none") !== "pending"
+      ) {
+        return false;
+      }
+
       const usage = patientUsageStatus(patient);
       if (usageTab === "none" && usage !== "none") return false;
       if (usageTab === "active" && usage !== "active") return false;
       if (usageTab === "finished" && usage !== "finished") return false;
       return true;
     });
-  }, [patients, searchQuery, diagnosisFilter, usageTab]);
+  }, [patients, searchQuery, diagnosisFilter, quickFilter, usageTab]);
 
   const usageTabCounts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -391,7 +409,7 @@ export default function PatientsListPage() {
   // Về trang 1 khi đổi tab lọc / từ khóa tìm kiếm
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, diagnosisFilter, usageTab]);
+  }, [searchQuery, diagnosisFilter, usageTab, quickFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -705,63 +723,199 @@ export default function PatientsListPage() {
           </div>
         </div>
 
-        {/* 4 Clinical KPI Chips */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[20px]">groups</span>
+        {/* 4 Interactive Clinical KPI Filter Cards */}
+        <div
+          role="tablist"
+          aria-label="Lọc nhanh danh sách bệnh nhân theo trạng thái"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+        >
+          {/* Card 1: Tổng bệnh nhân */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quickFilter === "all"}
+            onClick={() => {
+              setQuickFilter("all");
+              setUsageTab("all");
+            }}
+            title="Xem tất cả bệnh nhân"
+            className={`group relative p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              quickFilter === "all"
+                ? "bg-primary/[0.06] border-primary ring-2 ring-primary/20 shadow-xs"
+                : "bg-surface-container-lowest border-outline-variant/60 hover:border-primary/40 hover:bg-surface-container-low/40"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  quickFilter === "all"
+                    ? "bg-primary text-on-primary"
+                    : "bg-primary/10 text-primary group-hover:bg-primary/15"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">groups</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                  Tổng bệnh nhân
+                </span>
+                <span className="text-xl font-black text-on-surface tabular-nums block">
+                  {patients.length}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Tổng bệnh nhân
+            {quickFilter === "all" && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white shrink-0">
+                Đang lọc
               </span>
-              <span className="text-xl font-black text-on-surface tabular-nums">
-                {patients.length}
-              </span>
-            </div>
-          </div>
+            )}
+          </button>
 
-          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[20px]">play_circle</span>
+          {/* Card 2: Đang áp dụng thực đơn */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quickFilter === "active"}
+            onClick={() => {
+              setQuickFilter((prev) => (prev === "active" ? "all" : "active"));
+              setUsageTab("all");
+            }}
+            title="Lọc bệnh nhân đang áp dụng thực đơn"
+            className={`group relative p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+              quickFilter === "active"
+                ? "bg-emerald-500/[0.08] border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
+                : "bg-surface-container-lowest border-outline-variant/60 hover:border-emerald-500/40 hover:bg-emerald-50/20"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  quickFilter === "active"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-emerald-500/10 text-emerald-800 group-hover:bg-emerald-500/15"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">play_circle</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                  Đang áp dụng thực đơn
+                </span>
+                <span className="text-xl font-black text-emerald-900 tabular-nums block">
+                  {activeUsageCount}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Đang áp dụng thực đơn
+            {quickFilter === "active" && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-700 text-white shrink-0">
+                Đang lọc
               </span>
-              <span className="text-xl font-black text-emerald-900 tabular-nums">
-                {activeUsageCount}
-              </span>
-            </div>
-          </div>
+            )}
+          </button>
 
-          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
+          {/* Card 3: Thực đơn chờ duyệt */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quickFilter === "pending"}
+            onClick={() => {
+              setQuickFilter((prev) => (prev === "pending" ? "all" : "pending"));
+              setUsageTab("all");
+            }}
+            title="Lọc bệnh nhân có thực đơn cần bác sĩ phê duyệt"
+            className={`group relative p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              quickFilter === "pending"
+                ? "bg-amber-500/[0.08] border-amber-600 ring-2 ring-amber-500/20 shadow-xs"
+                : "bg-surface-container-lowest border-outline-variant/60 hover:border-amber-500/40 hover:bg-amber-50/20"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  quickFilter === "pending"
+                    ? "bg-amber-600 text-white"
+                    : "bg-amber-500/10 text-amber-800 group-hover:bg-amber-500/15"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
+                {pendingPlanCount > 0 && quickFilter !== "pending" && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-surface-container-lowest animate-pulse" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                  Thực đơn chờ duyệt
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl font-black text-amber-900 tabular-nums">
+                    {pendingPlanCount}
+                  </span>
+                  {pendingPlanCount > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                      Cần xử lý
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Thực đơn chờ duyệt
+            {quickFilter === "pending" && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-700 text-white shrink-0">
+                Đang lọc
               </span>
-              <span className="text-xl font-black text-amber-900 tabular-nums">
-                {pendingPlanCount}
-              </span>
-            </div>
-          </div>
+            )}
+          </button>
 
-          <div className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[20px]">notifications_active</span>
+          {/* Card 4: Yêu cầu tạo thực đơn */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quickFilter === "request"}
+            onClick={() => {
+              setQuickFilter((prev) => (prev === "request" ? "all" : "request"));
+              setUsageTab("all");
+            }}
+            title="Lọc bệnh nhân có yêu cầu tạo thực đơn mới"
+            className={`group relative p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+              quickFilter === "request"
+                ? "bg-sky-500/[0.08] border-sky-600 ring-2 ring-sky-500/20 shadow-xs"
+                : "bg-surface-container-lowest border-outline-variant/60 hover:border-sky-500/40 hover:bg-sky-50/20"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  quickFilter === "request"
+                    ? "bg-sky-600 text-white"
+                    : "bg-sky-500/10 text-sky-800 group-hover:bg-sky-500/15"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">notifications_active</span>
+                {requestPlanCount > 0 && quickFilter !== "request" && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-surface-container-lowest animate-pulse" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                  Yêu cầu tạo thực đơn
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl font-black text-sky-900 tabular-nums">
+                    {requestPlanCount}
+                  </span>
+                  {requestPlanCount > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-100 text-sky-800">
+                      Mới
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-                Yêu cầu tạo thực đơn
+            {quickFilter === "request" && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-700 text-white shrink-0">
+                Đang lọc
               </span>
-              <span className="text-xl font-black text-sky-900 tabular-nums">
-                {requestPlanCount}
-              </span>
-            </div>
-          </div>
+            )}
+          </button>
         </div>
 
         {error && (
@@ -773,6 +927,111 @@ export default function PatientsListPage() {
               className="underline cursor-pointer font-bold"
             >
               Đóng
+            </button>
+          </div>
+        )}
+
+        {/* Active Filter Summary Bar (if any filter is applied) */}
+        {(quickFilter !== "all" ||
+          diagnosisFilter !== "all" ||
+          searchQuery.trim() !== "" ||
+          usageTab !== "all") && (
+          <div className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container-low/80 border border-outline-variant/60 text-xs animate-fadeIn">
+            <div className="flex items-center flex-wrap gap-2 text-on-surface-variant">
+              <span className="font-bold text-on-surface flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px] text-primary">
+                  filter_alt
+                </span>
+                Đang lọc:
+              </span>
+              <span className="font-bold text-primary font-mono tabular-nums">
+                {filteredPatients.length} / {patients.length}
+              </span>
+              <span>bệnh nhân</span>
+
+              {quickFilter !== "all" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-primary/30 font-semibold text-primary shadow-2xs">
+                  <span>
+                    {quickFilter === "active" && "Đang áp dụng thực đơn"}
+                    {quickFilter === "pending" && "Thực đơn chờ duyệt"}
+                    {quickFilter === "request" && "Yêu cầu tạo thực đơn"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuickFilter("all")}
+                    className="hover:text-rose-600 cursor-pointer font-bold ml-0.5"
+                    title="Bỏ lọc nhanh này"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+
+              {diagnosisFilter !== "all" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/60 font-semibold text-on-surface shadow-2xs">
+                  <span>
+                    {catalog?.diagnoses.find((d) => d.code === diagnosisFilter)?.name ??
+                      diagnosisFilter}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDiagnosisFilter("all")}
+                    className="hover:text-rose-600 cursor-pointer font-bold ml-0.5"
+                    title="Bỏ lọc chẩn đoán"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+
+              {searchQuery.trim() !== "" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/60 font-semibold text-on-surface shadow-2xs">
+                  <span>Từ khóa: &ldquo;{searchQuery}&rdquo;</span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="hover:text-rose-600 cursor-pointer font-bold ml-0.5"
+                    title="Xóa từ khóa tìm kiếm"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+
+              {usageTab !== "all" && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/60 font-semibold text-on-surface shadow-2xs">
+                  <span>
+                    Trạng thái:{" "}
+                    {usageTab === "none"
+                      ? "Chưa áp dụng"
+                      : usageTab === "active"
+                        ? "Đang sử dụng"
+                        : "Đã hoàn thành"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUsageTab("all")}
+                    className="hover:text-rose-600 cursor-pointer font-bold ml-0.5"
+                    title="Bỏ lọc trạng thái thực đơn"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuickFilter("all");
+                setDiagnosisFilter("all");
+                setUsageTab("all");
+                setSearchQuery("");
+              }}
+              className="text-xs font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-primary/10"
+            >
+              <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+              <span>Đặt lại tất cả</span>
             </button>
           </div>
         )}
@@ -816,7 +1075,7 @@ export default function PatientsListPage() {
               <span>Đang tải danh sách bệnh nhân...</span>
             </div>
           ) : filteredPatients.length === 0 ? (
-            <div className="p-16 text-center text-on-surface-variant">
+            <div className="p-16 text-center text-on-surface-variant flex flex-col items-center">
               <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
                 search_off
               </span>
@@ -825,11 +1084,30 @@ export default function PatientsListPage() {
                   ? "Chưa có bệnh nhân nào trong hệ thống"
                   : "Không tìm thấy bệnh nhân phù hợp"}
               </p>
-              <p className="text-xs mt-1 text-on-surface-variant">
+              <p className="text-xs mt-1 text-on-surface-variant max-w-md">
                 {patients.length === 0
                   ? "Đăng ký tài khoản patient hoặc dùng demo_patient_1@example.com"
-                  : "Thử đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái."}
+                  : "Thử đổi từ khóa tìm kiếm hoặc bấm nút bên dưới để xem lại toàn bộ danh sách."}
               </p>
+              {patients.length > 0 &&
+                (quickFilter !== "all" ||
+                  diagnosisFilter !== "all" ||
+                  searchQuery.trim() !== "" ||
+                  usageTab !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickFilter("all");
+                      setDiagnosisFilter("all");
+                      setUsageTab("all");
+                      setSearchQuery("");
+                    }}
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                    <span>Xem tất cả bệnh nhân ({patients.length})</span>
+                  </button>
+                )}
             </div>
           ) : (
             <>

@@ -791,7 +791,7 @@ export default function DoctorPatientHistoryPage() {
                       </div>
                       {patientId && selectedEntry && (
                         <Link
-                          href={`/doctor/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(selectedEntry.plan.id)}`}
+                          href={buildReviewHref(patientId, selectedEntry.plan.id)}
                           className="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1 shadow-2xs"
                         >
                           <span className="material-symbols-outlined text-[16px]">edit</span>

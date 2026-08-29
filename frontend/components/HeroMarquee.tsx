@@ -1,5 +1,3 @@
-"use client";
-
 const col1 = [
     { icon: "🥗", title: "Dinh dưỡng đúng bệnh lý", text: "Thực đơn cá nhân hóa cho đái tháo đường típ 1, típ 2, thai kỳ và biến chứng thần kinh." },
     { icon: "🩺", title: "Bác sĩ phê duyệt (HITL)", text: "Mọi kế hoạch đều được chuyên gia y tế kiểm duyệt trước khi áp dụng." },

@@ -14,6 +14,7 @@ from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.alert import Alert
 from app.models.catalog import Allergy, Diagnosis, Medicine
+from app.models.doctor_profile import DoctorProfile
 from app.models.meal_plan import MealPlan
 from app.models.patient_transfer import PatientTransfer
 from app.models.profile import Profile
@@ -31,6 +32,10 @@ from app.schemas.doctor import (
     DoctorConstraintsUpdate,
     DoctorPatientSummary,
     DoctorPatientUpdate,
+    DoctorProfileOut,
+    DoctorProfileResponse,
+    DoctorProfileUpdate,
+    DoctorStatsOut,
     FoodCatalogItem,
     FoodCatalogMacros,
     FoodCatalogOut,
@@ -1028,4 +1033,184 @@ def delete_doctor_patient(
     db.delete(target_user)
     db.commit()
     return None
+
+
+def _get_doctor_stats(db: Session, doctor_id: str) -> DoctorStatsOut:
+    patient_ids = [
+        u.id
+        for u in db.query(User.id)
+        .filter(User.role == "patient", User.assigned_doctor_id == doctor_id)
+        .all()
+    ]
+    total_patients = len(patient_ids)
+
+    if total_patients == 0:
+        approved_plans = (
+            db.query(MealPlan)
+            .filter(
+                MealPlan.reviewer_id == doctor_id,
+                MealPlan.status.in_(["approved", "edited"]),
+            )
+            .count()
+        )
+        return DoctorStatsOut(
+            total_patients=0,
+            approved_plans=approved_plans,
+            confirmed_constraints=0,
+            average_compliance=None,
+        )
+
+    approved_plans = (
+        db.query(MealPlan)
+        .filter(
+            (MealPlan.reviewer_id == doctor_id) | (MealPlan.user_id.in_(patient_ids)),
+            MealPlan.status.in_(["approved", "edited"]),
+        )
+        .count()
+    )
+
+    confirmed_constraints = (
+        db.query(Profile)
+        .filter(
+            Profile.user_id.in_(patient_ids),
+            Profile.constraints_status == "confirmed",
+        )
+        .count()
+    )
+
+    compliance_rates: list[float] = []
+    comp_svc = ComplianceService(db)
+    for pid in patient_ids:
+        try:
+            comp = comp_svc.get_patient_compliance(pid, days=14)
+            if comp.overall_adherence_pct is not None:
+                compliance_rates.append(float(comp.overall_adherence_pct))
+        except Exception:
+            pass
+
+    avg_comp = (
+        round(sum(compliance_rates) / len(compliance_rates), 1)
+        if compliance_rates
+        else None
+    )
+
+    return DoctorStatsOut(
+        total_patients=total_patients,
+        approved_plans=approved_plans,
+        confirmed_constraints=confirmed_constraints,
+        average_compliance=avg_comp,
+    )
+
+
+def _doctor_profile_to_out(profile: DoctorProfile | None) -> DoctorProfileOut:
+    if profile is None:
+        return DoctorProfileOut()
+    return DoctorProfileOut(
+        title=profile.title,
+        specialties=profile.specialties or [],
+        license_number=profile.license_number,
+        workplace=profile.workplace,
+        years_of_experience=profile.years_of_experience,
+        bio=profile.bio,
+        phone=profile.phone,
+        accepting_patients=profile.accepting_patients,
+        consultation_hours=profile.consultation_hours,
+        emergency_contact=profile.emergency_contact,
+    )
+
+
+@router.get("/profile", response_model=DoctorProfileResponse)
+def get_doctor_profile(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorProfileResponse:
+    """Lấy thông tin tài khoản, hồ sơ chuyên môn và số liệu thống kê lâm sàng của bác sĩ đang đăng nhập."""
+    profile = (
+        db.query(DoctorProfile).filter(DoctorProfile.user_id == user.id).first()
+    )
+    stats = _get_doctor_stats(db, user.id)
+    return DoctorProfileResponse(
+        user_id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        avatar=user.avatar,
+        profile=_doctor_profile_to_out(profile),
+        stats=stats,
+    )
+
+
+@router.put("/profile", response_model=DoctorProfileResponse)
+def update_doctor_profile(
+    payload: DoctorProfileUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("doctor")),
+) -> DoctorProfileResponse:
+    """Cập nhật thông tin chuyên môn và/hoặc tên hiển thị của bác sĩ đang đăng nhập."""
+    user_row = db.get(User, user.id)
+    if user_row is None:
+        raise APIError(401, "USER_NOT_FOUND", "Người dùng không tồn tại.")
+
+    if payload.full_name is not None:
+        user_row.full_name = payload.full_name.strip() or None
+
+    profile = (
+        db.query(DoctorProfile).filter(DoctorProfile.user_id == user.id).first()
+    )
+    if profile is None:
+        profile = DoctorProfile(
+            user_id=user.id,
+            title=payload.title,
+            specialties=payload.specialties or [],
+            license_number=payload.license_number,
+            workplace=payload.workplace,
+            years_of_experience=payload.years_of_experience,
+            bio=payload.bio,
+            phone=payload.phone,
+            accepting_patients=(
+                payload.accepting_patients
+                if payload.accepting_patients is not None
+                else True
+            ),
+            consultation_hours=payload.consultation_hours,
+            emergency_contact=payload.emergency_contact,
+        )
+        db.add(profile)
+    else:
+        if payload.title is not None:
+            profile.title = payload.title
+        if payload.specialties is not None:
+            profile.specialties = payload.specialties
+        if payload.license_number is not None:
+            profile.license_number = payload.license_number
+        if payload.workplace is not None:
+            profile.workplace = payload.workplace
+        if payload.years_of_experience is not None:
+            profile.years_of_experience = payload.years_of_experience
+        if payload.bio is not None:
+            profile.bio = payload.bio
+        if payload.phone is not None:
+            profile.phone = payload.phone
+        if payload.accepting_patients is not None:
+            profile.accepting_patients = payload.accepting_patients
+        if payload.consultation_hours is not None:
+            profile.consultation_hours = payload.consultation_hours
+        if payload.emergency_contact is not None:
+            profile.emergency_contact = payload.emergency_contact
+
+    db.commit()
+    db.refresh(user_row)
+    if profile:
+        db.refresh(profile)
+
+    stats = _get_doctor_stats(db, user.id)
+    return DoctorProfileResponse(
+        user_id=user_row.id,
+        email=user_row.email,
+        full_name=user_row.full_name,
+        role=user_row.role,
+        avatar=user_row.avatar,
+        profile=_doctor_profile_to_out(profile),
+        stats=stats,
+    )
 

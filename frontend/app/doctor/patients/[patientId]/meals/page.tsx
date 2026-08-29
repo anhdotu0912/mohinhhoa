@@ -11,6 +11,7 @@ import { mealPlanToUiItem } from "@/lib/meal-plan-mappers";
 import { MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
+import { doctorReviewHref } from "@/lib/doctor-routes";
 
 function resolvePatientAvatar(raw: string | null | undefined): string {
   if (
@@ -384,9 +385,7 @@ export default function PatientMealPlansListPage() {
 
                             <button
                               onClick={() =>
-                                router.push(
-                                  `/doctor/reviews/${encodeURIComponent(patient.id)}/${encodeURIComponent(plan.id)}`
-                                )
+                                router.push(doctorReviewHref(patient.id, plan.id))
                               }
                               className={`px-md py-1.5 rounded-lg font-body-bold text-xs font-semibold transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 ${
                                 plan.status === "approved" || plan.status === "edited"
@@ -433,9 +432,7 @@ export default function PatientMealPlansListPage() {
 
                     <button
                       onClick={() =>
-                        router.push(
-                          `/doctor/reviews/${encodeURIComponent(patient.id)}/${encodeURIComponent(plan.id)}`
-                        )
+                        router.push(doctorReviewHref(patient.id, plan.id))
                       }
                       className="px-md py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold"
                     >

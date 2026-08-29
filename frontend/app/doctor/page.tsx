@@ -17,6 +17,7 @@ import {
   type DoctorPatientSummary,
   type PatientComplianceOut,
 } from "@/lib/types";
+import { doctorReviewHref } from "@/lib/doctor-routes";
 
 interface DayCompliance {
   day: string;
@@ -824,7 +825,7 @@ export default function DoctorDashboardPage() {
 
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-outline-variant/30">
                       <Link
-                        href={`/doctor/reviews/${plan.patientId}/${plan.id}`}
+                        href={doctorReviewHref(plan.patientId, plan.id)}
                         className="h-8 px-3.5 bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant font-body-bold rounded-lg hover:bg-surface-container-low hover:text-primary transition-all text-xs flex items-center gap-1 cursor-pointer font-semibold"
                       >
                         <span className="material-symbols-outlined text-[16px]">visibility</span>
