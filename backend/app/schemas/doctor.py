@@ -278,3 +278,47 @@ class MealPlanScheduleOut(BaseModel):
     active_plan: MealPlanOutput | None = None
     unassigned_plans: list[MealPlanOutput] = Field(default_factory=list)
     slots: list[MealPlanScheduleSlotOut] = Field(default_factory=list)
+
+
+class DoctorProfileOut(BaseModel):
+    title: str | None = None
+    specialties: list[str] = Field(default_factory=list)
+    license_number: str | None = None
+    workplace: str | None = None
+    years_of_experience: int | None = None
+    bio: str | None = None
+    phone: str | None = None
+    accepting_patients: bool = True
+    consultation_hours: str | None = None
+    emergency_contact: str | None = None
+
+
+class DoctorProfileUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    title: str | None = Field(default=None, max_length=50)
+    specialties: list[str] | None = None
+    license_number: str | None = Field(default=None, max_length=50)
+    workplace: str | None = Field(default=None, max_length=255)
+    years_of_experience: int | None = Field(default=None, ge=0, le=70)
+    bio: str | None = Field(default=None, max_length=2000)
+    phone: str | None = Field(default=None, max_length=32)
+    accepting_patients: bool | None = None
+    consultation_hours: str | None = Field(default=None, max_length=255)
+    emergency_contact: str | None = Field(default=None, max_length=255)
+
+
+class DoctorStatsOut(BaseModel):
+    total_patients: int = 0
+    approved_plans: int = 0
+    confirmed_constraints: int = 0
+    average_compliance: float | None = None
+
+
+class DoctorProfileResponse(BaseModel):
+    user_id: str
+    email: str
+    full_name: str | None = None
+    role: str = "doctor"
+    avatar: str | None = None
+    profile: DoctorProfileOut = Field(default_factory=DoctorProfileOut)
+    stats: DoctorStatsOut = Field(default_factory=DoctorStatsOut)

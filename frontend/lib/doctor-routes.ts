@@ -50,11 +50,16 @@ export function doctorGenerateHref(patientId: string, query?: string): string {
 }
 
 export function doctorReviewHref(patientId: string, planId: string): string {
-  return `/doctor/reviews/${enc(patientId)}/${enc(planId)}`;
+  return `/doctor/patients/${enc(patientId)}/meals/${enc(planId)}`;
 }
 
 export function isGeneratePath(pathname: string | null | undefined): boolean {
   return Boolean(pathname?.includes("/generate"));
+}
+
+/** Chi tiết / duyệt một thực đơn (không phải tab danh sách /meals). */
+export function isPlanReviewPath(pathname: string | null | undefined): boolean {
+  return Boolean(pathname && /\/patients\/[^/]+\/meals\/[^/]+/.test(pathname));
 }
 
 export function chartTabFromPath(pathname: string | null | undefined): ChartTabId {

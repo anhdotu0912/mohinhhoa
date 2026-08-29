@@ -102,3 +102,4 @@ backend/data/chroma/
 .agents/
 .agent/
 .gemini/skills/
+.impeccable/

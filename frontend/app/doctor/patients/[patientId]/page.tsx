@@ -26,6 +26,7 @@ import {
   patientUsageLabel,
 } from "@/lib/plan-expiry";
 import { DISEASE_OPTIONS } from "@/lib/profile-mappers";
+import { doctorReviewHref } from "@/lib/doctor-routes";
 
 interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
   patientCode: string;
@@ -985,7 +986,7 @@ export default function PatientDetailPage() {
                         </p>
                         {activePlan && (
                           <Link
-                            href={`/doctor/reviews/${patientId}/${activePlan.id}`}
+                            href={doctorReviewHref(patientId, activePlan.id)}
                             className="text-xs text-primary font-bold hover:underline mt-1 inline-flex items-center gap-1"
                           >
                             <span>Xem chi tiết thực đơn</span>
@@ -1024,7 +1025,7 @@ export default function PatientDetailPage() {
                         {recentPlans.map((plan) => (
                           <Link
                             key={plan.id}
-                            href={`/doctor/reviews/${patientId}/${plan.id}`}
+                            href={doctorReviewHref(patientId, plan.id)}
                             className="bg-surface-container-low/30 border border-outline-variant/40 hover:border-primary/50 transition-all rounded-lg p-3 flex items-center justify-between gap-3 text-xs group cursor-pointer block shadow-2xs"
                           >
                             <div className="min-w-0 flex-1">

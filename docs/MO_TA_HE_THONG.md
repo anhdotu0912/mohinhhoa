@@ -51,9 +51,9 @@ Nav chính: Dashboard · Bệnh nhân · Hàng việc.
 | `/doctor/patients/{id}/compliance` | Biểu đồ tuân thủ + gửi nhắc |
 | `/doctor/patients/{id}/history` | Lịch tuần 7 ngày (ADR-012) + apply/replace slot |
 | `/doctor/patients/{id}/generate` | Sinh thực đơn AI (hàng đợi `QueueDrawer`) |
-| `/doctor/reviews/{patientId}/{planId}` | Duyệt (approve/edit/reject) rồi **áp dụng** (`POST .../apply`) |
+| `/doctor/patients/{id}/meals/{planId}` | Duyệt (approve/edit/reject) rồi **áp dụng** (`POST .../apply`) |
 
-Redirect (IA cũ → mới): `/doctor/reviews` → inbox `plan_review`; `/doctor/patients/constraints` → inbox `constraints`; `/doctor/patients/compliance` → `/doctor`; `/doctor/history` → danh sách BN; `/doctor/messages` → `/doctor` (không có backend messaging).
+Redirect (IA cũ → mới): `/doctor/reviews` → inbox `plan_review`; `/doctor/reviews/{patientId}/{planId}` → `/doctor/patients/{id}/meals/{planId}`; `/doctor/patients/constraints` → inbox `constraints`; `/doctor/patients/compliance` → `/doctor`; `/doctor/history` → danh sách BN; `/doctor/messages` → `/doctor` (không có backend messaging).
 
 ---
 
@@ -147,7 +147,7 @@ North Star as-built: hồ sơ → (BN yêu cầu **hoặc** BS generate) → pla
 3. BE load Profile → `meal_planner_agent` (luôn chạy, không nhánh `DEMO_MOCK`) → 7 ngày, mỗi món có citation.
 4. Agent chạy `interaction_checker_agent` trên món trong plan (KB `drug_food_interactions.json`, ~28 cặp): "Nguy hiểm" → swap + `swaps[]`; "Cần chú ý" → cảnh báo, không swap. Cặp không có trong KB → `unmatched_pairs[]`.
 5. Plan persist `status=pending_review`. Cờ `meal_plan_request_status` của BN reset về `"none"`.
-6. Inbox `plan_review` / `GET /doctor/meal-plans?status=pending_review` → mở `/doctor/reviews/{patientId}/{planId}`.
+6. Inbox `plan_review` / `GET /doctor/meal-plans?status=pending_review` → mở `/doctor/patients/{id}/meals/{planId}`.
 7. Bác sĩ chọn:
    - **Duyệt** → `POST /doctor/meal-plans/{id}/review` `{action: approve}` → `approved` + `Notification(type=plan_approved)`. **Chưa** tạo `meal_reminder` / `adherence_checkin`.
    - **Từ chối** → `{action: reject, notes}` → `rejected`; hủy notification `pending` gắn plan.

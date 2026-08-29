@@ -1,12 +1,11 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { DayNutritionDashboard } from "@/components/doctor/DayNutritionDashboard";
-import { TopBar } from "@/components/shared/TopBar";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
+import { doctorChartHref } from "@/lib/doctor-routes";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import {
@@ -42,13 +41,6 @@ const SLOT_LABELS: Record<MealSlot, { title: string; icon: string; iconClass: st
 
 function clonePlan(plan: MealPlanOutput): MealPlanOutput {
   return structuredClone(plan);
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function realAvatarUrl(avatar?: string | null): string | null {
@@ -249,8 +241,6 @@ export default function PlanReviewDetailPage() {
       nextStartLabel: `${formatDateFull(nextStart)} – ${formatDateFull(nextEnd)}`,
     };
   }, [patientSchedule]);
-
-  const avatarSrc = realAvatarUrl(patient?.avatar);
 
   const syncSlotsFromPlan = useCallback((uiPlan: MealPlanItem, dayIdx: number) => {
     const day = uiPlan.days.find((d) => d.dayIndex === dayIdx) || uiPlan.days[0];
@@ -832,34 +822,28 @@ export default function PlanReviewDetailPage() {
 
   if (loading) {
     return (
-      <>
-        <TopBar title="Chi tiết thực đơn" />
-        <main className="p-lg text-sm text-on-surface-variant">Đang tải thực đơn…</main>
-      </>
+      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
+        Đang tải thực đơn…
+      </main>
     );
   }
 
   if (loadError || !plan || !patient || !rawPlan) {
     return (
-      <>
-        <TopBar title="Chi tiết thực đơn" />
-        <main className="p-lg">
-          <p className="text-sm text-error mb-md">{loadError || "Không tìm thấy thực đơn."}</p>
-          <Link
-            href={`/doctor/patients/${patientId}`}
-            className="text-xs font-semibold text-primary hover:underline"
-          >
-            Quay lại hồ sơ bệnh nhân
-          </Link>
-        </main>
-      </>
+      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
+        <p className="text-sm text-error mb-md">{loadError || "Không tìm thấy thực đơn."}</p>
+        <Link
+          href={doctorChartHref(patientId, "meals")}
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          Quay lại danh sách thực đơn
+        </Link>
+      </main>
     );
   }
 
   return (
     <>
-      <TopBar title={`Chi tiết thực đơn - ${plan.planTitle}`} />
-
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-lg shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">
@@ -870,94 +854,48 @@ export default function PlanReviewDetailPage() {
       )}
 
       <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 pb-28 flex-1">
-        <div className="flex items-center justify-between">
-          <Link
-            href={`/doctor/patients/${patientId}/meals`}
-            className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Quay lại danh sách thực đơn của {patient.name}
-          </Link>
-        </div>
-
-        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-subtle">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/40">
-            <div className="flex items-center gap-4 min-w-0">
-              {avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt={patient.name}
-                  className="w-12 h-12 rounded-full object-cover ring-2 ring-outline-variant/40 shrink-0"
-                />
-              ) : (
-                <div
-                  className="w-12 h-12 rounded-full ring-2 ring-primary/20 shrink-0 bg-primary/10 text-primary flex items-center justify-center text-sm font-bold"
-                  aria-hidden
-                >
-                  {initials(patient.name)}
-                </div>
-              )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-h1 text-h1 text-on-surface font-bold text-lg truncate">
-                    {patient.name}
-                  </h2>
-                  <span className="font-mono text-xs text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-md">
-                    {patient.id}
-                  </span>
-                </div>
-                <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5 font-medium">
-                  Chẩn đoán: {plan.condition || "—"}
-                  {plan.createdAt ? ` • Đợt tạo: ${plan.createdAt}` : ""}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {status === "pending" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  Chờ duyệt
-                </span>
-              )}
-              {status === "approved" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  Đã duyệt
-                </span>
-              )}
-              {status === "edited" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
-                  <span className="material-symbols-outlined text-[14px]">edit_note</span>
-                  Đã chỉnh sửa
-                </span>
-              )}
-              {status === "rejected" && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                  <span className="material-symbols-outlined text-[14px]">cancel</span>
-                  Đã từ chối
-                </span>
-              )}
-              {hardWarningCount > 0 && isReviewable && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                  {hardWarningCount} vi phạm lâm sàng
-                </span>
-              )}
-            </div>
+        <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-bold text-lg text-on-surface tracking-tight truncate">
+              {plan.planTitle}
+            </h1>
+            <p className="text-sm text-on-surface-variant mt-1">
+              {daysList.length} ngày
+              {plan.createdAt ? ` · ${plan.createdAt}` : ""}
+            </p>
           </div>
-
-          <div className="pt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
-                {plan.planTitle}
-              </h3>
-              <p className="font-caption text-caption text-on-surface-variant text-xs mt-0.5">
-                Mã thực đơn: <span className="font-mono font-semibold text-primary">{plan.id}</span> • Tổng số ngày:{" "}
-                <strong className="text-on-surface">{daysList.length} ngày</strong>
-              </p>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {status === "pending" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Chờ duyệt
+              </span>
+            )}
+            {status === "approved" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                Đã duyệt
+              </span>
+            )}
+            {status === "edited" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
+                <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                Đã chỉnh sửa
+              </span>
+            )}
+            {status === "rejected" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                <span className="material-symbols-outlined text-[14px]">cancel</span>
+                Đã từ chối
+              </span>
+            )}
+            {hardWarningCount > 0 && isReviewable && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                {hardWarningCount} vi phạm lâm sàng
+              </span>
+            )}
           </div>
-        </div>
+        </header>
 
         {showApplyPrompt && (
           <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 flex flex-col gap-4 shadow-2xs">
@@ -1127,7 +1065,7 @@ export default function PlanReviewDetailPage() {
       </main>
 
       {isReviewable && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] py-3 px-6 md:px-8">
+        <div className="fixed bottom-0 left-0 right-0 md:left-[240px] z-40 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] py-3 px-6 md:px-8">
           <div className="max-w-[1600px] w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-3">
             {editingSlot ? (
               <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">

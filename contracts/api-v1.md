@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.15 (2026-08-28 — `PATCH /auth/me` + chat `doctor_note.notes[]`. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.16 (2026-08-29 — Doctor Profile & Clinical Statistics: `GET|PUT /doctor/profile`. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -516,6 +516,57 @@ Một bệnh nhân chỉ có **một** transfer `pending` — gửi mới sẽ h
 // Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
 ```
 
+### `GET /doctor/profile` (as-built 2026-08-29)
+**Role:** `doctor`. Lấy thông tin tài khoản, hồ sơ chuyên môn và số liệu thống kê lâm sàng của bác sĩ đang đăng nhập.
+```json
+// Response 200 → DoctorProfileResponse
+{
+  "user_id": "doc_uuid",
+  "email": "doctor@example.com",
+  "full_name": "BS. CKI Nguyễn Văn Bình",
+  "role": "doctor",
+  "avatar": "/static/avatars/doc_uuid.png",
+  "profile": {
+    "title": "BS. CKI",
+    "specialties": ["Dinh dưỡng lâm sàng", "Nội tiết & Đái tháo đường"],
+    "license_number": "CCHN-012345/BYT",
+    "workplace": "Khoa Dinh dưỡng & Tiết chế — Bệnh viện Đa khoa Quốc tế Vinmec",
+    "years_of_experience": 12,
+    "bio": "Chuyên gia dinh dưỡng lâm sàng với hơn 10 năm kinh nghiệm điều trị và xây dựng phác đồ tiết chế bệnh lý chuyển hoá.",
+    "phone": "0912345678",
+    "accepting_patients": true,
+    "consultation_hours": "08:00 - 17:00 (Thứ 2 - Thứ 6)",
+    "emergency_contact": "Khoa Cấp cứu / Trực ban Dinh dưỡng"
+  },
+  "stats": {
+    "total_patients": 15,
+    "approved_plans": 42,
+    "confirmed_constraints": 18,
+    "average_compliance": 82.5
+  }
+}
+```
+
+### `PUT /doctor/profile` (as-built 2026-08-29)
+**Role:** `doctor`. Cập nhật thông tin chuyên môn và/hoặc tên hiển thị của bác sĩ đang đăng nhập.
+```json
+// Request (mọi field optional)
+{
+  "full_name": "BS. CKI Nguyễn Văn Bình",
+  "title": "BS. CKI",
+  "specialties": ["Dinh dưỡng lâm sàng", "Nội tiết & Đái tháo đường"],
+  "license_number": "CCHN-012345/BYT",
+  "workplace": "Khoa Dinh dưỡng & Tiết chế — BV Vinmec",
+  "years_of_experience": 12,
+  "bio": "Tiểu sử cập nhật...",
+  "phone": "0912345678",
+  "accepting_patients": true,
+  "consultation_hours": "08:00 - 17:00 (Thứ 2 - Thứ 6)",
+  "emergency_contact": "Hotline khoa"
+}
+// Response 200 → DoctorProfileResponse (cùng shape GET /doctor/profile)
+```
+
 ---
 
 ## 9. Doctor Review
@@ -917,7 +968,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.15**.
+- Version hiện tại: **1.16**.
+- **Changelog 1.15 → 1.16 (2026-08-29):** thêm `GET /doctor/profile` và `PUT /doctor/profile` (lấy/cập nhật hồ sơ chuyên môn bác sĩ: danh xưng/học vị, chuyên khoa, số CCHN, cơ quan, số năm kinh nghiệm, bio, trạng thái nhận bệnh, giờ tư vấn, liên hệ khẩn cấp kèm thống kê KPI lâm sàng). Không breaking change.
 - **Changelog 1.14 → 1.15 (2026-08-28):** `PATCH /auth/me` (`full_name`) cho user đã đăng nhập. Chat intent `doctor_note`: `DoctorNoteOut` thêm `doctor_avatar`, `notes[]` (list `manual_reminder`, mới → cũ, cap 10, `has_more`), tên/ảnh lấy từ bác sĩ được gán — không còn default cứng `"Bác sĩ điều trị"`. Không còn fallback `adjustment_note`. Field `note`/`created_at`/`tags` giữ là bản ghi mới nhất để tương thích. Đồng bộ `contracts/agent-io-schema.md` v1.10.
 - **Changelog 1.13 → 1.14 (2026-08-28):** phân công bác sĩ ↔ bệnh nhân 1–1. `GET /doctor/patients` (và mọi endpoint doctor theo `patient_id` / meal-plan) chỉ còn phạm vi bệnh nhân đã gắn. Thêm `POST /doctor/patients`, `GET /doctor/claim-queue`, `POST /doctor/patients/{id}/claim`, `GET /doctor/colleagues`, `POST /doctor/patients/{id}/transfer`, `POST /doctor/transfers/{id}/accept`. `GET /auth/me` thêm `assigned_doctor`. `DoctorPatientSummary` thêm `pending_transfer`. **Breaking** với client giả định 1 bác sĩ thấy mọi bệnh nhân.
 - **Changelog 1.12 → 1.13 (2026-08-27):** thêm `POST /auth/change-password` (user đã đăng nhập đổi mật khẩu bằng `current_password` + `new_password`). Không breaking — endpoint mới.

@@ -14,6 +14,8 @@ import {
   type DoctorPatientSummary,
   type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
+  type DoctorProfileResponse,
+  type DoctorProfileUpdate,
   type FoodCatalogOut,
   type FoodLogCreate,
   type FoodLogEntry,
@@ -337,6 +339,17 @@ export const api = {
 
   simulateNotifications(): Promise<NotificationOut[]> {
     return request("/api/v1/notifications/demo/simulate", { method: "POST" });
+  },
+
+  getDoctorProfile(): Promise<DoctorProfileResponse> {
+    return request("/api/v1/doctor/profile");
+  },
+
+  updateDoctorProfile(payload: DoctorProfileUpdate): Promise<DoctorProfileResponse> {
+    return request("/api/v1/doctor/profile", {
+      method: "PUT",
+      body: payload,
+    });
   },
 
   listDoctorPatients(params?: {

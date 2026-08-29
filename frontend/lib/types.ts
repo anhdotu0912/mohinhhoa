@@ -404,6 +404,50 @@ export interface PatientComplianceOut {
   events: ComplianceEvent[];
 }
 
+export interface DoctorProfile {
+  title?: string | null;
+  specialties: string[];
+  license_number?: string | null;
+  workplace?: string | null;
+  years_of_experience?: number | null;
+  bio?: string | null;
+  phone?: string | null;
+  accepting_patients: boolean;
+  consultation_hours?: string | null;
+  emergency_contact?: string | null;
+}
+
+export interface DoctorProfileUpdate {
+  full_name?: string | null;
+  title?: string | null;
+  specialties?: string[] | null;
+  license_number?: string | null;
+  workplace?: string | null;
+  years_of_experience?: number | null;
+  bio?: string | null;
+  phone?: string | null;
+  accepting_patients?: boolean | null;
+  consultation_hours?: string | null;
+  emergency_contact?: string | null;
+}
+
+export interface DoctorStats {
+  total_patients: number;
+  approved_plans: number;
+  confirmed_constraints: number;
+  average_compliance?: number | null;
+}
+
+export interface DoctorProfileResponse {
+  user_id: string;
+  email: string;
+  full_name?: string | null;
+  role: UserRole;
+  avatar?: string | null;
+  profile: DoctorProfile;
+  stats: DoctorStats;
+}
+
 export interface PatientMetrics {
   weight: number | null;
   height: number | null;

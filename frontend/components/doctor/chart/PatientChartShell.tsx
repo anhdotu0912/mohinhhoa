@@ -17,6 +17,7 @@ import {
   doctorPatientsHref,
   doctorGenerateHref,
   isGeneratePath,
+  isPlanReviewPath,
 } from "@/lib/doctor-routes";
 import { asRouteId } from "@/lib/route-params";
 import type { DoctorPatientSummary } from "@/lib/types";
@@ -71,7 +72,23 @@ export function PatientChartShell({
 
   const routeId = asRouteId(patientIdProp);
   const compact = isGeneratePath(pathname);
+  const reviewing = isPlanReviewPath(pathname);
+  const hideChartNav = compact || reviewing;
   const activeTab = chartTabFromPath(pathname);
+
+  const backHref = !routeId
+    ? doctorPatientsHref()
+    : compact
+      ? doctorChartHref(routeId, "overview")
+      : reviewing
+        ? doctorChartHref(routeId, "meals")
+        : doctorPatientsHref();
+  const backLabel = compact ? "Hồ sơ" : reviewing ? "Thực đơn" : "Danh sách";
+  const backTitle = compact
+    ? "Quay lại Hồ sơ"
+    : reviewing
+      ? "Quay lại danh sách thực đơn"
+      : "Quay lại Danh sách bệnh nhân";
 
   const load = useCallback(async () => {
     if (!token || role !== "doctor" || !routeId) return;
@@ -92,7 +109,15 @@ export function PatientChartShell({
 
   return (
     <>
-      <TopBar title={compact ? "Tạo thực đơn AI" : "Hồ sơ lâm sàng bệnh nhân"} />
+      <TopBar
+        title={
+          compact
+            ? "Tạo thực đơn AI"
+            : reviewing
+              ? "Duyệt thực đơn"
+              : "Hồ sơ lâm sàng bệnh nhân"
+        }
+      />
 
       {/* Modern EHR 2-Tier Sticky Header Bar */}
       <div className="bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/60 sticky top-16 z-20 shadow-xs">
@@ -102,16 +127,12 @@ export function PatientChartShell({
             {/* Left Section: Back link + Avatar + Patient Info */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <Link
-                href={
-                  compact && routeId
-                    ? doctorChartHref(routeId, "overview")
-                    : doctorPatientsHref()
-                }
+                href={backHref}
                 className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-all shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-outline-variant/60 hover:bg-surface-container-low hover:border-primary/40 shadow-2xs cursor-pointer active:scale-95"
-                title={compact ? "Quay lại Hồ sơ" : "Quay lại Danh sách bệnh nhân"}
+                title={backTitle}
               >
                 <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                <span>{compact ? "Hồ sơ" : "Danh sách"}</span>
+                <span>{backLabel}</span>
               </Link>
 
               <div className="h-6 w-px bg-outline-variant/60 hidden sm:block shrink-0" />
@@ -162,7 +183,13 @@ export function PatientChartShell({
                   <span className="material-symbols-outlined text-[18px] text-primary animate-spin">
                     progress_activity
                   </span>
-                  <span>{compact ? "Đang thiết lập tạo thực đơn AI..." : "Đang tải hồ sơ lâm sàng..."}</span>
+                  <span>
+                    {compact
+                      ? "Đang thiết lập tạo thực đơn AI..."
+                      : reviewing
+                        ? "Đang tải thực đơn..."
+                        : "Đang tải hồ sơ lâm sàng..."}
+                  </span>
                 </div>
               )}
             </div>
@@ -179,11 +206,11 @@ export function PatientChartShell({
                 />
               )}
 
-              {patient && !compact ? (
+              {patient && !hideChartNav ? (
                 <TransferDoctorControl patient={patient} onTransferred={() => void load()} />
               ) : null}
 
-              {!compact && routeId && (
+              {!hideChartNav && routeId && (
                 <Link
                   href={doctorGenerateHref(routeId)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
@@ -196,7 +223,7 @@ export function PatientChartShell({
             </div>
           </div>
 
-          {!compact && routeId && (
+          {!hideChartNav && routeId && (
             <div className="pb-3">
               <div
                 role="tablist"

@@ -4,6 +4,7 @@ from app.models.alert import Alert
 from app.models.body_metrics import BodyMetricsEntry
 from app.models.catalog import Allergy, Diagnosis, Medicine
 from app.models.chat_session import ChatMessage, ChatSession
+from app.models.doctor_profile import DoctorProfile
 from app.models.food_log import FoodLog
 from app.models.meal_plan import MealPlan
 from app.models.notification import Notification
@@ -20,6 +21,7 @@ __all__ = [
     "ChatMessage",
     "ChatSession",
     "Diagnosis",
+    "DoctorProfile",
     "DrugProduct",
     "DrugRule",
     "FoodComposition",
