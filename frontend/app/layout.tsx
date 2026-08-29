@@ -16,6 +16,13 @@ const materialSymbols = localFont({
 export const metadata: Metadata = {
   title: "VMEC-10 - Dinh dưỡng AI chuẩn lâm sàng",
   description: "Dinh dưỡng AI chuẩn lâm sàng cho bệnh nhân mãn tính. Cá nhân hóa thực đơn theo bệnh lý với sự phê duyệt của bác sĩ chuyên khoa.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/favicon.png" }],
+  },
 };
 
 export default function RootLayout({

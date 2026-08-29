@@ -383,6 +383,37 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                 strokeDasharray="3 4"
               />
 
+              <defs>
+                <linearGradient id="safeZoneGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.10" />
+                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.03" />
+                </linearGradient>
+              </defs>
+
+              {/* Safe Target Zone Band — Clamped strictly within chart bounds */}
+              {focusedSeries.targetMax != null && (() => {
+                const chartTop = PAD.top;
+                const chartBottom = VIEW_H - PAD.bottom;
+                const rawTopY = plotY(focusedSeries.targetMax, focusedDomain);
+                const rawBottomY = focusedSeries.targetMin != null
+                  ? plotY(focusedSeries.targetMin, focusedDomain)
+                  : chartBottom;
+                const bandTop = Math.max(chartTop, Math.min(chartBottom, Math.min(rawTopY, rawBottomY)));
+                const bandBottom = Math.max(chartTop, Math.min(chartBottom, Math.max(rawTopY, rawBottomY)));
+                const safeHeight = Math.max(0, bandBottom - bandTop);
+
+                return safeHeight > 0 ? (
+                  <rect
+                    x={PAD.left}
+                    y={bandTop}
+                    width={VIEW_W - PAD.left - PAD.right}
+                    height={safeHeight}
+                    fill="url(#safeZoneGrad)"
+                    rx="3"
+                  />
+                ) : null;
+              })()}
+
               {visible.map((series) => {
                 const domain = focusedDomain;
                 const pointCount = observedCount(historyDays, series.id);
@@ -448,10 +479,10 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                           key={`${series.id}-${day.key}`}
                           cx={plotX(i, days.length)}
                           cy={plotY(value, domain)}
-                          r={active || (day.isToday && series.id === focused) ? 4.5 : 3.2}
+                          r={active || (day.isToday && series.id === focused) ? 5 : 3.5}
                           fill={series.color}
                           stroke="#ffffff"
-                          strokeWidth="1.5"
+                          strokeWidth="1.75"
                         />
                       );
                     })}
@@ -534,15 +565,33 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
             )}
           </div>
 
-          {!canForecastFocused && (
-            <p className="text-[11px] text-slate-500 font-medium pt-1">
-              Cần thêm lần ghi để dự đoán {focusedSeries.label.toLowerCase()}.
-            </p>
+          {!canForecastFocused ? (
+            <div className="mt-2 p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200/70 flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
+                <span className="material-symbols-outlined text-[16px] text-[#006857]">tips_and_updates</span>
+                <span>
+                  {focusedPointCount === 0
+                    ? `Chưa có dữ liệu ${focusedSeries.label.toLowerCase()} trong 7 ngày qua.`
+                    : `Đã có dữ liệu ${focusedPointCount}/3 ngày trong tuần (mỗi ngày là 1 mốc). Ghi thêm các ngày tiếp theo để AI vẽ đường dự báo.`}
+                </span>
+              </span>
+              <span className="text-[11px] font-bold text-[#006857] shrink-0">
+                Chuẩn: {focusedSeries.targetDesc}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px] text-[#006857]">trending_up</span>
+                <span>Đường nét đứt thể hiện xu hướng dự báo khi tiếp tục duy trì thực đơn.</span>
+              </span>
+              <span className="font-semibold text-slate-700">Mục tiêu: {focusedSeries.targetDesc}</span>
+            </div>
           )}
 
           {hoverIndex != null && days[hoverIndex] && (
             <div
-              className="pointer-events-none absolute z-10 min-w-[176px] rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+              className="pointer-events-none absolute z-10 min-w-[190px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.14)]"
               style={{
                 left: `${(plotX(hoverIndex, days.length) / VIEW_W) * 100}%`,
                 top: 8,
@@ -550,16 +599,24 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                   hoverIndex > days.length / 2 ? "translateX(-108%)" : "translateX(8px)",
               }}
             >
-              <p className="text-xs font-semibold text-slate-900 mb-1.5">
-                {days[hoverIndex].isForecast
-                  ? `Dự kiến ${days[hoverIndex].label || ""}`.trim()
-                  : days[hoverIndex].isToday
-                    ? "Hôm nay"
-                    : days[hoverIndex].label}
-              </p>
-              <ul className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-900">
+                  {days[hoverIndex].isForecast
+                    ? `Dự kiến ${days[hoverIndex].label || ""}`.trim()
+                    : days[hoverIndex].isToday
+                      ? "Hôm nay"
+                      : days[hoverIndex].label}
+                </p>
+                {days[hoverIndex].isForecast && (
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
+                    Dự báo AI
+                  </span>
+                )}
+              </div>
+              <ul className="flex flex-col gap-1.5">
                 {visible.map((series) => {
                   const observed = days[hoverIndex].display[series.id];
+                  const rawVal = days[hoverIndex].values[series.id];
                   const forecastVal = forecasts[series.id]?.[hoverIndex];
                   const text = days[hoverIndex].isForecast
                     ? forecastVal != null
@@ -567,12 +624,20 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                       : "—"
                     : (observed ?? "—");
                   return (
-                    <li key={series.id} className="flex items-center justify-between gap-3 text-xs">
-                      <span className="flex items-center gap-1.5 text-slate-500">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: series.color }} />
-                        {series.label}
-                      </span>
-                      <span className="tabular-nums font-medium text-slate-900">{text}</span>
+                    <li key={series.id} className="space-y-0.5">
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="flex items-center gap-1.5 text-slate-600 font-medium">
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: series.color }}
+                          />
+                          {series.label}
+                        </span>
+                        <span className="tabular-nums font-bold text-slate-900">{text}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 pl-3.5">
+                        Chuẩn: {series.targetDesc}
+                      </p>
                     </li>
                   );
                 })}
@@ -584,3 +649,4 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
     </section>
   );
 }
+

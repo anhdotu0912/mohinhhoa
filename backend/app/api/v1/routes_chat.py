@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+from app.core.llm import flush_langfuse
+
 @router.post("", response_model=AgentRunOutput)
 def chat(
     payload: ChatRequest,
@@ -38,7 +40,9 @@ def chat(
     try:
         from app.agents.graph import run_agent
 
-        return run_agent(AgentRunInput(user_id=user.id, message=payload.message), db=db)
+        result = run_agent(AgentRunInput(user_id=user.id, message=payload.message), db=db)
+        flush_langfuse()
+        return result
     except APIError:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -55,11 +59,14 @@ def chat_stream(
     from app.agents.streaming import stream_agent_events
 
     def _sse():
-        for event in stream_agent_events(
-            AgentRunInput(user_id=user.id, message=payload.message),
-            db=db,
-        ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        try:
+            for event in stream_agent_events(
+                AgentRunInput(user_id=user.id, message=payload.message),
+                db=db,
+            ):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            flush_langfuse()
 
     return StreamingResponse(_sse(), media_type="text/event-stream")
 

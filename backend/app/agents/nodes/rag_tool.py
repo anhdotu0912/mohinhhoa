@@ -134,20 +134,45 @@ QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ):
 
 
 def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:
-    """Generate RAG answer using LLM or template-based fallback."""
+    """Generate RAG answer with Tier 4 Semantic Caching, Prompt KV-Cache & Max Tokens constraints."""
+    diseases_list = profile.get("disease", [])
+
+    # Tier 4: Check Semantic Cache first (0 tokens, <50ms)
+    try:
+        from app.services.semantic_cache import semantic_qa_cache
+
+        cached = semantic_qa_cache.get(message, diseases_list)
+        if cached is not None:
+            cached_answer, _ = cached
+            return cached_answer
+    except Exception as e:
+        logger.debug("Semantic cache check failed: %s", e)
+
     context_texts = [c["text"] for c in rag_context[:2]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
         from app.core.llm import get_chat_llm
 
-        llm = get_chat_llm(temperature=0.3)
+        # Tier 5: Bound max_tokens to 500 (~350 words) to prevent token bloat
+        llm = get_chat_llm(temperature=0.3, max_tokens=500)
         if llm is None:
             return _template_answer(message, context_str)
 
         prompt = _build_rag_prompt(message, rag_context, profile)
         response = llm.invoke(prompt)
-        return response.content
+        answer = response.content
+
+        # Tier 4: Store generated answer into Semantic Cache
+        try:
+            from app.services.semantic_cache import semantic_qa_cache
+
+            citations = [c["source"] for c in rag_context]
+            semantic_qa_cache.put(message, answer, citations, diseases_list)
+        except Exception:
+            pass
+
+        return answer
 
     except Exception as e:
         logger.warning("LLM answer generation failed: %s", e)
@@ -159,27 +184,59 @@ def stream_answer_tokens(
     rag_context: list[dict],
     profile: dict,
 ) -> Iterator[str]:
-    """Stream RAG answer tokens from LLM, or yield template fallback once."""
+    """Stream RAG answer tokens from Semantic Cache or LLM, yielding tokens efficiently."""
+    diseases_list = profile.get("disease", [])
+
+    # Tier 4: Check Semantic Cache first
+    try:
+        from app.services.semantic_cache import semantic_qa_cache
+
+        cached = semantic_qa_cache.get(message, diseases_list)
+        if cached is not None:
+            cached_answer, _ = cached
+            import re
+            for part in re.split(r"(\s+)", cached_answer):
+                if part:
+                    yield part
+            return
+    except Exception as e:
+        logger.debug("Semantic cache stream check failed: %s", e)
+
     context_texts = [c["text"] for c in rag_context[:2]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
         from app.core.llm import get_chat_llm
 
-        llm = get_chat_llm(temperature=0.3)
+        # Tier 5: Bound max_tokens to 500
+        llm = get_chat_llm(temperature=0.3, max_tokens=500)
         if llm is None:
             yield _template_answer(message, context_str)
             return
 
         prompt = _build_rag_prompt(message, rag_context, profile)
+        accumulated_chunks = []
         for chunk in llm.stream(prompt):
             content = getattr(chunk, "content", None)
             if content:
+                accumulated_chunks.append(content)
                 yield content
+
+        # Tier 4: Cache the accumulated answer
+        if accumulated_chunks:
+            full_ans = "".join(accumulated_chunks)
+            try:
+                from app.services.semantic_cache import semantic_qa_cache
+
+                citations = [c["source"] for c in rag_context]
+                semantic_qa_cache.put(message, full_ans, citations, diseases_list)
+            except Exception:
+                pass
 
     except Exception as e:
         logger.warning("LLM streaming failed: %s", e)
         yield _template_answer(message, context_str)
+
 
 
 def _detect_food_in_question(message: str) -> str | None:

@@ -136,7 +136,10 @@ def stream_agent_events(input_data: AgentRunInput, db=None) -> Iterator[dict]:
     full_answer = ""
 
     try:
-        yield _status_event("profile_loader")
+        from app.core.cache import profile_cache
+
+        if not profile_cache.is_cached(input_data.user_id):
+            yield _status_event("profile_loader")
         state = {**state, **profile_loader(state)}
 
         yield _status_event("intent_classifier")

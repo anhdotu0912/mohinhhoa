@@ -118,12 +118,18 @@ def _default_profile(user_id: str) -> dict:
 
 
 def profile_loader(state: AgentState) -> AgentState:
-    """Load patient profile from DB, demo data, or defaults."""
+    """Load patient profile from cache, DB, demo data, or defaults (Tier 1 Cost Optimization)."""
     user_id = state.get("user_id", "")
 
     if state.get("profile"):
-        logger.debug("Profile already loaded for user %s", user_id)
+        logger.debug("Profile already loaded in state for user %s", user_id)
         return state
+
+    from app.core.cache import profile_cache
+
+    cached_profile = profile_cache.get(user_id)
+    if cached_profile is not None:
+        return {**state, "profile": cached_profile}
 
     db = state.get("db")
     if db is not None:
@@ -131,10 +137,12 @@ def profile_loader(state: AgentState) -> AgentState:
 
         profile_obj = get_profile_row(db, user_id)
         if profile_obj is not None:
-            logger.info("Loaded DB profile for user %s", user_id)
+            profile_data = profile_obj.model_dump(mode="json")
+            profile_cache.set(user_id, profile_data)
+            logger.info("Loaded and cached DB profile for user %s", user_id)
             return {
                 **state,
-                "profile": profile_obj.model_dump(mode="json"),
+                "profile": profile_data,
             }
 
     profile = _DEMO_PROFILES.get(user_id)
@@ -144,4 +152,6 @@ def profile_loader(state: AgentState) -> AgentState:
         logger.warning("No profile found for user %s, using diabetes defaults", user_id)
         profile = _default_profile(user_id)
 
+    profile_cache.set(user_id, profile)
     return {**state, "profile": profile}
+

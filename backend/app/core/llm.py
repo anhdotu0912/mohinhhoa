@@ -46,21 +46,49 @@ def llm_configured() -> bool:
     return bool(llm_api_key())
 
 
+def flush_langfuse() -> None:
+    """Flush pending traces to Langfuse Cloud."""
+    import os
+
+    if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+        try:
+            from langfuse import Langfuse
+
+            Langfuse().flush()
+        except Exception:
+            pass
+
+
 def get_chat_llm(*, temperature: float = 0.3, **kwargs: Any):
-    """Return ChatOpenAI pointed at the configured provider, or None if no key."""
+    """Return ChatOpenAI with automatic Langfuse tracing if configured, or None if no key."""
     api_key = llm_api_key()
     if not api_key:
         return None
 
+    import os
     from langchain_openai import ChatOpenAI
+
+    callbacks = list(kwargs.pop("callbacks", []) or [])
+    if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+        try:
+            from langfuse.langchain import CallbackHandler
+
+            if not any(isinstance(cb, CallbackHandler) for cb in callbacks):
+                callbacks.append(CallbackHandler())
+        except Exception:
+            pass
 
     params: dict[str, Any] = {
         "model": llm_model(),
         "temperature": temperature,
         "api_key": api_key,
     }
+    if callbacks:
+        params["callbacks"] = callbacks
+
     base_url = llm_base_url()
     if base_url:
         params["base_url"] = base_url
     params.update(kwargs)
     return ChatOpenAI(**params)
+

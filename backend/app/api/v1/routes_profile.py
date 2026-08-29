@@ -58,6 +58,10 @@ def upsert_profile(
     elif is_new:
         row.constraints_status = "confirmed"
     db.commit()
+
+    from app.core.cache import profile_cache
+    profile_cache.invalidate(user.id)
+
     return get_profile(db, user.id)
 
 

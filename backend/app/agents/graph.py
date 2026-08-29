@@ -547,17 +547,10 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
     )
 
 
+import os
+
 def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
-    """Run the agent graph with the given input.
-
-    This is the main facade function that BE2 calls.
-
-    Args:
-        input_data: AgentRunInput with user_id, message, and optional force_intent.
-
-    Returns:
-        AgentRunOutput with the agent's response.
-    """
+    """Run the agent graph with Langfuse tracing, token and cost tracking."""
     compiled = get_compiled_graph()
 
     initial_state: AgentState = {
@@ -583,8 +576,28 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         "errors": [],
     }
 
+    # 1. Khởi tạo Langfuse Callback nếu có cấu hình API Key
+    callbacks = []
+    if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+        try:
+            from langfuse.langchain import CallbackHandler
+
+            langfuse_handler = CallbackHandler(
+                user_id=str(input_data.user_id) if input_data.user_id else "anonymous",
+                tags=["p014-nutrition-agent", input_data.force_intent or "auto"],
+                metadata={
+                    "patient_id": str(input_data.user_id),
+                },
+            )
+            callbacks.append(langfuse_handler)
+        except Exception as e:
+            logger.warning("Không thể khởi tạo Langfuse Handler: %s", e)
+
+    config = {"callbacks": callbacks} if callbacks else None
+
+    # 2. Thực thi graph với config callbacks
     try:
-        final_state = compiled.invoke(initial_state)
+        final_state = compiled.invoke(initial_state, config=config)
     except Exception as e:
         logger.error("Agent graph execution failed: %s", e, exc_info=True)
         return AgentRunOutput(
@@ -595,3 +608,4 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
         )
 
     return build_agent_run_output(final_state)
+

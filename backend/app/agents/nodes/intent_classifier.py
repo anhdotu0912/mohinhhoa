@@ -206,12 +206,13 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
 
 
 def _classify_by_llm(message: str) -> str:
-    """Classify intent using LLM (OpenAI GPT) empowered by Description Engineering & Negative Constraints."""
+    """Classify intent using LLM (OpenAI/DeepSeek) empowered by Description Engineering & Negative Constraints."""
     try:
         from app.agents.skills.registry import format_intent_classification_prompt_snippet
         from app.core.llm import get_chat_llm
 
-        llm = get_chat_llm(temperature=0)
+        # Tier 5: Limit max_tokens to 20 for pure intent classification output
+        llm = get_chat_llm(temperature=0, max_tokens=20)
         if llm is None:
             logger.debug("No LLM API key, falling back to keyword classification")
             return _classify_by_keywords(message)
@@ -259,11 +260,11 @@ Trả lời CHỈ DUY NHẤT một từ là tên intent hợp lệ ({valid_inten
 
 
 def intent_classifier(state: AgentState) -> AgentState:
-    """Classify user intent from message.
+    """Classify user intent from message with Tier 2 Zero-Token Fast-Path Routing.
 
     If `force_intent` is set in state, use that directly.
-    Otherwise, try LLM classification with keyword fallback.
-    Extracts secondary_intents for multi-intent questions.
+    Deterministic intents (greeting, refuse, emergency, compliance, food_log) bypass LLM.
+    Ambiguous questions fall back to fast LLM classification with max_tokens bound.
     """
     # Honor force_intent if provided
     force_intent = state.get("force_intent")
@@ -275,7 +276,19 @@ def intent_classifier(state: AgentState) -> AgentState:
     if not message:
         return {**state, "intent": "unknown", "secondary_intents": []}
 
+    # Tier 2: Check Emergency Triage first (0 tokens)
+    from app.agents.skills import emergency_triage_check
+    if emergency_triage_check(message) is not None:
+        logger.info("Tier 2 Fast-Path: Emergency triage detected (0 LLM tokens)")
+        return {**state, "intent": "unknown", "secondary_intents": []}
+
+    # Tier 2: Rule-based fast-path for deterministic intents (0 tokens)
     kw_primary, kw_secondary = _detect_intents_by_keywords(message)
+    if kw_primary in ("greeting", "refuse", "weekly_compliance", "doctor_note", "food_log"):
+        logger.info("Tier 2 Fast-Path: Intent '%s' routed without LLM (0 tokens)", kw_primary)
+        return {**state, "intent": kw_primary, "secondary_intents": kw_secondary}
+
+    # Complex / Ambiguous intent: Fallback to constrained LLM
     intent = _classify_by_llm(message)
     if intent not in VALID_INTENTS:
         intent = kw_primary
@@ -290,3 +303,4 @@ def intent_classifier(state: AgentState) -> AgentState:
     )
 
     return {**state, "intent": intent, "secondary_intents": secondary_intents}
+
