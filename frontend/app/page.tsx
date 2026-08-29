@@ -8,32 +8,33 @@ import { ClinicalChatLoopPreview } from "@/components/home/ClinicalChatLoopPrevi
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeAudienceTab, setActiveAudienceTab] = useState<"patient" | "doctor">("patient");
+  const [mobileHeroTab, setMobileHeroTab] = useState<"overview" | "chat">("overview");
 
   return (
     <div className="bg-[#f8fafc] text-[#0f172a] font-body antialiased min-h-screen flex flex-col justify-between selection:bg-[#0f766e]/20 selection:text-[#0f766e]">
       {/* 1. TOP NAVIGATION */}
       <nav className="fixed top-0 left-0 right-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-colors">
-        <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 h-14 sm:h-16 flex justify-between items-center">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-20 h-14 sm:h-16 flex justify-between items-center">
           {/* Logo & Brand Identity */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-[#0f766e] to-[#115e59] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[20px] sm:text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-[#0f766e] to-[#115e59] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform shrink-0">
+                <span className="material-symbols-outlined text-[19px] sm:text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                   health_and_safety
                 </span>
               </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-base sm:text-lg tracking-tight text-[#0f766e] group-hover:text-[#115e59] transition-colors leading-none">
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm sm:text-base lg:text-lg tracking-tight text-[#0f766e] group-hover:text-[#115e59] transition-colors leading-none truncate">
                   VMEC-10
                 </span>
-                <span className="text-[9.5px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
+                <span className="text-[8.5px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5 truncate">
                   Dinh dưỡng Lâm sàng AI
                 </span>
               </div>
             </Link>
 
             {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center gap-6 ml-8 pl-8 border-l border-slate-200">
+            <div className="hidden md:flex items-center gap-6 ml-6 pl-6 border-l border-slate-200">
               <a href="#tro-ly" className="text-sm font-medium text-slate-600 hover:text-[#0f766e] transition-colors">
                 Trợ lý Dinh dưỡng
               </a>
@@ -47,16 +48,16 @@ export default function HomePage() {
           </div>
 
           {/* Action CTAs */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               href="/login"
-              className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-[#0f766e] px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-[#0f766e] px-2 sm:px-3 py-1.5 rounded-lg transition-colors"
             >
               Đăng nhập
             </Link>
             <Link
               href="/register"
-              className="bg-[#0f766e] hover:bg-[#115e59] text-white text-xs sm:text-sm font-semibold h-8 sm:h-9 px-3.5 sm:px-4 rounded-lg flex items-center justify-center shadow-xs hover:shadow transition-all active:scale-[0.98]"
+              className="hidden md:flex bg-[#0f766e] hover:bg-[#115e59] text-white text-xs sm:text-sm font-semibold h-8 sm:h-9 px-3 sm:px-4 rounded-lg items-center justify-center shadow-xs hover:shadow transition-all active:scale-[0.98]"
             >
               Bắt đầu ngay
             </Link>
@@ -65,7 +66,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center justify-center"
               aria-label="Mở menu điều hướng"
               aria-expanded={mobileMenuOpen}
             >
@@ -78,34 +79,37 @@ export default function HomePage() {
 
         {/* Mobile Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 px-6 py-4 shadow-xl animate-in slide-in-from-top duration-200">
+          <div className="md:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 sm:px-6 py-4 shadow-xl animate-in slide-in-from-top duration-200">
             <div className="flex flex-col space-y-3">
               <a
                 href="#tro-ly"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors"
+                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors flex items-center gap-2"
               >
-                Trợ lý Dinh dưỡng
+                <span className="material-symbols-outlined text-[18px] text-[#0f766e]">chat</span>
+                <span>Trợ lý Dinh dưỡng</span>
               </a>
               <a
                 href="#tinh-nang"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors"
+                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors flex items-center gap-2"
               >
-                Tính năng Nền tảng
+                <span className="material-symbols-outlined text-[18px] text-[#0f766e]">dataset</span>
+                <span>Tính năng Nền tảng</span>
               </a>
               <a
                 href="#doi-tuong"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors"
+                className="text-sm font-semibold text-slate-700 hover:text-[#0f766e] py-1 transition-colors flex items-center gap-2"
               >
-                Bệnh nhân &amp; Bác sĩ
+                <span className="material-symbols-outlined text-[18px] text-[#0f766e]">group</span>
+                <span>Bệnh nhân &amp; Bác sĩ</span>
               </a>
               <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
                 <Link
                   href="/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full bg-[#0f766e] text-white font-semibold text-sm py-2 rounded-xl flex items-center justify-center gap-2 shadow-xs"
+                  className="w-full bg-[#0f766e] text-white font-semibold text-sm py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-[0.99]"
                 >
                   <span>Bắt đầu miễn phí ngay</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -113,7 +117,7 @@ export default function HomePage() {
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-center text-sm font-medium text-slate-600 hover:text-slate-900 py-1"
+                  className="text-center text-sm font-medium text-slate-600 hover:text-slate-900 py-1.5"
                 >
                   Đã có tài khoản? Đăng nhập
                 </Link>
@@ -126,16 +130,54 @@ export default function HomePage() {
       {/* MAIN CONTENT CONTAINER */}
       <main className="w-full flex-grow pt-14 sm:pt-16">
         {/* 2. HERO SECTION WITH LOOPING CHAT PREVIEW */}
-        <section className="relative w-full min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex flex-col justify-center pt-2 sm:pt-4 md:pt-5 pb-8 md:pb-12 lg:pb-14 border-b border-slate-200/80 overflow-hidden" id="tro-ly">
+        <section className="relative w-full py-6 sm:py-8 lg:py-14 border-b border-slate-200/80 overflow-hidden" id="tro-ly">
           <MedicalAmbientBackground />
 
-          <div className="relative z-10 w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 pt-1 sm:pt-2 pb-4 sm:pb-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 xl:gap-16 items-center">
+          <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-20">
+            {/* Mobile View Switcher Tabs (< lg) */}
+            <div className="lg:hidden flex items-center justify-center mb-6">
+              <div className="grid grid-cols-2 p-1 bg-slate-200/70 backdrop-blur-xs rounded-xl border border-slate-300/60 w-full max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => setMobileHeroTab("overview")}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    mobileHeroTab === "overview"
+                      ? "bg-white text-[#0f766e] shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">info</span>
+                  <span>Tổng quan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileHeroTab("chat")}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    mobileHeroTab === "chat"
+                      ? "bg-white text-[#0f766e] shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+                  <span>Xem Trợ lý AI</span>
+                </button>
+              </div>
+            </div>
 
-              {/* Left Column: Clinical Value Proposition */}
-              <div className="w-full flex flex-col items-start text-left gap-4">
+            {/* Desktop Layout (2 cols) & Mobile Segmented Display */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-center">
 
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-[42px] font-extrabold text-slate-900 tracking-tight leading-[1.18] animate-hero-slide-up animation-delay-100">
+              {/* Left Column: Clinical Value Proposition (Visible on Desktop OR when mobileHeroTab === 'overview') */}
+              <div className={`w-full flex flex-col items-start text-left gap-3.5 sm:gap-4 ${
+                mobileHeroTab === "overview" ? "flex" : "hidden lg:flex"
+              }`}>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-[#0f766e] text-[11px] font-bold">
+                  <span className="material-symbols-outlined text-[14px]">verified</span>
+                  <span>Công nghệ Y tế AI Đồng hành cùng Bác sĩ</span>
+                </div>
+
+                <h1 className="text-xl sm:text-3xl lg:text-4xl xl:text-[42px] font-extrabold text-slate-900 tracking-tight leading-[1.2] sm:leading-[1.18] animate-hero-slide-up animation-delay-100">
                   Dinh dưỡng chuẩn y khoa cho người bệnh mãn tính
                 </h1>
 
@@ -147,39 +189,60 @@ export default function HomePage() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto pt-1 animate-hero-slide-up animation-delay-300">
                   <Link
                     href="/register"
-                    className="bg-[#0f766e] hover:bg-[#115e59] text-white font-semibold text-xs sm:text-sm h-10 px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-xs hover:shadow transition-all active:scale-[0.98]"
+                    className="bg-[#0f766e] hover:bg-[#115e59] text-white font-semibold text-xs sm:text-sm h-10 px-5 sm:px-6 rounded-xl flex items-center justify-center gap-1.5 shadow-xs hover:shadow transition-all active:scale-[0.98]"
                   >
                     <span>Cá nhân hóa thực đơn ngay</span>
                     <span className="material-symbols-outlined text-[17px]">arrow_forward</span>
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => setMobileHeroTab("chat")}
+                    className="lg:hidden bg-teal-50 hover:bg-teal-100/70 text-[#0f766e] font-semibold text-xs h-10 px-4 rounded-xl border border-teal-200/80 flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+                    <span>Thử tương tác Trợ lý AI</span>
+                  </button>
                   <Link
                     href="/login"
-                    className="bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm h-10 px-5 rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+                    className="hidden sm:flex bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm h-10 px-4 sm:px-5 rounded-xl border border-slate-200 items-center justify-center gap-1.5 shadow-2xs transition-all"
                   >
                     <span>Đăng nhập hệ thống</span>
                   </Link>
                 </div>
 
                 {/* Trust Points */}
-                <div className="grid grid-cols-3 gap-3 sm:gap-5 pt-4 border-t border-slate-200/80 w-full animate-hero-slide-up animation-delay-400">
+                <div className="grid grid-cols-3 gap-2 sm:gap-5 pt-3 sm:pt-4 border-t border-slate-200/80 w-full animate-hero-slide-up animation-delay-400">
                   <div className="flex flex-col">
-                    <span className="text-lg sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">1.200+</span>
-                    <span className="text-[11px] text-slate-500 font-medium mt-0.5">Món ăn Việt phân tích</span>
+                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">1.200+</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Món ăn Việt phân tích</span>
                   </div>
-                  <div className="flex flex-col border-l border-slate-200 pl-3 sm:pl-5">
-                    <span className="text-lg sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
-                    <span className="text-[11px] text-slate-500 font-medium mt-0.5">Dữ liệu RAG y văn</span>
+                  <div className="flex flex-col border-l border-slate-200 pl-2 sm:pl-5">
+                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Dữ liệu RAG y văn</span>
                   </div>
-                  <div className="flex flex-col border-l border-slate-200 pl-3 sm:pl-5">
-                    <span className="text-lg sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
-                    <span className="text-[11px] text-slate-500 font-medium mt-0.5">Rà soát tương tác thuốc</span>
+                  <div className="flex flex-col border-l border-slate-200 pl-2 sm:pl-5">
+                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Rà soát tương tác thuốc</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Clean Looping Video & Chat Preview */}
-              <div className="w-full flex items-center justify-center lg:justify-end animate-hero-slide-left animation-delay-200">
-                <ClinicalChatLoopPreview />
+              {/* Right Column: Clean Looping Video & Chat Preview (Visible on Desktop OR when mobileHeroTab === 'chat') */}
+              <div className={`w-full items-center justify-center lg:justify-end animate-hero-slide-left animation-delay-200 ${
+                mobileHeroTab === "chat" ? "flex flex-col" : "hidden lg:flex"
+              }`}>
+                <div className="w-full max-w-[480px]">
+                  <ClinicalChatLoopPreview />
+                </div>
+                {/* Mobile switch back button */}
+                <button
+                  type="button"
+                  onClick={() => setMobileHeroTab("overview")}
+                  className="lg:hidden mt-3 text-xs font-semibold text-[#0f766e] hover:text-[#115e59] inline-flex items-center gap-1 py-1 px-3 rounded-lg bg-white border border-slate-200 shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                  <span>Quay lại Xem giới thiệu &amp; Đăng ký</span>
+                </button>
               </div>
 
             </div>
@@ -187,8 +250,8 @@ export default function HomePage() {
         </section>
 
         {/* 3. BENTO GRID (PLATFORM CAPABILITIES) */}
-        <section className="relative w-full min-h-screen flex flex-col justify-center py-12 md:py-16 lg:py-20 bg-[#f8fafc] border-b border-slate-200 overflow-hidden" id="tinh-nang">
-          <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 my-auto">
+        <section className="relative w-full py-10 sm:py-14 lg:py-20 bg-[#f8fafc] border-b border-slate-200 overflow-hidden" id="tinh-nang">
+          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-20">
             <div className="max-w-2xl mb-6 animate-hero-slide-up animation-delay-100">
               <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight mb-1.5">
                 Công nghệ &amp; Tính năng nền tảng
@@ -198,45 +261,45 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
 
               {/* Feature 1: Vietnamese Food RAG Database (Span 8) */}
-              <div className="md:col-span-8 bg-gradient-to-br from-[#0f172a] via-[#113835] to-[#0f766e] text-white rounded-2xl p-6 sm:p-7 flex flex-col justify-between overflow-hidden relative shadow-sm animate-hero-slide-up animation-delay-200">
+              <div className="md:col-span-8 bg-gradient-to-br from-[#0f172a] via-[#113835] to-[#0f766e] text-white rounded-2xl p-5 sm:p-7 flex flex-col justify-between overflow-hidden relative shadow-sm animate-hero-slide-up animation-delay-200">
                 <div className="z-10 max-w-xl">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 text-[11px] font-semibold mb-2.5 border border-teal-400/30">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 text-[10.5px] sm:text-[11px] font-semibold mb-2.5 border border-teal-400/30">
                     <span className="material-symbols-outlined text-[14px]">database</span>
                     CSDL Món ăn Việt Nam
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-white mb-1.5">
+                  <h3 className="text-base sm:text-xl font-bold text-white mb-1.5">
                     RAG y văn trên 1.200+ món ăn truyền thống
                   </h3>
                   <p className="text-xs text-teal-50/90 leading-relaxed mb-4">
                     Định lượng chi tiết các món ăn quen thuộc hàng ngày: từ phở, bún riêu, canh chua cá lóc đến thịt kho tàu, giúp bệnh nhân ăn ngon mà vẫn an toàn.
                   </p>
                 </div>
-                <div className="z-10 grid grid-cols-3 gap-2.5 pt-2.5 border-t border-teal-500/30">
-                  <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                <div className="z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 pt-2.5 border-t border-teal-500/30">
+                  <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
                     <div className="text-xs sm:text-sm font-bold text-teal-300">GI &amp; GL</div>
-                    <div className="text-[10px] text-teal-100/80 mt-0.5">Chỉ số đường huyết</div>
+                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Chỉ số đường huyết</div>
                   </div>
-                  <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                  <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
                     <div className="text-xs sm:text-sm font-bold text-teal-300">Natri &amp; Kali</div>
-                    <div className="text-[10px] text-teal-100/80 mt-0.5">Bệnh thận &amp; HA</div>
+                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Bệnh thận &amp; HA</div>
                   </div>
-                  <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                  <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
                     <div className="text-xs sm:text-sm font-bold text-teal-300">Purin mg</div>
-                    <div className="text-[10px] text-teal-100/80 mt-0.5">Khắc chế cơn Gút</div>
+                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Khắc chế cơn Gút</div>
                   </div>
                 </div>
               </div>
 
               {/* Feature 2: HITL Doctor Approval (Span 4) */}
-              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-300">
+              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-300">
                 <div>
-                  <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#0f766e] flex items-center justify-center mb-3 border border-teal-200/80">
-                    <span className="material-symbols-outlined text-[18px]">verified</span>
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-teal-50 text-[#0f766e] flex items-center justify-center mb-3 border border-teal-200/80">
+                    <span className="material-symbols-outlined text-[17px] sm:text-[18px]">verified</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1.5">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                     Human-in-the-Loop (HITL)
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
@@ -250,12 +313,12 @@ export default function HomePage() {
               </div>
 
               {/* Feature 3: Drug-Food Interaction Engine (Span 4) */}
-              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-2xs hover:border-rose-200 transition-all animate-hero-slide-up animation-delay-300">
+              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-2xs hover:border-rose-200 transition-all animate-hero-slide-up animation-delay-300">
                 <div>
-                  <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center mb-3 border border-rose-200/80">
-                    <span className="material-symbols-outlined text-[18px]">medication_liquid</span>
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center mb-3 border border-rose-200/80">
+                    <span className="material-symbols-outlined text-[17px] sm:text-[18px]">medication_liquid</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1.5">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                     Cảnh báo tương tác thuốc
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
@@ -269,12 +332,12 @@ export default function HomePage() {
               </div>
 
               {/* Feature 4: Food Log 3-Slot Tracking (Span 4) */}
-              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-400">
+              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-400">
                 <div>
-                  <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#0f766e] flex items-center justify-center mb-3 border border-teal-200/80">
-                    <span className="material-symbols-outlined text-[18px]">menu_book</span>
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-teal-50 text-[#0f766e] flex items-center justify-center mb-3 border border-teal-200/80">
+                    <span className="material-symbols-outlined text-[17px] sm:text-[18px]">menu_book</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1.5">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                     Nhật ký ăn uống 3 bữa
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
@@ -288,12 +351,12 @@ export default function HomePage() {
               </div>
 
               {/* Feature 5: Patient Metrics Time-Series (Span 4) */}
-              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-400">
+              <div className="md:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-2xs hover:border-teal-300 transition-all animate-hero-slide-up animation-delay-400">
                 <div>
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center mb-3 border border-slate-200">
-                    <span className="material-symbols-outlined text-[18px]">monitoring</span>
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center mb-3 border border-slate-200">
+                    <span className="material-symbols-outlined text-[17px] sm:text-[18px]">monitoring</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1.5">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                     Theo dõi sinh hiệu
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
@@ -311,8 +374,8 @@ export default function HomePage() {
         </section>
 
         {/* 4. DUAL AUDIENCE PERSPECTIVE */}
-        <section className="relative w-full min-h-screen flex flex-col justify-center py-12 md:py-16 lg:py-20 bg-white border-b border-slate-200 overflow-hidden" id="doi-tuong">
-          <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20 my-auto">
+        <section className="relative w-full py-10 sm:py-14 lg:py-20 bg-white border-b border-slate-200 overflow-hidden" id="doi-tuong">
+          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-20">
             <div className="text-center max-w-2xl mx-auto mb-6 animate-hero-slide-up animation-delay-100">
               <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight mb-1.5">
                 Đồng hành cùng Bệnh nhân &amp; Chuyên gia Y tế
@@ -321,12 +384,12 @@ export default function HomePage() {
                 Kết nối liền mạch giữa việc tự quản lý tại nhà của người bệnh và sự giám sát chuyên môn từ bác sĩ.
               </p>
 
-              {/* Toggle Audience Tabs */}
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 mt-4">
+              {/* Toggle Audience Tabs - Adaptive Grid on Mobile */}
+              <div className="w-full max-w-md mx-auto grid grid-cols-2 p-1 bg-slate-100 rounded-xl border border-slate-200 mt-4">
                 <button
                   type="button"
                   onClick={() => setActiveAudienceTab("patient")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeAudienceTab === "patient"
+                  className={`px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center ${activeAudienceTab === "patient"
                       ? "bg-white text-[#0f766e] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                     }`}
@@ -336,19 +399,19 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setActiveAudienceTab("doctor")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeAudienceTab === "doctor"
+                  className={`px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center ${activeAudienceTab === "doctor"
                       ? "bg-white text-[#0f766e] shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
-                  Dành cho Bác sĩ &amp; Cơ sở Y tế
+                  Dành cho Bác sĩ &amp; CSYT
                 </button>
               </div>
             </div>
 
             {/* Audience View: Patient */}
             {activeAudienceTab === "patient" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-in fade-in duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 animate-in fade-in duration-300">
                 <div className="bg-[#f8fafc] border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between animate-hero-slide-up animation-delay-200">
                   <div className="space-y-2.5">
                     <div className="w-8 h-8 rounded-xl bg-teal-50 text-[#0f766e] flex items-center justify-center font-bold">
@@ -398,7 +461,7 @@ export default function HomePage() {
 
             {/* Audience View: Doctor */}
             {activeAudienceTab === "doctor" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-in fade-in duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 animate-in fade-in duration-300">
                 <div className="bg-[#f8fafc] border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col justify-between animate-hero-slide-up animation-delay-200">
                   <div className="space-y-2.5">
                     <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
@@ -451,7 +514,7 @@ export default function HomePage() {
 
       {/* 5. FOOTER */}
       <footer className="w-full bg-slate-900 text-slate-400 border-t border-slate-800 py-8 lg:py-10 text-xs">
-        <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 xl:px-20">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-16 xl:px-20">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-6 border-b border-slate-800">
 
             {/* Brand Column */}

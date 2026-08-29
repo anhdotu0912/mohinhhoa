@@ -166,31 +166,31 @@ export function ClinicalChatLoopPreview() {
   return (
     <div className="w-full max-w-[480px] mx-auto lg:mr-0 lg:ml-auto bg-white rounded-xl border border-slate-200/90 shadow-md overflow-hidden flex flex-col text-slate-800 text-xs">
       {/* 1. Chatbot Top Header Bar */}
-      <div className="bg-gradient-to-r from-[#0f766e] to-[#115e59] text-white px-4 py-2.5 flex items-center justify-between border-b border-teal-700/50 shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-white shadow-2xs">
+      <div className="bg-gradient-to-r from-[#0f766e] to-[#115e59] text-white px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between border-b border-teal-700/50 shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-white shadow-2xs shrink-0">
             <span className="material-symbols-outlined text-[17px]" style={{ fontVariationSettings: "'FILL' 1" }}>
               health_and_safety
             </span>
           </div>
-          <div>
-            <div className="font-bold text-xs text-white leading-tight flex items-center gap-1.5">
+          <div className="min-w-0">
+            <div className="font-bold text-xs text-white leading-tight flex items-center gap-1.5 truncate">
               <span>Trợ lý Dinh dưỡng VMEC-10</span>
             </div>
-            <div className="text-[10px] text-teal-100/80 font-normal mt-0.5">
+            <div className="text-[10px] text-teal-100/80 font-normal mt-0.5 truncate">
               Hỗ trợ cá nhân hóa 24/7
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-teal-900/40 border border-teal-300/30 px-2.5 py-1 rounded-full text-teal-100 text-[10.5px] font-medium">
+        <div className="flex items-center gap-1.5 bg-teal-900/40 border border-teal-300/30 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-teal-100 text-[10px] sm:text-[10.5px] font-medium shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
           <span>Trực tuyến</span>
         </div>
       </div>
 
       {/* Interactive Scenario Tabs */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100/70 border-b border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shrink-0">
+      <div className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-slate-100/70 border-b border-slate-200 overflow-x-auto touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shrink-0">
         {SCENARIOS.map((item, idx) => {
           const isActive = idx === activeScenarioIdx;
           return (
@@ -198,7 +198,7 @@ export function ClinicalChatLoopPreview() {
               key={item.id}
               type="button"
               onClick={() => handleManualSelect(idx)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap ${isActive
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0 ${isActive
                 ? "bg-white text-[#0f766e] shadow-2xs border border-slate-200"
                 : "text-slate-500 hover:text-slate-800 hover:bg-white/60"
                 }`}
@@ -213,7 +213,7 @@ export function ClinicalChatLoopPreview() {
       {/* 3. Locked-Height Chat Viewport with Auto-Scroll */}
       <div
         ref={chatScrollRef}
-        className="h-[430px] p-3.5 space-y-3 overflow-y-auto custom-scrollbar bg-slate-50/40 flex-grow"
+        className="h-[340px] sm:h-[390px] md:h-[430px] p-3 sm:p-4 space-y-3 overflow-y-auto custom-scrollbar bg-slate-50/40 flex-grow"
       >
         {/* User Message */}
         <div className="flex justify-end animate-message-fade">
