@@ -853,50 +853,104 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 pb-28 flex-1">
-        <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-bold text-lg text-on-surface tracking-tight truncate">
-              {plan.planTitle}
-            </h1>
-            <p className="text-sm text-on-surface-variant mt-1">
-              {daysList.length} ngày
-              {plan.createdAt ? ` · ${plan.createdAt}` : ""}
-            </p>
+      {/* Sticky top action & navigation bar */}
+      <div className="sticky top-0 z-30 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3 transition-all">
+        <div className="max-w-[1600px] w-full mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Left: Back button + Plan info + Status Badges */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Link
+              href={doctorChartHref(patientId, "meals")}
+              className="p-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors shrink-0 flex items-center justify-center"
+              title="Quay lại danh sách thực đơn"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-bold text-base sm:text-lg text-on-surface tracking-tight truncate max-w-md">
+                  {plan.planTitle}
+                </h1>
+                {status === "pending" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Chờ duyệt
+                  </span>
+                )}
+                {status === "approved" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
+                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                    Đã duyệt
+                  </span>
+                )}
+                {status === "edited" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
+                    <span className="material-symbols-outlined text-[13px]">edit_note</span>
+                    Đã chỉnh sửa
+                  </span>
+                )}
+                {status === "rejected" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                    <span className="material-symbols-outlined text-[13px]">cancel</span>
+                    Đã từ chối
+                  </span>
+                )}
+                {hardWarningCount > 0 && isReviewable && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                    {hardWarningCount} vi phạm lâm sàng
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-on-surface-variant mt-0.5 truncate">
+                Bệnh nhân: <strong className="font-semibold text-on-surface">{patient.name}</strong> ({patient.id})
+                {daysList.length ? ` · ${daysList.length} ngày` : ""}
+                {plan.createdAt ? ` · Tạo: ${plan.createdAt}` : ""}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {status === "pending" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                Chờ duyệt
-              </span>
-            )}
-            {status === "approved" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
-                <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                Đã duyệt
-              </span>
-            )}
-            {status === "edited" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
-                <span className="material-symbols-outlined text-[14px]">edit_note</span>
-                Đã chỉnh sửa
-              </span>
-            )}
-            {status === "rejected" && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                <span className="material-symbols-outlined text-[14px]">cancel</span>
-                Đã từ chối
-              </span>
-            )}
-            {hardWarningCount > 0 && isReviewable && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                {hardWarningCount} vi phạm lâm sàng
-              </span>
-            )}
-          </div>
-        </header>
 
+          {/* Right: Review helper notice & action buttons */}
+          {isReviewable && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2.5 shrink-0">
+              {editingSlot ? (
+                <span className="text-[11px] text-amber-800 bg-amber-50/90 px-2.5 py-1 rounded-md border border-amber-200/70 font-medium">
+                  Đang sửa bữa — bấm «Xong»/«Lưu» trước khi duyệt
+                </span>
+              ) : hardWarningCount > 0 ? (
+                <span className="text-[11px] text-rose-800 bg-rose-50/90 px-2.5 py-1 rounded-md border border-rose-200/70 font-semibold">
+                  Còn {hardWarningCount} vi phạm cần xử lý trước khi duyệt
+                </span>
+              ) : dirty ? (
+                <span className="text-[11px] text-on-surface-variant font-medium">
+                  Có thay đổi chưa lưu (sẽ lưu khi duyệt)
+                </span>
+              ) : null}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalOpen(true)}
+                  disabled={saving || !!editingSlot}
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-[16px]">cancel</span>
+                  <span>Từ chối</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApprove()}
+                  disabled={saving || !canApprove}
+                  className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                  <span>{saving ? "Đang xử lý…" : "Duyệt thực đơn"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 pb-12 flex-1">
         {showApplyPrompt && (
           <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 flex flex-col gap-4 shadow-2xs">
             <div>
@@ -1063,52 +1117,6 @@ export default function PlanReviewDetailPage() {
           </div>
         </div>
       </main>
-
-      {isReviewable && (
-        <div className="fixed bottom-0 left-0 right-0 md:left-[240px] z-40 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/40 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] py-3 px-6 md:px-8">
-          <div className="max-w-[1600px] w-full mx-auto flex flex-col sm:flex-row sm:items-center justify-end gap-3">
-            {editingSlot ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
-                Đang chỉnh sửa bữa — bấm «Xong» hoặc «Lưu» trên bữa đó rồi mới duyệt /
-                từ chối.
-              </p>
-            ) : hardWarningCount > 0 ? (
-              <p className="text-xs text-rose-800 sm:mr-auto font-semibold">
-                Còn {hardWarningCount} vi phạm ràng buộc lâm sàng trên toàn bộ thực đơn —
-                chỉnh món đến khi hết vi phạm rồi mới duyệt được.
-              </p>
-            ) : dirty ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
-                Có thay đổi chưa lưu — sẽ được lưu khi bạn duyệt.
-              </p>
-            ) : status === "edited" ? (
-              <p className="text-xs text-on-surface-variant sm:mr-auto font-medium">
-                Thực đơn đã chỉnh sửa — sẵn sàng duyệt nếu không còn vi phạm lâm sàng.
-              </p>
-            ) : null}
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setRejectModalOpen(true)}
-                disabled={saving || !!editingSlot}
-                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">cancel</span>
-                <span>Từ chối thực đơn này</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleApprove()}
-                disabled={saving || !canApprove}
-                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                <span>{saving ? "Đang xử lý…" : "Duyệt thực đơn này"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {addingToSlot && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">

@@ -56,6 +56,9 @@ def _profile_from_row(row: Profile) -> PatientProfile:
         preferences=row.preferences or [],
         treatment_goals=row.treatment_goals or [],
         constraints_status=getattr(row, "constraints_status", None) or "confirmed",
+        proposed_target_kcal=getattr(row, "proposed_target_kcal", None),
+        proposed_restrictions=getattr(row, "proposed_restrictions", None),
+        proposed_treatment_goals=getattr(row, "proposed_treatment_goals", None),
     )
 
 
@@ -254,7 +257,7 @@ def generate_meal_plan(
 
     assert_can_generate_meal_plan(db, user.id)
     profile = get_profile(db, user.id)
-    plan = build_plan(profile, notes=notes, priorities=priorities or [], db=db)
+    plan = build_plan(profile.for_meal_planning(), notes=notes, priorities=priorities or [], db=db)
     clear_meal_plan_request(db, user.id)
     return persist_generated_plan(db, user.id, plan)
 

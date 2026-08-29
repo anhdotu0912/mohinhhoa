@@ -19,10 +19,10 @@
 
 ### Done — Clinical Constraints + HITL (→ `specs/02`, `specs/04-clinical-constraints.md`)
 - [x] Mở rộng `Restrictions` schema thêm `salt_daily_g`/`sugar_daily_g` (song song field cũ; `protein_daily_g` đã bị loại khỏi scope).
-- [x] `constraints_status` (`"confirmed"|"pending_doctor_review"`) trên `PatientProfile`; `POST /profile` set `"pending_doctor_review"` khi patient đổi `target_kcal`/`restrictions`.
-- [x] `PUT /doctor/patients/{patient_id}/constraints` (partial update); FE đã nối `api.updateDoctorConstraints`.
-- [x] `POST /doctor/patients/{patient_id}/constraints/approve` (chỉ đổi status, không đổi giá trị).
-- [x] `GET /doctor/patients/{patient_id}` trả kèm `target_kcal`/`restrictions`/`constraints_status`; FE hiển thị badge "Chờ bác sĩ xác nhận".
+- [x] `constraints_status` (`"confirmed"|"pending_doctor_review"`) trên `PatientProfile`; `POST /profile` lưu `proposed_*` khi patient đổi `target_kcal`/`restrictions`/`treatment_goals` (không ghi đè cột hiệu lực).
+- [x] `PUT /doctor/patients/{patient_id}/constraints` (partial update, ghi hiệu lực ngay, hủy đề xuất); FE đã nối `api.updateDoctorConstraints`.
+- [x] `POST /doctor/patients/{patient_id}/constraints/approve` (chép `proposed_*` → cột hiệu lực).
+- [x] `GET /doctor/patients/{patient_id}` trả kèm `target_kcal`/`constraints_status`/`proposed_*`; FE hiển thị badge "Chờ bác sĩ xác nhận".
 
 ### Done — Doctor Compliance View (→ `specs/10-doctor-compliance-view.md`, ADR-008)
 - [x] `GET /doctor/patients/{patient_id}/compliance` — on-the-fly aggregate từ `Notification(type="adherence_checkin")` + `Alert`, mặc định 14 ngày.

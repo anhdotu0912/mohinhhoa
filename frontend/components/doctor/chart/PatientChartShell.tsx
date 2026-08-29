@@ -10,6 +10,7 @@ import { TransferDoctorControl } from "@/components/doctor/TransferDoctorControl
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { PatientRecordId } from "@/components/doctor/chart/PatientRecordId";
+import { NotificationBadge } from "@/components/shared/NotificationBadge";
 import {
   CHART_TABS,
   chartTabFromPath,
@@ -20,7 +21,7 @@ import {
   isPlanReviewPath,
 } from "@/lib/doctor-routes";
 import { asRouteId } from "@/lib/route-params";
-import type { DoctorPatientSummary } from "@/lib/types";
+import type { DoctorPatientSummary, MealPlanOutput } from "@/lib/types";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -69,6 +70,7 @@ export function PatientChartShell({
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
   const [patient, setPatient] = useState<DoctorPatientSummary | null>(null);
+  const [hasPendingMealPlan, setHasPendingMealPlan] = useState(false);
 
   const routeId = asRouteId(patientIdProp);
   const compact = isGeneratePath(pathname);
@@ -93,10 +95,18 @@ export function PatientChartShell({
   const load = useCallback(async () => {
     if (!token || role !== "doctor" || !routeId) return;
     try {
-      const row = await api.getDoctorPatient(routeId);
+      const [row, pendingPlans] = await Promise.all([
+        api.getDoctorPatient(routeId),
+        api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
+      ]);
       setPatient(row);
+      const hasPending =
+        pendingPlans.some((p) => p.user_id === routeId) ||
+        row.latest_plan_status === "pending";
+      setHasPendingMealPlan(hasPending);
     } catch {
       setPatient(null);
+      setHasPendingMealPlan(false);
     }
   }, [token, role, routeId]);
 
@@ -232,14 +242,27 @@ export function PatientChartShell({
               >
                 {CHART_TABS.map((tab) => {
                   const selected = activeTab === tab.id;
+                  const constraintsPending =
+                    tab.id === "constraints" &&
+                    patient?.constraints_status === "pending_doctor_review";
+                  const mealsPending =
+                    tab.id === "meals" && hasPendingMealPlan;
+                  const hasNotification = constraintsPending || mealsPending;
                   return (
                     <Link
                       key={tab.id}
                       role="tab"
                       aria-selected={selected}
                       aria-current={selected ? "page" : undefined}
+                      aria-label={
+                        constraintsPending
+                          ? "Ràng buộc, 1 đề xuất chờ duyệt"
+                          : mealsPending
+                            ? "Thực đơn, có thực đơn chờ duyệt"
+                            : undefined
+                      }
                       href={doctorChartHref(routeId, tab.id)}
-                      className={`flex flex-1 min-w-[9rem] items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
+                      className={`relative flex flex-1 min-w-[9rem] items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                         selected
                           ? "bg-primary text-on-primary font-bold shadow-[0_1px_2px_rgba(18,28,42,0.18)]"
                           : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest/80"
@@ -256,6 +279,12 @@ export function PatientChartShell({
                         {tabIcon(tab.id)}
                       </span>
                       <span>{tab.label}</span>
+                      {hasNotification ? (
+                        <NotificationBadge
+                          dot
+                          className="bottom-auto top-0.5 right-0.5 w-2 h-2 ring-[1.5px] ring-white"
+                        />
+                      ) : null}
                     </Link>
                   );
                 })}

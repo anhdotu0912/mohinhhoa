@@ -117,7 +117,9 @@ Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định
 { "disease": ["diabetes_t2"], "medications": ["metformin"], "allergies": ["hải sản"], "bmi": 26.5, "weight": 72, "height": 170, "target_kcal": 1800, "restrictions": { "carb_per_meal": 45, "sodium_daily": 1500 }, "preferences": ["thích ăn cơm"] }
 // Response 200 → PatientProfile (xem contracts/agent-io-schema.md §1)
 ```
-**`constraints_status` (as-built 2026-08-18):** nếu request thay đổi `target_kcal`/`restrictions` so với giá trị đang lưu, BE set `constraints_status="pending_doctor_review"` (giá trị mới vẫn áp dụng ngay cho lần generate kế tiếp).
+**Field bệnh nhân ghi ngay:** `disease`, `medications`, `allergies`, chỉ số cơ thể (`bmi`/`weight`/`height`/`age`/`gender`), liên hệ, `preferences`.
+
+**Field lâm sàng — đề xuất, không có hiệu lực tới khi bác sĩ duyệt (2026-08-29):** `target_kcal`, `restrictions`, `treatment_goals`. Nếu request khác giá trị hiệu lực đang lưu, BE ghi vào `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` và set `constraints_status="pending_doctor_review"`. Response `target_kcal`/`restrictions`/`treatment_goals` **vẫn là giá trị đã duyệt**; `proposed_*` phản ánh đề xuất. `meal_planner_agent` chỉ đọc cột hiệu lực.
 
 ### `GET /profile/me`
 **Role:** `patient`. Response 200 → `PatientProfile`.
@@ -126,14 +128,14 @@ Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định
 
 ## 3. Clinical Constraints
 
-Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Doctor set qua endpoint riêng bên dưới (as-built 2026-08-16). `PUT /doctor/patients/{id}/profile` **không** nhận `target_kcal`/`restrictions`.
+Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POST /profile` (lưu `proposed_*`, không ghi đè cột hiệu lực). Doctor set giá trị hiệu lực qua endpoint riêng bên dưới (as-built 2026-08-16). `PUT /doctor/patients/{id}/profile` **không** nhận `target_kcal`/`restrictions`.
 
 **Quyết định 2026-08-16 (as-built):**
-- **Ràng buộc doctor UI:** `target_kcal`, `salt_daily_g`, `sugar_daily_g` — khớp trang `frontend/app/doctor/patients/constraints/page.tsx`.
+- **Ràng buộc doctor UI:** `target_kcal`, `carb_per_meal`, `sodium_daily`, `salt_daily_g`, `sugar_daily_g`, `treatment_goals` — cùng bộ chỉ số với hồ sơ bệnh nhân.
 - **Schema `Restrictions`:** giữ song song `carb_per_meal`/`sodium_daily` (patient) + `salt_daily_g`/`sugar_daily_g` (doctor). Meal planner dùng `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị.
 - **`protein_daily_g`:** bỏ khỏi scope ràng buộc (Won't Have MVP này).
 
-**HITL as-built (2026-08-18):** patient tự sửa `target_kcal`/`restrictions` → `pending_doctor_review`; doctor approve qua endpoint bên dưới.
+**HITL as-built (cập nhật 2026-08-29):** patient đề xuất `target_kcal`/`restrictions`/`treatment_goals` → `pending_doctor_review` + `proposed_*`; cột hiệu lực không đổi. Doctor approve chép proposed → hiệu lực; hoặc `PUT .../constraints` ghi hiệu lực ngay và hủy đề xuất.
 
 ### `PUT /doctor/patients/{patient_id}/constraints` (as-built)
 **Role:** `doctor`. Partial update — chỉ field gửi lên mới bị ghi đè.
@@ -141,19 +143,27 @@ Patient tự set `restrictions`/`target_kcal` qua `POST /profile` (as-built). Do
 // Request (flat — không bọc trong restrictions)
 {
   "target_kcal": 1700,
+  "carb_per_meal": 45,
+  "sodium_daily": 1500,
   "salt_daily_g": 4.5,
-  "sugar_daily_g": 20
+  "sugar_daily_g": 20,
+  "treatment_goals": ["Kiểm soát đường huyết ổn định (HbA1c < 7%)."]
 }
-// Response 200 → DoctorPatientSummary (target_kcal + salt_daily_g + sugar_daily_g đã cập nhật)
+// Response 200 → DoctorPatientSummary (cột hiệu lực đã cập nhật, proposed_* = null)
 // Error 404 PATIENT_NOT_FOUND — bệnh nhân không tồn tại
-// Error 422 — target_kcal/salt/sugar ngoài range validation
+// Error 422 — field ngoài range:
+//   target_kcal 800–4000; carb_per_meal 0–200 g; sodium_daily 0–5000 mg;
+//   salt_daily_g 0–15 g; sugar_daily_g 0–100 g;
+//   treatment_goals: mỗi mục 3–80 ký tự, tối đa 12 mục
 ```
 
-### `POST /doctor/patients/{patient_id}/constraints/approve` (as-built 2026-08-18)
-**Role:** `doctor`. Xác nhận thay đổi ràng buộc mà **patient tự sửa** trước đó (không đổi giá trị, chỉ chuyển `constraints_status` từ `"pending_doctor_review"` → `"confirmed"`).
+`POST /profile` dùng **cùng range** cho `target_kcal` / `restrictions` / `treatment_goals` (đề xuất). Field `null`/omit vẫn hợp lệ (onboarding không gửi lâm sàng).
+
+### `POST /doctor/patients/{patient_id}/constraints/approve` (as-built 2026-08-18, cập nhật 2026-08-29)
+**Role:** `doctor`. Áp dụng đề xuất ràng buộc mà **patient gửi** trước đó: chép `proposed_*` sang cột hiệu lực, xóa proposed, `constraints_status` `"pending_doctor_review"` → `"confirmed"`.
 ```json
 // Request: rỗng (không cần body)
-// Response 200 → PatientProfile (constraints_status="confirmed")
+// Response 200 → PatientProfile (constraints_status="confirmed", proposed_* = null, target_kcal/restrictions/treatment_goals = giá trị vừa duyệt)
 // Error 400 { "code": "NOTHING_TO_APPROVE", "detail": "Không có thay đổi nào đang chờ duyệt." } — khi constraints_status đã là "confirmed"
 ```
 
@@ -968,7 +978,10 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.16**.
+- Version hiện tại: **1.19**.
+- **Changelog 1.18 → 1.19 (2026-08-29):** validate range ràng buộc lâm sàng thống nhất FE+BE (`target_kcal` 800–4000, `carb_per_meal` 0–200, `sodium_daily` 0–5000, `salt_daily_g` 0–15, `sugar_daily_g` 0–100, `treatment_goals` 3–80 ký tự / tối đa 12). UI bác sĩ và hồ sơ BN dùng thanh kéo trong các khoảng này. 422 nếu vượt range. Không breaking với payload trong range cũ (trừ `target_kcal` < 800 hoặc muối > 15 / đường > 100).
+- **Changelog 1.17 → 1.18 (2026-08-29):** `PUT /doctor/patients/{id}/constraints` nhận thêm `carb_per_meal`, `sodium_daily`, `treatment_goals` (cùng bộ chỉ số với hồ sơ BN). Onboarding bệnh nhân không gửi field lâm sàng. Không breaking — field mới optional.
+- **Changelog 1.16 → 1.17 (2026-08-29):** HITL ràng buộc lâm sàng — `POST /profile` không còn áp `target_kcal`/`restrictions`/`treatment_goals` ngay; lưu `proposed_*` tới khi doctor `approve` (chép sang cột hiệu lực) hoặc `PUT .../constraints` (ghi hiệu lực, hủy đề xuất). `PatientProfile` / `DoctorPatientSummary` thêm `proposed_*` optional. Meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/agent-io-schema.md` v1.11. Không breaking — field mới default `null`.
 - **Changelog 1.15 → 1.16 (2026-08-29):** thêm `GET /doctor/profile` và `PUT /doctor/profile` (lấy/cập nhật hồ sơ chuyên môn bác sĩ: danh xưng/học vị, chuyên khoa, số CCHN, cơ quan, số năm kinh nghiệm, bio, trạng thái nhận bệnh, giờ tư vấn, liên hệ khẩn cấp kèm thống kê KPI lâm sàng). Không breaking change.
 - **Changelog 1.14 → 1.15 (2026-08-28):** `PATCH /auth/me` (`full_name`) cho user đã đăng nhập. Chat intent `doctor_note`: `DoctorNoteOut` thêm `doctor_avatar`, `notes[]` (list `manual_reminder`, mới → cũ, cap 10, `has_more`), tên/ảnh lấy từ bác sĩ được gán — không còn default cứng `"Bác sĩ điều trị"`. Không còn fallback `adjustment_note`. Field `note`/`created_at`/`tags` giữ là bản ghi mới nhất để tương thích. Đồng bộ `contracts/agent-io-schema.md` v1.10.
 - **Changelog 1.13 → 1.14 (2026-08-28):** phân công bác sĩ ↔ bệnh nhân 1–1. `GET /doctor/patients` (và mọi endpoint doctor theo `patient_id` / meal-plan) chỉ còn phạm vi bệnh nhân đã gắn. Thêm `POST /doctor/patients`, `GET /doctor/claim-queue`, `POST /doctor/patients/{id}/claim`, `GET /doctor/colleagues`, `POST /doctor/patients/{id}/transfer`, `POST /doctor/transfers/{id}/accept`. `GET /auth/me` thêm `assigned_doctor`. `DoctorPatientSummary` thêm `pending_transfer`. **Breaking** với client giả định 1 bác sĩ thấy mọi bệnh nhân.

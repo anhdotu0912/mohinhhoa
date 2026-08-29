@@ -58,6 +58,9 @@ export interface PatientProfile {
   preferences: string[];
   treatment_goals?: string[];
   constraints_status?: "confirmed" | "pending_doctor_review";
+  proposed_target_kcal?: number | null;
+  proposed_restrictions?: Restrictions | null;
+  proposed_treatment_goals?: string[] | null;
 }
 
 export interface ProfileUpsert {
@@ -73,9 +76,9 @@ export interface ProfileUpsert {
   address?: string | null;
   blood_pressure?: string | null;
   blood_glucose?: string | null;
-  target_kcal: number;
-  restrictions: Restrictions;
   preferences: string[];
+  target_kcal?: number;
+  restrictions?: Restrictions;
   treatment_goals?: string[];
 }
 
@@ -285,8 +288,16 @@ export interface DoctorPatientSummary {
   target_kcal: number;
   salt_daily_g?: number | null;
   sugar_daily_g?: number | null;
+  carb_per_meal?: number | null;
+  sodium_daily?: number | null;
   preferences: string[];
   constraints_status?: "confirmed" | "pending_doctor_review";
+  proposed_target_kcal?: number | null;
+  proposed_treatment_goals?: string[] | null;
+  proposed_salt_daily_g?: number | null;
+  proposed_sugar_daily_g?: number | null;
+  proposed_carb_per_meal?: number | null;
+  proposed_sodium_daily?: number | null;
   status: DoctorPatientStatus;
   status_key: DoctorPatientStatusKey;
   latest_plan_id?: string | null;
@@ -544,8 +555,11 @@ export interface DoctorPatientUpdate {
 
 export interface DoctorConstraintsUpdate {
   target_kcal?: number;
+  carb_per_meal?: number | null;
+  sodium_daily?: number | null;
   salt_daily_g?: number | null;
   sugar_daily_g?: number | null;
+  treatment_goals?: string[];
 }
 
 export interface CatalogItem {

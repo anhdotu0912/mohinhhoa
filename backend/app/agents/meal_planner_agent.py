@@ -1421,6 +1421,7 @@ def generate_meal_plan(
         profile_obj = PatientProfile(**profile)
     else:
         profile_obj = profile
+    profile_obj = profile_obj.for_meal_planning()
 
     catalog = _resolve_catalog(db)
     user_id = profile_obj.user_id or "demo_user"

@@ -36,7 +36,7 @@ export const COMMON_ALLERGIES = [
   "Gluten",
 ];
 
-/** Preset treatment goals for onboarding step 3 (stored as treatment_goals). */
+/** Preset treatment goals for doctor constraints + patient profile (stored as treatment_goals). */
 export const TREATMENT_GOAL_OPTIONS = [
   "Kiểm soát đường huyết ổn định (HbA1c < 7%).",
   "Đường huyết đói thai kỳ ≤ 95 mg/dL, 2h sau ăn ≤ 120 mg/dL (QĐ 1470/QĐ-BYT).",

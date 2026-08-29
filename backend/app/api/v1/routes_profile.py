@@ -10,13 +10,16 @@ from app.db.session import get_db
 from app.models.profile import Profile
 from app.models.user import User
 from app.schemas.profile import PatientProfile, ProfileUpsert
+from app.services.clinical_constraints import store_patient_proposals
 from app.services.meal_plan_service import get_profile
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 
-def _restrictions_changed(old: dict | None, new: dict) -> bool:
-    return dict(old or {}) != dict(new or {})
+def _invalidate_profile_cache(user_id: str) -> None:
+    from app.core.cache import profile_cache
+
+    profile_cache.invalidate(user_id)
 
 
 @router.post("", response_model=PatientProfile)
@@ -31,12 +34,6 @@ def upsert_profile(
         row = Profile(user_id=user.id)
         db.add(row)
 
-    new_restrictions = payload.restrictions.model_dump()
-    constraints_changed = not is_new and (
-        row.target_kcal != payload.target_kcal
-        or _restrictions_changed(row.restrictions, new_restrictions)
-    )
-
     row.disease = payload.disease
     row.medications = payload.medications
     row.allergies = payload.allergies
@@ -49,19 +46,11 @@ def upsert_profile(
     row.address = payload.address
     row.blood_pressure = payload.blood_pressure
     row.blood_glucose = payload.blood_glucose
-    row.target_kcal = payload.target_kcal
-    row.restrictions = new_restrictions
     row.preferences = payload.preferences
-    row.treatment_goals = payload.treatment_goals
-    if constraints_changed:
-        row.constraints_status = "pending_doctor_review"
-    elif is_new:
-        row.constraints_status = "confirmed"
+    store_patient_proposals(row, payload)
     db.commit()
 
-    from app.core.cache import profile_cache
-    profile_cache.invalidate(user.id)
-
+    _invalidate_profile_cache(user.id)
     return get_profile(db, user.id)
 
 

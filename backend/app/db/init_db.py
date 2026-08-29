@@ -504,6 +504,26 @@ def _migrate_add_constraints_status(db: Session) -> None:
         logger.info("Added profiles.constraints_status column")
 
 
+def _migrate_add_proposed_constraints(db: Session) -> None:
+    """Add profiles.proposed_* columns for HITL clinical proposals (idempotent)."""
+    from sqlalchemy import inspect, text
+
+    columns = [c["name"] for c in inspect(engine).get_columns("profiles")]
+    added: list[str] = []
+    if "proposed_target_kcal" not in columns:
+        db.execute(text("ALTER TABLE profiles ADD COLUMN proposed_target_kcal INTEGER"))
+        added.append("proposed_target_kcal")
+    if "proposed_restrictions" not in columns:
+        db.execute(text("ALTER TABLE profiles ADD COLUMN proposed_restrictions JSON"))
+        added.append("proposed_restrictions")
+    if "proposed_treatment_goals" not in columns:
+        db.execute(text("ALTER TABLE profiles ADD COLUMN proposed_treatment_goals JSON"))
+        added.append("proposed_treatment_goals")
+    if added:
+        db.commit()
+        logger.info("Added profiles columns: %s", ", ".join(added))
+
+
 def _migrate_add_meal_plan_adjustment_note(db: Session) -> None:
     """Add meal_plans.adjustment_note (idempotent)."""
     from sqlalchemy import inspect, text
@@ -604,6 +624,7 @@ def init_db() -> None:
         _migrate_add_body_metrics(db)
         _migrate_add_profile_detail(db)
         _migrate_add_constraints_status(db)
+        _migrate_add_proposed_constraints(db)
         _migrate_add_meal_plan_request_fields(db)
         _migrate_add_metrics_clinical_fields(db)
         _migrate_widen_alert_severity(db)

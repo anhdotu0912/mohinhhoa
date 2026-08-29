@@ -8,12 +8,9 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import {
   DISEASE_OPTIONS,
-  TREATMENT_GOAL_OPTIONS,
   calcBmi,
   diseaseLabelsToCodes,
   normalizeMedications,
-  suggestRestrictions,
-  suggestTargetKcal,
 } from "@/lib/profile-mappers";
 import {
   firstFieldError,
@@ -23,7 +20,6 @@ import {
   validateAddress,
   validateBloodGlucose,
   validateBloodPressure,
-  validateFreeTextLabel,
   validatePhone,
   validatePositiveInt,
   validatePositiveNumber,
@@ -41,10 +37,7 @@ type FieldName =
   | "bloodPressure"
   | "bloodGlucose"
   | "conditions"
-  | "customGoal"
-  | "preferences"
-  | "targetKcal"
-  | "goals";
+  | "preferences";
 
 type FieldErrors = Partial<Record<FieldName, string>>;
 
@@ -77,9 +70,9 @@ const STEP_META = [
       "Chọn bệnh lý, thuốc và dị ứng — nền tảng để AI tạo thực đơn an toàn.",
   },
   {
-    title: "Mục tiêu điều trị & Dinh dưỡng",
+    title: "Sở thích ăn uống",
     subtitle:
-      "Chọn mục tiêu điều trị và sở thích ăn uống để cá nhân hóa kế hoạch.",
+      "Ghi khẩu vị để cá nhân hóa thực đơn. Bác sĩ sẽ đặt kcal và ngưỡng dinh dưỡng.",
   },
 ] as const;
 
@@ -111,10 +104,7 @@ export default function PatientOnboardingPage() {
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Step 3
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
-  const [customGoalInput, setCustomGoalInput] = useState("");
   const [preferencesText, setPreferencesText] = useState("");
-  const [targetKcalInput, setTargetKcalInput] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -145,11 +135,6 @@ export default function PatientOnboardingPage() {
     if (!w || !h || w <= 0 || h <= 0) return null;
     return calcBmi(w, h);
   }, [weight, height]);
-
-  const suggestedKcal = useMemo(() => {
-    const diseaseCodes = diseaseLabelsToCodes(selectedConditions);
-    return suggestTargetKcal(previewBmi, diseaseCodes);
-  }, [previewBmi, selectedConditions]);
 
   /** Hiển thị tối đa 5 mục trong catalog theo từ khóa tìm kiếm (giống doctor edit). */
   const visibleCatalog = (
@@ -227,34 +212,6 @@ export default function PatientOnboardingPage() {
     }
   };
 
-  const toggleGoal = (goal: string) => {
-    clearFieldError("goals");
-    if (selectedGoals.includes(goal)) {
-      setSelectedGoals(selectedGoals.filter((g) => g !== goal));
-    } else {
-      setSelectedGoals([...selectedGoals, goal]);
-    }
-  };
-
-  const handleAddCustomGoal = () => {
-    const err = validateFreeTextLabel(customGoalInput, {
-      required: true,
-      min: 3,
-      max: 80,
-      label: "Mục tiêu",
-    });
-    if (err) {
-      setFieldError("customGoal", err);
-      return;
-    }
-    const g = customGoalInput.trim();
-    if (!selectedGoals.includes(g)) {
-      setSelectedGoals([...selectedGoals, g]);
-    }
-    setCustomGoalInput("");
-    clearFieldError("customGoal");
-  };
-
   const collectStep1Errors = (): FieldErrors => {
     const next: FieldErrors = {};
     const ageErr = validatePositiveInt(age, 1, 130, "Tuổi");
@@ -284,24 +241,8 @@ export default function PatientOnboardingPage() {
 
   const collectStep3Errors = (): FieldErrors => {
     const next: FieldErrors = {};
-    const kcalErr = validatePositiveInt(targetKcalInput, 800, 5000, "Mục tiêu kcal");
-    if (kcalErr) next.targetKcal = kcalErr;
     const prefErr = validatePreferencesText(preferencesText);
     if (prefErr) next.preferences = prefErr;
-    const pendingGoal = customGoalInput.trim();
-    if (pendingGoal) {
-      const goalErr = validateFreeTextLabel(pendingGoal, {
-        min: 3,
-        max: 80,
-        label: "Mục tiêu",
-      });
-      if (goalErr) next.customGoal = goalErr;
-    }
-    const hasGoal =
-      selectedGoals.length > 0 || Boolean(pendingGoal && !next.customGoal);
-    if (!hasGoal) {
-      next.goals = "Chọn ít nhất một mục tiêu điều trị & dinh dưỡng.";
-    }
     return next;
   };
 
@@ -323,7 +264,6 @@ export default function PatientOnboardingPage() {
     if (step === 2) {
       if (applyErrors(collectStep2Errors())) return;
       setFieldErrors({});
-      setTargetKcalInput((prev) => prev || String(suggestedKcal));
       // Defer step change so the click that triggered "Tiếp tục" cannot
       // land on a newly-mounted type="submit" button and auto-submit.
       window.setTimeout(() => setStep(3), 0);
@@ -367,17 +307,10 @@ export default function PatientOnboardingPage() {
       : diseaseLabelsToCodes(selectedConditions);
     const medCodes = normalizeMedications(medications);
     const bmi = calcBmi(w, h);
-    const restrictions = suggestRestrictions(diseaseCodes);
-    const targetKcal = Number(targetKcalInput) || suggestTargetKcal(bmi, diseaseCodes);
     const preferences = preferencesText
       .split(/[,;\n]+/)
       .map((p) => p.trim())
       .filter(Boolean);
-    const pendingGoal = customGoalInput.trim();
-    const treatmentGoals =
-      pendingGoal && !selectedGoals.includes(pendingGoal)
-        ? [...selectedGoals, pendingGoal]
-        : selectedGoals;
 
     setLoading(true);
     try {
@@ -394,10 +327,7 @@ export default function PatientOnboardingPage() {
         address: address.trim() || null,
         blood_pressure: bloodPressure.trim() || null,
         blood_glucose: bloodGlucose.trim() || null,
-        target_kcal: targetKcal,
-        restrictions,
         preferences,
-        treatment_goals: treatmentGoals,
       });
       router.push("/patient");
     } catch (err) {
@@ -853,166 +783,40 @@ export default function PatientOnboardingPage() {
           )}
 
           {step === 3 && (
-            <>
-              <div>
-                <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
-                  Mục tiêu điều trị & Dinh dưỡng{" "}
-                  <span className="text-error">*</span>
-                </label>
-                <p className="font-caption text-caption text-on-surface-variant text-xs mb-sm">
-                  Chọn một hoặc nhiều mục tiêu phù hợp với tình trạng của bạn.
-                </p>
-                <FieldHint id="goals-error" message={fieldErrors.goals} />
-                <div className="flex flex-wrap gap-xs mb-sm">
-                  {TREATMENT_GOAL_OPTIONS.map((goal) => {
-                    const isSelected = selectedGoals.includes(goal);
-                    return (
-                      <button
-                        key={goal}
-                        type="button"
-                        onClick={() => toggleGoal(goal)}
-                        className={`px-md py-sm rounded-full text-xs font-semibold border transition-all cursor-pointer text-left ${
-                          isSelected
-                            ? "bg-primary/10 border-primary text-primary shadow-xs"
-                            : "bg-surface-container-lowest border-outline-variant text-on-surface-variant hover:border-primary/50"
-                        }`}
-                      >
-                        {isSelected && "✓ "}
-                        {goal}
-                      </button>
-                    );
-                  })}
-                  {selectedGoals
-                    .filter((g) => !TREATMENT_GOAL_OPTIONS.includes(g))
-                    .map((goal) => (
-                      <button
-                        key={goal}
-                        type="button"
-                        onClick={() => toggleGoal(goal)}
-                        className="px-md py-sm rounded-full text-xs font-semibold border bg-primary/10 border-primary text-primary shadow-xs text-left"
-                      >
-                        ✓ {goal}
-                      </button>
-                    ))}
-                </div>
-                <div>
-                  <div className="flex gap-xs">
-                    <input
-                      type="text"
-                      value={customGoalInput}
-                      onChange={(e) => {
-                        setCustomGoalInput(e.target.value.slice(0, 80));
-                        clearFieldError("customGoal");
-                      }}
-                      onBlur={(e) => {
-                        const value = e.target.value;
-                        if (!value.trim()) {
-                          clearFieldError("customGoal");
-                          return;
-                        }
-                        setFieldError(
-                          "customGoal",
-                          validateFreeTextLabel(value, {
-                            min: 3,
-                            max: 80,
-                            label: "Mục tiêu",
-                          })
-                        );
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddCustomGoal();
-                        }
-                      }}
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors.customGoal)}
-                      aria-describedby={
-                        fieldErrors.customGoal ? "custom-goal-error" : undefined
-                      }
-                      placeholder="Thêm mục tiêu khác..."
-                      className={`flex-1 px-md py-sm bg-surface-container-lowest border rounded-lg text-xs text-on-surface focus:outline-none ${
-                        fieldErrors.customGoal
-                          ? "border-error focus:border-error"
-                          : "border-outline-variant focus:border-primary"
-                      }`}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddCustomGoal}
-                      className="px-md py-sm bg-surface-container-low border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container-high transition-colors"
-                    >
-                      + Thêm
-                    </button>
-                  </div>
-                  <FieldHint id="custom-goal-error" message={fieldErrors.customGoal} />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
-                  Sở thích ăn uống
-                </label>
-                <textarea
-                  value={preferencesText}
-                  onChange={(e) => {
-                    setPreferencesText(e.target.value.slice(0, 500));
-                    clearFieldError("preferences");
-                  }}
-                  onBlur={(e) =>
-                    setFieldError(
-                      "preferences",
-                      validatePreferencesText(e.target.value)
-                    )
-                  }
-                  rows={2}
-                  maxLength={500}
-                  aria-invalid={Boolean(fieldErrors.preferences)}
-                  aria-describedby={
-                    fieldErrors.preferences ? "preferences-error" : undefined
-                  }
-                  placeholder="Ví dụ: thích ăn cơm, không ăn thịt bò (cách nhau bằng dấu phẩy)"
-                  className={`w-full p-md bg-surface-container-lowest border rounded-lg text-xs text-on-surface focus:outline-none ${
-                    fieldErrors.preferences
-                      ? "border-error focus:border-error"
-                      : "border-outline-variant focus:border-primary"
-                  }`}
-                />
-                <FieldHint id="preferences-error" message={fieldErrors.preferences} />
-              </div>
-
-              <div>
-                <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
-                  Mục tiêu kcal / ngày
-                </label>
-                <input
-                  type="number"
-                  value={targetKcalInput}
-                  onChange={(e) => {
-                    setTargetKcalInput(e.target.value);
-                    clearFieldError("targetKcal");
-                  }}
-                  onBlur={(e) =>
-                    setFieldError(
-                      "targetKcal",
-                      validatePositiveInt(e.target.value, 800, 5000, "Mục tiêu kcal")
-                    )
-                  }
-                  min={800}
-                  max={5000}
-                  inputMode="numeric"
-                  aria-invalid={Boolean(fieldErrors.targetKcal)}
-                  aria-describedby={
-                    fieldErrors.targetKcal ? "kcal-error" : undefined
-                  }
-                  className={inputClass(Boolean(fieldErrors.targetKcal), "font-bold")}
-                />
-                <FieldHint id="kcal-error" message={fieldErrors.targetKcal} />
-                <p className="mt-xs text-xs text-on-surface-variant">
-                  Gợi ý theo BMI & bệnh lý: {suggestedKcal} kcal
-                </p>
-              </div>
-            </>
+            <div>
+              <label className="font-label text-label text-on-surface block mb-xs font-semibold text-sm">
+                Sở thích ăn uống
+              </label>
+              <p className="font-caption text-caption text-on-surface-variant text-xs mb-sm">
+                Bác sĩ sẽ đặt kcal, carb, muối và mục tiêu điều trị sau khi xem hồ sơ.
+              </p>
+              <textarea
+                value={preferencesText}
+                onChange={(e) => {
+                  setPreferencesText(e.target.value.slice(0, 500));
+                  clearFieldError("preferences");
+                }}
+                onBlur={(e) =>
+                  setFieldError(
+                    "preferences",
+                    validatePreferencesText(e.target.value)
+                  )
+                }
+                rows={3}
+                maxLength={500}
+                aria-invalid={Boolean(fieldErrors.preferences)}
+                aria-describedby={
+                  fieldErrors.preferences ? "preferences-error" : undefined
+                }
+                placeholder="Ví dụ: thích ăn cơm, không ăn thịt bò (cách nhau bằng dấu phẩy)"
+                className={`w-full p-md bg-surface-container-lowest border rounded-lg text-xs text-on-surface focus:outline-none ${
+                  fieldErrors.preferences
+                    ? "border-error focus:border-error"
+                    : "border-outline-variant focus:border-primary"
+                }`}
+              />
+              <FieldHint id="preferences-error" message={fieldErrors.preferences} />
+            </div>
           )}
 
           {error && (
