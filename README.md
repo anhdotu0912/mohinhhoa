@@ -1,201 +1,264 @@
-# 🤖 AI20K Agent Template
+# P-014 — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
 
-Template chính thức cho học viên **VinUni AI20K Build Phase** — cung cấp sẵn cấu trúc dự án, code mẫu, và hướng dẫn kỹ thuật chi tiết để xây dựng AI Agent đạt điểm cao (35+/50).
+Prototype giúp bệnh nhân đái tháo đường Type 2 nhận thực đơn 7 ngày cá nhân hoá, cảnh báo tương tác thuốc–thực phẩm, nhắc tuân thủ (compliance), và dashboard cho bác sĩ/chuyên gia dinh dưỡng duyệt thực đơn.
 
-> 📖 **Technical Guidebook:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
+Tài liệu chi tiết: [`CLAUDE.md`](CLAUDE.md) · [`docs/MO_TA_HE_THONG.md`](docs/MO_TA_HE_THONG.md) · [`tasks/roadmap-mvp.md`](tasks/roadmap-mvp.md)
 
-## 🎯 Template này dùng để làm gì?
+---
 
-Khi tham gia AI20K Build Phase, mỗi đội cần xây dựng một AI Agent hoàn chỉnh — từ kiến trúc, code, test, đến deploy. Thay vì bắt đầu từ con số không, template này cung cấp:
+## Yêu cầu
 
-- **Cấu trúc thư mục chuẩn** — đã được thiết kế theo best practices (separation of concerns)
-- **Code mẫu** cho các phần cốt lõi: LangGraph agent, FastAPI API, config, schemas
-- **Docker + CI/CD sẵn** — Dockerfile multi-stage, GitHub Actions workflow
-- **Hướng dẫn kỹ thuật 10 chương** — từ clone template đến nộp bài Demo Day
-- **Checklist 10 deliverables** — đảm bảo không bỏ sót yêu cầu BTC
-- **AI Usage Logging tự động** — Pre-configured hooks cho Claude Code, Cursor, Codex, Gemini CLI, Antigravity, và GitHub Copilot
+| Thành phần | Phiên bản |
+|---|---|
+| Python | 3.11+ |
+| Node.js | 18+ |
+| Docker + Docker Compose | Khuyến nghị (Postgres nằm trong stack) |
+| PostgreSQL | Chỉ cần cài tay nếu chạy backend **không** dùng Docker |
 
-## ⚡ Quick Start
+---
 
-### Bước 1: Fork hoặc Clone
+## Tech stack
 
-```bash
-# Clone template
-git clone https://github.com/AI20K-Build-Cohort-2/starter-code-template.git team-YOUR_TEAM_NAME
-cd team-YOUR_TEAM_NAME
+| Layer | Công nghệ |
+|---|---|
+| Backend | FastAPI, SQLAlchemy, JWT |
+| AI | LangGraph, LangChain, Gemini embedding, Qdrant |
+| Frontend | Next.js 16, Tailwind, Zustand |
+| Database | PostgreSQL (dev + prod, chạy trong Docker Compose) |
+| Deploy | Docker Compose, Nginx + Let's Encrypt (VPS) |
 
-# Xóa git history cũ và khởi tạo lại
-rm -rf .git
-git init
-git add .
-git commit -m "feat: khởi tạo dự án từ template"
+---
+
+## Cấu trúc thư mục
+
+```
+P-014/
+├── backend/app/          # FastAPI + agents + RAG
+├── backend/data/         # food_db_vn.json, drug_food_interactions.json, guidelines/
+├── backend/qdrant_db/    # Qdrant index snapshot (tracked — zero-setup demo)
+├── frontend/             # Next.js App Router
+├── deploy/               # bootstrap.sh, nginx, certbot
+├── docker-compose.yml    # Local dev stack
+├── docker-compose.prod.yml
+├── specs/                # Business specs 01–13
+├── contracts/            # API + agent I/O schemas
+└── .env.example          # Env template (copy → .env)
 ```
 
-### Bước 2: Setup môi trường
+---
+
+## Quick start — local dev
+
+### 1. Chuẩn bị môi trường (bắt buộc)
 
 ```bash
-# Tạo virtual environment
-python3.11 -m venv .venv
-source .venv/bin/activate
-
-# Cài dependencies
-pip install -e ".[dev]"
-
-# Cấu hình API keys
 cp .env.example .env
-# Mở .env và thêm OPENAI_API_KEY của bạn
-# Đồng thời cập nhật AI_LOG_API_KEY bằng key riêng từ link mời của BTC
-# (giá trị trong .env.example chỉ là placeholder)
 ```
 
-### Bước 3: Cài AI Logging Hooks
+File `.env` ở **root repo** là bắt buộc — `docker-compose.yml` đọc `env_file: .env`. Thiếu file này, `docker compose up` sẽ fail.
+
+**LLM / embedding (tùy chọn):** điền `DEEPSEEK_API_KEY` hoặc `OPENAI_API_KEY`, và `GEMINI_API_KEY` (RAG embedding). Thiếu key → sinh thực đơn vẫn chạy (xoay vòng catalog, không gọi LLM).
 
 ```bash
-# Linux / macOS / Git Bash
-bash scripts/setup_hooks.sh
+# Ví dụ DeepSeek
+LLM_PROVIDER=deepseek
+LLM_MODEL=deepseek-chat
+DEEPSEEK_API_KEY=sk-...
 
-# Windows PowerShell
-# powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
+# Embedding Gemini — nhiều key cách nhau bởi dấu phẩy, xoay khi hết quota / 429
+GEMINI_API_KEY=key-1,key-2,key-3
 ```
 
-Hooks tự động log mọi AI prompt khi dùng Claude Code, Cursor, Codex, Gemini CLI, Antigravity, hoặc GitHub Copilot. Không cần thao tác thủ công.
+File `.env` của project **ghi đè** biến môi trường Windows cùng tên. Có thể dùng thêm `backend/.env` nếu cần override cục bộ.
 
-### Bước 4: Chạy server
+### 2. Chạy full stack bằng Docker (khuyến nghị)
+
+Postgres được tạo tự động trong stack — không cần cài hay khởi động Postgres riêng.
 
 ```bash
-# Chạy FastAPI backend
-uvicorn src.main:app --reload --port 8000
-
-# Mở Swagger UI
-# http://localhost:8000/docs
+docker compose up --build
 ```
 
-### Bước 5: Đọc hướng dẫn
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Swagger: http://localhost:8000/docs
+- Health: http://localhost:8000/health
 
-📖 Mở **[Technical Guidebook](https://phoenix.note.transformerlabs.ai/technical-book)** và làm theo từng chương.
+### 3. Chạy tay (không Docker)
 
-## 📁 Cấu trúc dự án
+**Bước 1 — PostgreSQL phải chạy trước.** Backend gọi `init_db()` ngay khi khởi động; thiếu Postgres → crash.
 
-```
-├── src/
-│   ├── agents/           # 🧠 LangGraph Agent
-│   │   ├── graph.py      #    State graph (nodes + edges)
-│   │   ├── state.py      #    State schema (TypedDict)
-│   │   ├── nodes/        #    Node functions
-│   │   └── tools/        #    Agent tools (@tool)
-│   ├── api/              # 🌐 FastAPI Backend
-│   │   └── routes.py     #    API endpoints
-│   ├── models/           # 📋 Pydantic schemas
-│   ├── services/         # 🔧 Business logic (LLM, etc.)
-│   ├── config.py         # ⚙️ Pydantic Settings
-│   └── main.py           # 🚀 App entry point
-├── tests/                # 🧪 pytest suite
-│   ├── test_agents/      #    Agent/graph tests
-│   └── test_api/         #    API endpoint tests
-├── scripts/              # 🔌 AI Logging Hooks
-│   ├── log_hook.py       #    Auto-log cho Claude/Cursor/Codex/Gemini/Copilot
-│   ├── log_antigravity.py#    Antigravity IDE prompt scanner
-│   ├── log_manual.py     #    Manual log cho ChatGPT / web tools
-│   ├── submit_log.py     #    Submit logs on git push
-│   └── setup_hooks.sh    #    One-time hook installer
-├── .claude/ .codex/ .cursor/ .gemini/  # Per-tool hook configs
-├── .agents/              # Antigravity rules + workflows
-├── .ai-log/              # 📊 AI usage logs (auto-generated)
-├── docs/
-│   ├── guide/            # 📖 Technical Guidebook (10 chapters)
-│   └── architecture_diagram.md
-├── eval/                 # 📊 Evaluation results
-├── presentation/         # 🎤 Demo Day slides
-├── .github/workflows/    # ⚡ CI/CD (GitHub Actions)
-├── .github/hooks/        # 🪝 Copilot hook config
-├── Dockerfile            # 🐳 Multi-stage build
-├── docker-compose.yml    # 🐙 Full stack orchestration
-└── README_boilerplate.md # 📝 README template cho đội của bạn
-```
-
-## 📚 Technical Guidebook — 10 Chương
-
-| Chương | Nội dung | Thời gian |
-|---------|----------|-----------|
-| 1 | Lời mở đầu — Mục tiêu, cách sử dụng | 15 phút |
-| 2 | Khởi tạo dự án — Clone, setup, git workflow | 4 giờ |
-| 3 | Thiết kế kiến trúc — 3-tier, diagrams, ADR | 6 giờ |
-| 4 | **LangGraph Agent** — State, nodes, edges, tools, RAG | 8 giờ |
-| 5 | FastAPI — Routes, validation, error handling, streaming | 6 giờ |
-| 6 | Giao diện — Next.js + Streamlit quickstart | 6 giờ |
-| 7 | DevOps — Docker, CI/CD, deploy, logging | 6 giờ |
-| 8 | Kiểm thử — Unit test, integration test, RAGAS | 4 giờ |
-| 9 | Demo Day — 10 deliverables, checklist, tips | 2 giờ |
-| 10 | Tài nguyên — Khóa học, docs, BMAD method | tham khảo |
-
-📖 **Đọc online:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
-
-## 📋 10 Deliverables cho Demo Day
-
-| # | Deliverable | File vị trí | Template có sẵn |
-|---|-------------|-------------|:---:|
-| 1 | Source Code | `src/` | ✅ |
-| 2 | README.md | `README_boilerplate.md` → copy thành `README.md` | ✅ |
-| 3 | Architecture Diagram | `docs/architecture_diagram.md` | ✅ |
-| 4 | AI Logs | LangSmith (3 env vars) + Auto AI Usage Logging | ✅ |
-| 5 | Live URL | Deploy lên Render/Vercel | ⚡ CI/CD sẵn |
-| 6 | Video Demo | `presentation/` | 📝 |
-| 7 | Pitch Deck | `presentation/` | 📝 |
-| 8 | Development Journal | `JOURNAL.md` | ✅ |
-| 9 | Worklog | `WORKLOG.md` | ✅ |
-| 10 | Evaluation Evidence | `eval/` | 📝 |
-
-## 🛠 Tech Stack
-
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| AI Agent | LangGraph + LangChain | Latest |
-| Backend | FastAPI + Uvicorn | 0.100+ |
-| LLM | OpenAI GPT-4o-mini | API |
-| Frontend | Next.js / Streamlit | 14+ / 1.30+ |
-| Database | SQLite (dev) / PostgreSQL (prod) | — |
-| DevOps | Docker + GitHub Actions | — |
-| Testing | pytest + pytest-asyncio | 8+ |
-
-## 📊 AI Usage Logging
-
-Template đã tích hợp sẵn auto-logging hooks cho 6 AI tools:
-
-| Tool | Cơ chế | Config |
-|------|--------|--------|
-| Claude Code | `.claude/settings.json` hooks | Tự động |
-| Cursor | `.cursor/hooks.json` | Tự động |
-| OpenAI Codex CLI | `.codex/hooks.json` | Tự động |
-| Gemini CLI | `.gemini/settings.json` | Tự động |
-| GitHub Copilot | `.github/hooks/hooks.json` | Tự động |
-| Antigravity IDE | Pre-push scan transcript | Tự động trên `git push` |
-
-Tất cả prompts và tool calls được log vào `.ai-log/session.jsonl` và tự động submit lên grading server mỗi khi `git push`.
-
-**ChatGPT / web tools khác** — log thủ công:
 ```bash
-bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "What you asked"
+# Cách nhanh nhất: chỉ bật Postgres từ Docker Compose
+docker compose up postgres -d
 ```
 
-> ⚠️ Chạy `bash scripts/setup_hooks.sh` một lần sau khi clone để cài pre-push hook.
+Hoặc dùng Postgres cài sẵn trên máy — sửa `DATABASE_URL` trong `.env` cho khớp (mặc định: `postgresql://p014:p014@localhost:5432/p014`).
 
-## 📖 Đọc Technical Guidebook
+**Bước 2 — Backend:**
 
-**Online (khuyến nghị):** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-Đăng nhập bằng GitHub (cùng account đã được BTC mời vào org `AI20K-Build-Cohort-2`)
-→ chọn tab **Technical Book** ở sidebar trái → đọc 10 chương + topic sections,
-có table of contents bên phải, hỗ trợ light/dark/cyberpunk theme.
+**Bước 3 — Frontend** (terminal mới):
 
-**Offline:** mọi chương đều ở thư mục `docs/guide/` trong template này — mở bằng
-bất kỳ markdown viewer/editor nào (VS Code, Obsidian, GitHub UI, …).
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
-## 🔗 Liên kết
+Frontend mặc định gọi API tại `http://localhost:8000` — không bắt buộc tạo `frontend/.env.local` trừ khi backend chạy ở URL khác.
 
-- 📖 **Technical Guidebook:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
-- 🏫 **AI20K Program:** VinUni AI20K Build Phase
-- 👨‍🏫 **Mentor:** Đặng Hải Lộc
+### 4. Index RAG (nếu vector store trống)
 
-## 📄 License
+```bash
+cd backend
+python -m app.rag.indexer
+```
 
-MIT — Sử dụng tự do cho mục đích giáo dục.
+Vector store duy nhất: **Qdrant** (`QDRANT_PERSIST_DIR`, mặc định `./qdrant_db`; dùng `QDRANT_URL`/`QDRANT_API_KEY` cho Qdrant Server/Cloud).
+
+---
+
+## Demo accounts
+
+Seed mặc định khi backend khởi động (xem `backend/app/db/init_db.py`):
+
+| Role | Email | Password |
+|---|---|---|
+| Bác sĩ 1 | `demo_doctor@example.com` | `demo1234` |
+| Bác sĩ 2 | `demo_doctor_2@example.com` | `demo1234` |
+| Bệnh nhân 1 | `demo_patient_1@example.com` | `demo1234` (Nguyễn Văn A) |
+| Bệnh nhân 2 | `demo_patient_2@example.com` | `demo1234` (Trần Thị B) |
+| Bệnh nhân 3 | `demo_patient_3@example.com` | `demo1234` (Lê Văn C) |
+
+Bệnh nhân demo ban đầu **chưa gắn bác sĩ** — đăng nhập bác sĩ, vào **Hàng việc → Chờ nhận** rồi bấm **Nhận**. Bệnh nhân do bác sĩ thêm hộ thì gắn ngay vào bác sĩ đó.
+
+---
+
+## Deploy production — VPS
+
+Chi tiết đầy đủ: [`docs/DEPLOY_VPS.md`](docs/DEPLOY_VPS.md)
+
+### Yêu cầu
+
+- VPS có Docker + Docker Compose
+- Domain trỏ DNS về VPS (cho HTTPS)
+- File `.env` production (copy từ `.env.example`)
+
+### Biến môi trường bắt buộc (prod)
+
+| Biến | Mô tả |
+|---|---|
+| `APP_ENV` | `production` |
+| `JWT_SECRET` | Chuỗi ngẫu nhiên mạnh (≠ `change-me-dev-only`) |
+| `POSTGRES_PASSWORD` | Mật khẩu Postgres |
+| `DOMAIN` | Tên miền (vd. `app.example.com`) |
+| `NEXT_PUBLIC_API_BASE_URL` | URL public (vd. `https://app.example.com`) |
+| `CORS_ORIGINS` | Origin frontend (thường cùng domain) |
+| `LLM_PROVIDER` + API key | `openai` / `deepseek` + key tương ứng |
+| `GEMINI_API_KEY` | Embedding RAG (hoặc `EMBEDDING_PROVIDER=local`) |
+
+### Bootstrap một lệnh
+
+```bash
+cp .env.example .env
+# Chỉnh .env với giá trị production
+bash deploy/bootstrap.sh
+```
+
+Script sẽ:
+1. Build + start Postgres, backend, frontend
+2. Đợi backend `/health`
+3. Chạy `python -m app.rag.indexer`
+4. Setup Nginx + Let's Encrypt (nếu `DOMAIN` đã set)
+
+### Deploy frontend riêng (Vercel)
+
+GitHub Actions workflow `.github/workflows/deploy.yml` deploy frontend khi push `main`/`dev`. Cần secrets:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+Set `NEXT_PUBLIC_API_BASE_URL` trên Vercel trỏ về backend public.
+
+---
+
+## Kiểm tra & CI
+
+```bash
+# Backend lint + test
+cd backend
+ruff check app/ tests/
+pytest tests/ -v
+
+# Frontend lint + build
+cd frontend
+npm run lint
+npm run build
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) chạy cả backend và frontend trên push/PR.
+
+---
+
+## Troubleshooting
+
+### Backend crash khi khởi động — không kết nối được Postgres
+
+PostgreSQL chưa chạy hoặc `DATABASE_URL` sai. Chạy `docker compose up postgres -d` trước khi `uvicorn`, hoặc kiểm tra Postgres cài sẵn đang lắng nghe đúng host/port.
+
+### `/health` trả `degraded` — vector store chưa sẵn sàng
+
+```bash
+docker compose exec backend python -m app.rag.indexer
+# hoặc local:
+cd backend && python -m app.rag.indexer
+```
+
+Index Qdrant persist tại `./backend/qdrant_db` (dev, đã tracked sẵn trong git) hoặc volume `qdrant_data` (prod — xem `docker-compose.prod.yml`).
+
+### Backend không start ở production
+
+`JWT_SECRET` vẫn là `change-me-dev-only` khi `APP_ENV=production` → app fail-fast. Đặt secret mạnh trong `.env`.
+
+### Frontend gọi API sai URL
+
+`NEXT_PUBLIC_API_BASE_URL` là **build-time** variable. Sau khi đổi, rebuild image frontend:
+
+```bash
+docker compose up --build frontend
+```
+
+### Quên mật khẩu (SMTP)
+
+Luồng: `/forgot-password` → BE tạo mật khẩu tạm → gửi SMTP → đăng nhập bằng mật khẩu trong email.
+
+Thêm vào `.env` (root repo hoặc `backend/.env`):
+
+```bash
+SMTP_USERNAME=ban@gmail.com
+SMTP_PASSWORD="xxxx xxxx xxxx xxxx"
+```
+
+**Gmail:** bật xác minh 2 bước, tạo [App Password](https://myaccount.google.com/apppasswords) 16 ký tự. Bọc trong dấu ngoặc kép; code tự bỏ khoảng trắng. Sửa `.env` xong phải **restart uvicorn** (reload không theo dõi file `.env`).
+
+Nếu chưa cấu hình SMTP, API trả `503 EMAIL_NOT_CONFIGURED`.
+
+Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`.
+
+---
+
+## Liên quan
+
+- Specs nghiệp vụ: [`specs/`](specs/)
+- ADR kiến trúc: [`adrs/`](adrs/)
+- Contract API: [`contracts/api-v1.md`](contracts/api-v1.md)
