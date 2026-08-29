@@ -121,9 +121,18 @@ export function buildInboxJobs(
         patientGender: patient.gender,
         title: "Ràng buộc lâm sàng chưa xác nhận",
         subtitle: [
-          patient.target_kcal ? `${patient.target_kcal} kcal` : null,
-          patient.salt_daily_g != null ? `muối ≤ ${patient.salt_daily_g}g` : null,
-          patient.sugar_daily_g != null ? `đường ≤ ${patient.sugar_daily_g}g` : null,
+          patient.proposed_target_kcal != null
+            ? `BN đề xuất ${patient.proposed_target_kcal} kcal`
+            : null,
+          patient.target_kcal ? `hiện hành ${patient.target_kcal} kcal` : null,
+          patient.proposed_carb_per_meal != null
+            ? `carb/bữa ${patient.proposed_carb_per_meal}g`
+            : null,
+          patient.proposed_sugar_daily_g != null
+            ? `đường ${patient.proposed_sugar_daily_g}g`
+            : patient.sugar_daily_g != null
+              ? `đường ≤ ${patient.sugar_daily_g}g`
+              : null,
         ]
           .filter(Boolean)
           .join(" · ") || "Cần xác nhận trước khi tạo thực đơn",

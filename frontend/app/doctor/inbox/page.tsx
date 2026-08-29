@@ -501,6 +501,8 @@ function InboxContent() {
                   ? "Không còn việc chờ xử lý"
                   : activeType === "patient_claim"
                   ? "Không có bệnh nhân đang chờ nhận"
+                  : activeType === "constraints"
+                  ? "Không có đề xuất ràng buộc chờ duyệt"
                   : "Không có công việc trong danh mục này"}
               </p>
               <p className="text-xs text-on-surface-variant mt-1 max-w-md mx-auto">
@@ -512,6 +514,8 @@ function InboxContent() {
                   ? "Tất cả thực đơn, ràng buộc dinh dưỡng và chu kỳ điều trị của bệnh nhân đang ở trạng thái ổn định."
                   : activeType === "patient_claim"
                   ? "Khi bệnh nhân tự đăng ký hoặc đồng nghiệp chuyển hồ sơ, việc nhận sẽ hiện ở đây."
+                  : activeType === "constraints"
+                  ? "Khi bệnh nhân gửi kcal, muối, đường hoặc mục tiêu điều trị mới, việc duyệt hiện ở đây và trên tab Ràng buộc của hồ sơ bệnh nhân."
                   : "Chọn tab “Tất cả” hoặc chọn danh mục khác để kiểm tra công việc còn lại."}
               </p>
             </div>

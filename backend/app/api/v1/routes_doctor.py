@@ -60,6 +60,10 @@ from app.services import assignment as assignment_service
 from app.services import plan_expiry
 from app.services.avatar_service import save_user_avatar
 from app.services.compliance import ComplianceService
+from app.services.clinical_constraints import (
+    apply_approved_proposals,
+    confirm_doctor_override,
+)
 from app.services.meal_plan_service import _format_request_dt, generate_meal_plan, get_profile, meal_plan_from_row
 from app.services.notification import NotificationService
 from app.services.plan_apply import (
@@ -182,6 +186,13 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
     restrictions = dict(profile.restrictions or {}) if profile else {}
     salt_daily_g = restrictions.get("salt_daily_g")
     sugar_daily_g = restrictions.get("sugar_daily_g")
+    carb_per_meal = restrictions.get("carb_per_meal")
+    sodium_daily = restrictions.get("sodium_daily")
+    proposed_restrictions = (
+        dict(profile.proposed_restrictions or {})
+        if profile and getattr(profile, "proposed_restrictions", None)
+        else {}
+    )
 
     latest_plan = (
         db.query(MealPlan)
@@ -291,8 +302,20 @@ def _patient_summary(db: Session, user: User) -> DoctorPatientSummary:
         target_kcal=target_kcal,
         salt_daily_g=salt_daily_g,
         sugar_daily_g=sugar_daily_g,
+        carb_per_meal=carb_per_meal,
+        sodium_daily=sodium_daily,
         preferences=preferences,
         constraints_status=getattr(profile, "constraints_status", None) or "confirmed",
+        proposed_target_kcal=getattr(profile, "proposed_target_kcal", None) if profile else None,
+        proposed_treatment_goals=(
+            list(profile.proposed_treatment_goals)
+            if profile and getattr(profile, "proposed_treatment_goals", None) is not None
+            else None
+        ),
+        proposed_salt_daily_g=proposed_restrictions.get("salt_daily_g"),
+        proposed_sugar_daily_g=proposed_restrictions.get("sugar_daily_g"),
+        proposed_carb_per_meal=proposed_restrictions.get("carb_per_meal"),
+        proposed_sodium_daily=proposed_restrictions.get("sodium_daily"),
         status=status,  # type: ignore[arg-type]
         status_key=status_key,  # type: ignore[arg-type]
         latest_plan_id=latest_plan.id if latest_plan else None,
@@ -566,7 +589,12 @@ def update_patient_goals(
         profile = Profile(user_id=patient.id)
         db.add(profile)
     profile.treatment_goals = payload.goals
+    if getattr(profile, "proposed_treatment_goals", None) is not None:
+        profile.proposed_treatment_goals = None
     db.commit()
+    from app.core.cache import profile_cache
+
+    profile_cache.invalidate(patient.id)
     return GoalsOut(goals=list(profile.treatment_goals or []))
 
 
@@ -617,7 +645,12 @@ def update_patient_profile(
     ):
         if field in provided:
             setattr(profile, field, getattr(payload, field))
+    if "treatment_goals" in provided:
+        profile.proposed_treatment_goals = None
     db.commit()
+    from app.core.cache import profile_cache
+
+    profile_cache.invalidate(patient.id)
     return _patient_summary(db, patient)
 
 
@@ -644,10 +677,19 @@ def update_patient_constraints(
         restrictions["salt_daily_g"] = payload.salt_daily_g
     if "sugar_daily_g" in provided:
         restrictions["sugar_daily_g"] = payload.sugar_daily_g
+    if "carb_per_meal" in provided:
+        restrictions["carb_per_meal"] = payload.carb_per_meal
+    if "sodium_daily" in provided:
+        restrictions["sodium_daily"] = payload.sodium_daily
     profile.restrictions = restrictions
-    profile.constraints_status = "confirmed"
+    if "treatment_goals" in provided and payload.treatment_goals is not None:
+        profile.treatment_goals = payload.treatment_goals
+    confirm_doctor_override(profile)
 
     db.commit()
+    from app.core.cache import profile_cache
+
+    profile_cache.invalidate(patient.id)
     return _patient_summary(db, patient)
 
 
@@ -670,8 +712,11 @@ def approve_patient_constraints(
             "Không có thay đổi nào đang chờ duyệt.",
         )
 
-    profile.constraints_status = "confirmed"
+    apply_approved_proposals(profile)
     db.commit()
+    from app.core.cache import profile_cache
+
+    profile_cache.invalidate(patient.id)
     return get_profile(db, patient.id)
 
 

@@ -4,8 +4,21 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.clinical_limits import (
+    CARB_PER_MEAL_MAX,
+    CARB_PER_MEAL_MIN,
+    SALT_DAILY_MAX,
+    SALT_DAILY_MIN,
+    SODIUM_DAILY_MAX,
+    SODIUM_DAILY_MIN,
+    SUGAR_DAILY_MAX,
+    SUGAR_DAILY_MIN,
+    TARGET_KCAL_MAX,
+    TARGET_KCAL_MIN,
+    normalize_treatment_goals,
+)
 from app.schemas.meal_plan import MealPlanOutput
 
 
@@ -46,8 +59,16 @@ class DoctorPatientSummary(BaseModel):
     target_kcal: int = 1800
     salt_daily_g: float | None = None
     sugar_daily_g: float | None = None
+    carb_per_meal: float | None = None
+    sodium_daily: float | None = None
     preferences: list[str] = Field(default_factory=list)
     constraints_status: str = "confirmed"
+    proposed_target_kcal: int | None = None
+    proposed_treatment_goals: list[str] | None = None
+    proposed_salt_daily_g: float | None = None
+    proposed_sugar_daily_g: float | None = None
+    proposed_carb_per_meal: float | None = None
+    proposed_sodium_daily: float | None = None
     status: Literal["Cần chú ý", "Ổn định", "Cảnh báo", "Chờ duyệt"] = "Ổn định"
     status_key: Literal["attention", "stable", "warning", "pending"] = "stable"
     latest_plan_id: str | None = None
@@ -138,6 +159,11 @@ class GoalsUpdate(BaseModel):
 
     goals: list[str] = Field(default_factory=list)
 
+    @field_validator("goals")
+    @classmethod
+    def _goals(cls, value: list[str]) -> list[str]:
+        return normalize_treatment_goals(value) or []
+
 
 class GoalsOut(BaseModel):
     goals: list[str] = Field(default_factory=list)
@@ -164,13 +190,32 @@ class DoctorPatientUpdate(BaseModel):
     preferences: list[str] | None = None
     treatment_goals: list[str] | None = None
 
+    @field_validator("treatment_goals")
+    @classmethod
+    def _goals(cls, value: list[str] | None) -> list[str] | None:
+        return normalize_treatment_goals(value)
+
 
 class DoctorConstraintsUpdate(BaseModel):
     """PUT /doctor/patients/{id}/constraints — partial update."""
 
-    target_kcal: int | None = Field(default=None, ge=500, le=4000)
-    salt_daily_g: float | None = Field(default=None, ge=0, le=20)
-    sugar_daily_g: float | None = Field(default=None, ge=0, le=150)
+    target_kcal: int | None = Field(default=None, ge=TARGET_KCAL_MIN, le=TARGET_KCAL_MAX)
+    carb_per_meal: float | None = Field(
+        default=None, ge=CARB_PER_MEAL_MIN, le=CARB_PER_MEAL_MAX
+    )
+    sodium_daily: float | None = Field(
+        default=None, ge=SODIUM_DAILY_MIN, le=SODIUM_DAILY_MAX
+    )
+    salt_daily_g: float | None = Field(default=None, ge=SALT_DAILY_MIN, le=SALT_DAILY_MAX)
+    sugar_daily_g: float | None = Field(
+        default=None, ge=SUGAR_DAILY_MIN, le=SUGAR_DAILY_MAX
+    )
+    treatment_goals: list[str] | None = None
+
+    @field_validator("treatment_goals")
+    @classmethod
+    def _goals(cls, value: list[str] | None) -> list[str] | None:
+        return normalize_treatment_goals(value)
 
 
 class CatalogItem(BaseModel):

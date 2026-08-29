@@ -24,7 +24,15 @@ import {
   validateBloodGlucose,
   validateBloodPressure,
   validatePositiveNumber,
+  validateFreeTextLabel,
 } from "@/lib/profile-validation";
+import {
+  CLINICAL_LIMITS,
+  clampClinical,
+  validateConstraintValues,
+  validateTreatmentGoals,
+} from "@/lib/clinical-constraints";
+import { ConstraintRangeInput } from "@/components/shared/ConstraintRangeInput";
 import {
   ApiError,
   type CatalogItem,
@@ -288,6 +296,30 @@ function ChangePasswordCard() {
   );
 }
 
+function ClinicalEffectiveValue({
+  effective,
+  proposed,
+  unit,
+}: {
+  effective: number | null | undefined;
+  proposed: number | null | undefined;
+  unit: string;
+}) {
+  const pending = proposed != null && proposed !== effective;
+  return (
+    <>
+      <p className="text-base font-bold text-on-surface">
+        {effective != null ? `${effective} ${unit}` : "Chưa bác sĩ thiết lập"}
+      </p>
+      {pending ? (
+        <p className="text-[10px] font-semibold text-amber-800 mt-1">
+          Đề xuất: {proposed} {unit} (chờ duyệt)
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 type EditFormState = {
   age: string;
   gender: string;
@@ -302,9 +334,11 @@ type EditFormState = {
   allergies: string[];
   selectedGoals: string[];
   preferencesText: string;
-  targetKcalInput: string;
-  carbPerMeal: string;
-  sodiumDaily: string;
+  targetKcal: number;
+  carbPerMeal: number;
+  sodiumDaily: number;
+  saltDaily: number;
+  sugarDaily: number;
 };
 
 function profileToForm(
@@ -318,6 +352,9 @@ function profileToForm(
     return fromCatalog?.name ?? code;
   });
 
+  const clinicalRestrictions =
+    profile.proposed_restrictions ?? profile.restrictions;
+
   return {
     age: profile.age != null ? String(profile.age) : "",
     gender: profile.gender ?? "",
@@ -330,17 +367,27 @@ function profileToForm(
     diseaseCodes: [...(profile.disease ?? [])],
     medications: medDisplay,
     allergies: [...(profile.allergies ?? [])],
-    selectedGoals: [...(profile.treatment_goals ?? [])],
+    selectedGoals: [
+      ...(profile.proposed_treatment_goals ?? profile.treatment_goals ?? []),
+    ],
     preferencesText: (profile.preferences ?? []).join(", "),
-    targetKcalInput: String(profile.target_kcal ?? 1800),
-    carbPerMeal:
-      profile.restrictions?.carb_per_meal != null
-        ? String(profile.restrictions.carb_per_meal)
-        : "",
-    sodiumDaily:
-      profile.restrictions?.sodium_daily != null
-        ? String(profile.restrictions.sodium_daily)
-        : "",
+    targetKcal: clampClinical(
+      "target_kcal",
+      profile.proposed_target_kcal ?? profile.target_kcal
+    ),
+    carbPerMeal: clampClinical(
+      "carb_per_meal",
+      clinicalRestrictions?.carb_per_meal
+    ),
+    sodiumDaily: clampClinical(
+      "sodium_daily",
+      clinicalRestrictions?.sodium_daily
+    ),
+    saltDaily: clampClinical("salt_daily_g", clinicalRestrictions?.salt_daily_g),
+    sugarDaily: clampClinical(
+      "sugar_daily_g",
+      clinicalRestrictions?.sugar_daily_g
+    ),
   };
 }
 
@@ -619,12 +666,29 @@ export default function PatientProfilePage() {
   };
 
   const handleAddCustomGoal = () => {
-    const g = customGoalInput.trim();
-    if (!g || !form) return;
-    if (!form.selectedGoals.includes(g)) {
-      setForm({ ...form, selectedGoals: [...form.selectedGoals, g] });
+    if (!form) return;
+    const err = validateFreeTextLabel(customGoalInput, {
+      required: true,
+      min: 3,
+      max: 80,
+      label: "Mục tiêu",
+    });
+    if (err) {
+      setError(err);
+      return;
     }
+    const g = customGoalInput.trim();
+    const nextGoals = form.selectedGoals.includes(g)
+      ? form.selectedGoals
+      : [...form.selectedGoals, g];
+    const goalsErr = validateTreatmentGoals(nextGoals);
+    if (goalsErr) {
+      setError(goalsErr);
+      return;
+    }
+    setForm({ ...form, selectedGoals: nextGoals });
     setCustomGoalInput("");
+    setError(null);
   };
 
   // Avatar file upload handler — persist via POST /auth/me/avatar
@@ -708,14 +772,14 @@ export default function PatientProfilePage() {
     if (form.diseaseCodes.length === 0) {
       return "Chọn ít nhất một bệnh lý nền.";
     }
-    if (form.selectedGoals.length === 0) {
-      return "Chọn ít nhất một mục tiêu điều trị.";
-    }
-    const kcal = Number(form.targetKcalInput);
-    if (!kcal || kcal < 800 || kcal > 5000) {
-      return "Nhập mục tiêu kcal hợp lệ (800–5000).";
-    }
-    return null;
+    return validateConstraintValues({
+      target_kcal: form.targetKcal,
+      carb_per_meal: form.carbPerMeal,
+      sodium_daily: form.sodiumDaily,
+      salt_daily_g: form.saltDaily,
+      sugar_daily_g: form.sugarDaily,
+      treatment_goals: form.selectedGoals,
+    });
   };
 
   const handleSave = async () => {
@@ -729,21 +793,17 @@ export default function PatientProfilePage() {
     const w = Number(form.weight);
     const h = Number(form.height);
     const bmi = calcBmi(w, h);
-    const targetKcal = Number(form.targetKcalInput);
+    const targetKcal = form.targetKcal;
     const preferences = form.preferencesText
       .split(/[,;\n]+/)
       .map((p) => p.trim())
       .filter(Boolean);
 
     const restrictions: ProfileUpsert["restrictions"] = {
-      carb_per_meal: form.carbPerMeal.trim()
-        ? Number(form.carbPerMeal)
-        : null,
-      sodium_daily: form.sodiumDaily.trim()
-        ? Number(form.sodiumDaily)
-        : null,
-      salt_daily_g: profile.restrictions?.salt_daily_g ?? null,
-      sugar_daily_g: profile.restrictions?.sugar_daily_g ?? null,
+      carb_per_meal: form.carbPerMeal,
+      sodium_daily: form.sodiumDaily,
+      salt_daily_g: form.saltDaily,
+      sugar_daily_g: form.sugarDaily,
     };
 
     const payload: ProfileUpsert = {
@@ -776,7 +836,7 @@ export default function PatientProfilePage() {
       setMetricErrors({});
       if (updated.constraints_status === "pending_doctor_review") {
         setSaveNotice(
-          "Thay đổi mục tiêu kcal hoặc ràng buộc dinh dưỡng đã được lưu và đang chờ bác sĩ duyệt lại."
+          "Đã gửi đề xuất kcal/ràng buộc cho bác sĩ. Thực đơn vẫn dùng giá trị đã duyệt cho tới khi được xác nhận."
         );
       } else {
         setSaveNotice("Đã lưu hồ sơ sức khỏe thành công.");
@@ -1731,7 +1791,7 @@ export default function PatientProfilePage() {
                       Kế hoạch Dinh dưỡng & Mục tiêu Điều trị
                     </h3>
                     <p className="text-xs text-on-surface-variant">
-                      Chỉ tiêu Calo, hạn ngạch Carb/Muối và định hướng lối sống.
+                      Đang dùng cho thực đơn vs đề xuất chờ bác sĩ duyệt. Sửa ở đây là đề xuất, không áp dụng ngay.
                     </p>
                   </div>
                 </div>
@@ -1772,7 +1832,8 @@ export default function PatientProfilePage() {
                         <input
                           type="text"
                           value={customGoalInput}
-                          onChange={(e) => setCustomGoalInput(e.target.value)}
+                          onChange={(e) => setCustomGoalInput(e.target.value.slice(0, 80))}
+                          maxLength={80}
                           placeholder="Thêm mục tiêu điều trị khác..."
                           className="flex-1 px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
                         />
@@ -1786,26 +1847,54 @@ export default function PatientProfilePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {!(profile.treatment_goals?.length) ? (
-                        <p className="text-sm text-on-surface-variant italic">
-                          Chưa chọn mục tiêu điều trị
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                          Đang dùng cho thực đơn
                         </p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {profile.treatment_goals.map((g) => (
-                            <div
-                              key={g}
-                              className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 flex items-start gap-2.5 text-xs text-on-surface font-medium"
-                            >
-                              <span className="material-symbols-outlined text-[18px] text-teal-700 shrink-0">
-                                check_circle
-                              </span>
-                              <span>{g}</span>
-                            </div>
-                          ))}
+                        {!(profile.treatment_goals?.length) ? (
+                          <p className="text-sm text-on-surface-variant italic">
+                            Chưa bác sĩ thiết lập
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {profile.treatment_goals.map((g) => (
+                              <div
+                                key={g}
+                                className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 flex items-start gap-2.5 text-xs text-on-surface font-medium"
+                              >
+                                <span className="material-symbols-outlined text-[18px] text-teal-700 shrink-0">
+                                  check_circle
+                                </span>
+                                <span>{g}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {profile.proposed_treatment_goals &&
+                      profile.proposed_treatment_goals.length > 0 &&
+                      JSON.stringify(profile.proposed_treatment_goals) !==
+                        JSON.stringify(profile.treatment_goals ?? []) ? (
+                        <div className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                            Đề xuất chờ duyệt
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {profile.proposed_treatment_goals.map((g) => (
+                              <div
+                                key={g}
+                                className="p-2.5 bg-white/80 rounded-lg border border-amber-200 flex items-start gap-2 text-xs text-amber-950 font-medium"
+                              >
+                                <span className="material-symbols-outlined text-[16px] text-amber-700 shrink-0">
+                                  schedule
+                                </span>
+                                <span>{g}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -1817,23 +1906,27 @@ export default function PatientProfilePage() {
                       <span className="text-xs font-bold text-teal-900 uppercase tracking-wider">
                         Năng lượng mục tiêu (Target Kcal)
                       </span>
-                      <div className="flex items-baseline gap-2 mt-1">
+                      <div className="flex items-baseline gap-2 mt-1 flex-wrap">
                         {editing && form ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min={800}
-                              max={5000}
-                              step={50}
-                              value={form.targetKcalInput}
-                              onChange={(e) =>
-                                setForm({ ...form, targetKcalInput: e.target.value })
+                          <div className="w-full space-y-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-3xl font-black text-teal-950 tabular-nums">
+                                {form.targetKcal.toLocaleString()}
+                              </span>
+                              <span className="text-sm font-bold text-teal-900">
+                                kcal / ngày
+                              </span>
+                            </div>
+                            <ConstraintRangeInput
+                              limitKey="target_kcal"
+                              value={form.targetKcal}
+                              onChange={(value) =>
+                                setForm({ ...form, targetKcal: value })
                               }
-                              className="w-32 px-3 py-1.5 bg-white border border-teal-300 rounded-xl text-xl font-black text-teal-950 focus:outline-none focus:ring-2 focus:ring-teal-500"
                             />
-                            <span className="text-sm font-bold text-teal-900">
-                              kcal / ngày
-                            </span>
+                            <p className="text-[10px] text-teal-800 font-medium">
+                              {CLINICAL_LIMITS.target_kcal.min}–{CLINICAL_LIMITS.target_kcal.max} kcal
+                            </p>
                           </div>
                         ) : (
                           <>
@@ -1841,8 +1934,17 @@ export default function PatientProfilePage() {
                               {profile.target_kcal.toLocaleString()}
                             </span>
                             <span className="text-xs font-bold text-teal-800">
-                              kcal / ngày
+                              kcal / ngày · đang dùng
                             </span>
+                            {profile.proposed_target_kcal != null &&
+                              profile.proposed_target_kcal !==
+                                profile.target_kcal && (
+                                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
+                                  Đề xuất:{" "}
+                                  {profile.proposed_target_kcal.toLocaleString()}{" "}
+                                  kcal (chờ duyệt)
+                                </span>
+                              )}
                           </>
                         )}
                       </div>
@@ -1862,11 +1964,14 @@ export default function PatientProfilePage() {
                           {suggestedKcal} kcal/ngày
                         </strong>
                       </p>
-                      {editing && form && form.targetKcalInput !== String(suggestedKcal) && (
+                      {editing && form && form.targetKcal !== suggestedKcal && (
                         <button
                           type="button"
                           onClick={() =>
-                            setForm({ ...form, targetKcalInput: String(suggestedKcal) })
+                            setForm({
+                              ...form,
+                              targetKcal: clampClinical("target_kcal", suggestedKcal),
+                            })
                           }
                           className="mt-2 text-[11px] font-bold text-white bg-teal-700 hover:bg-teal-800 px-3 py-1 rounded-lg transition-colors inline-flex items-center gap-1"
                         >
@@ -1877,77 +1982,137 @@ export default function PatientProfilePage() {
                   </div>
 
                   {/* Macros & Restrictions Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                    {/* Carb per meal */}
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
-                      <span className="text-[11px] text-on-surface-variant font-medium block mb-1">
-                        Carb / bữa (g)
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-on-surface-variant font-medium">
+                          Carb / bữa
+                        </span>
+                        {editing && form ? (
+                          <span className="text-sm font-bold text-on-surface tabular-nums">
+                            {form.carbPerMeal} g
+                          </span>
+                        ) : null}
+                      </div>
                       {editing && form ? (
-                        <input
-                          type="number"
-                          placeholder="60"
-                          value={form.carbPerMeal}
-                          onChange={(e) =>
-                            setForm({ ...form, carbPerMeal: e.target.value })
-                          }
-                          className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface"
-                        />
+                        <>
+                          <ConstraintRangeInput
+                            limitKey="carb_per_meal"
+                            value={form.carbPerMeal}
+                            onChange={(value) =>
+                              setForm({ ...form, carbPerMeal: value })
+                            }
+                          />
+                          <p className="text-[10px] text-on-surface-variant">
+                            {CLINICAL_LIMITS.carb_per_meal.min}–{CLINICAL_LIMITS.carb_per_meal.max} g
+                          </p>
+                        </>
                       ) : (
-                        <p className="text-base font-bold text-on-surface">
-                          {profile.restrictions?.carb_per_meal != null
-                            ? `${profile.restrictions.carb_per_meal} g`
-                            : "—"}
-                        </p>
+                        <ClinicalEffectiveValue
+                          effective={profile.restrictions?.carb_per_meal}
+                          proposed={profile.proposed_restrictions?.carb_per_meal}
+                          unit="g"
+                        />
                       )}
                     </div>
 
-                    {/* Sodium daily */}
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
-                      <span className="text-[11px] text-on-surface-variant font-medium block mb-1">
-                        Natri / ngày (mg)
-                      </span>
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-on-surface-variant font-medium">
+                          Natri / ngày
+                        </span>
+                        {editing && form ? (
+                          <span className="text-sm font-bold text-on-surface tabular-nums">
+                            {form.sodiumDaily} mg
+                          </span>
+                        ) : null}
+                      </div>
                       {editing && form ? (
-                        <input
-                          type="number"
-                          placeholder="2000"
-                          value={form.sodiumDaily}
-                          onChange={(e) =>
-                            setForm({ ...form, sodiumDaily: e.target.value })
-                          }
-                          className="w-full bg-white border border-outline-variant rounded-lg px-2 py-1 text-sm font-bold text-on-surface"
-                        />
+                        <>
+                          <ConstraintRangeInput
+                            limitKey="sodium_daily"
+                            value={form.sodiumDaily}
+                            onChange={(value) =>
+                              setForm({ ...form, sodiumDaily: value })
+                            }
+                          />
+                          <p className="text-[10px] text-on-surface-variant">
+                            {CLINICAL_LIMITS.sodium_daily.min}–{CLINICAL_LIMITS.sodium_daily.max} mg
+                          </p>
+                        </>
                       ) : (
-                        <p className="text-base font-bold text-on-surface">
-                          {profile.restrictions?.sodium_daily != null
-                            ? `${profile.restrictions.sodium_daily} mg`
-                            : "—"}
-                        </p>
+                        <ClinicalEffectiveValue
+                          effective={profile.restrictions?.sodium_daily}
+                          proposed={profile.proposed_restrictions?.sodium_daily}
+                          unit="mg"
+                        />
                       )}
                     </div>
 
-                    {/* Salt daily (Doctor prescribed) */}
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
-                      <span className="text-[11px] text-on-surface-variant font-medium block mb-1">
-                        Muối / ngày (BS đặt)
-                      </span>
-                      <p className="text-base font-bold text-on-surface">
-                        {profile.restrictions?.salt_daily_g != null
-                          ? `${profile.restrictions.salt_daily_g} g`
-                          : "—"}
-                      </p>
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-on-surface-variant font-medium">
+                          Muối / ngày
+                        </span>
+                        {editing && form ? (
+                          <span className="text-sm font-bold text-on-surface tabular-nums">
+                            {form.saltDaily} g
+                          </span>
+                        ) : null}
+                      </div>
+                      {editing && form ? (
+                        <>
+                          <ConstraintRangeInput
+                            limitKey="salt_daily_g"
+                            value={form.saltDaily}
+                            onChange={(value) =>
+                              setForm({ ...form, saltDaily: value })
+                            }
+                          />
+                          <p className="text-[10px] text-on-surface-variant">
+                            {CLINICAL_LIMITS.salt_daily_g.min}–{CLINICAL_LIMITS.salt_daily_g.max} g
+                          </p>
+                        </>
+                      ) : (
+                        <ClinicalEffectiveValue
+                          effective={profile.restrictions?.salt_daily_g}
+                          proposed={profile.proposed_restrictions?.salt_daily_g}
+                          unit="g"
+                        />
+                      )}
                     </div>
 
-                    {/* Sugar daily (Doctor prescribed) */}
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60">
-                      <span className="text-[11px] text-on-surface-variant font-medium block mb-1">
-                        Đường / ngày (BS đặt)
-                      </span>
-                      <p className="text-base font-bold text-on-surface">
-                        {profile.restrictions?.sugar_daily_g != null
-                          ? `${profile.restrictions.sugar_daily_g} g`
-                          : "—"}
-                      </p>
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-on-surface-variant font-medium">
+                          Đường tự do / ngày
+                        </span>
+                        {editing && form ? (
+                          <span className="text-sm font-bold text-on-surface tabular-nums">
+                            {form.sugarDaily} g
+                          </span>
+                        ) : null}
+                      </div>
+                      {editing && form ? (
+                        <>
+                          <ConstraintRangeInput
+                            limitKey="sugar_daily_g"
+                            value={form.sugarDaily}
+                            onChange={(value) =>
+                              setForm({ ...form, sugarDaily: value })
+                            }
+                          />
+                          <p className="text-[10px] text-on-surface-variant">
+                            {CLINICAL_LIMITS.sugar_daily_g.min}–{CLINICAL_LIMITS.sugar_daily_g.max} g
+                          </p>
+                        </>
+                      ) : (
+                        <ClinicalEffectiveValue
+                          effective={profile.restrictions?.sugar_daily_g}
+                          proposed={profile.proposed_restrictions?.sugar_daily_g}
+                          unit="g"
+                        />
+                      )}
                     </div>
                   </div>
 

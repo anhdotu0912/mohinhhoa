@@ -1207,6 +1207,15 @@ export default function PatientsListPage() {
                                     {patient.age} tuổi · {patient.gender === "male" ? "Nam" : patient.gender === "female" ? "Nữ" : patient.gender}
                                   </p>
                                 ) : null}
+                                {patient.constraintsStatus === "pending_doctor_review" ? (
+                                  <Link
+                                    href={`/doctor/patients/${patient.id}/constraints`}
+                                    className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-900 border border-amber-500/20 text-[10px] font-bold hover:bg-amber-500/20"
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">clinical_notes</span>
+                                    Chờ duyệt ràng buộc
+                                  </Link>
+                                ) : null}
                               </div>
                             </div>
                           </td>

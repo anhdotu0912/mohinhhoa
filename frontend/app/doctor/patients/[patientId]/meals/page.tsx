@@ -12,6 +12,7 @@ import { MealPlanItem } from "@/lib/plans-store";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
 import { doctorReviewHref } from "@/lib/doctor-routes";
+import { NotificationBadge } from "@/components/shared/NotificationBadge";
 
 function resolvePatientAvatar(raw: string | null | undefined): string {
   if (
@@ -191,13 +192,19 @@ export default function PatientMealPlansListPage() {
       <div className="flex items-center gap-1.5 pb-1 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab("pending")}
-          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+          className={`relative px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "pending"
               ? "bg-amber-600 text-white shadow-2xs"
               : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
           }`}
         >
-          Chờ duyệt ({pendingCount})
+          <span>Chờ duyệt ({pendingCount})</span>
+          {pendingCount > 0 && activeTab !== "pending" && (
+            <NotificationBadge
+              dot
+              className="bottom-auto top-1 right-1 w-2 h-2 ring-[1.5px] ring-white"
+            />
+          )}
         </button>
         <button
           onClick={() => setActiveTab("approved")}
@@ -249,6 +256,7 @@ export default function PatientMealPlansListPage() {
           {/* Display Grouped Variant Batches */}
           {groupsList.map((group) => {
             const isExpanded = expandedGroups[group.groupId] !== false; // Default true (expanded)
+            const hasPendingInGroup = group.plans.some((p) => p.status === "pending");
 
             return (
               <div
@@ -261,8 +269,16 @@ export default function PatientMealPlansListPage() {
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-xs pb-sm border-b border-outline-variant/60 cursor-pointer select-none hover:opacity-90 transition-opacity"
                   >
                     <div className="flex items-center gap-xs flex-wrap">
-                      <span className="material-symbols-outlined text-primary text-[22px]">
-                        view_carousel
+                      <span className="relative inline-flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-[22px]">
+                          view_carousel
+                        </span>
+                        {hasPendingInGroup && (
+                          <NotificationBadge
+                            dot
+                            className="bottom-auto -top-0.5 -right-0.5 w-2.5 h-2.5 ring-[1.5px] ring-white"
+                          />
+                        )}
                       </span>
                       <h3 className="font-h2 text-h2 font-bold text-on-surface text-sm sm:text-base">
                         Đợt sinh thực đơn: {group.plans.length} phương án thay thế
@@ -270,6 +286,12 @@ export default function PatientMealPlansListPage() {
                       <span className="bg-primary/10 text-primary font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold">
                         {group.groupId}
                       </span>
+                      {hasPendingInGroup && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Có phương án chờ duyệt
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-md text-xs text-on-surface-variant font-caption">
@@ -297,14 +319,24 @@ export default function PatientMealPlansListPage() {
                       {group.plans.map((plan) => (
                         <div
                           key={plan.id}
-                          className={`bg-surface-container-lowest border rounded-xl p-md shadow-xs transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
-                            plan.status === "approved" || plan.status === "edited"
+                          className={`relative bg-surface-container-lowest border rounded-xl p-md shadow-xs transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
+                            plan.status === "pending"
+                              ? "border-amber-300/80 bg-amber-50/15 hover:border-amber-400"
+                              : plan.status === "approved" || plan.status === "edited"
                               ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20"
                               : plan.status === "rejected"
                               ? "border-red-200 opacity-75 bg-red-50/30"
                               : "border-outline-variant hover:border-primary/50"
                           }`}
                         >
+                          {/* Facebook-style red notification dot on top right of pending meal card */}
+                          {plan.status === "pending" && (
+                            <NotificationBadge
+                              dot
+                              className="bottom-auto top-2.5 right-2.5 w-3 h-3 ring-2 ring-white shadow-xs"
+                            />
+                          )}
+
                           {/* Left Side: Variant Index Tag & Title */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-xs mb-1 flex-wrap">
@@ -416,8 +448,20 @@ export default function PatientMealPlansListPage() {
                 {standalonePlans.map((plan) => (
                   <div
                     key={plan.id}
-                    className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-md"
+                    className={`relative bg-surface-container-lowest border rounded-xl p-md shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
+                      plan.status === "pending"
+                        ? "border-amber-300/80 bg-amber-50/15"
+                        : "border-outline-variant"
+                    }`}
                   >
+                    {/* Facebook-style red notification dot on top right of pending standalone card */}
+                    {plan.status === "pending" && (
+                      <NotificationBadge
+                        dot
+                        className="bottom-auto top-2.5 right-2.5 w-3 h-3 ring-2 ring-white shadow-xs"
+                      />
+                    )}
+
                     <div className="flex-1 min-w-0">
                       <p className="font-mono text-xs font-bold text-primary mb-1">
                         {plan.id}

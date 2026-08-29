@@ -61,6 +61,17 @@ class TestMealPlanSchema:
             assert len(plan.days) == 7
             assert plan.user_id == user_id
 
+    def test_planner_uses_confirmed_kcal_not_patient_proposal(self):
+        profile = PatientProfile(
+            user_id="demo_patient_1",
+            disease=["diabetes_t2"],
+            target_kcal=1600,
+            proposed_target_kcal=2500,
+        )
+        plan = generate_meal_plan(profile)
+        assert plan.profile_snapshot["target_kcal"] == 1600
+        assert plan.profile_snapshot.get("proposed_target_kcal") is None
+
 
 # ============================================================
 # Test: Hard Allergy Filter (MP-02)

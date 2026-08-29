@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.10 (2026-08-28 — `DoctorNoteOut.notes[]` + danh tính bác sĩ được gán. Xem changelog ở §7 Versioning.)
+**Version:** 1.11 (2026-08-29 — HITL ràng buộc lâm sàng: patient proposal không có hiệu lực tới khi bác sĩ duyệt. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -51,7 +51,10 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
   },
   "preferences": ["thích ăn cơm", "không ăn thịt bò"],
   "treatment_goals": ["Kiểm soát đường huyết ổn định (HbA1c < 7%)."],
-  "constraints_status": "confirmed"
+  "constraints_status": "confirmed",
+  "proposed_target_kcal": null,
+  "proposed_restrictions": null,
+  "proposed_treatment_goals": null
 }
 ```
 
@@ -66,9 +69,10 @@ Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `Patie
 - `allergies` = **hard filter** (loại tuyệt đối khỏi thực đơn, không có ngoại lệ) — dùng trong `meal_planner_agent._is_allergic`.
 - `preferences` = **soft filter** — as-built hiện chỉ match đúng 1 pattern hard-code (`"không ăn thịt bò"`). **[Planned, quyết định 2026-08-15]** mở rộng thêm danh sách pattern phổ biến khác (ví dụ `"ăn chay"`, `"không ăn hải sản"`, `"không ăn heo/lợn"`, `"không ăn gà"`) — danh sách cụ thể do BE1 chốt khi implement, xem `specs/02` §3 rule 4 và `tasks/be1-ai-core.md`.
 - `restrictions.carb_per_meal`/`restrictions.sodium_daily` optional, `null` = không áp giới hạn đó — **as-built**.
-- **`restrictions.salt_daily_g`/`sugar_daily_g` — as-built (2026-08-16):** doctor set qua `PUT /doctor/patients/{id}/constraints`; optional, `null` = không áp giới hạn. Giữ **song song** với `carb_per_meal`/`sodium_daily` cũ (patient set qua `POST /profile`). Meal planner quy đổi `salt_daily_g` → natri hiệu lực: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị (hằng số 400 mg natri/g muối).
+- **`restrictions.salt_daily_g`/`sugar_daily_g` — as-built (2026-08-16):** doctor set qua `PUT /doctor/patients/{id}/constraints`; optional, `null` = không áp giới hạn. Giữ **song song** với `carb_per_meal`/`sodium_daily`. Meal planner quy đổi `salt_daily_g` → natri hiệu lực: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị (hằng số 400 mg natri/g muối). Patient `POST /profile` **không** ghi đè các field này lên cột hiệu lực — chỉ lưu đề xuất (xem `proposed_*`).
 - **`protein_daily_g` — Won't Have (2026-08-16):** bỏ khỏi scope ràng buộc doctor; `protein_g` vẫn có trong `Macros`/`DayTotals` như thông tin dinh dưỡng, không phải ngưỡng ràng buộc.
-- **`constraints_status` — as-built (2026-08-18):** enum `"confirmed" | "pending_doctor_review"`. Default `"confirmed"`. Chuyển sang `"pending_doctor_review"` khi **patient tự sửa** `target_kcal`/`restrictions` qua `POST /profile`; reset lại `"confirmed"` khi **doctor xác nhận** (qua `POST /doctor/patients/{id}/constraints/approve` hoặc khi doctor tự sửa trực tiếp qua `PUT /doctor/patients/{id}/constraints`). Giá trị mới của patient **vẫn được áp dụng ngay** cho lần generate plan kế tiếp trong lúc chờ duyệt (không block demo flow) — `constraints_status` chỉ là cờ hiển thị cho doctor biết cần xem lại, không phải cờ chặn sử dụng. Xem thiết kế đầy đủ ở `specs/04-clinical-constraints.md`.
+- **`constraints_status` — as-built (cập nhật 2026-08-29):** enum `"confirmed" | "pending_doctor_review"`. Default `"confirmed"`. `target_kcal` / `restrictions` / `treatment_goals` trên `PatientProfile` là **giá trị đã duyệt** (cột hiệu lực). Khi patient gửi các field này qua `POST /profile`, BE **không** ghi đè cột hiệu lực — lưu vào `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` và set `"pending_doctor_review"`. Meal planner / `profile_snapshot` chỉ đọc cột hiệu lực. Doctor `POST .../constraints/approve` **chép** proposed → hiệu lực rồi xóa proposed, `"confirmed"`. Doctor `PUT .../constraints` ghi hiệu lực ngay, xóa proposed, `"confirmed"`. Xem `specs/04-clinical-constraints.md`.
+- **`proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals`:** optional, `null` khi không có đề xuất đang chờ. Không đưa vào input lâm sàng của `meal_planner_agent`.
 
 ---
 
@@ -426,7 +430,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.10**.
+- Version hiện tại của contract này: **1.11**.
+- **Changelog 1.10 → 1.11 (2026-08-29):** HITL ràng buộc lâm sàng — `PatientProfile` thêm `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` (optional, default `null`). `POST /profile` không còn ghi đè `target_kcal`/`restrictions`/`treatment_goals` hiệu lực; meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/api-v1.md` v1.17, `specs/02`, `specs/04`. Không breaking — field mới optional, cột hiệu lực giữ nguyên shape.
 - **Changelog 1.9 → 1.10 (2026-08-28):** `DoctorNoteOut` thêm `doctor_avatar`, `notes[]`, `has_more`; `note`/`created_at`/`tags` giữ là reminder mới nhất. Nguồn chỉ `manual_reminder` (bỏ fallback `adjustment_note`). Tên/ảnh từ bác sĩ được gán, không hallucinate. Đồng bộ `contracts/api-v1.md` v1.15. Không breaking — field mới optional/default.
 - **Changelog 1.8 → 1.9 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"` (4 slot food log khớp meal plan bữa phụ). Không breaking — giá trị mới optional cho client cũ. Đồng bộ `contracts/api-v1.md` v1.12, `adrs/009` supersede, `specs/09`.
 - **Changelog 1.7 → 1.8 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.11.

@@ -26,7 +26,7 @@ import {
   patientUsageLabel,
 } from "@/lib/plan-expiry";
 import { DISEASE_OPTIONS } from "@/lib/profile-mappers";
-import { doctorReviewHref } from "@/lib/doctor-routes";
+import { doctorChartHref, doctorReviewHref } from "@/lib/doctor-routes";
 
 interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
   patientCode: string;
@@ -555,6 +555,44 @@ export default function PatientDetailPage() {
         )}
 
         <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
+          {summary?.constraints_status === "pending_doctor_review" && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <span className="material-symbols-outlined text-amber-700 text-[22px] shrink-0 mt-0.5">
+                  clinical_notes
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-amber-950">
+                    Bệnh nhân đề xuất ràng buộc lâm sàng — chờ bạn duyệt
+                  </p>
+                  <p className="text-xs text-amber-900/90 font-medium mt-0.5">
+                    Đề xuất: {summary.proposed_target_kcal ?? "—"} kcal
+                    {summary.proposed_carb_per_meal != null
+                      ? ` · carb/bữa ${summary.proposed_carb_per_meal} g`
+                      : ""}
+                    {summary.proposed_salt_daily_g != null
+                      ? ` · muối ${summary.proposed_salt_daily_g} g`
+                      : ""}
+                    {summary.proposed_sugar_daily_g != null
+                      ? ` · đường ${summary.proposed_sugar_daily_g} g`
+                      : ""}
+                    <span className="text-amber-800">
+                      {" "}
+                      · phác đồ hiện hành {summary.target_kcal} kcal vẫn đang được dùng để sinh thực đơn.
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={doctorChartHref(patientId, "constraints")}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-2xs transition-all cursor-pointer active:scale-95 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[16px]">verified</span>
+                <span>Duyệt ràng buộc</span>
+              </Link>
+            </div>
+          )}
+
           {/* Top Quick Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
 

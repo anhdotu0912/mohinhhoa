@@ -178,7 +178,7 @@ North Star as-built: hồ sơ → (BN yêu cầu **hoặc** BS generate) → pla
 |---|---|
 | Xem ràng buộc | `target_kcal`, `salt_daily_g`, `sugar_daily_g` (schema `Restrictions` còn song song `carb_per_meal`/`sodium_daily` phía patient) |
 | Cập nhật ràng buộc | `PUT /doctor/patients/{id}/constraints` — partial, áp dụng ngay lần generate sau. Meal planner: `effective_sodium_mg = min(sodium_daily, salt_daily_g * 400)` khi cả hai có giá trị |
-| Xác nhận thay đổi BN tự sửa | HITL: patient `POST /profile` đổi kcal/restrictions → `constraints_status=pending_doctor_review` (giá trị **vẫn dùng ngay**). Doctor `POST .../constraints/approve` → `confirmed`. `400 NOTHING_TO_APPROVE` nếu đã confirmed |
+| Xác nhận thay đổi BN tự sửa | HITL: patient `POST /profile` đổi kcal/restrictions → lưu `proposed_*`, `constraints_status=pending_doctor_review` (cột hiệu lực **không** đổi; generate vẫn dùng giá trị bác sĩ). Doctor `POST .../constraints/approve` chép proposed → hiệu lực. `400 NOTHING_TO_APPROVE` nếu đã confirmed |
 
 **Luồng chính:**
 1. Inbox filter `constraints` hoặc tab Ràng buộc trên chart.
@@ -213,7 +213,7 @@ North Star as-built: hồ sơ → (BN yêu cầu **hoặc** BS generate) → pla
 | Khai báo dị ứng | `allergies[]` (hard filter khi generate) |
 | Đặt mục tiêu | `target_kcal`, `treatment_goals`, `preferences` (5 pattern: bò/chay/hải sản/heo/gà) |
 
-**Luồng chính:** `POST /auth/register` → login → `/patient/onboarding` (3 bước) → `POST /api/v1/profile` (upsert) → `/patient`. Nếu BN tự sửa kcal/restrictions sau này → `constraints_status=pending_doctor_review`.
+**Luồng chính:** `POST /auth/register` → login → `/patient/onboarding` (3 bước) → `POST /api/v1/profile` (upsert) → `/patient`. Nếu BN gửi kcal/restrictions khác giá trị đã duyệt → `proposed_*` + `constraints_status=pending_doctor_review` (phác đồ vẫn dùng giá trị bác sĩ).
 
 ### 3.2 Cập nhật và theo dõi chỉ số
 **Status:** Done (ghi nhận + lịch sử + overlay đa chỉ số + `metrics_delta_advice`).
