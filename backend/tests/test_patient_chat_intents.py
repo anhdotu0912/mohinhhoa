@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-
 from app.agents.graph import (
     doctor_note_node,
     reset_compiled_graph,

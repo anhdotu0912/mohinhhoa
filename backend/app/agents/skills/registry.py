@@ -9,11 +9,11 @@ Standardizes all Primitive and Utility skills with the mandatory 3-part Descript
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class SkillCategory(str, Enum):
+class SkillCategory(StrEnum):
     """Categorization of agent skills."""
     PRIMITIVE = "primitive"  # Atomic domain business functions
     UTILITY = "utility"      # Triage, clarification, greeting, guardrail refusals
@@ -59,7 +59,7 @@ class SkillDefinition:
         description = (
             f"{self.purpose}\n\n"
             f"KHI NÀO DÙNG:\n" + "\n".join(f"- {q}" for q in self.when_to_use) + "\n\n"
-            f"TUYỆT ĐỐI KHÔNG DÙNG (NEGATIVE CONSTRAINTS):\n" + "\n".join(f"- {r}" for r in self.never_use)
+            "TUYỆT ĐỐI KHÔNG DÙNG (NEGATIVE CONSTRAINTS):\n" + "\n".join(f"- {r}" for r in self.never_use)
         )
         return {
             "type": "function",

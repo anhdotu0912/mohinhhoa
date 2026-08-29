@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.core.startup_checks import validate_security_settings
 
 

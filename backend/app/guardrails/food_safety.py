@@ -12,13 +12,11 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.agents.interaction_checker_agent import (
     get_medication_known_interactions,
-    load_interaction_kb,
 )
 from app.agents.skills.primitive_skills import _ALLERGY_FOOD_MAP
 

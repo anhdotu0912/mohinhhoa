@@ -10,11 +10,9 @@ Verifies that:
 from __future__ import annotations
 
 import inspect
-import pytest
 
+import pytest
 from app.agents.nodes.intent_classifier import (
-    VALID_INTENTS,
-    _classify_by_keywords,
     _detect_intents_by_keywords,
 )
 from app.agents.skills import (
@@ -28,12 +26,10 @@ from app.agents.skills import (
     emergency_triage_check,
     format_intent_classification_prompt_snippet,
     get_all_skill_descriptions,
-    get_all_skill_definitions,
     get_doctor_notes,
     get_metrics_delta_advice,
     get_openai_tools_schema,
     get_patient_meal_plan,
-    get_skill_definition,
     get_skills_by_category,
     get_weekly_adherence_summary,
     log_food_adherence,

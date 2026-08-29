@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from tests.plan_helpers import generate_approve_apply
+
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
     response = client.post(
@@ -13,9 +15,6 @@ def _login(client, email: str, password: str = "demo1234") -> dict:
     assert response.status_code == 200, response.text
     data = response.json()
     return {"Authorization": f"Bearer {data['access_token']}"}
-
-
-from tests.plan_helpers import generate_approve_apply
 
 
 def _generate_and_approve(client, patient_email: str, doctor_headers: dict) -> str:
@@ -190,6 +189,7 @@ def test_apply_next_week_displaces_misaligned_plan(client):
     canonical next week must succeed instead of 409 PLAN_DATE_OVERLAP.
     """
     from app.models.meal_plan import MealPlan
+
     from tests.conftest import TestingSessionLocal
 
     doctor_headers = _login(client, "demo_doctor@example.com")
@@ -251,6 +251,7 @@ def test_plan_usage_for_row_windows():
 def test_reconcile_unapplies_overlapping_plans(client):
     from app.models.meal_plan import MealPlan
     from app.services.plan_apply import reconcile_overlapping_applied_plans
+
     from tests.conftest import TestingSessionLocal
 
     doctor_headers = _login(client, "demo_doctor@example.com")

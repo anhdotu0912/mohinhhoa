@@ -7,7 +7,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.meal_plan import MealPlanOutput
-from app.schemas.profile import PatientProfile
 
 
 class ReviewRequest(BaseModel):

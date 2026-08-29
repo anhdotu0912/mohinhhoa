@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from app.agents.nodes.intent_classifier import (
     VALID_INTENTS,
     _classify_by_keywords,

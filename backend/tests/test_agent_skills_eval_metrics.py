@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import pytest
 
+import pytest
 from scripts.evaluate_agent_skills import (
     evaluate_emergency_zero_hallucination,
     evaluate_token_consumption_reduction,

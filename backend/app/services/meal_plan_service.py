@@ -8,11 +8,11 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.profile import Profile
 from app.models.user import User
-from app.core.errors import APIError
 from app.schemas.meal_plan import (
     DayPlan,
     FoodItem,

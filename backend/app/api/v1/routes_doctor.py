@@ -8,9 +8,9 @@ from fastapi import APIRouter, Body, Depends, File, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import APIError
 from app.core.security import require_roles
-from app.core.config import settings
 from app.db.session import get_db
 from app.models.alert import Alert
 from app.models.catalog import Allergy, Diagnosis, Medicine
@@ -28,9 +28,9 @@ from app.schemas.doctor import (
     CreateDoctorPatientRequest,
     DiagnosisItem,
     DoctorColleague,
+    DoctorConstraintsUpdate,
     DoctorPatientSummary,
     DoctorPatientUpdate,
-    DoctorConstraintsUpdate,
     FoodCatalogItem,
     FoodCatalogMacros,
     FoodCatalogOut,
@@ -49,13 +49,13 @@ from app.schemas.doctor import (
     TransferRequest,
 )
 from app.schemas.meal_plan import ApplyMealPlanRequest, GenerateMealPlanRequest, MealPlanOutput
-from app.schemas.profile import PatientProfile
 from app.schemas.notification import NotificationOut
+from app.schemas.profile import PatientProfile
 from app.services import assignment as assignment_service
 from app.services import plan_expiry
 from app.services.avatar_service import save_user_avatar
 from app.services.compliance import ComplianceService
-from app.services.meal_plan_service import generate_meal_plan, get_profile, meal_plan_from_row, _format_request_dt
+from app.services.meal_plan_service import _format_request_dt, generate_meal_plan, get_profile, meal_plan_from_row
 from app.services.notification import NotificationService
 from app.services.plan_apply import (
     apply_meal_plan,
@@ -465,7 +465,7 @@ def get_patient_compliance(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> PatientComplianceOut:
-    patient = assignment_service.require_assigned_patient(db, user, patient_id)
+    assignment_service.require_assigned_patient(db, user, patient_id)
     return ComplianceService(db).get_patient_compliance(patient_id, days=days)
 
 
@@ -800,7 +800,7 @@ def list_patient_meal_plans(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> list[MealPlanOutput]:
-    patient = assignment_service.require_assigned_patient(db, user, patient_id)
+    assignment_service.require_assigned_patient(db, user, patient_id)
     query = db.query(MealPlan).filter(MealPlan.user_id == patient_id)
     if status != "all":
         query = query.filter(MealPlan.status == status)
@@ -817,7 +817,7 @@ def get_patient_meal_plan_schedule(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> MealPlanScheduleOut:
-    patient = assignment_service.require_assigned_patient(db, user, patient_id)
+    assignment_service.require_assigned_patient(db, user, patient_id)
     data = build_meal_plan_schedule(db, patient_id)
     return MealPlanScheduleOut(**data)
 

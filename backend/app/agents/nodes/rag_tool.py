@@ -254,7 +254,6 @@ def _template_answer(message: str, context: str) -> str:
     2. Searches chunks for sentences mentioning that food
     3. Produces a concise, structured answer
     """
-    import re as _re
 
     food_name = _detect_food_in_question(message)
 
