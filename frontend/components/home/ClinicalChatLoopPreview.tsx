@@ -20,7 +20,7 @@ const SCENARIOS: Scenario[] = [
     chipIcon: "restaurant",
     userPrompt: "Trưa nay tôi định ăn bún chả hoặc cơm tấm. Nhờ bác sĩ và AI tư vấn món an toàn cho đường huyết?",
     thinking: "Đối soát chỉ số GI/GL bún tươi vs cơm tấm sườn • Khẩu phần mục tiêu: 450-520 kcal",
-    aiMessage: "Chào bác A, bác nên **ưu tiên Bún chả nướng điều chỉnh** thay vì Cơm tấm sườn bì (do cơm tấm có GI cao ~80 dễ làm tăng vọt đường huyết). Bác nên giảm 1/2 lượng bún và ăn kèm nhiều rau sống trước.",
+    aiMessage: "Chào bác An, bác nên **ưu tiên Bún chả nướng điều chỉnh** thay vì Cơm tấm sườn bì (do cơm tấm có GI cao ~80 dễ làm tăng vọt đường huyết). Bác nên giảm 1/2 lượng bún và ăn kèm nhiều rau sống trước.",
     cardType: "meal",
   },
   {
@@ -47,7 +47,7 @@ const SCENARIOS: Scenario[] = [
     chipIcon: "clinical_notes",
     userPrompt: "Bác sĩ phụ trách có dặn dò gì mới cho chế độ ăn của tôi không?",
     thinking: "Truy xuất y lệnh mới nhất từ Hồ sơ bệnh án • Khoa Nội tiết - Dinh dưỡng",
-    aiMessage: "Bác sĩ phụ trách **BS.CKII Nguyễn Thu Trang** vừa gửi lời dặn dò chuyên môn mới vào sáng nay:",
+    aiMessage: "Bác sĩ phụ trách **BS.CKII Đỗ Tú Anh** vừa gửi lời dặn dò chuyên môn mới vào sáng nay:",
     cardType: "doctor",
   },
 ];
