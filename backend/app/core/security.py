@@ -4,18 +4,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import bcrypt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import APIError
 from app.db.session import get_db
 from app.models.user import User
-
-import bcrypt
 
 bearer_scheme = HTTPBearer(auto_error=False)
 

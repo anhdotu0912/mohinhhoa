@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.schemas.meal_plan import DoctorNoteOut, MealPlanOutput, MealPreviewOut, WeeklyComplianceOut
 from app.schemas.body_metrics import MetricsDeltaAdviceOut
+from app.schemas.meal_plan import DoctorNoteOut, MealPlanOutput, MealPreviewOut, WeeklyComplianceOut
 
 
 class ChatMessageOut(BaseModel):

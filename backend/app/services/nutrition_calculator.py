@@ -7,6 +7,7 @@ calories and dietary restrictions, and emit descriptive warning messages.
 from __future__ import annotations
 
 import logging
+
 from app.schemas.meal_plan import DayPlan, DayTotals, Macros, Meal
 from app.schemas.profile import Restrictions
 

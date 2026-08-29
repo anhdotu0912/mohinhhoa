@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from app.schemas.profile import PatientProfile
-
 
 class RAGContext(TypedDict, total=False):
     """A single retrieved context chunk."""

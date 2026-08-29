@@ -9,6 +9,7 @@ import logging
 import re
 
 from app.agents.state import AgentState
+from app.guardrails.rules import REFUSE_REGEX_PATTERNS
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,6 @@ VALID_INTENTS = {
     "doctor_note",
     "metrics_delta_advice",
 }
-
-# Keyword patterns for rule-based fallback (refuse patterns shared with guardrails.rules)
-from app.guardrails.rules import REFUSE_REGEX_PATTERNS
 
 _RAG_QA_PATTERNS = [
     r"(?:những|các|danh sách|top|nhóm|hoa quả ngọt|trái cây ngọt)\s+(?:loại\s+)?(?:rau|củ|quả|trái cây|hoa quả|thực phẩm|thức ăn|đồ ăn|món ăn|đồ uống|hạt|thịt|cá|chất béo)",

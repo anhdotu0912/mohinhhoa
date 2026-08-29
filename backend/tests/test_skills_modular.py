@@ -5,8 +5,7 @@ Verifies that all atomic skills execute independently, correctly and safely.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import pytest
+from datetime import UTC, datetime
 
 from app.agents.skills import (
     ask_clarification,
@@ -15,12 +14,10 @@ from app.agents.skills import (
     chit_chat_greeting,
     emergency_triage_check,
     get_doctor_notes,
-    get_metrics_delta_advice,
     get_patient_meal_plan,
     get_weekly_adherence_summary,
     log_food_adherence,
     refuse_unsafe_medication,
-    search_medical_guidelines,
 )
 from app.models.food_log import FoodLog
 from app.models.notification import Notification
@@ -131,7 +128,7 @@ class TestPrimitiveSkills:
                 slot="morning",
                 type="as_planned",
                 note="",
-                logged_at=datetime.now(timezone.utc),
+                logged_at=datetime.now(UTC),
             )
         )
         db_session.commit()
@@ -155,7 +152,7 @@ class TestPrimitiveSkills:
                 type="manual_reminder",
                 title="Nhắc nhở",
                 body="Uống thuốc đúng giờ và hạn chế muối.",
-                scheduled_at=datetime.now(timezone.utc),
+                scheduled_at=datetime.now(UTC),
                 status="sent",
                 related_ids={},
                 payload={"tags": ["Hạn chế muối"]},

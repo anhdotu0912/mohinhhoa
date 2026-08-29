@@ -10,7 +10,6 @@ Verifies that:
 from __future__ import annotations
 
 import pytest
-
 from app.agents.nodes.rag_tool import _build_rag_context, _build_rag_prompt
 from app.agents.skills import (
     get_bound_tool_schema_for_intent,

@@ -13,28 +13,20 @@ from typing import Literal
 
 from langgraph.graph import END, StateGraph
 
-from app.agents.interaction_checker_agent import (
-    extract_foods_from_message,
-    get_medication_known_interactions,
-    interaction_checker_agent,
-    load_interaction_kb,
-)
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import rag_qa_node
 from app.agents.state import AgentState
-from app.guardrails.rules import enforce_output_safety, get_refuse_message
+from app.guardrails.rules import enforce_output_safety
 from app.guardrails.source_check import enforce_citation_guardrail
 from app.schemas.meal_plan import (
     AgentRunInput,
     AgentRunOutput,
     DoctorNoteOut,
-    InteractionCheckInput,
     MealPreviewOut,
     MetricsDeltaAdviceOut,
     WeeklyComplianceOut,
 )
-from app.schemas.profile import PatientProfile
 
 logger = logging.getLogger(__name__)
 

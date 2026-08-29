@@ -619,9 +619,9 @@ def test_chat_thin_wrapper(client):
     assert gen.status_code == 200, gen.text
     existing_plan_id = gen.json()["id"]
 
-    from app.models.meal_plan import MealPlan
     from app.db.session import get_db
     from app.main import app
+    from app.models.meal_plan import MealPlan
 
     def _count_plans():
         override = app.dependency_overrides.get(get_db)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
     response = client.post(

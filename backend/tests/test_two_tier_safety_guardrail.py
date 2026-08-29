@@ -10,8 +10,6 @@ Tests:
 
 from __future__ import annotations
 
-import pytest
-
 from app.agents.graph import apply_guardrails
 from app.agents.nodes.rag_tool import _build_rag_prompt
 from app.guardrails.food_safety import enforce_food_safety_guardrail

@@ -10,8 +10,6 @@ import sys
 import time
 from pathlib import Path
 
-import pytest
-
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -20,8 +18,7 @@ from app.agents.meal_planner_agent import generate_meal_plan, meal_planner_agent
 from app.agents.nodes.profile_loader import _DEMO_PROFILES
 from app.schemas.meal_plan import AgentRunInput, MealPlanOutput
 from app.schemas.profile import PatientProfile
-from app.services.nutrition_calculator import calculate_day_totals, validate_nutrition
-
+from app.services.nutrition_calculator import calculate_day_totals
 
 # ============================================================
 # Test: 7-Day Meal Plan Schema & Structure
@@ -232,10 +229,9 @@ class TestFacadeIntegration:
     def test_run_agent_meal_plan(self, db_session):
         """run_agent meal_plan intent is read-only and returns preview from DB."""
         from app.agents.graph import reset_compiled_graph
-        from app.db.init_db import seed_demo_accounts
-        from app.services.meal_plan_service import persist_generated_plan
         from app.agents.meal_planner_agent import generate_meal_plan as build_plan
-        from app.services.meal_plan_service import get_profile
+        from app.db.init_db import seed_demo_accounts
+        from app.services.meal_plan_service import get_profile, persist_generated_plan
 
         reset_compiled_graph()
         seed_demo_accounts(db_session)

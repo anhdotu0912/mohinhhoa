@@ -176,7 +176,6 @@ def check_drug_food_interaction(
         interactions = result.interactions
 
     meds_str = ", ".join(m.capitalize() for m in medications)
-    food_names_str = ", ".join(foods)
 
     if allergy_warnings:
         from app.agents.graph import _generate_allergy_blocked_answer
