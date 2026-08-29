@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
 from app.models.catalog import Allergy, Diagnosis, Medicine
@@ -174,7 +176,16 @@ DEMO_ACCOUNTS = [
     },
 ]
 
-DEMO_PASSWORD = "demo1234"
+# Demo patients 1–4 are pre-assigned to demo_doctor; patient_5 stays unassigned for claim-queue demos.
+DEMO_PATIENT_ASSIGNMENTS: dict[str, str] = {
+    "demo_patient_1": "demo_doctor",
+    "demo_patient_2": "demo_doctor",
+    "demo_patient_3": "demo_doctor",
+    "demo_patient_4": "demo_doctor",
+}
+
+DEMO_ACCOUNT_EMAILS = {account["email"] for account in DEMO_ACCOUNTS}
+DEMO_ACCOUNT_IDS = {account["user_id"] for account in DEMO_ACCOUNTS}
 
 CATALOG_MEDICINES = [
     "Metformin 500mg",
@@ -245,8 +256,48 @@ def _migrate_legacy_dietitian(db: Session) -> None:
     db.commit()
 
 
-def seed_demo_accounts(db: Session) -> None:
+def _resolve_demo_password(explicit: str | None = None) -> str:
+    """Return password to use for demo accounts."""
+    if explicit and explicit.strip():
+        return explicit.strip()
+    configured = get_settings().DEMO_PASSWORD.strip()
+    if configured:
+        return configured
+    return secrets.token_urlsafe(12)
+
+
+def _apply_demo_patient_assignment(user: User, user_id: str) -> None:
+    assigned_doctor = DEMO_PATIENT_ASSIGNMENTS.get(user_id)
+    if assigned_doctor is not None:
+        user.assigned_doctor_id = assigned_doctor
+        user.signup_channel = "legacy"
+
+
+def lock_known_demo_accounts(db: Session) -> None:
+    """Invalidate credentials for known demo accounts on non-development environments."""
+    locked = 0
+    for account in DEMO_ACCOUNTS:
+        user = db.get(User, account["user_id"])
+        if user is None:
+            user = db.query(User).filter(User.email == account["email"]).first()
+        if user is None:
+            continue
+        user.hashed_password = hash_password(secrets.token_urlsafe(32))
+        locked += 1
+    if locked:
+        db.commit()
+        logger.warning("Locked %s known demo account(s) — demo login disabled outside development", locked)
+
+
+def seed_demo_accounts(
+    db: Session,
+    *,
+    password: str | None = None,
+    reset_passwords: bool = False,
+) -> str:
+    """Create or update demo users. Returns the password applied to new/reset accounts."""
     _migrate_legacy_dietitian(db)
+    demo_password = _resolve_demo_password(password)
     for account in DEMO_ACCOUNTS:
         user = db.get(User, account["user_id"])
         full_name = account.get("full_name")
@@ -255,24 +306,34 @@ def seed_demo_accounts(db: Session) -> None:
             user.email = account["email"]
             if full_name:
                 user.full_name = full_name
+            if reset_passwords:
+                user.hashed_password = hash_password(demo_password)
             if account["role"] == "patient" and not getattr(user, "signup_channel", None):
                 user.signup_channel = "legacy"
+            if account["role"] == "patient":
+                _apply_demo_patient_assignment(user, account["user_id"])
         else:
             by_email = db.query(User).filter(User.email == account["email"]).first()
             if by_email is not None:
                 by_email.role = account["role"]
                 if full_name:
                     by_email.full_name = full_name
+                if reset_passwords:
+                    by_email.hashed_password = hash_password(demo_password)
                 user = by_email
+                if account["role"] == "patient":
+                    _apply_demo_patient_assignment(user, account["user_id"])
             else:
                 user = User(
                     id=account["user_id"],
                     email=account["email"],
-                    hashed_password=hash_password(DEMO_PASSWORD),
+                    hashed_password=hash_password(demo_password),
                     role=account["role"],
                     full_name=full_name,
                     signup_channel="legacy" if account["role"] == "patient" else None,
                 )
+                if account["role"] == "patient":
+                    _apply_demo_patient_assignment(user, account["user_id"])
                 db.add(user)
                 db.flush()
         profile_data = account["profile"]
@@ -283,12 +344,12 @@ def seed_demo_accounts(db: Session) -> None:
             if profile is None:
                 profile = Profile(user_id=user.id)
                 db.add(profile)
-            # Upsert deterministic demo profile fields (idempotent)
             for key, value in profile_data.items():
                 setattr(profile, key, value)
             db.flush()
         logger.info("Seeded demo account %s", account["email"])
     db.commit()
+    return demo_password
 
 
 def _migrate_add_full_name(db: Session) -> None:
@@ -633,7 +694,6 @@ def init_db() -> None:
         _migrate_add_meal_plan_adjustment_note(db)
         _migrate_add_meal_plan_dates(db)
         _migrate_add_assignment_fields(db)
-        seed_demo_accounts(db)
         seed_catalog(db)
         if engine.dialect.name == "postgresql" and default_data_dir().exists():
             seed_nutrition_catalog(db, default_data_dir())

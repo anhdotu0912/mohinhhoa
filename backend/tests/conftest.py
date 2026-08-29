@@ -23,6 +23,7 @@ os.environ["EMBEDDING_PROVIDER"] = "local"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["SMTP_USERNAME"] = ""
 os.environ["SMTP_PASSWORD"] = ""
+os.environ["DEMO_PASSWORD"] = "demo1234"
 
 import app.models  # noqa: E402,F401 — register nutrition catalog tables
 import pytest  # noqa: E402
@@ -67,6 +68,8 @@ def db_session():
 
 
 DEMO_PATIENT_IDS = tuple(f"demo_patient_{i}" for i in range(1, 6))
+# Patients 1–4 are pre-assigned in seed; auto-claim is idempotent. Patient 5 stays unassigned for claim-queue tests.
+DEMO_PATIENT_IDS_AUTO_CLAIM = tuple(f"demo_patient_{i}" for i in range(1, 5))
 DEMO_DOCTOR_EMAIL = "demo_doctor@example.com"
 DEMO_PASSWORD = "demo1234"
 
@@ -97,7 +100,7 @@ def client(request):
         )
         assert login.status_code == 200, login.text
         headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-        for pid in DEMO_PATIENT_IDS:
+        for pid in DEMO_PATIENT_IDS_AUTO_CLAIM:
             claimed = test_client.post(
                 f"/api/v1/doctor/patients/{pid}/claim",
                 headers=headers,

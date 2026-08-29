@@ -9,6 +9,8 @@ pytestmark = pytest.mark.no_auto_claim
 DOCTOR = "demo_doctor@example.com"
 DOCTOR_2 = "demo_doctor_2@example.com"
 PATIENT = "demo_patient_1@example.com"
+UNASSIGNED_PATIENT_ID = "demo_patient_5"
+UNASSIGNED_PATIENT = "demo_patient_5@example.com"
 
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
@@ -20,18 +22,24 @@ def _login(client, email: str, password: str = "demo1234") -> dict:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def test_unassigned_patients_are_in_claim_queue_not_roster(client):
+def test_assigned_demo_patients_on_roster_unassigned_in_claim_queue(client):
     headers = _login(client, DOCTOR)
     roster = client.get("/api/v1/doctor/patients", headers=headers)
     assert roster.status_code == 200
-    assert roster.json() == []
+    roster_ids = {p["id"] for p in roster.json()}
+    assert "demo_patient_1" in roster_ids
+    assert "demo_patient_2" in roster_ids
+    assert "demo_patient_3" in roster_ids
+    assert "demo_patient_4" in roster_ids
+    assert UNASSIGNED_PATIENT_ID not in roster_ids
 
     queue = client.get("/api/v1/doctor/claim-queue", headers=headers)
     assert queue.status_code == 200, queue.text
     ids = {item["patient_id"] for item in queue.json()}
-    assert "demo_patient_1" in ids
+    assert UNASSIGNED_PATIENT_ID in ids
+    assert "demo_patient_1" not in ids
     sources = {item["patient_id"]: item["source"] for item in queue.json()}
-    assert sources["demo_patient_1"] == "unassigned_pool"
+    assert sources[UNASSIGNED_PATIENT_ID] == "unassigned_pool"
 
 
 def test_self_register_goes_to_claim_queue(client):
@@ -99,16 +107,25 @@ def test_claim_is_exclusive_and_idempotent(client):
     a = _login(client, DOCTOR)
     b = _login(client, DOCTOR_2)
 
-    first = client.post("/api/v1/doctor/patients/demo_patient_1/claim", headers=a)
+    first = client.post(
+        f"/api/v1/doctor/patients/{UNASSIGNED_PATIENT_ID}/claim",
+        headers=a,
+    )
     assert first.status_code == 200, first.text
-    again = client.post("/api/v1/doctor/patients/demo_patient_1/claim", headers=a)
+    again = client.post(
+        f"/api/v1/doctor/patients/{UNASSIGNED_PATIENT_ID}/claim",
+        headers=a,
+    )
     assert again.status_code == 200
 
-    conflict = client.post("/api/v1/doctor/patients/demo_patient_1/claim", headers=b)
+    conflict = client.post(
+        f"/api/v1/doctor/patients/{UNASSIGNED_PATIENT_ID}/claim",
+        headers=b,
+    )
     assert conflict.status_code == 409
     assert conflict.json()["code"] == "ALREADY_ASSIGNED"
 
-    me = client.get("/api/v1/auth/me", headers=_login(client, PATIENT))
+    me = client.get("/api/v1/auth/me", headers=_login(client, UNASSIGNED_PATIENT))
     assert me.json()["assigned_doctor"]["id"] == "demo_doctor"
     assert me.json()["assigned_doctor"]["full_name"] == "BS. Minh"
 
@@ -116,7 +133,7 @@ def test_claim_is_exclusive_and_idempotent(client):
 def test_transfer_requires_accept_before_ownership_moves(client):
     a = _login(client, DOCTOR)
     b = _login(client, DOCTOR_2)
-    assert client.post("/api/v1/doctor/patients/demo_patient_1/claim", headers=a).status_code == 200
+    # demo_patient_1 is pre-assigned to demo_doctor via seed
 
     colleagues = client.get("/api/v1/doctor/colleagues", headers=a)
     assert colleagues.status_code == 200
@@ -163,7 +180,7 @@ def test_transfer_requires_accept_before_ownership_moves(client):
 
 def test_cannot_transfer_to_self(client):
     a = _login(client, DOCTOR)
-    assert client.post("/api/v1/doctor/patients/demo_patient_1/claim", headers=a).status_code == 200
+    # demo_patient_1 is pre-assigned to demo_doctor via seed
     response = client.post(
         "/api/v1/doctor/patients/demo_patient_1/transfer",
         headers=a,
@@ -171,3 +188,35 @@ def test_cannot_transfer_to_self(client):
     )
     assert response.status_code == 400
     assert response.json()["code"] == "INVALID_TRANSFER"
+
+
+def test_doctor_cannot_access_other_doctors_assigned_patient(client):
+    other = _login(client, DOCTOR_2)
+
+    hidden = client.get("/api/v1/doctor/patients/demo_patient_1", headers=other)
+    assert hidden.status_code == 404
+    assert hidden.json()["code"] == "PATIENT_NOT_FOUND"
+
+    metrics = client.put(
+        "/api/v1/doctor/patients/demo_patient_1/metrics",
+        headers=other,
+        json={"weight": 70, "height": 170},
+    )
+    assert metrics.status_code == 404
+    assert metrics.json()["code"] == "PATIENT_NOT_FOUND"
+
+    goals = client.put(
+        "/api/v1/doctor/patients/demo_patient_1/goals",
+        headers=other,
+        json={"goals": ["Mục tiêu test"]},
+    )
+    assert goals.status_code == 404
+    assert goals.json()["code"] == "PATIENT_NOT_FOUND"
+
+    profile = client.put(
+        "/api/v1/doctor/patients/demo_patient_1/profile",
+        headers=other,
+        json={"full_name": "Không được sửa"},
+    )
+    assert profile.status_code == 404
+    assert profile.json()["code"] == "PATIENT_NOT_FOUND"

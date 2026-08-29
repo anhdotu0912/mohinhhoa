@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { ApiError } from "@/lib/types";
+import { BackToHomeLink } from "../BackToHomeLink";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -61,7 +62,9 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-md py-xl font-body">
-      <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg md:p-xl shadow-md max-w-md w-full">
+      <div className="max-w-md w-full">
+        <BackToHomeLink />
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg md:p-xl shadow-md w-full">
         <div className="text-center mb-lg">
           <Link href="/" className="inline-block mb-xs">
             <h1 className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
@@ -161,6 +164,7 @@ export default function RegisterPage() {
               Đăng nhập ngay
             </Link>
           </p>
+        </div>
         </div>
       </div>
     </div>
