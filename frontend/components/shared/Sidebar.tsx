@@ -81,6 +81,7 @@ function SidebarFooter({
   role: AppRole;
   onNavigate?: () => void;
 }) {
+  const pathname = usePathname();
   const router = useRouter();
   const meta = ROLE_META[role];
   const token = useAuthStore((s) => s.token);
@@ -148,11 +149,22 @@ function SidebarFooter({
     </>
   );
 
+  const profileHref = role === "doctor" ? "/doctor/profile" : "/patient/profile";
+  const profileActive = pathname === profileHref;
+
   return (
     <div className="mt-auto px-sm pt-md border-t border-outline-variant">
-      <div className="flex items-center gap-sm p-sm rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors mb-sm">
+      <Link
+        href={profileHref}
+        onClick={onNavigate}
+        className={`flex items-center gap-sm p-sm rounded-lg transition-colors mb-sm ${
+          profileActive
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-surface-container-low cursor-pointer"
+        }`}
+      >
         {profileBlock}
-      </div>
+      </Link>
 
       <button
         type="button"

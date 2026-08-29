@@ -13,7 +13,9 @@ from app.agents.graph import (
     weekly_compliance_node,
 )
 from app.agents.nodes.intent_classifier import _classify_by_keywords
+from app.core.security import hash_password
 from app.models.notification import Notification
+from app.models.user import User
 from app.schemas.meal_plan import AgentRunInput
 from app.services.compliance import ComplianceService
 
@@ -104,8 +106,36 @@ def test_weekly_compliance_node_matches_compliance_service(db_session):
         assert node_point["adherence_pct"] == service_point.adherence_pct
 
 
+def _add_assigned_pair(db_session, *, patient_id: str, doctor_name: str = "BS. Lan", avatar: str | None = None):
+    doctor_id = f"doc_for_{patient_id}"
+    db_session.add(
+        User(
+            id=doctor_id,
+            email=f"{doctor_id}@example.com",
+            hashed_password=hash_password("demo1234"),
+            role="doctor",
+            full_name=doctor_name,
+            avatar=avatar,
+        )
+    )
+    db_session.add(
+        User(
+            id=patient_id,
+            email=f"{patient_id}@example.com",
+            hashed_password=hash_password("demo1234"),
+            role="patient",
+            assigned_doctor_id=doctor_id,
+        )
+    )
+    db_session.commit()
+    return doctor_id
+
+
 def test_doctor_note_node_manual_reminder(db_session):
     user_id = "demo_patient_doctor_note_manual"
+    _add_assigned_pair(
+        db_session, patient_id=user_id, doctor_name="BS. Lan", avatar="/static/avatars/lan.jpg"
+    )
     db_session.add(
         Notification(
             user_id=user_id,
@@ -122,16 +152,69 @@ def test_doctor_note_node_manual_reminder(db_session):
 
     result = doctor_note_node({"user_id": user_id, "db": db_session})
     assert result["doctor_note"] is not None
-    assert result["doctor_note"]["doctor_name"] == "Bác sĩ điều trị"
+    assert result["doctor_note"]["doctor_name"] == "BS. Lan"
+    assert result["doctor_note"]["doctor_avatar"] == "/static/avatars/lan.jpg"
     assert "Hạn chế muối" in result["doctor_note"]["note"]
     assert result["doctor_note"]["tags"] == ["Hạn chế muối"]
+    assert len(result["doctor_note"]["notes"]) == 1
+    assert result["doctor_note"]["notes"][0]["title"] == "Nhắc nhở tuân thủ từ bác sĩ"
+
+
+def test_doctor_note_node_lists_reminders_newest_first(db_session):
+    user_id = "demo_patient_doctor_note_list"
+    _add_assigned_pair(db_session, patient_id=user_id, doctor_name="BS. Minh")
+    db_session.add_all(
+        [
+            Notification(
+                user_id=user_id,
+                type="manual_reminder",
+                title="Cũ",
+                body="Uống thuốc đúng giờ.",
+                scheduled_at=datetime(2026, 8, 20, 7, 0),
+                status="sent",
+            ),
+            Notification(
+                user_id=user_id,
+                type="manual_reminder",
+                title="Mới",
+                body="Hạn chế muối tuần này.",
+                scheduled_at=datetime(2026, 8, 23, 8, 0),
+                status="sent",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    result = doctor_note_node({"user_id": user_id, "db": db_session})
+    notes = result["doctor_note"]["notes"]
+    assert [item["note"] for item in notes] == ["Hạn chế muối tuần này.", "Uống thuốc đúng giờ."]
+    assert result["doctor_note"]["note"] == "Hạn chế muối tuần này."
+    assert "2 lời dặn" in result["answer"]
 
 
 def test_doctor_note_node_empty(db_session):
-    user_id = "demo_patient_2"
+    user_id = "demo_patient_doctor_note_empty_assigned"
+    _add_assigned_pair(db_session, patient_id=user_id)
     result = doctor_note_node({"user_id": user_id, "db": db_session})
     assert result["doctor_note"] is None
-    assert "chưa có ghi chú" in result["answer"].lower()
+    assert "chưa có lời dặn" in result["answer"].lower()
+
+
+def test_doctor_note_node_awaiting_assignment(db_session):
+    user_id = "demo_patient_doctor_note_unassigned"
+    db_session.add(
+        User(
+            id=user_id,
+            email=f"{user_id}@example.com",
+            hashed_password=hash_password("demo1234"),
+            role="patient",
+            assigned_doctor_id=None,
+        )
+    )
+    db_session.commit()
+    result = doctor_note_node({"user_id": user_id, "db": db_session})
+    assert result["doctor_note"] is None
+    assert "chờ bác sĩ nhận" in result["answer"].lower()
 
 
 def test_run_agent_weekly_compliance_force_intent(db_session):
@@ -152,6 +235,7 @@ def test_run_agent_weekly_compliance_force_intent(db_session):
 def test_run_agent_doctor_note_force_intent(db_session):
     reset_compiled_graph()
     user_id = "demo_patient_doctor_note_run"
+    _add_assigned_pair(db_session, patient_id=user_id, doctor_name="BS. Minh")
     db_session.add(
         Notification(
             user_id=user_id,

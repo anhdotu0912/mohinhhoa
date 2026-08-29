@@ -135,6 +135,37 @@ def test_change_password_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_patch_me_full_name_doctor(client):
+    headers = _login(client, DOCTOR)
+    response = client.patch(
+        "/api/v1/auth/me",
+        headers=headers,
+        json={"full_name": "  BS. Minh Khoa  "},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["full_name"] == "BS. Minh Khoa"
+    assert body["role"] == "doctor"
+
+    me = client.get("/api/v1/auth/me", headers=headers)
+    assert me.json()["full_name"] == "BS. Minh Khoa"
+
+    patient_headers = _login(client, PATIENT)
+    assigned = client.get("/api/v1/auth/me", headers=patient_headers).json()["assigned_doctor"]
+    assert assigned["full_name"] == "BS. Minh Khoa"
+
+
+def test_patch_me_full_name_blank_clears(client):
+    headers = _login(client, DOCTOR)
+    response = client.patch(
+        "/api/v1/auth/me",
+        headers=headers,
+        json={"full_name": "   "},
+    )
+    assert response.status_code == 200
+    assert response.json()["full_name"] is None
+
+
 def test_metrics_incomplete(client):
     doctor_headers = _login(client, DOCTOR)
     patient_id = client.get("/api/v1/auth/me", headers=_login(client, PATIENT)).json()["id"]

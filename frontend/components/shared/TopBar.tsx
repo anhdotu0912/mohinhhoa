@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { DOCTOR_AVATAR_SRC } from "@/lib/nav-config";
 import { useMobileMenu } from "@/components/shared/MobileMenuContext";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { useQueueStore } from "@/lib/queue-store";
@@ -28,11 +27,9 @@ export function TopBar({
   const displayName = useAuthStore((s) => s.displayName);
   const email = useAuthStore((s) => s.email);
 
-  const notificationsHref =
-    role === "patient" ? "/patient/notifications" : "/doctor";
-  const avatarSrc =
-    role === "doctor" ? DOCTOR_AVATAR_SRC : resolveUserAvatar(authAvatar);
-  const avatarInitials = userInitials(displayName || email || "BN");
+  const avatarSrc = resolveUserAvatar(authAvatar);
+  const avatarInitials = userInitials(displayName || email || (role === "doctor" ? "BS" : "BN"));
+  const profileHref = role === "doctor" ? "/doctor/profile" : "/patient/profile";
 
   const activeJobsCount = jobs.filter(
     (j) => j.status === "queued" || j.status === "processing"
@@ -92,7 +89,11 @@ export function TopBar({
                 )}
               </button>
             )}
-            <div className="relative w-[32px] h-[32px] rounded-full md:hidden border border-outline-variant overflow-hidden bg-primary/15 shrink-0">
+            <Link
+              href={profileHref}
+              title="Hồ sơ"
+              className="relative w-[32px] h-[32px] rounded-full border border-outline-variant overflow-hidden bg-primary/15 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            >
               <div
                 translate="no"
                 className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary"
@@ -109,7 +110,7 @@ export function TopBar({
                   }}
                 />
               ) : null}
-            </div>
+            </Link>
           </div>
         ) : null}
       </div>

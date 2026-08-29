@@ -264,7 +264,7 @@ Một user / một ngày VN / một slot = một log (upsert). `logged_at` timez
 | Tra cứu thực phẩm / guideline | Intent `rag_qa` — dense retrieval (chưa `retrieve_hybrid`) + citation |
 | Tóm tắt nhật ký ăn | Intent `food_log` — đọc DB, không tạo log |
 | Tuân thủ tuần | Intent `weekly_compliance` — cùng `ComplianceService` với `GET /compliance/me` |
-| Ghi chú bác sĩ | Intent `doctor_note` — `manual_reminder` mới nhất hoặc `adjustment_note` của plan |
+| Ghi chú bác sĩ | Intent `doctor_note` — list `manual_reminder` (tên/ảnh bác sĩ được gán, không hallucinate) |
 | Từ chối phạm vi y khoa | Intent `refuse` — `get_refuse_message()` |
 | Greeting / unknown | Intent `greeting` / `unknown` |
 | Đi chợ / map bán | Ngoài MVP |

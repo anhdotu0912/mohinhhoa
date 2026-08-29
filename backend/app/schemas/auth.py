@@ -39,6 +39,10 @@ class UserMeResponse(BaseModel):
     assigned_doctor: AssignedDoctorOut | None = None
 
 
+class UpdateMeRequest(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+
+
 class AssignedDoctorOut(BaseModel):
     id: str
     full_name: str | None = None

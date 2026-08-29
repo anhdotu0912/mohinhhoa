@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VMEC-10
 
-**Version:** 1.9 (2026-08-27 — `FoodLogEntry.slot` thêm `snack` (4 slot). Xem changelog ở §7 Versioning.)
+**Version:** 1.10 (2026-08-28 — `DoctorNoteOut.notes[]` + danh tính bác sĩ được gán. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -284,7 +284,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 {
   "intent": "doctor_note",
   "secondary_intents": [],
-  "message": "Bác sĩ điều trị nhắc bạn hạn chế muối và tái khám sau 2 tuần.",
+  "message": "BS. Minh có 2 lời dặn gần đây.",
   "meal_plan_id": null,
   "meal_preview": null,
   "food_log_id": null,
@@ -293,10 +293,28 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
   "guardrail_triggered": false,
   "weekly_compliance": null,
   "doctor_note": {
-    "doctor_name": "Bác sĩ điều trị",
+    "doctor_name": "BS. Minh",
+    "doctor_avatar": "/static/avatars/demo_doctor.jpg",
     "note": "Hạn chế muối trong 2 tuần tới. Tái khám ngày 06/09/2026.",
     "created_at": "2026-08-23T08:15:00+07:00",
-    "tags": ["Hạn chế muối", "Tái khám 2 tuần"]
+    "tags": ["Hạn chế muối", "Tái khám 2 tuần"],
+    "has_more": false,
+    "notes": [
+      {
+        "id": "notif_uuid_1",
+        "title": "Nhắc nhở tuân thủ từ bác sĩ",
+        "note": "Hạn chế muối trong 2 tuần tới. Tái khám ngày 06/09/2026.",
+        "created_at": "2026-08-23T08:15:00+07:00",
+        "tags": ["Hạn chế muối", "Tái khám 2 tuần"]
+      },
+      {
+        "id": "notif_uuid_2",
+        "title": "Nhắc nhở",
+        "note": "Uống thuốc đúng giờ trước bữa sáng.",
+        "created_at": "2026-08-20T07:00:00+07:00",
+        "tags": []
+      }
+    ]
   }
 }
 ```
@@ -310,7 +328,7 @@ meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_co
 
 **`weekly_compliance` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi tuân thủ tuần của bệnh nhân. Node gọi `ComplianceService.get_patient_compliance(user_id, days=7)` và map sang `WeeklyComplianceOut` (subset của `PatientComplianceOut` §10 `contracts/api-v1.md`). Field `weekly_compliance` populated khi intent khớp; `null` khi intent khác. Không sinh dữ liệu giả — nếu chưa có check-in, `overall_adherence_pct` có thể `null`, `daily_series[].adherence_pct` có thể `null` theo ngày.
 
-**`doctor_note` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi "bác sĩ dặn gì / lời nhắc bác sĩ". Nguồn dữ liệu (theo thứ tự ưu tiên): (1) `Notification` mới nhất `type="manual_reminder"` của patient; (2) fallback `adjustment_note` trên meal plan active. `doctor_name` default `"Bác sĩ điều trị"` khi model chưa có field tên — **không hallucinate tên**. Nếu không có ghi chú: `doctor_note = null`, `message` fallback "Bạn chưa có ghi chú nào từ bác sĩ gần đây." `tags[]` optional — trích từ metadata notification/plan nếu có.
+**`doctor_note` — as-built (Phase 2; cập nhật 2026-08-28):** intent cho câu hỏi "bác sĩ dặn gì / lời nhắc bác sĩ". Nguồn: mọi `Notification` `type="manual_reminder"` của patient, **mới → cũ**, tối đa 10 (`has_more=true` nếu còn). **Không** fallback `adjustment_note`. Danh tính: `users.assigned_doctor_id` → `full_name` (trống thì `email`) + `avatar` — **không** default cứng `"Bác sĩ điều trị"` / `"BS. Minh"`. Chưa được gán bác sĩ và không có reminder: `doctor_note = null`, `message` = "Bạn đang chờ bác sĩ nhận hồ sơ. Khi có lời dặn, tôi sẽ hiện tại đây." Được gán nhưng chưa có reminder: `doctor_note = null`, `message` = "Bạn chưa có lời dặn nào từ bác sĩ gần đây." `note` / `created_at` / `tags` trên envelope = bản ghi mới nhất (tương thích client cũ).
 
 **`WeeklyMealPlanCard` (FE, không intent mới):** câu "thực đơn tuần / xem thực đơn / lịch ăn 7 ngày" vẫn classify về `meal_plan` (mở rộng pattern classifier hiện có). FE gọi `GET /meal-plans/me` khi render card — **không** thêm intent riêng.
 
@@ -337,7 +355,15 @@ meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_co
 { "overall_adherence_pct": 92, "daily_series": [{ "date": "2026-08-15", "adherence_pct": 80 }] }
 
 // DoctorNoteOut
-{ "doctor_name": "Bác sĩ điều trị", "note": "...", "created_at": "2026-08-23T08:15:00+07:00", "tags": ["Hạn chế muối"] }
+{
+  "doctor_name": "BS. Minh",
+  "doctor_avatar": "/static/avatars/demo_doctor.jpg",
+  "note": "...",
+  "created_at": "2026-08-23T08:15:00+07:00",
+  "tags": ["Hạn chế muối"],
+  "has_more": false,
+  "notes": [{ "id": "notif_uuid", "title": "Nhắc nhở", "note": "...", "created_at": "2026-08-23T08:15:00+07:00", "tags": ["Hạn chế muối"] }]
+}
 ```
 
 Nguồn Pydantic dự kiến: `backend/app/schemas/meal_plan.py` (`WeeklyComplianceOut`, `DoctorNoteOut`); `ComplianceDayPoint` tái dùng từ `backend/app/schemas/doctor.py`.
@@ -400,7 +426,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.9**.
+- Version hiện tại của contract này: **1.10**.
+- **Changelog 1.9 → 1.10 (2026-08-28):** `DoctorNoteOut` thêm `doctor_avatar`, `notes[]`, `has_more`; `note`/`created_at`/`tags` giữ là reminder mới nhất. Nguồn chỉ `manual_reminder` (bỏ fallback `adjustment_note`). Tên/ảnh từ bác sĩ được gán, không hallucinate. Đồng bộ `contracts/api-v1.md` v1.15. Không breaking — field mới optional/default.
 - **Changelog 1.8 → 1.9 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"` (4 slot food log khớp meal plan bữa phụ). Không breaking — giá trị mới optional cho client cũ. Đồng bộ `contracts/api-v1.md` v1.12, `adrs/009` supersede, `specs/09`.
 - **Changelog 1.7 → 1.8 (2026-08-26):** `BodyMetricsEntry` thêm field lâm sàng optional (`waist_cm`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`); `blood_pressure`/`blood_glucose` giữ derived. Intent `metrics_delta_advice` + `AgentRunOutput.metrics_delta_advice` (`MetricsDeltaAdviceOut`). Không breaking — field mới default `null`. Đồng bộ `contracts/api-v1.md` v1.11.
 - **Changelog 1.6 → 1.7 (2026-08-24):** `FoodLogEntry.logged_at` chốt timezone-aware; ngày tuân thủ / filter food-log theo Asia/Ho_Chi_Minh; upsert 1 log / user / ngày VN / slot. Đồng bộ `contracts/api-v1.md` v1.8. Không đổi enum `slot`.

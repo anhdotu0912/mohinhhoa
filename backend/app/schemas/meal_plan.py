@@ -215,12 +215,28 @@ class WeeklyComplianceOut(BaseModel):
     daily_series: list[WeeklyComplianceDayPoint] = Field(default_factory=list)
 
 
-class DoctorNoteOut(BaseModel):
-    """Doctor reminder/note surfaced in patient chat."""
-    doctor_name: str
+class DoctorNoteItem(BaseModel):
+    """One manual_reminder row in the doctor_note list."""
+    id: str
+    title: str = ""
     note: str
     created_at: datetime
     tags: list[str] = Field(default_factory=list)
+
+
+class DoctorNoteOut(BaseModel):
+    """Doctor reminders surfaced in patient chat.
+
+    ``note`` / ``created_at`` / ``tags`` mirror the latest item for older clients.
+    ``notes`` is the full list (newest first, cap 10).
+    """
+    doctor_name: str
+    doctor_avatar: str | None = None
+    note: str
+    created_at: datetime
+    tags: list[str] = Field(default_factory=list)
+    has_more: bool = False
+    notes: list[DoctorNoteItem] = Field(default_factory=list)
 
 
 class AgentRunOutput(BaseModel):

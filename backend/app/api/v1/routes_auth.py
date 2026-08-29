@@ -26,6 +26,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     ResetPasswordResponse,
     TokenResponse,
+    UpdateMeRequest,
     UserMeResponse,
 )
 from app.schemas.doctor import AvatarOut
@@ -221,11 +222,7 @@ def change_password(
     return ChangePasswordResponse(message="Đổi mật khẩu thành công.")
 
 
-@router.get("/me", response_model=UserMeResponse)
-def get_me(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> UserMeResponse:
+def _user_me_response(user: User, db: Session) -> UserMeResponse:
     assigned = None
     if user.role == "patient" and user.assigned_doctor_id:
         doctor = db.get(User, user.assigned_doctor_id)
@@ -243,6 +240,29 @@ def get_me(
         avatar=user.avatar,
         assigned_doctor=assigned,
     )
+
+
+@router.get("/me", response_model=UserMeResponse)
+def get_me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserMeResponse:
+    return _user_me_response(user, db)
+
+
+@router.patch("/me", response_model=UserMeResponse)
+def update_me(
+    payload: UpdateMeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> UserMeResponse:
+    row = db.get(User, user.id)
+    if row is None:
+        raise APIError(401, "USER_NOT_FOUND", "Người dùng không tồn tại.")
+    row.full_name = (payload.full_name or "").strip() or None
+    db.commit()
+    db.refresh(row)
+    return _user_me_response(row, db)
 
 
 @router.post("/me/avatar", response_model=AvatarOut)

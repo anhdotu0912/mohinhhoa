@@ -27,6 +27,7 @@ from app.guardrails.source_check import enforce_citation_guardrail
 from app.schemas.meal_plan import (
     AgentRunInput,
     AgentRunOutput,
+    DoctorNoteItem,
     DoctorNoteOut,
     InteractionCheckInput,
     MealPreviewOut,
@@ -411,64 +412,115 @@ def greeting_node(state: AgentState) -> AgentState:
     }
 
 
+_DOCTOR_NOTE_LIMIT = 10
+
+
+def _assigned_doctor_for_patient(db, user_id: str):
+    from app.models.user import User
+
+    patient = db.get(User, user_id)
+    if patient is None or not patient.assigned_doctor_id:
+        return None
+    return db.get(User, patient.assigned_doctor_id)
+
+
+def _doctor_display_name(doctor) -> str:
+    if doctor is None:
+        return ""
+    name = (doctor.full_name or "").strip()
+    if name:
+        return name
+    return (doctor.email or "").strip()
+
+
+def _reminder_tags(payload: dict | None) -> list[str]:
+    tags_raw = (payload or {}).get("tags", [])
+    if not isinstance(tags_raw, list):
+        return []
+    return [str(tag) for tag in tags_raw if isinstance(tag, str) and tag.strip()]
+
+
 def doctor_note_node(state: AgentState) -> AgentState:
-    """Load latest doctor reminder or meal-plan adjustment note for the patient."""
+    """Load assigned doctor's manual_reminder list for the patient — no invented name."""
     db = state.get("db")
     user_id = state.get("user_id", "")
 
     if db is None or not user_id:
         return {
             **state,
-            "answer": "Không thể tải ghi chú bác sĩ lúc này. Vui lòng thử lại sau.",
+            "answer": "Không thể tải lời dặn bác sĩ lúc này. Vui lòng thử lại sau.",
             "doctor_note": None,
         }
 
     from app.models.notification import Notification
-    from app.services.meal_plan_service import resolve_patient_plan_row
 
-    reminder = (
+    doctor = _assigned_doctor_for_patient(db, user_id)
+    awaiting_assignment = doctor is None
+
+    from sqlalchemy import func as sa_func
+
+    reminders = (
         db.query(Notification)
         .filter(
             Notification.user_id == user_id,
             Notification.type == "manual_reminder",
         )
-        .order_by(Notification.created_at.desc())
-        .first()
+        .order_by(sa_func.coalesce(Notification.scheduled_at, Notification.created_at).desc())
+        .limit(_DOCTOR_NOTE_LIMIT + 1)
+        .all()
     )
+    has_more = len(reminders) > _DOCTOR_NOTE_LIMIT
+    reminders = reminders[:_DOCTOR_NOTE_LIMIT]
 
-    doctor_note: DoctorNoteOut | None = None
-    if reminder is not None:
+    notes: list[DoctorNoteItem] = []
+    for reminder in reminders:
         note_text = (reminder.body or reminder.title or "").strip()
-        if note_text:
-            tags_raw = (reminder.payload or {}).get("tags", [])
-            tags = tags_raw if isinstance(tags_raw, list) else []
-            created_at = reminder.scheduled_at or reminder.created_at
-            doctor_note = DoctorNoteOut(
-                doctor_name="Bác sĩ điều trị",
+        if not note_text:
+            continue
+        created_at = reminder.scheduled_at or reminder.created_at
+        notes.append(
+            DoctorNoteItem(
+                id=reminder.id,
+                title=(reminder.title or "").strip(),
                 note=note_text,
                 created_at=created_at,
-                tags=tags,
+                tags=_reminder_tags(reminder.payload if isinstance(reminder.payload, dict) else None),
             )
+        )
 
-    if doctor_note is None:
-        plan_row = resolve_patient_plan_row(db, user_id)
-        if plan_row is not None and plan_row.adjustment_note and plan_row.adjustment_note.strip():
-            created_at = plan_row.updated_at or plan_row.created_at
-            doctor_note = DoctorNoteOut(
-                doctor_name="Bác sĩ điều trị",
-                note=plan_row.adjustment_note.strip(),
-                created_at=created_at,
-                tags=[],
+    if not notes:
+        if awaiting_assignment:
+            answer = (
+                "Bạn đang chờ bác sĩ nhận hồ sơ. Khi có lời dặn, tôi sẽ hiện tại đây."
             )
-
-    if doctor_note is None:
+        else:
+            answer = "Bạn chưa có lời dặn nào từ bác sĩ gần đây."
         return {
             **state,
-            "answer": "Bạn chưa có ghi chú nào từ bác sĩ gần đây.",
+            "answer": answer,
             "doctor_note": None,
         }
 
-    answer = f"{doctor_note.doctor_name} nhắc: {doctor_note.note}"
+    latest = notes[0]
+    doctor_name = _doctor_display_name(doctor)
+    doctor_note = DoctorNoteOut(
+        doctor_name=doctor_name,
+        doctor_avatar=doctor.avatar if doctor is not None else None,
+        note=latest.note,
+        created_at=latest.created_at,
+        tags=latest.tags,
+        has_more=has_more,
+        notes=notes,
+    )
+
+    who = doctor_name or "Bác sĩ phụ trách"
+    if len(notes) == 1:
+        answer = f"{who} dặn: {latest.note}"
+    else:
+        answer = f"{who} có {len(notes)} lời dặn gần đây."
+        if has_more:
+            answer += " Xem thêm trong thông báo."
+
     return {
         **state,
         "answer": answer,

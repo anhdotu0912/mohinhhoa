@@ -235,3 +235,5 @@ class TestChatStreamHTTP:
         assert done["data"]["intent"] == "doctor_note"
         assert done["data"]["doctor_note"] is not None
         assert "Uống thuốc" in done["data"]["doctor_note"]["note"]
+        assert done["data"]["doctor_note"]["doctor_name"] == "BS. Minh"
+        assert len(done["data"]["doctor_note"]["notes"]) == 1

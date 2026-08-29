@@ -562,11 +562,22 @@ export interface WeeklyComplianceOut {
   daily_series?: { date: string; adherence_pct: number | null }[];
 }
 
-export interface DoctorNoteOut {
-  doctor_name: string;
+export interface DoctorNoteItem {
+  id: string;
+  title?: string;
   note: string;
   created_at: string;
   tags?: string[];
+}
+
+export interface DoctorNoteOut {
+  doctor_name: string;
+  doctor_avatar?: string | null;
+  note: string;
+  created_at: string;
+  tags?: string[];
+  has_more?: boolean;
+  notes?: DoctorNoteItem[];
 }
 
 export interface AgentRunOutput {

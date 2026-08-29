@@ -21,7 +21,7 @@ export function AssignedDoctorStatus({
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-semibold">
       <span className="material-symbols-outlined text-[15px]">stethoscope</span>
-      Bác sĩ phụ trách: {doctor.full_name?.trim() || "Bác sĩ điều trị"}
+      Bác sĩ phụ trách{doctor.full_name?.trim() ? `: ${doctor.full_name.trim()}` : ""}
     </span>
   );
 }

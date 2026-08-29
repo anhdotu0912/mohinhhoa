@@ -1,6 +1,6 @@
 # API v1 Contract — VMEC-10 (FE ↔ BE)
 
-**Version:** 1.14 (2026-08-28 — phân công bác sĩ ↔ bệnh nhân 1–1. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.15 (2026-08-28 — `PATCH /auth/me` + chat `doctor_note.notes[]`. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -49,6 +49,15 @@
 }
 ```
 `full_name` / `avatar` có thể `null`. `assigned_doctor` luôn `null` với role `doctor`; với patient chưa ai nhận cũng `null` (FE hiện “Đang chờ bác sĩ nhận”). Trong lúc chuyển bác sĩ chưa được nhận, `assigned_doctor` vẫn là bác sĩ cũ.
+
+### `PATCH /auth/me` (as-built 2026-08-28)
+**Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`). Cập nhật tên hiển thị. Bác sĩ dùng trên `/doctor/profile`; bệnh nhân có thể dùng sau — hiện FE bệnh nhân chưa nối field này.
+```json
+// Request
+{ "full_name": "BS. Minh" }
+// Response 200 → UserMeResponse (cùng shape `GET /auth/me`)
+```
+`full_name` gửi `""` hoặc chỉ khoảng trắng → lưu `null`. Email / role / avatar không đổi qua endpoint này (ảnh dùng `POST /auth/me/avatar`).
 
 ### `POST /auth/me/avatar`
 **Role:** Bất kỳ user đã đăng nhập (`patient` hoặc `doctor`). Multipart form upload (`file`), ảnh ≤ 2MB, mime `image/*` (png/jpg/webp/gif — kiểm tra magic bytes). Bệnh nhân tự tải ảnh đại diện trên `/patient/profile`; bác sĩ tải hộ bệnh nhân vẫn dùng `POST /doctor/patients/{id}/avatar`.
@@ -908,7 +917,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.14**.
+- Version hiện tại: **1.15**.
+- **Changelog 1.14 → 1.15 (2026-08-28):** `PATCH /auth/me` (`full_name`) cho user đã đăng nhập. Chat intent `doctor_note`: `DoctorNoteOut` thêm `doctor_avatar`, `notes[]` (list `manual_reminder`, mới → cũ, cap 10, `has_more`), tên/ảnh lấy từ bác sĩ được gán — không còn default cứng `"Bác sĩ điều trị"`. Không còn fallback `adjustment_note`. Field `note`/`created_at`/`tags` giữ là bản ghi mới nhất để tương thích. Đồng bộ `contracts/agent-io-schema.md` v1.10.
 - **Changelog 1.13 → 1.14 (2026-08-28):** phân công bác sĩ ↔ bệnh nhân 1–1. `GET /doctor/patients` (và mọi endpoint doctor theo `patient_id` / meal-plan) chỉ còn phạm vi bệnh nhân đã gắn. Thêm `POST /doctor/patients`, `GET /doctor/claim-queue`, `POST /doctor/patients/{id}/claim`, `GET /doctor/colleagues`, `POST /doctor/patients/{id}/transfer`, `POST /doctor/transfers/{id}/accept`. `GET /auth/me` thêm `assigned_doctor`. `DoctorPatientSummary` thêm `pending_transfer`. **Breaking** với client giả định 1 bác sĩ thấy mọi bệnh nhân.
 - **Changelog 1.12 → 1.13 (2026-08-27):** thêm `POST /auth/change-password` (user đã đăng nhập đổi mật khẩu bằng `current_password` + `new_password`). Không breaking — endpoint mới.
 - **Changelog 1.11 → 1.12 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"`. Không breaking — client cũ vẫn gửi 3 slot. Đồng bộ `contracts/agent-io-schema.md` v1.9.

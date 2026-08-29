@@ -215,6 +215,13 @@ export const api = {
     return request("/api/v1/auth/me", { token });
   },
 
+  updateCurrentUser(payload: { full_name?: string | null }): Promise<UserMeResponse> {
+    return request("/api/v1/auth/me", {
+      method: "PATCH",
+      body: { full_name: payload.full_name ?? null },
+    });
+  },
+
   getProfile(token?: string | null): Promise<PatientProfile> {
     return request("/api/v1/profile/me", { token });
   },
