@@ -128,3 +128,19 @@ SMTP_PASSWORD="xxxx xxxx xxxx xxxx"
 Nếu chưa cấu hình SMTP, API trả `503 EMAIL_NOT_CONFIGURED`. Kiểm tra cả hộp thư rác.
 
 Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`.
+
+---
+
+## 4. Dọn lịch sử git (tùy chọn, cần đồng ý cả nhóm)
+
+PR dọn repo đã xoá `data/seed/` và `users_profile.json` khỏi HEAD, nhưng blob cũ vẫn nằm trong `.git` — clone mới vẫn tải ~40 MB lịch sử cho đến khi rewrite.
+
+Khi team sẵn sàng làm repo nhẹ thật:
+
+1. Cài [`git-filter-repo`](https://github.com/newren/git-filter-repo).
+2. Xoá khỏi toàn bộ lịch sử:
+   - `data/seed/`
+   - `data/clean/users_profile.json`
+3. Force-push nhánh chính; mọi người **re-clone** hoặc rebase lại local branch.
+
+Không chạy bước này trong PR hygiene thường — chỉ sau khi cả nhóm thống nhất.

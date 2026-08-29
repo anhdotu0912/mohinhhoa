@@ -38,6 +38,10 @@ backend/app.db
 logs/
 *.log
 
+# Scratch / one-off debug artifacts
+_tmp*
+*_tmp*
+
 # Test coverage
 htmlcov/
 .coverage
