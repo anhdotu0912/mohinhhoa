@@ -1,4 +1,4 @@
-# CLAUDE.md — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
+# CLAUDE.md — VinNutri — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
 
 > File này là "nguồn sự thật" (single source of truth) cho AI coding agent khi làm việc trên repo này.
 > Đọc toàn bộ file này TRƯỚC khi code bất kỳ task nào. Pointer ngắn: [`AGENTS.md`](AGENTS.md).
@@ -7,7 +7,7 @@
 
 ## 1. Tổng quan dự án
 
-**Sản phẩm:** AI Agent giúp bệnh nhân đái tháo đường (tiểu đường Type 2) nhận thực đơn cá nhân hoá theo bệnh lý, nhận cảnh báo tương tác thuốc–thực phẩm, và nhận nhắc tuân thủ (compliance) theo thực đơn/thuốc. Có dashboard cho chuyên gia dinh dưỡng duyệt thực đơn.
+**Sản phẩm:** **VinNutri** — AI Agent giúp bệnh nhân đái tháo đường (tiểu đường Type 2) nhận thực đơn cá nhân hoá theo bệnh lý, nhận cảnh báo tương tác thuốc–thực phẩm, và nhận nhắc tuân thủ (compliance) theo thực đơn/thuốc. Có dashboard cho chuyên gia dinh dưỡng duyệt thực đơn.
 
 **Timeline:** Prototype 2 tuần (14 ngày), mục tiêu là demo, không phải sản phẩm hoàn chỉnh.
 

@@ -220,7 +220,7 @@ def _classify_by_llm(message: str) -> str:
         skill_descriptions_block = format_intent_classification_prompt_snippet()
         valid_intents_list = ", ".join(sorted(VALID_INTENTS))
 
-        prompt = f"""Bạn là bộ định tuyến ý định (Intent Classifier) chính xác cao cho Trợ lý Y tế & Dinh dưỡng Đái Tháo Đường P-014.
+        prompt = f"""Bạn là bộ định tuyến ý định (Intent Classifier) chính xác cao cho Trợ lý Y tế & Dinh dưỡng Đái Tháo Đường VinNutri.
 Nhiệm vụ của bạn là phân loại tin nhắn của bệnh nhân vào ĐÚNG MỘT intent phù hợp nhất dựa trên các quy chuẩn Kỹ năng (Skills) và Ràng buộc Phủ định (Negative Constraints) dưới đây:
 
 {skill_descriptions_block}

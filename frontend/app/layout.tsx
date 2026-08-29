@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
+import { APP_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
@@ -14,7 +15,7 @@ const materialSymbols = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "VMEC-10 - Dinh dưỡng AI chuẩn lâm sàng",
+  title: `${APP_NAME} - Dinh dưỡng AI chuẩn lâm sàng`,
   description: "Dinh dưỡng AI chuẩn lâm sàng cho bệnh nhân mãn tính. Cá nhân hóa thực đơn theo bệnh lý với sự phê duyệt của bác sĩ chuyên khoa.",
   icons: {
     icon: [

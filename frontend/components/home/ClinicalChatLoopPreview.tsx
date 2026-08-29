@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { APP_NAME } from "@/lib/brand";
 
 interface Scenario {
   id: "meal" | "drug" | "compliance" | "doctor";
@@ -19,7 +20,7 @@ const SCENARIOS: Scenario[] = [
     chipIcon: "restaurant",
     userPrompt: "Trưa nay tôi định ăn bún chả hoặc cơm tấm. Nhờ bác sĩ và AI tư vấn món an toàn cho đường huyết?",
     thinking: "Đối soát chỉ số GI/GL bún tươi vs cơm tấm sườn • Khẩu phần mục tiêu: 450-520 kcal",
-    aiMessage: "Chào bác A, bác nên **ưu tiên Bún chả nướng điều chỉnh** thay vì Cơm tấm sườn bì (do cơm tấm có GI cao ~80 dễ làm tăng vọt đường huyết). Bác nên giảm 1/2 lượng bún và ăn kèm nhiều rau sống trước.",
+    aiMessage: "Chào bác An, bác nên **ưu tiên Bún chả nướng điều chỉnh** thay vì Cơm tấm sườn bì (do cơm tấm có GI cao ~80 dễ làm tăng vọt đường huyết). Bác nên giảm 1/2 lượng bún và ăn kèm nhiều rau sống trước.",
     cardType: "meal",
   },
   {
@@ -46,7 +47,7 @@ const SCENARIOS: Scenario[] = [
     chipIcon: "clinical_notes",
     userPrompt: "Bác sĩ phụ trách có dặn dò gì mới cho chế độ ăn của tôi không?",
     thinking: "Truy xuất y lệnh mới nhất từ Hồ sơ bệnh án • Khoa Nội tiết - Dinh dưỡng",
-    aiMessage: "Bác sĩ phụ trách **BS.CKII Nguyễn Thu Trang** vừa gửi lời dặn dò chuyên môn mới vào sáng nay:",
+    aiMessage: "Bác sĩ phụ trách **BS.CKII Đỗ Tú Anh** vừa gửi lời dặn dò chuyên môn mới vào sáng nay:",
     cardType: "doctor",
   },
 ];
@@ -175,7 +176,7 @@ export function ClinicalChatLoopPreview() {
           </div>
           <div className="min-w-0">
             <div className="font-bold text-xs text-white leading-tight flex items-center gap-1.5 truncate">
-              <span>Trợ lý Dinh dưỡng VMEC-10</span>
+              <span>Trợ lý Dinh dưỡng {APP_NAME}</span>
             </div>
             <div className="text-[10px] text-teal-100/80 font-normal mt-0.5 truncate">
               Hỗ trợ cá nhân hóa 24/7
@@ -405,7 +406,7 @@ export function ClinicalChatLoopPreview() {
                         <span className="material-symbols-outlined text-[13px]">verified</span>
                         <span>Đã xác nhận y lệnh điều trị</span>
                       </span>
-                      <span className="text-slate-400">Hệ thống Y tế VMEC</span>
+                      <span className="text-slate-400">Hệ thống Y tế {APP_NAME}</span>
                     </div>
                   </div>
                 )}

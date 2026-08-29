@@ -4,7 +4,7 @@
 Accepted — **Update 2026-08-19: Qdrant là vector store DUY NHẤT.** ChromaDB fallback đã bị gỡ bỏ hoàn toàn khỏi codebase (không còn `VECTOR_DB_PROVIDER`, không còn `chromadb` trong `requirements.txt`) để đơn giản hoá stack theo yêu cầu "chỉ dùng 2 database: Qdrant + Postgres" (xem ADR-005 cho phần Postgres).
 
 ## Context
-VMEC-10 cần một vector store để RAG trên hai nguồn dữ liệu: `food_db_vn.json` (food items) và `data/guidelines/*.md` (hướng dẫn dinh dưỡng lâm sàng), phục vụ node `rag_qa` trong LangGraph (`backend/app/agents/nodes/rag_tool.py` → `app/rag/retriever.py`).
+VinNutri cần một vector store để RAG trên hai nguồn dữ liệu: `food_db_vn.json` (food items) và `data/guidelines/*.md` (hướng dẫn dinh dưỡng lâm sàng), phục vụ node `rag_qa` trong LangGraph (`backend/app/agents/nodes/rag_tool.py` → `app/rag/retriever.py`).
 
 ## Decision
 - **Vector store duy nhất: Qdrant.**

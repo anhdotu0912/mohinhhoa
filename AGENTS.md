@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Hướng dẫn ngắn cho AI coding agent trên repo **P-014**.
+Hướng dẫn ngắn cho AI coding agent trên repo **VinNutri (P-014)**.
 
 1. Đọc [`CLAUDE.md`](CLAUDE.md) trước (MoSCoW, stack **as-built**, luật cứng).
 2. Big picture: [`docs/MO_TA_HE_THONG.md`](docs/MO_TA_HE_THONG.md).

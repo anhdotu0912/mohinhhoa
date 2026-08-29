@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { MedicalAmbientBackground } from "@/components/home/MedicalAmbientBackground";
 import { ClinicalChatLoopPreview } from "@/components/home/ClinicalChatLoopPreview";
+import { APP_NAME } from "@/lib/brand";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,7 +26,7 @@ export default function HomePage() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm sm:text-base lg:text-lg tracking-tight text-[#0f766e] group-hover:text-[#115e59] transition-colors leading-none truncate">
-                  VMEC-10
+                  {APP_NAME}
                 </span>
                 <span className="text-[8.5px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5 truncate">
                   Dinh dưỡng Lâm sàng AI
@@ -525,13 +526,13 @@ export default function HomePage() {
                     health_and_safety
                   </span>
                 </div>
-                <span>VMEC-10 Clinical Nutrition</span>
+                <span>{APP_NAME} Clinical Nutrition</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
                 Trợ lý Dinh dưỡng Lâm sàng ứng dụng AI và RAG y văn, đồng hành cùng bệnh nhân mãn tính và chuyên gia y tế tại Việt Nam.
               </p>
               <div className="text-[10px] text-slate-500">
-                &copy; {new Date().getFullYear()} VMEC-10. All rights reserved.
+                &copy; {new Date().getFullYear()} {APP_NAME}. All rights reserved.
               </div>
             </div>
 
@@ -577,7 +578,7 @@ export default function HomePage() {
           {/* Medical Disclaimer Banner */}
           <div className="pt-4 flex flex-col md:flex-row justify-between items-center gap-2 text-[10.5px] text-slate-400">
             <p className="max-w-3xl leading-relaxed text-center md:text-left">
-              <strong>Tuyên bố miễn trừ trách nhiệm y khoa:</strong> VMEC-10 là hệ thống hỗ trợ ra quyết định dinh dưỡng dựa trên y văn và có sự đồng hành của bác sĩ điều trị. Các khuyến nghị không thay thế chẩn đoán y khoa trực tiếp hay phác đồ cấp cứu tại bệnh viện.
+              <strong>Tuyên bố miễn trừ trách nhiệm y khoa:</strong> {APP_NAME} là hệ thống hỗ trợ ra quyết định dinh dưỡng dựa trên y văn và có sự đồng hành của bác sĩ điều trị. Các khuyến nghị không thay thế chẩn đoán y khoa trực tiếp hay phác đồ cấp cứu tại bệnh viện.
             </p>
             <div className="flex gap-4 shrink-0">
               <a href="#" className="hover:text-white transition-colors">Điều khoản</a>

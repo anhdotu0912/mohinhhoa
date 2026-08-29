@@ -1,6 +1,6 @@
-# Hướng dẫn deploy P-014 lên VPS
+# Hướng dẫn deploy VinNutri (P-014) lên VPS
 
-Tài liệu này mô tả cách triển khai **VMEC-10 (P-014)** lên VPS Ubuntu bằng Docker Compose.
+Tài liệu này mô tả cách triển khai **VinNutri (P-014)** lên VPS Ubuntu bằng Docker Compose.
 
 Stack production gồm: **Postgres + Backend (FastAPI) + Frontend (Next.js) + Nginx + Certbot**. Postgres và vector store (Qdrant local) **được tạo tự động trong Docker** — bạn **không** cần cài Postgres/Qdrant riêng trên host.
 

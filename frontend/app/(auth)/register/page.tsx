@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { ApiError } from "@/lib/types";
 import { BackToHomeLink } from "../BackToHomeLink";
+import { APP_NAME } from "@/lib/brand";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function RegisterPage() {
         <div className="text-center mb-lg">
           <Link href="/" className="inline-block mb-xs">
             <h1 className="font-h1 text-h1 text-primary font-bold text-2xl tracking-tight">
-              VMEC-10
+              {APP_NAME}
             </h1>
           </Link>
           <p className="font-caption text-caption text-on-surface-variant text-xs">

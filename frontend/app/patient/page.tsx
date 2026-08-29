@@ -21,6 +21,7 @@ import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
 import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
 import { FormattedMessage } from "@/components/patient/FormattedMessage";
 import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
+import { APP_NAME } from "@/lib/brand";
 
 export type { Message };
 
@@ -683,7 +684,7 @@ export default function PatientChatHomePage() {
             type="text"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
-            placeholder="Hỏi trợ lý VMEC-10 về thực đơn, dinh dưỡng, tương tác thuốc..."
+            placeholder={`Hỏi trợ lý ${APP_NAME} về thực đơn, dinh dưỡng, tương tác thuốc...`}
             disabled={isSending}
             className="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-[15px] text-slate-900 placeholder:text-slate-400 py-2.5 px-4 outline-none disabled:opacity-50"
           />

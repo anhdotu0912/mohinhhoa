@@ -1,4 +1,4 @@
-# Mô tả chức năng — VMEC-10 (P-014)
+# Mô tả chức năng — VinNutri (P-014)
 
 > Tài liệu **as-built** (cập nhật 2026-08-25): chuyển hoá sơ đồ Use Case + bảng tác nhân trong `UML_VinMec_10.docx` thành đặc tả chức năng khớp **code đang chạy**, không còn là brief triển khai cho các mục đã Done.
 > Đối chiếu: `CLAUDE.md` (stack + MoSCoW), `specs/01-13` (Status từng spec), `contracts/api-v1.md` + `agent-io-schema.md`, backlog còn lại tại `tasks/roadmap-mvp.md`.

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import Link from "next/link";
+import { APP_NAME } from "@/lib/brand";
 
 interface Scenario {
   id: "meal_plan" | "drug_interaction" | "compliance" | "doctor_note";
@@ -202,7 +203,7 @@ export function ClinicalAssistantDemo() {
             <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-700 pl-3">
-            <span className="font-extrabold text-sm text-white tracking-tight">VMEC-10</span>
+            <span className="font-extrabold text-sm text-white tracking-tight">{APP_NAME}</span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               AI CLINICAL
             </span>
@@ -613,7 +614,7 @@ export function ClinicalAssistantDemo() {
                         <span className="material-symbols-outlined text-[16px]">verified</span>
                         Đã xác nhận y lệnh điều trị
                       </span>
-                      <span className="text-[11px] text-slate-400">VMEC Clinician Portal</span>
+                      <span className="text-[11px] text-slate-400">{APP_NAME} Clinician Portal</span>
                     </div>
                   </div>
                 )}

@@ -87,7 +87,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = get_settings()
-    print("P-014 — Tạo tài khoản demo\n")
+    print("VinNutri — Tạo tài khoản demo\n")
     print(f"APP_ENV:    {settings.APP_ENV}")
     print(f"Database:   {_mask_database_url(settings.DATABASE_URL)}\n")
     _print_account_plan()

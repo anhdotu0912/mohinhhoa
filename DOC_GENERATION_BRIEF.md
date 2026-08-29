@@ -1,6 +1,6 @@
 # Brief tạo lại toàn bộ tài liệu — specs/ · adrs/ · contracts/ · tasks/
 
-> **Dành cho:** AI coding agent được giao viết lại toàn bộ tài liệu dự án VMEC-10 (P-014) từ đầu, thay thế hoàn toàn nội dung cũ trong 4 thư mục `specs/`, `adrs/`, `contracts/`, `tasks/`.
+> **Dành cho:** AI coding agent được giao viết lại toàn bộ tài liệu dự án VinNutri (P-014) từ đầu, thay thế hoàn toàn nội dung cũ trong 4 thư mục `specs/`, `adrs/`, `contracts/`, `tasks/`.
 > **Việc cần làm:** Xoá nội dung cũ, tạo **30 file** liệt kê bên dưới, đúng tên, đúng thư mục, đúng format quy định ở Mục 1.
 > **Trước khi viết bất kỳ file nào:** đọc kỹ Mục 0 (bối cảnh dự án) và Mục 2 (dữ kiện as-built) — nội dung file phải khớp với code thật đang chạy trong repo (`backend/app`, `frontend/lib`), không được bịa hành vi chưa tồn tại. Nếu mô tả 1 use case chưa có code → ghi rõ `Status: Planned` và mô tả *thiết kế đề xuất*, không ghi như đã hoạt động.
 > **Sau khi viết xong toàn bộ:** đối chiếu chéo — mọi endpoint nhắc trong `specs/*` phải xuất hiện trong `contracts/api-v1.md`; mọi field/schema nhắc trong `specs/*` phải khớp `contracts/agent-io-schema.md`; mọi file spec phải có ít nhất 1 dòng trong `tasks/roadmap-mvp.md`.
@@ -9,7 +9,7 @@
 
 ## 0. Bối cảnh dự án (đưa vào phần đầu mỗi file liên quan khi cần)
 
-**Tên dự án:** VMEC-10 — AI Agent trợ lý dinh dưỡng lâm sàng & lối sống theo bệnh lý (Hệ thống y tế X).
+**Tên dự án:** VinNutri — AI Agent trợ lý dinh dưỡng lâm sàng & lối sống theo bệnh lý (Hệ thống y tế X).
 
 **Bài toán gốc:** Bệnh nhân mãn tính (tiểu đường, tăng huyết áp, gout...) khó tự lập thực đơn phù hợp, dễ vi phạm chỉ định do thiếu công cụ theo dõi.
 

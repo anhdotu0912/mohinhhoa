@@ -1,4 +1,4 @@
-# Agent I/O Schema Contract — VMEC-10
+# Agent I/O Schema Contract — VinNutri
 
 **Version:** 1.11 (2026-08-29 — HITL ràng buộc lâm sàng: patient proposal không có hiệu lực tới khi bác sĩ duyệt. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
