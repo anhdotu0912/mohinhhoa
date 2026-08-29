@@ -31,6 +31,23 @@ class TestRefuseRules:
         assert flags == []
         assert answer == safe_text
 
+    def test_enforce_output_safety_allows_negated_disclaimers(self):
+        disclaimer = (
+            "Lưu ý an toàn: Bệnh nhân tuyệt đối không được tự ý ngưng thuốc hoặc đổi liều thuốc. "
+            "Hãy luôn tham vấn ý kiến bác sĩ điều trị."
+        )
+        answer, flags, force_refuse = enforce_output_safety(disclaimer)
+        assert force_refuse is False
+        assert flags == []
+        assert answer == disclaimer
+
+    def test_enforce_output_safety_allows_food_portion_phrasing(self):
+        food_advice = "Bạn nên giảm liều lượng tinh bột và rau củ nhiều đường như khoai tây, bắp ngọt."
+        answer, flags, force_refuse = enforce_output_safety(food_advice)
+        assert force_refuse is False
+        assert flags == []
+        assert answer == food_advice
+
 
 class TestCitationGuardrail:
     def test_rag_qa_without_citations_is_redacted(self):

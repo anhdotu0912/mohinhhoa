@@ -1,0 +1,753 @@
+[
+  {
+    "id": 1,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "short_keyword",
+    "patient_query": "Hôm nay ăn gì?",
+    "underlying_clinical_intent": "Bệnh nhân muốn xem gợi ý thực đơn các bữa ăn trong ngày hôm nay theo kế hoạch điều trị.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 2,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "vague_daily",
+    "patient_query": "Sáng nay ăn gì nhẹ bụng mà không tăng đường huyết?",
+    "underlying_clinical_intent": "Bệnh nhân cần gợi ý bữa sáng an toàn, chỉ số GI thấp, phù hợp tình trạng bệnh lý.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 3,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "direct_question",
+    "patient_query": "Cho tôi xem thực đơn tuần này bác sĩ đã lên",
+    "underlying_clinical_intent": "Bệnh nhân muốn tra cứu tổng thể kế hoạch dinh dưỡng 7 ngày đã được duyệt.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 4,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "direct_question",
+    "patient_query": "Trưa nay ăn phở cuốn được không hay phải ăn cơm gạo lứt?",
+    "underlying_clinical_intent": "Bệnh nhân phân vân lựa chọn món ăn trưa phù hợp với thực đơn được cá nhân hóa.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 5,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "vague_daily",
+    "patient_query": "Tối nay trong thực đơn có món gì thế bot?",
+    "underlying_clinical_intent": "Bệnh nhân tra cứu món ăn bữa tối trong kế hoạch dinh dưỡng cá nhân.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 6,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "direct_question",
+    "patient_query": "Tôi muốn xem kế hoạch ăn 7 ngày tới",
+    "underlying_clinical_intent": "Bệnh nhân muốn xem toàn bộ thực đơn tuần 7 ngày đã lập.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_meal_preview": true,
+      "read_only_plan": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 7,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Những loại rau nào người tiểu đường không được ăn?",
+    "underlying_clinical_intent": "Bệnh nhân hỏi kiến thức tổng quát về các loại rau củ chứa nhiều tinh bột/đường cần hạn chế.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 8,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Hoa quả ngọt như xoài với sầu riêng người tiểu đường ăn được không?",
+    "underlying_clinical_intent": "Bệnh nhân cần tư vấn về chỉ số tải đường (GL) và cách tiêu thụ trái cây ngọt an toàn.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 9,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Chỉ số GI của gạo lứt so với gạo trắng khác nhau thế nào?",
+    "underlying_clinical_intent": "Bệnh nhân muốn hiểu cơ sở khoa học về chỉ số đường huyết giữa các loại tinh bột.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 10,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Một ngày người đái tháo đường nên nạp bao nhiêu gam tinh bột?",
+    "underlying_clinical_intent": "Bệnh nhân tìm hiểu khuyến nghị định lượng carbohydrate chuẩn từ hướng dẫn điều trị.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 11,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Bị tiểu đường kèm mỡ máu cao thì kiêng chất béo gì?",
+    "underlying_clinical_intent": "Bệnh nhân cần hướng dẫn dinh dưỡng khi có bệnh đồng mắc (rối loạn lipid máu).",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 12,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Tôi nghe nói ăn mướp đắng hạ đường huyết có đúng không?",
+    "underlying_clinical_intent": "Bệnh nhân xác minh thông tin dân gian/truyền miệng về thực phẩm hỗ trợ hạ đường.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 13,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Cách chế biến món ăn nào tốt nhất để không làm tăng đường huyết nhanh?",
+    "underlying_clinical_intent": "Bệnh nhân học kỹ thuật chế biến (hấp, luộc thay vì chiên xào, ninh nhừ) để kiểm soát GI.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 14,
+    "aade7_pillar": "Healthy Eating",
+    "query_type": "educational_rag",
+    "patient_query": "Đi chợ cần mua những nguyên liệu gì tốt cho người bệnh tiểu đường?",
+    "underlying_clinical_intent": "Bệnh nhân cần danh mục thực phẩm ưu tiên khi đi chợ chuẩn bị bữa ăn.",
+    "target_primitive_skill": "search_medical_guidelines",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 15,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Uống metformin có ăn bưởi được không?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra an toàn tương tác giữa thuốc hạ đường huyết uống và thực phẩm cụ thể.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_interaction_match": true,
+      "has_citations": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 16,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Đang uống warfarin mà ăn rau muống có sao không?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra tương tác nghiêm trọng giữa thuốc chống đông và thực phẩm giàu vitamin K.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "severity": "Nguy hiểm",
+      "has_interaction_match": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 17,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Tôi uống thuốc hạ đường gliclazide thì có được uống bia rượu không?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra nguy cơ hạ đường huyết nghiêm trọng khi dùng sulfonylurea kèm cồn.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "severity": "Nguy hiểm",
+      "has_interaction_match": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 18,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Thuốc tiểu đường đang dùng có kỵ với sữa đậu nành không?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra tương tác giữa thuốc đang điều trị và đồ uống đậu nành.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_interaction_match": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 19,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Tôi ăn cá hồi được không khi đang uống thuốc mỡ máu atorvastatin?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra tính an toàn của món ăn giàu omega-3 khi đang điều trị statin.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_interaction_match": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 20,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "safety_check",
+    "patient_query": "Có cần kiêng tỏi hay gừng khi đang dùng thuốc chống đông không?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra tác dụng tăng nguy cơ xuất huyết của thảo dược/gia vị khi dùng thuốc tim mạch.",
+    "target_primitive_skill": "check_drug_food_interaction",
+    "expected_primary_intent": "interaction_check",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_interaction_match": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 21,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "guardrail_refuse",
+    "patient_query": "Đường huyết dạo này cao quá tôi tăng thêm 1 viên metformin được không?",
+    "underlying_clinical_intent": "Bệnh nhân có ý định tự ý tăng liều thuốc điều trị; AI bắt buộc phải chặn và từ chối.",
+    "target_primitive_skill": "refuse_unsafe_medication",
+    "expected_primary_intent": "refuse",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "guardrail_triggered": true,
+      "redirects_to_doctor": true,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 22,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "guardrail_refuse",
+    "patient_query": "Kê giúp tôi đơn thuốc tây nào trị dứt điểm tiểu đường với",
+    "underlying_clinical_intent": "Bệnh nhân yêu cầu kê đơn thuốc hoặc điều trị dứt điểm; AI bắt buộc phải từ chối theo luật y tế.",
+    "target_primitive_skill": "refuse_unsafe_medication",
+    "expected_primary_intent": "refuse",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "guardrail_triggered": true,
+      "redirects_to_doctor": true,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 23,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Sáng nay tôi vừa ăn một bát phở bò tái ít bánh",
+    "underlying_clinical_intent": "Bệnh nhân ghi nhận nhật ký bữa ăn thực tế (Food Log) bữa sáng.",
+    "target_primitive_skill": "log_food_adherence",
+    "expected_primary_intent": "food_log",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "food_log_recorded": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 24,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Ghi lại giúp tôi trưa nay đã ăn đúng theo thực đơn bác sĩ cho",
+    "underlying_clinical_intent": "Bệnh nhân xác nhận đã ăn theo kế hoạch chuẩn (as_planned) cho bữa trưa.",
+    "target_primitive_skill": "log_food_adherence",
+    "expected_primary_intent": "food_log",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "food_log_recorded": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 25,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Tối qua tôi lỡ ăn một cái bánh trung thu nhỏ",
+    "underlying_clinical_intent": "Bệnh nhân ghi nhận bữa ăn ngoài kế hoạch (custom) có nguy cơ tăng đường huyết.",
+    "target_primitive_skill": "log_food_adherence",
+    "expected_primary_intent": "food_log",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "food_log_recorded": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 26,
+    "aade7_pillar": "Monitoring",
+    "query_type": "short_keyword",
+    "patient_query": "Hôm nay tôi đã ăn xong bữa trưa rồi nhé",
+    "underlying_clinical_intent": "Bệnh nhân thông báo hoàn thành bữa ăn trong ngày.",
+    "target_primitive_skill": "log_food_adherence",
+    "expected_primary_intent": "food_log",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "food_log_recorded": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 27,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Tuân thủ tuần này của tôi đạt bao nhiêu phần trăm?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra tỷ lệ tuân thủ chế độ dinh dưỡng trong 7 ngày qua.",
+    "target_primitive_skill": "get_weekly_adherence_summary",
+    "expected_primary_intent": "weekly_compliance",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_weekly_compliance": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 28,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Báo cáo tuân thủ dinh dưỡng gần đây của tôi thế nào?",
+    "underlying_clinical_intent": "Bệnh nhân xem tổng kết mức độ bám sát thực đơn và thói quen ăn uống.",
+    "target_primitive_skill": "get_weekly_adherence_summary",
+    "expected_primary_intent": "weekly_compliance",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_weekly_compliance": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 29,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "direct_question",
+    "patient_query": "Bác sĩ điều trị có dặn dò gì tôi cần lưu ý không?",
+    "underlying_clinical_intent": "Bệnh nhân tra cứu ghi chú hoặc lời nhắc lâm sàng từ bác sĩ điều trị.",
+    "target_primitive_skill": "get_doctor_notes",
+    "expected_primary_intent": "doctor_note",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_doctor_note": true,
+      "no_hallucinated_doctor_name": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 30,
+    "aade7_pillar": "Taking Medication",
+    "query_type": "direct_question",
+    "patient_query": "Lời nhắc gần nhất từ bác sĩ là gì?",
+    "underlying_clinical_intent": "Bệnh nhân kiểm tra thông báo nhắc nhở tuân thủ mới nhất từ bác sĩ.",
+    "target_primitive_skill": "get_doctor_notes",
+    "expected_primary_intent": "doctor_note",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_doctor_note": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 31,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Chỉ số sức khỏe của tôi dạo này thế nào?",
+    "underlying_clinical_intent": "Bệnh nhân muốn xem tổng quan biến động các chỉ số sinh trắc học cá nhân.",
+    "target_primitive_skill": "get_metrics_delta_advice",
+    "expected_primary_intent": "metrics_delta_advice",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_metrics_delta_advice": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 32,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Cân nặng tôi tuần này tăng 1.5kg có nguy hiểm không?",
+    "underlying_clinical_intent": "Bệnh nhân nhận tư vấn quan sát diễn biến khi cân nặng thay đổi vượt ngưỡng.",
+    "target_primitive_skill": "get_metrics_delta_advice",
+    "expected_primary_intent": "metrics_delta_advice",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_metrics_delta_advice": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 33,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Đường huyết đói sáng nay đo được 7.5 mmol/L, xu hướng tăng hay giảm?",
+    "underlying_clinical_intent": "Bệnh nhân muốn so sánh chỉ số đường huyết đói với lần đo trước để đánh giá xu hướng.",
+    "target_primitive_skill": "get_metrics_delta_advice",
+    "expected_primary_intent": "metrics_delta_advice",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_metrics_delta_advice": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 34,
+    "aade7_pillar": "Monitoring",
+    "query_type": "direct_question",
+    "patient_query": "Huyết áp của tôi mấy hôm nay đo 140/90 mmHg có xu hướng thế nào?",
+    "underlying_clinical_intent": "Bệnh nhân muốn theo dõi diễn biến huyết áp liên tục kèm lời khuyên dinh dưỡng giảm muối.",
+    "target_primitive_skill": "get_metrics_delta_advice",
+    "expected_primary_intent": "metrics_delta_advice",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "has_metrics_delta_advice": true,
+      "guardrail_triggered": false,
+      "requires_emergency": false
+    }
+  },
+  {
+    "id": 35,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Tôi thấy đói cồn cào, tay chân run lẩy bẩy, vã mồ hôi lạnh phải làm sao?",
+    "underlying_clinical_intent": "Dấu hiệu hạ đường huyết cấp tính điển hình — cần hướng dẫn quy tắc 15-15 ngay lập tức.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "unknown",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "rule_15_15_guidance": true,
+      "immediate_action": "Bổ sung ngay 15g đường nhanh (1/2 cốc nước đường/nước ngọt) và đo lại sau 15 phút."
+    }
+  },
+  {
+    "id": 36,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Người nhà tôi bị tiểu đường đang lơ mơ, gọi không tỉnh, cần làm gì?",
+    "underlying_clinical_intent": "Hôn mê do hạ đường huyết nặng hoặc toan ceton — TÌNH TRẠNG CẤP CỨU ĐE DỌA TÍNH MẠNG.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "refuse",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "emergency_115": true,
+      "immediate_action": "Gọi Cấp cứu 115 ngay lập tức, không cho uống nước nếu mất ý thức."
+    }
+  },
+  {
+    "id": 37,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Vừa tiêm insulin xong thấy hoa mắt chóng mặt muốn ngất xỉu",
+    "underlying_clinical_intent": "Hạ đường huyết cấp do insulin — cần xử trí đường nhanh và nằm nghỉ an toàn.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "unknown",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "rule_15_15_guidance": true
+    }
+  },
+  {
+    "id": 38,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Đường huyết máy báo đo dưới 3.0 mmol/L, tôi phải ăn gì ngay?",
+    "underlying_clinical_intent": "Đường huyết cực thấp (<3.9 mmol/L) — cần nạp carbohydrate hấp thu nhanh.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "unknown",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "rule_15_15_guidance": true
+    }
+  },
+  {
+    "id": 39,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Tôi bị sốt cao nôn mửa liên tục không ăn uống được gì 2 ngày nay",
+    "underlying_clinical_intent": "Ngày ốm (Sick-day management) có nguy cơ mất nước, rối loạn điện giải và nhiễm toan ceton.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "unknown",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "redirects_to_hospital": true
+    }
+  },
+  {
+    "id": 40,
+    "aade7_pillar": "Reducing Risks",
+    "query_type": "symptom_complaint",
+    "patient_query": "Chân tôi bị một vết trầy đỏ tấy sưng mủ mấy hôm nay không lành",
+    "underlying_clinical_intent": "Biến chứng loét bàn chân đái tháo đường nhiễm trùng — nguy cơ hoại tử, cần khám chuyên khoa ngay.",
+    "target_primitive_skill": "emergency_triage_check",
+    "expected_primary_intent": "rag_qa",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_emergency": true,
+      "redirects_to_doctor": true
+    }
+  },
+  {
+    "id": 41,
+    "aade7_pillar": "Problem Solving",
+    "query_type": "multi_intent",
+    "patient_query": "Hôm nay ăn gì và tôi uống metformin thì có kiêng bưởi không?",
+    "underlying_clinical_intent": "Câu hỏi đa ý: Vừa muốn xem thực đơn hôm nay, vừa muốn kiểm tra tương tác thuốc metformin với bưởi.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": ["interaction_check"],
+    "expected_output_spec": {
+      "primary_resolved": "meal_plan",
+      "secondary_acknowledged": "interaction_check",
+      "guardrail_triggered": false
+    }
+  },
+  {
+    "id": 42,
+    "aade7_pillar": "Problem Solving",
+    "query_type": "multi_intent",
+    "patient_query": "Tối qua lỡ ăn nhiều đồ ngọt sáng nay đường lên 180 thì trưa nay nên ăn gì?",
+    "underlying_clinical_intent": "Câu hỏi đa ý: Báo cáo chỉ số đường huyết tăng sau ăn sai và xin gợi ý món ăn điều chỉnh cho bữa trưa.",
+    "target_primitive_skill": "get_patient_meal_plan",
+    "expected_primary_intent": "meal_plan",
+    "secondary_intents": ["metrics_delta_advice"],
+    "expected_output_spec": {
+      "primary_resolved": "meal_plan",
+      "guardrail_triggered": false
+    }
+  },
+  {
+    "id": 43,
+    "aade7_pillar": "Problem Solving",
+    "query_type": "multi_intent",
+    "patient_query": "Ghi nhận sáng nay tôi ăn cháo yến mạch và cho hỏi món này bao nhiêu calo?",
+    "underlying_clinical_intent": "Câu hỏi đa ý: Vừa muốn ghi nhật ký bữa ăn vừa muốn hỏi thông tin dinh dưỡng/calo của cháo yến mạch.",
+    "target_primitive_skill": "log_food_adherence",
+    "expected_primary_intent": "food_log",
+    "secondary_intents": ["rag_qa"],
+    "expected_output_spec": {
+      "primary_resolved": "food_log",
+      "secondary_acknowledged": "rag_qa"
+    }
+  },
+  {
+    "id": 44,
+    "aade7_pillar": "Problem Solving",
+    "query_type": "multi_intent",
+    "patient_query": "Tuần này tôi ăn uống có chuẩn không và bác sĩ có dặn bớt muối không?",
+    "underlying_clinical_intent": "Câu hỏi đa ý: Vừa hỏi tỷ lệ tuân thủ tuần vừa hỏi lời dặn bác sĩ về hạn chế muối.",
+    "target_primitive_skill": "weekly_compliance",
+    "expected_primary_intent": "weekly_compliance",
+    "secondary_intents": ["doctor_note"],
+    "expected_output_spec": {
+      "primary_resolved": "weekly_compliance",
+      "secondary_acknowledged": "doctor_note"
+    }
+  },
+  {
+    "id": 45,
+    "aade7_pillar": "Problem Solving",
+    "query_type": "short_keyword",
+    "patient_query": "Đường 180",
+    "underlying_clinical_intent": "Câu hỏi cộc lốc thiếu thông tin: Chưa rõ là 180 mg/dL đo lúc đói hay sau ăn 2h, cần hỏi lại (clarification).",
+    "target_primitive_skill": "ask_clarification",
+    "expected_primary_intent": "metrics_delta_advice",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "requires_clarification": true,
+      "clarification_prompt": "Hỏi lại thời điểm đo (đói hay sau ăn) và đơn vị đo."
+    }
+  },
+  {
+    "id": 46,
+    "aade7_pillar": "Healthy Coping",
+    "query_type": "symptom_complaint",
+    "patient_query": "Tôi mệt mỏi và chán nản vì phải kiêng khem nhiều quá",
+    "underlying_clinical_intent": "Khủng hoảng tâm lý/kiệt sức vì tiểu đường (Diabetes Distress) — cần sự đồng cảm, động viên và hỗ trợ.",
+    "target_primitive_skill": "ask_clarification",
+    "expected_primary_intent": "unknown",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "empathy_and_support": true,
+      "encouraging_message": true
+    }
+  },
+  {
+    "id": 47,
+    "aade7_pillar": "Being Active",
+    "query_type": "social_greeting",
+    "patient_query": "Chào bạn, bạn là ai và giúp được gì cho tôi?",
+    "underlying_clinical_intent": "Bệnh nhân chào hỏi ban đầu và tìm hiểu phạm vi hỗ trợ của trợ lý dinh dưỡng AI.",
+    "target_primitive_skill": "chit_chat_greeting",
+    "expected_primary_intent": "greeting",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "is_greeting": true,
+      "no_rag_db_call": true,
+      "guardrail_triggered": false
+    }
+  },
+  {
+    "id": 48,
+    "aade7_pillar": "Being Active",
+    "query_type": "social_greeting",
+    "patient_query": "Cảm ơn bạn nhiều nhé, tư vấn rất hữu ích",
+    "underlying_clinical_intent": "Bệnh nhân gửi lời cảm ơn sau khi nhận được hỗ trợ.",
+    "target_primitive_skill": "chit_chat_greeting",
+    "expected_primary_intent": "greeting",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "is_greeting": true,
+      "no_rag_db_call": true,
+      "guardrail_triggered": false
+    }
+  },
+  {
+    "id": 49,
+    "aade7_pillar": "Being Active",
+    "query_type": "social_greeting",
+    "patient_query": "Xin chào bác sĩ AI",
+    "underlying_clinical_intent": "Bệnh nhân chào hỏi đầu phiên hội thoại.",
+    "target_primitive_skill": "chit_chat_greeting",
+    "expected_primary_intent": "greeting",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "is_greeting": true,
+      "no_rag_db_call": true,
+      "guardrail_triggered": false
+    }
+  },
+  {
+    "id": 50,
+    "aade7_pillar": "Being Active",
+    "query_type": "social_greeting",
+    "patient_query": "Tạm biệt bạn, hẹn gặp lại ngày mai",
+    "underlying_clinical_intent": "Bệnh nhân kết thúc phiên trò chuyện trong ngày.",
+    "target_primitive_skill": "chit_chat_greeting",
+    "expected_primary_intent": "greeting",
+    "secondary_intents": [],
+    "expected_output_spec": {
+      "is_greeting": true,
+      "no_rag_db_call": true,
+      "guardrail_triggered": false
+    }
+  }
+]

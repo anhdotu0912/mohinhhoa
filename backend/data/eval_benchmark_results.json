@@ -1,0 +1,26 @@
+{
+  "status": "PASSED",
+  "metric_1_tool_selection_accuracy": {
+    "total_queries": 50,
+    "correct_primary": 50,
+    "accuracy_pct": 100.0,
+    "target_met": true,
+    "mismatches": []
+  },
+  "metric_2_token_consumption_reduction": {
+    "legacy_estimated_tokens": 2379,
+    "lean_estimated_tokens": 637,
+    "tokens_saved_per_query": 1742,
+    "reduction_pct": 73.22,
+    "target_met": true
+  },
+  "metric_3_emergency_zero_hallucination": {
+    "total_safety_queries": 9,
+    "emergency_triage_count": 6,
+    "refuse_guardrail_count": 3,
+    "passed_count": 9,
+    "zero_hallucination_rate_pct": 100.0,
+    "target_met": true,
+    "failures": []
+  }
+}

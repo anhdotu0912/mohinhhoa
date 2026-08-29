@@ -275,8 +275,73 @@ def extract_foods_from_message(message: str) -> tuple[list[str], bool]:
     if extracted_candidates:
         return extracted_candidates, True
 
-    # 3. Fallback for general interaction inquiry
-    return list(_DEFAULT_INTERACTION_FOODS), False
+    # 3. If no specific food is identified in message, return empty list without fabricating default items
+    return [], False
+
+
+def get_medication_known_interactions(
+    medications: list[str],
+    db: Session | None = None,
+) -> list[InteractionItem]:
+    """Retrieve all known drug-food interactions in KB for given medications."""
+    kb = load_interaction_kb()
+    if not medications or not kb:
+        return []
+
+    results: list[InteractionItem] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    for med in medications:
+        if not med:
+            continue
+        product = resolve_medication(med, db=db)
+        active_key = product.get("activeKey", "") if product else ""
+        rule_id = product.get("ruleId") if product else None
+        resolved_name = product.get("activeIngredientText", med) if product else med
+
+        clinical_rule = get_clinical_rule(active_key, rule_id, db=db) if active_key else None
+        drug_class = product.get("drugClass", "") if product else ""
+        meal_timing = ""
+        hypoglycemia_risk = ""
+        ai_warning = ""
+
+        if clinical_rule:
+            mt = clinical_rule.get("mealTiming", {})
+            meal_timing = mt.get("instructionVi", "")
+            safety = clinical_rule.get("safety", {})
+            hypoglycemia_risk = safety.get("hypoglycemiaRisk", "")
+            ai_warning = safety.get("aiWarningVi", "")
+
+        for entry in kb:
+            drug_name = entry.get("drug", "")
+            drug_aliases = entry.get("drug_aliases", [])
+            food_name = entry.get("food", "")
+
+            drug_matched = (
+                _match_term(med, drug_name, drug_aliases)
+                or _match_term(resolved_name, drug_name, drug_aliases)
+            )
+
+            if drug_matched:
+                key = (drug_name.lower(), food_name.lower())
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    results.append(
+                        InteractionItem(
+                            drug=entry.get("drug", med),
+                            food=entry.get("food", food_name),
+                            mechanism=entry.get("mechanism", ""),
+                            severity=entry.get("severity", "Cần chú ý"),
+                            recommendation=entry.get("recommendation", ""),
+                            sources=entry.get("sources", []),
+                            drug_class=drug_class or None,
+                            meal_timing=meal_timing or None,
+                            hypoglycemia_risk=hypoglycemia_risk or None,
+                            ai_warning=ai_warning or None,
+                        )
+                    )
+
+    return results
 
 
 # =====================================================================
