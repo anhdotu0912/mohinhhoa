@@ -14,7 +14,10 @@ import type { NotificationOut } from "@/lib/types";
 
 export type PatientPanelKey = "menu" | "notifications" | "health" | null;
 export type HealthPanelView = "dock" | "record";
-export type NotificationsPanelView = "list" | { detailId: string };
+export type NotificationsPanelView =
+  | "list"
+  | { detailId: string }
+  | { escalationId: string };
 
 const NOTIF_SEEN_KEY_PREFIX = "p014.notif.seenAt:";
 
@@ -52,6 +55,8 @@ export interface PatientPanelContextValue extends PatientPanelState {
   openPanel: (key: Exclude<PatientPanelKey, null>) => void;
   closePanel: () => void;
   openNotificationDetail: (id: string) => void;
+  openNotificationThread: (detailId?: string) => void;
+  openEscalationThread: (escalationId: string) => void;
   backToNotificationList: () => void;
   goToRecordMetricsForm: () => void;
   backToHealthDock: () => void;
@@ -118,6 +123,28 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
     setNotificationsView({ detailId: id });
   }, []);
 
+  const openNotificationThread = useCallback(
+    (detailId?: string) => {
+      setActivePanel("notifications");
+      setHealthView("dock");
+      setNotificationsView(detailId ? { detailId } : "list");
+      markNotificationsSeen();
+      void refreshNotificationsBadge();
+    },
+    [markNotificationsSeen, refreshNotificationsBadge]
+  );
+
+  const openEscalationThread = useCallback(
+    (escalationId: string) => {
+      setActivePanel("notifications");
+      setHealthView("dock");
+      setNotificationsView({ escalationId });
+      markNotificationsSeen();
+      void refreshNotificationsBadge();
+    },
+    [markNotificationsSeen, refreshNotificationsBadge]
+  );
+
   const backToNotificationList = useCallback(() => {
     setNotificationsView("list");
   }, []);
@@ -160,6 +187,8 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
     openPanel,
     closePanel,
     openNotificationDetail,
+    openNotificationThread,
+    openEscalationThread,
     backToNotificationList,
     goToRecordMetricsForm,
     backToHealthDock,

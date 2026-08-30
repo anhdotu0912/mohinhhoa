@@ -19,7 +19,8 @@ export type InboxJobType =
   | "constraints"
   | "generate_request"
   | "plan_expiry"
-  | "patient_claim";
+  | "patient_claim"
+  | "chat_escalation";
 
 export function doctorPatientsHref(): string {
   return "/doctor/patients";
@@ -27,11 +28,12 @@ export function doctorPatientsHref(): string {
 
 export function doctorInboxHref(
   type?: InboxJobType | "all",
-  opts?: { urgency?: "soon" }
+  opts?: { urgency?: "soon"; escalation?: string }
 ): string {
   const params = new URLSearchParams();
   if (type && type !== "all") params.set("type", type);
   if (opts?.urgency) params.set("urgency", opts.urgency);
+  if (opts?.escalation) params.set("escalation", opts.escalation);
   const qs = params.toString();
   return qs ? `/doctor/inbox?${qs}` : "/doctor/inbox";
 }

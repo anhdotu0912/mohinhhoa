@@ -15,6 +15,9 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.rag.embeddings import get_embedding_function
+from app.rag.qdrant import get_qdrant_client
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +30,7 @@ FOOD_DB_PATH = DATA_DIR / "food_db_vn.json"
 
 def _get_qdrant_client():
     """Return a Qdrant client (local file-based or remote URL)."""
-    import qdrant_client
-    if settings.QDRANT_URL:
-        logger.info("Connecting to Qdrant remote server at %s", settings.QDRANT_URL)
-        return qdrant_client.QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY or None,
-        )
-    persist_dir = os.path.join(_BACKEND_DIR, settings.QDRANT_PERSIST_DIR)
-    logger.info("Using local persistent Qdrant at %s", persist_dir)
-    return qdrant_client.QdrantClient(path=persist_dir)
+    return get_qdrant_client()
 
 
 def _chunk_markdown(text: str, source: str, max_chunk_size: int = 800) -> list[dict]:

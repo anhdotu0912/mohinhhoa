@@ -1,6 +1,6 @@
 # API v1 Contract — VinNutri (FE ↔ BE)
 
-**Version:** 1.20 (2026-08-30 — `GET /guidelines/{source_id}` đọc nội dung trích dẫn. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.21 (2026-08-31 — Chat escalation HITL: bệnh nhân hỏi bác sĩ khi AI không chắc. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -859,7 +859,104 @@ Thay toàn bộ mảng tin nhắn (snapshot sau khi stream `done`/`error`).
 - `intent`, `secondary_intents[]`, `citations[]`, `guardrail_triggered`, `meal_plan_id`
 - `meal_preview` (MealPreviewOut), `weekly_compliance` (WeeklyComplianceOut), `doctor_note` (DoctorNoteOut)
 - `meal_plan_week` (MealPlanOutput), `show_weekly_plan`, `thinking_steps[]`, `corrected`, `correction_reason`
+- `unmatched_pairs[]` (`{drug, food}` — optional, default `[]`)
+- `escalation_id` (optional, `null` — id job hỏi bác sĩ gắn với lượt AI này)
 - **Không persist** `is_streaming` (ephemeral lúc SSE)
+
+### Chat escalations — hỏi bác sĩ khi AI không chắc (as-built 2026-08-31)
+
+HITL một chiều: bệnh nhân **opt-in** (bấm nút) khi câu AI thuộc `refuse` | `unknown` (không phải cấp cứu) | `rag_qa` thiếu citation | `unmatched_kb`. Không trộn lời bác sĩ vào bong bóng AI. Một bệnh nhân tối đa **một job đang mở**; gửi thêm khi đang mở thì **nối cùng thread**.
+
+`reason` ∈ `missing_citations | unknown | refuse | unmatched_kb`.  
+`status` ∈ `waiting_doctor | waiting_patient | resolved`.
+
+#### `POST /chat/escalations`
+**Role:** `patient`.
+```json
+// Request
+{
+  "session_id": "session_uuid",
+  "ai_message_id": "msg_uuid",
+  "note": "optional, max 200",
+  "question_text": "Câu hỏi BN (fallback nếu chưa persist session)",
+  "answer_text": "Câu AI",
+  "intent": "unknown",
+  "citations": [],
+  "correction_reason": "missing_citations",
+  "unmatched_pairs": [],
+  "guardrail_triggered": true
+}
+// Response 201 → EscalationOut (kèm messages[], notification_id của mốc "đã gửi")
+// Error 400 ESCALATION_NOT_ELIGIBLE — câu AI không thuộc trường hợp không chắc / là cấp cứu
+// Error 400 NO_ASSIGNED_DOCTOR — chưa được bác sĩ nhận hồ sơ
+```
+
+#### `GET /chat/escalations/{id}`
+**Role:** `patient` (chỉ job của mình).
+```json
+// Response 200 → EscalationOut
+// Error 404 ESCALATION_NOT_FOUND
+```
+
+#### `POST /chat/escalations/{id}/messages`
+**Role:** `patient`. Tiếp tục thread cho tới khi `resolved`.
+```json
+// Request { "body": "Câu hỏi thêm, max 2000" }
+// Response 200 → EscalationOut
+// Error 400 ESCALATION_RESOLVED — job đã đóng
+```
+
+#### `GET /doctor/escalations`
+**Role:** `doctor`. Query optional `status`: `open` (default, `waiting_doctor|waiting_patient`) | `waiting_doctor` | `waiting_patient` | `resolved` | `all`.
+```json
+// Response 200 → list[EscalationListItem] (không kèm messages đầy đủ)
+```
+
+#### `GET /doctor/escalations/{id}`
+**Role:** `doctor` (chỉ bệnh nhân đã gán).
+```json
+// Response 200 → EscalationOut
+```
+
+#### `POST /doctor/escalations/{id}/messages`
+**Role:** `doctor`. Tạo `Notification(type="escalation_reply")` cho bệnh nhân.
+```json
+// Request { "body": "Lời đáp, max 2000" }
+// Response 200 → EscalationOut
+```
+
+#### `POST /doctor/escalations/{id}/resolve`
+**Role:** `doctor`. Đóng job (`status=resolved`). Không xóa lịch sử.
+```json
+// Response 200 → EscalationOut
+```
+
+**EscalationOut**
+```json
+{
+  "id": "esc_uuid",
+  "patient_id": "user_uuid",
+  "doctor_id": "doctor_uuid",
+  "patient_name": "Nguyễn Văn A",
+  "patient_avatar": null,
+  "patient_disease": ["diabetes_t2"],
+  "session_id": "session_uuid",
+  "ai_message_id": "msg_uuid",
+  "question_text": "...",
+  "answer_text": "...",
+  "reason": "unknown",
+  "patient_note": "",
+  "status": "waiting_doctor",
+  "messages": [
+    { "id": "m_uuid", "sender": "patient", "body": "ghi chú", "created_at": "...", "kind": "note" }
+  ],
+  "notification_id": "notif_uuid",
+  "created_at": "...",
+  "updated_at": "...",
+  "resolved_at": null
+}
+```
+`messages[].kind` ∈ `note | reply | context`. `notification_id` chỉ có trên `POST /chat/escalations`.
 
 ---
 
@@ -992,7 +1089,9 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 | `PatientTransfer.status` | `pending` \| `accepted` \| `cancelled` | `models/patient_transfer.py` |
 | `MealPlan.status` | `pending_review` \| `approved` \| `rejected` \| `edited` | `models/meal_plan.py`, set qua `meal_planner_agent`/`routes_doctor.review_meal_plan` |
 | `Alert.severity` / `InteractionItem.severity` | `Nguy hiểm` \| `Cần chú ý` \| `An toàn` | `data/drug_food_interactions.json`, `services/meal_plan_demo.py` |
-| `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `plan_expiring` \| `plan_expired` \| `interaction_followup` \| `manual_reminder` | `services/notification.py` |
+| `Notification.type` | `meal_reminder` \| `adherence_checkin` \| `plan_approved` \| `plan_expiring` \| `plan_expired` \| `interaction_followup` \| `manual_reminder` \| `escalation_sent` \| `escalation_reply` | `services/notification.py` |
+| `ChatEscalation.reason` | `missing_citations` \| `unknown` \| `refuse` \| `unmatched_kb` | `models/chat_escalation.py` |
+| `ChatEscalation.status` | `waiting_doctor` \| `waiting_patient` \| `resolved` | `models/chat_escalation.py` |
 | `Notification.status` | `pending` \| `sent` \| `read` \| `dismissed` \| `done` \| `cancelled` | `services/notification.py`, `models/notification.py` |
 | `NotificationActionRequest.adherence` | `yes` \| `partial` \| `no` | `schemas/notification.py` |
 | `ReviewRequest.action` | `approve` \| `reject` \| `edit` | `schemas/doctor.py` |
@@ -1012,7 +1111,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.20**.
+- Version hiện tại: **1.21**.
+- **Changelog 1.20 → 1.21 (2026-08-31):** Chat escalation HITL — `POST/GET /chat/escalations`, `POST .../messages`; `GET/POST /doctor/escalations` + `.../resolve`. Notification type mới `escalation_sent` | `escalation_reply` (`related_ids.escalation_id`). `AgentRunOutput.unmatched_pairs[]` optional. `ChatMessageOut` thêm `unmatched_pairs[]`, `escalation_id`. Không breaking.
 - **Changelog 1.19 → 1.20 (2026-08-30):** thêm `GET /guidelines/{source_id}` (role `patient`|`doctor`) — đọc nội dung file guideline RAG hoặc ghi chú catalog khi click citation trên UI duyệt thực đơn. Không breaking.
 - **Changelog 1.18 → 1.19 (2026-08-29):** validate range ràng buộc lâm sàng thống nhất FE+BE (`target_kcal` 800–4000, `carb_per_meal` 0–200, `sodium_daily` 0–5000, `salt_daily_g` 0–15, `sugar_daily_g` 0–100, `treatment_goals` 3–80 ký tự / tối đa 12). UI bác sĩ và hồ sơ BN dùng thanh kéo trong các khoảng này. 422 nếu vượt range. Không breaking với payload trong range cũ (trừ `target_kcal` < 800 hoặc muối > 15 / đường > 100).
 - **Changelog 1.17 → 1.18 (2026-08-29):** `PUT /doctor/patients/{id}/constraints` nhận thêm `carb_per_meal`, `sodium_daily`, `treatment_goals` (cùng bộ chỉ số với hồ sơ BN). Onboarding bệnh nhân không gửi field lâm sàng. Không breaking — field mới optional.

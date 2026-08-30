@@ -31,6 +31,8 @@ export interface ChatMessage {
   thinkingSteps?: ThinkingStep[];
   corrected?: boolean;
   correctionReason?: string;
+  unmatchedPairs?: { drug: string; food: string }[];
+  escalationId?: string | null;
 }
 
 export interface ChatSession {
@@ -67,6 +69,8 @@ function apiMessageToLocal(message: ChatMessageOut): ChatMessage {
     thinkingSteps: (message.thinking_steps ?? []) as ThinkingStep[],
     corrected: message.corrected ?? false,
     correctionReason: message.correction_reason ?? undefined,
+    unmatchedPairs: message.unmatched_pairs ?? [],
+    escalationId: message.escalation_id ?? null,
   };
 }
 
@@ -88,6 +92,8 @@ function localMessageToApi(message: ChatMessage): ChatMessageOut {
     thinking_steps: message.thinkingSteps ?? [],
     corrected: message.corrected ?? false,
     correction_reason: message.correctionReason ?? null,
+    unmatched_pairs: message.unmatchedPairs ?? [],
+    escalation_id: message.escalationId ?? null,
   };
 }
 

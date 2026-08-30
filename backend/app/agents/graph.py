@@ -352,7 +352,6 @@ def unknown_node(state: AgentState) -> AgentState:
     }
 
 
-
 def apply_guardrails(state: AgentState) -> AgentState:
     """Post-process node: citation checks, unsafe recommendation blocking, and food safety filtering."""
     intent = state.get("intent", "unknown")
@@ -531,6 +530,15 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
     if metrics_advice_raw:
         metrics_delta_advice = MetricsDeltaAdviceOut(**metrics_advice_raw)
 
+    unmatched_pairs = []
+    interactions_raw = final_state.get("interactions")
+    if interactions_raw is not None:
+        raw_pairs = getattr(interactions_raw, "unmatched_pairs", None)
+        if raw_pairs is None and isinstance(interactions_raw, dict):
+            raw_pairs = interactions_raw.get("unmatched_pairs")
+        if raw_pairs:
+            unmatched_pairs = list(raw_pairs)
+
     return AgentRunOutput(
         intent=final_state.get("intent", "unknown"),
         secondary_intents=final_state.get("secondary_intents", []),
@@ -544,6 +552,7 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
         weekly_compliance=weekly_compliance,
         doctor_note=doctor_note,
         metrics_delta_advice=metrics_delta_advice,
+        unmatched_pairs=unmatched_pairs,
     )
 
 

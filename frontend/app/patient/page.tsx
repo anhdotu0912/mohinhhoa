@@ -22,6 +22,8 @@ import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPl
 import { FormattedMessage } from "@/components/patient/FormattedMessage";
 import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
 import { CitationDetailModal } from "@/components/patient-chat/panels/CitationDetailModal";
+import { AskDoctorCta } from "@/components/patient-chat/AskDoctorCta";
+import { getEscalationReason } from "@/lib/escalation";
 import { APP_NAME } from "@/lib/brand";
 
 export type { Message };
@@ -291,6 +293,7 @@ export default function PatientChatHomePage() {
     doctorNote: response.doctor_note ?? null,
     showWeeklyPlan: extras?.showWeeklyPlan ?? false,
     mealPlanWeek: extras?.mealPlanWeek ?? null,
+    unmatchedPairs: response.unmatched_pairs ?? [],
     isStreaming: false,
   });
 
@@ -600,7 +603,7 @@ export default function PatientChatHomePage() {
           {/* Messages List with smooth transition */}
           {hasConversation && (
             <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
-              {messages.map((msg) =>
+              {messages.map((msg, idx) =>
                 msg.sender === "user" ? (
                   <div key={msg.id} className="flex justify-end w-full animate-in fade-in slide-in-from-bottom-1 duration-200">
                     <div className="max-w-[80%] sm:max-w-[68%] md:max-w-[62%] ml-auto bg-[#006857] text-white rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-2xs break-words">
@@ -677,6 +680,34 @@ export default function PatientChatHomePage() {
                           {msg.citations && msg.citations.length > 0 && (
                             <CitationsAccordion citations={msg.citations} />
                           )}
+
+                          {getEscalationReason(msg) ? (
+                            <AskDoctorCta
+                              message={msg}
+                              previousUserText={
+                                [...messages.slice(0, idx)]
+                                  .reverse()
+                                  .find((m) => m.sender === "user")?.text || ""
+                              }
+                              sessionId={activeSessionId}
+                              assignedDoctor={assignedDoctor ?? null}
+                              onEscalated={(messageId, escalationId) => {
+                                setMessages((prev) => {
+                                  const next = prev.map((m) =>
+                                    m.id === messageId ? { ...m, escalationId } : m
+                                  );
+                                  if (activeSessionId) {
+                                    void saveActiveSessionMessages(
+                                      next,
+                                      undefined,
+                                      activeSessionId
+                                    );
+                                  }
+                                  return next;
+                                });
+                              }}
+                            />
+                          ) : null}
                         </div>
                       )}
                     </div>

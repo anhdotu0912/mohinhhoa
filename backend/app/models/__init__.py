@@ -3,6 +3,7 @@
 from app.models.alert import Alert
 from app.models.body_metrics import BodyMetricsEntry
 from app.models.catalog import Allergy, Diagnosis, Medicine
+from app.models.chat_escalation import ChatEscalation, ChatEscalationMessage
 from app.models.chat_session import ChatMessage, ChatSession
 from app.models.doctor_profile import DoctorProfile
 from app.models.food_log import FoodLog
@@ -18,6 +19,8 @@ __all__ = [
     "Alert",
     "Allergy",
     "BodyMetricsEntry",
+    "ChatEscalation",
+    "ChatEscalationMessage",
     "ChatMessage",
     "ChatSession",
     "Diagnosis",

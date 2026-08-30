@@ -30,13 +30,13 @@ Kết quả sau khi sửa: backend 197/197 pytest pass, frontend `next build` + 
 | 10 | `specs/10-doctor-compliance-view.md` | **Done (core)** — `GET /doctor/patients/{id}/compliance` + `POST .../remind` (on-the-fly, ADR-008), type `manual_reminder`; FE nối API thật | Should | BE2 + FE |
 | 11 | `specs/11-compliance-notification-delivery.md` | **Done** — event-driven materialize-ahead; `POST /notifications/demo/simulate` idempotent theo `existing_types`; type `manual_reminder` | Must | BE2 |
 | 12 | `specs/12-patient-metrics-tracking.md` | **Done** — snapshot + time-series patient self-tracking (ADR-013) + validate `weight`+`height`; "lời khuyên khi chỉ số đổi" vẫn **Planned** (chưa có intent) | Should | BE2 (tracking) / BE1 (AI advice, Planned) |
-| 13 | `specs/13-ai-chat-assistant.md` | **Done (core)** — guardrails citation+safety wired, `profile_loader` đọc DB thật, `food_log` đọc dữ liệu thật, `secondary_intents[]`, `/chat/stream` SSE; hybrid RAG + wiring `validate_interaction_output`/`sanitize_recommendation` vẫn **Planned** | Must | BE1 |
+| 13 | `specs/13-ai-chat-assistant.md` | **Done (core)** — guardrails citation+safety+per-recommendation (T01) wired, `profile_loader` đọc DB thật, `food_log` đọc dữ liệu thật, `secondary_intents[]`, `/chat/stream` SSE; hybrid RAG vẫn **Planned** | Must | BE1 |
 
 ## Backlog thật còn lại (đã xác minh KHÔNG có trong code)
 
 | # | Nội dung | Spec/ADR liên quan | MoSCoW | Owner |
 |---|---|---|---|---|
-| B1 | Wire `validate_interaction_output`/`sanitize_recommendation` (đã viết ở `guardrails/rules.py`, chưa có nơi gọi) vào `interaction_check_node`/`apply_guardrails` | `specs/13`, `adrs/006` | Should | BE1 |
+| B1 | ~~Wire `validate_interaction_output`/`sanitize_recommendation` vào runtime~~ **Done T01 (2026-08-31)** | `specs/13`, `adrs/006` | Should | BE1 |
 | B2 | Chuyển `rag_qa_node` sang `retrieve_hybrid()` (BM25+dense RRF đã có trong `rag/retriever.py`, chat hiện vẫn dense-only) | `specs/13`, `adrs/001` | Should | BE1 |
 | B3 | LLM dual-provider fallback OpenAI ↔ DeepSeek tự động thử provider phụ trước khi rơi về rule-based (as-built hiện tại chỉ single-provider qua `LLM_PROVIDER`) | `adrs/004` | Should | BE1 |
 | B4 | Intent Agent mới "lời khuyên khi chỉ số cơ thể đổi" — cần thêm vào `VALID_INTENTS` + cơ chế so sánh snapshot trước/sau | `specs/12` §6 | Should | BE1 |

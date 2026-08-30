@@ -34,6 +34,8 @@ _PAYLOAD_FIELDS = (
     "thinking_steps",
     "corrected",
     "correction_reason",
+    "unmatched_pairs",
+    "escalation_id",
 )
 
 

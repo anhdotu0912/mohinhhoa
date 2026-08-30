@@ -29,6 +29,8 @@ class ChatMessageOut(BaseModel):
     thinking_steps: list[dict[str, Any]] = Field(default_factory=list)
     corrected: bool = False
     correction_reason: str | None = None
+    unmatched_pairs: list[dict] = Field(default_factory=list)
+    escalation_id: str | None = None
 
 
 class ChatMessageIn(BaseModel):
@@ -49,6 +51,8 @@ class ChatMessageIn(BaseModel):
     thinking_steps: list[dict[str, Any]] = Field(default_factory=list)
     corrected: bool = False
     correction_reason: str | None = None
+    unmatched_pairs: list[dict] = Field(default_factory=list)
+    escalation_id: str | None = None
 
 
 class ChatSessionSummaryOut(BaseModel):

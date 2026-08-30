@@ -17,6 +17,7 @@ from app.api.v1 import (
     routes_chat,
     routes_compliance,
     routes_doctor,
+    routes_escalations,
     routes_food_log,
     routes_guidelines,
     routes_interactions,
@@ -110,6 +111,8 @@ async def lifespan(app: FastAPI):
     init_db()
     _warn_if_vector_store_empty()
     yield
+    from app.rag.qdrant import close_qdrant_client
+    close_qdrant_client()
 
 
 app = FastAPI(title="VinNutri API", version="0.1.0", lifespan=lifespan)
@@ -131,6 +134,8 @@ for router in (
     routes_profile.router,
     routes_meal_plan.router,
     routes_chat.router,
+    routes_escalations.patient_router,
+    routes_escalations.doctor_router,
     routes_interactions.router,
     routes_alerts.router,
     routes_notifications.router,

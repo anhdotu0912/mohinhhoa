@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VinNutri
 
-**Version:** 1.11 (2026-08-29 — HITL ràng buộc lâm sàng: patient proposal không có hiệu lực tới khi bác sĩ duyệt. Xem changelog ở §7 Versioning.)
+**Version:** 1.12 (2026-08-31 — `AgentRunOutput.unmatched_pairs[]` cho chat escalation HITL. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -254,7 +254,8 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
   "guardrail_triggered": false,
   "weekly_compliance": null,
   "doctor_note": null,
-  "metrics_delta_advice": null
+  "metrics_delta_advice": null,
+  "unmatched_pairs": []
 }
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
@@ -430,7 +431,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.11**.
+- Version hiện tại của contract này: **1.12**.
+- **Changelog 1.11 → 1.12 (2026-08-31):** `AgentRunOutput.unmatched_pairs[]` (optional, default `[]`) — map từ `interaction_check` để chat hiện CTA hỏi bác sĩ khi KB không có cặp thuốc–thực phẩm. Đồng bộ `contracts/api-v1.md` v1.21. Không breaking.
 - **Changelog 1.10 → 1.11 (2026-08-29):** HITL ràng buộc lâm sàng — `PatientProfile` thêm `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` (optional, default `null`). `POST /profile` không còn ghi đè `target_kcal`/`restrictions`/`treatment_goals` hiệu lực; meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/api-v1.md` v1.17, `specs/02`, `specs/04`. Không breaking — field mới optional, cột hiệu lực giữ nguyên shape.
 - **Changelog 1.9 → 1.10 (2026-08-28):** `DoctorNoteOut` thêm `doctor_avatar`, `notes[]`, `has_more`; `note`/`created_at`/`tags` giữ là reminder mới nhất. Nguồn chỉ `manual_reminder` (bỏ fallback `adjustment_note`). Tên/ảnh từ bác sĩ được gán, không hallucinate. Đồng bộ `contracts/api-v1.md` v1.15. Không breaking — field mới optional/default.
 - **Changelog 1.8 → 1.9 (2026-08-27):** `FoodLogEntry.slot` thêm `"snack"` (4 slot food log khớp meal plan bữa phụ). Không breaking — giá trị mới optional cho client cũ. Đồng bộ `contracts/api-v1.md` v1.12, `adrs/009` supersede, `specs/09`.

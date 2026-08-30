@@ -253,6 +253,7 @@ class AgentRunOutput(BaseModel):
     weekly_compliance: WeeklyComplianceOut | None = None
     doctor_note: DoctorNoteOut | None = None
     metrics_delta_advice: MetricsDeltaAdviceOut | None = None
+    unmatched_pairs: list[UnmatchedPair] = Field(default_factory=list)
 
 
 FoodItem.model_rebuild()
