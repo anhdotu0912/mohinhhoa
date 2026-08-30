@@ -3,13 +3,18 @@ import { DEFAULT_VARIANTS_PER_JOB, DEFAULT_PLAN_DAYS } from "./config";
 
 export interface MealDishItem {
   name: string;
+  /** Khẩu phần gốc từ agent / catalog — không tự bịa. */
+  portion?: string;
   calories: number;
   salt: number;
+  /** Natri mg gốc — dùng cộng tổng ngày cho khớp BE, tránh lệch do làm tròn muối/món. */
+  sodiumMg?: number;
   sugar: number;
   /** Fat (g) — hiển thị macro chip trên thực đơn bệnh nhân. */
   fat?: number;
   /** Carb (g) — dùng tính cảnh báo carb/bữa khi có dữ liệu catalog. */
   carbG?: number;
+  proteinG?: number;
   foodId?: string | null;
   alternatives?: MealDishItem[];
 }

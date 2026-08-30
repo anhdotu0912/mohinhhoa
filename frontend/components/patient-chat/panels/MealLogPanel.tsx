@@ -12,23 +12,10 @@ import {
 } from "@/lib/types";
 import { MealItemRow } from "@/components/patient-chat/MealItemRow";
 import { WeeklyAdherenceChart } from "@/components/patient-chat/WeeklyAdherenceChart";
-import { mealsToDayTotals } from "@/lib/meal-plan-display";
+import { mealsToDayTotals, sumMealNutrition } from "@/lib/meal-plan-display";
+import { NutrientChips } from "@/components/shared/NutrientChips";
 
 
-const DEFAULT_MEAL_IMAGES: Record<string, string> = {
-  morning:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCy63oLuOJDAmaKRpjFVopv89rdYQENESNjmE7aq_Ocq5jrHK-FH4GgCQR9vK5YZKE3RLentfO1lbIteBFsDnqnrIzn4LYFvI8taELitugsX2t_WedQhDlwtNFs5y9hU2pIiXrC7lePguTix4QtDrL0g3dW0dBVdyMRmIFNu-q5hrSD3rHRDJuBreht0dKaUxvrTNLQ65jCCGDQv-UyRxlfu-xHsVEgiGRWTVTxHlL_H-pkvO10wV_OkQ",
-  breakfast:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCy63oLuOJDAmaKRpjFVopv89rdYQENESNjmE7aq_Ocq5jrHK-FH4GgCQR9vK5YZKE3RLentfO1lbIteBFsDnqnrIzn4LYFvI8taELitugsX2t_WedQhDlwtNFs5y9hU2pIiXrC7lePguTix4QtDrL0g3dW0dBVdyMRmIFNu-q5hrSD3rHRDJuBreht0dKaUxvrTNLQ65jCCGDQv-UyRxlfu-xHsVEgiGRWTVTxHlL_H-pkvO10wV_OkQ",
-  noon:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuADxt27IKTLgeBaUZZGmclNHqa1yxJ5BdE0hwQFPCghtzkBs-pLnXxtW9rJx9oEEHdsi2YcdIOOe-sJ_ieXqF3meSXctDnCBu_bdGF6O00ujRzs-_rwLYj9GMPyExtZbk6BybfRiv4tdGIw277x0dhVDL-038JXsqgcXBovCGlm_GNZ49AuvnZ74ZowOiWHC9-1EtExtZZAYUgEh-yrRUXoED48SXWnpqysR-Isco73Nyy02z2BTLtdmw",
-  lunch:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuADxt27IKTLgeBaUZZGmclNHqa1yxJ5BdE0hwQFPCghtzkBs-pLnXxtW9rJx9oEEHdsi2YcdIOOe-sJ_ieXqF3meSXctDnCBu_bdGF6O00ujRzs-_rwLYj9GMPyExtZbk6BybfRiv4tdGIw277x0dhVDL-038JXsqgcXBovCGlm_GNZ49AuvnZ74ZowOiWHC9-1EtExtZZAYUgEh-yrRUXoED48SXWnpqysR-Isco73Nyy02z2BTLtdmw",
-  evening:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuD2oStqvUJaJYckUh0nABnEJ8Ct080LnSnLWI4sl5w6O9GOHregWxmfd5Kv18OPXYPh3r6OLpxuRI9X7zxLm8gxXIqGIBGjVCQJN7KsNoDmYo_EVCUf90JZkUVFlrbTBFU1m_dX_RW3fMInFSM5ldv15Fv4EYzGjOnB2xGQOg6r2NILwjFncmEUHwMc9Gn66Z6roL-wOe1RtpO9zdnVpk5wYh_AXeLPxp7HmrOXOGRVtdwEKAbLW8hq6g",
-  dinner:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuD2oStqvUJaJYckUh0nABnEJ8Ct080LnSnLWI4sl5w6O9GOHregWxmfd5Kv18OPXYPh3r6OLpxuRI9X7zxLm8gxXIqGIBGjVCQJN7KsNoDmYo_EVCUf90JZkUVFlrbTBFU1m_dX_RW3fMInFSM5ldv15Fv4EYzGjOnB2xGQOg6r2NILwjFncmEUHwMc9Gn66Z6roL-wOe1RtpO9zdnVpk5wYh_AXeLPxp7HmrOXOGRVtdwEKAbLW8hq6g",
-};
 
 const SLOT_META: Record<string, { label: string; icon: string }> = {
   morning: { label: "Bữa sáng", icon: "wb_twilight" },
@@ -92,6 +79,14 @@ export function MealLogPanel() {
   const [customSlot, setCustomSlot] = useState<string | null>(null);
   const [customNote, setCustomNote] = useState("");
   const [savingSlot, setSavingSlot] = useState<string | null>(null);
+  const [expandedNutrientSlots, setExpandedNutrientSlots] = useState<Record<string, boolean>>({});
+
+  const toggleSlotNutrient = (slotKey: string) => {
+    setExpandedNutrientSlots((prev) => ({
+      ...prev,
+      [slotKey]: !prev[slotKey],
+    }));
+  };
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -349,20 +344,8 @@ export function MealLogPanel() {
                 const slotKey = meal.slot;
                 const slotMeta = SLOT_META[slotKey] || { label: slotKey, icon: "restaurant" };
                 const items = meal.items || [];
-                const totalKcal = Math.round(
-                  items.reduce((acc, it) => acc + (it.kcal || 0), 0)
-                );
-                const totalProtein = Math.round(
-                  items.reduce((acc, it) => acc + (it.macros?.protein_g || 0), 0)
-                );
-                const totalCarbs = Math.round(
-                  items.reduce((acc, it) => acc + (it.macros?.carb_g || 0), 0)
-                );
-                const totalFat = Math.round(
-                  items.reduce((acc, it) => acc + (it.macros?.fat_g || 0), 0)
-                );
+                const nutrition = sumMealNutrition(meal);
 
-                const imageSrc = DEFAULT_MEAL_IMAGES[slotKey] || DEFAULT_MEAL_IMAGES.noon;
                 const foodLogSlot = toFoodLogSlot(slotKey);
                 const canLogSlot = foodLogSlot !== null;
                 const isLogged = isToday && canLogSlot ? isSlotLogged(slotKey) : false;
@@ -385,9 +368,9 @@ export function MealLogPanel() {
                         <span className="text-xs sm:text-sm font-bold text-slate-900">
                           {slotMeta.label}
                         </span>
-                        {totalKcal > 0 && (
-                          <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
-                            {totalKcal} kcal
+                        {nutrition.kcal > 0 && (
+                          <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80 tabular-nums">
+                            {nutrition.kcal} kcal
                           </span>
                         )}
                       </div>
@@ -431,17 +414,8 @@ export function MealLogPanel() {
                       </div>
                     </div>
 
-                    {/* Middle Row: Image Thumbnail + Full Dishes List */}
-                    <div className="flex items-start gap-2.5 sm:gap-3.5">
-                      <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs aspect-square">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageSrc}
-                          alt={slotMeta.label}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-
+                    {/* Dishes List */}
+                    <div className="flex flex-col gap-2">
                       {/* Multi-dish items breakdown */}
                       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                         {items.length > 0 ? (
@@ -457,25 +431,33 @@ export function MealLogPanel() {
                             Món ăn dinh dưỡng chuẩn theo hướng dẫn y khoa.
                           </div>
                         )}
+                      </div>
 
-                        {/* Macros Breakdown Pills */}
-                        {(totalProtein > 0 || totalCarbs > 0 || totalFat > 0) && (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] font-semibold text-slate-500">
-                            {totalProtein > 0 && (
-                              <span className="bg-emerald-50 text-emerald-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/70">
-                                Đạm: {totalProtein}g
-                              </span>
-                            )}
-                            {totalCarbs > 0 && (
-                              <span className="bg-blue-50 text-blue-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-blue-200/70">
-                                Carb: {totalCarbs}g
-                              </span>
-                            )}
-                            {totalFat > 0 && (
-                              <span className="bg-amber-50 text-amber-800 px-1.5 sm:px-2 py-0.5 rounded-md border border-amber-200/70">
-                                Béo: {totalFat}g
-                              </span>
-                            )}
+                      {/* Nút Xem thêm thành phần dinh dưỡng bữa */}
+                      <div className="pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleSlotNutrient(slotKey)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#006857] py-0.5 px-1.5 rounded-md hover:bg-emerald-50/60 transition-colors cursor-pointer"
+                        >
+                          <span>Thành phần bữa</span>
+                          <span
+                            className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
+                              expandedNutrientSlots[slotKey] ? "rotate-180 text-[#006857]" : "text-slate-400"
+                            }`}
+                          >
+                            expand_more
+                          </span>
+                        </button>
+
+                        {expandedNutrientSlots[slotKey] && (
+                          <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <NutrientChips
+                              values={nutrition}
+                              layer="detail"
+                              compact
+                              omit={["kcal"]}
+                            />
                           </div>
                         )}
                       </div>

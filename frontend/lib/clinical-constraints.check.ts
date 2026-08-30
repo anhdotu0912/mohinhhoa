@@ -28,7 +28,7 @@ assert.equal(clampClinical("carb_per_meal", 45), 45);
 
 assert.equal(validateClinicalNumber("target_kcal", 799), "Năng lượng hợp lệ từ 800–4000 kcal.");
 assert.equal(validateClinicalNumber("target_kcal", 1800), null);
-assert.equal(validateClinicalNumber("sugar_daily_g", 101), "Đường tự do / ngày hợp lệ từ 0–100 g.");
+assert.equal(validateClinicalNumber("sugar_daily_g", 101), "Đường / ngày hợp lệ từ 0–100 g.");
 assert.equal(validateClinicalNumber("salt_daily_g", 15), null);
 
 assert.equal(validateTreatmentGoals(["ab"]), "Mỗi mục tiêu tối thiểu 3 ký tự.");

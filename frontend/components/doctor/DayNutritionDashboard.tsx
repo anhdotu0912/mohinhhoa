@@ -1,165 +1,160 @@
 "use client";
 
-export type DayNutritionMetricKey = "calories" | "salt" | "sugar";
+import { formatQty } from "@/lib/meal-plan-mappers";
 
-type MetricConfig = {
-  key: DayNutritionMetricKey;
+type SlotKey = "breakfast" | "lunch" | "dinner" | "snack";
+
+type MetricKey = "calories" | "carb" | "salt" | "sugar";
+
+type CompactMetric = {
+  key: MetricKey;
   label: string;
   unit: string;
-  icon: string;
-  format: (n: number) => string;
+  value: number;
+  mode: "band" | "ceiling";
+  lower: number;
+  upper: number | null;
+  limitText?: string;
+  subText?: string;
+  isHardFail?: boolean;
 };
-
-const METRICS: MetricConfig[] = [
-  {
-    key: "calories",
-    label: "Kalo",
-    unit: "kcal",
-    icon: "local_fire_department",
-    format: (n) => `${Math.round(n)}`,
-  },
-  {
-    key: "salt",
-    label: "Muối",
-    unit: "g",
-    icon: "water_drop",
-    format: (n) => n.toFixed(1),
-  },
-  {
-    key: "sugar",
-    label: "Đường",
-    unit: "g",
-    icon: "nutrition",
-    format: (n) => n.toFixed(1),
-  },
-];
 
 export type DayNutritionDashboardProps = {
   dayLabel: string;
   calories: number;
   saltG: number;
   sugarG: number;
+  carbG?: number;
   targetCalories: number;
-  targetSaltG: number;
-  targetSugarG: number;
-  mealBreakdown?: { breakfast: number; lunch: number; dinner: number; snack: number };
-  /** Cảnh báo cứng cấp ngày (kalo/natri vượt ngưỡng). */
+  targetSaltG: number | null;
+  targetSugarG: number | null;
+  targetCarbG?: number | null;
+  mealCarbG?: Record<SlotKey, number>;
+  carbPerMealLimit?: number | null;
   dayWarnings?: string[];
-  /** Gợi ý cấp ngày — không chặn duyệt. */
   dayAdvisoryWarnings?: string[];
   kcalLower?: number;
   kcalUpper?: number;
 };
 
-type Band = { target: number; lower: number; upper: number };
-
-type GuidanceMode = "band" | "ceiling" | "informational";
-
-function bandFor(
-  key: DayNutritionMetricKey,
-  target: number,
-  kcalLower?: number,
-  kcalUpper?: number
-): Band {
-  if (key === "calories") {
-    return {
-      target: Math.round(target),
-      lower: kcalLower ?? Math.round(target * 0.9),
-      upper: kcalUpper ?? Math.round(target * 1.1),
-    };
-  }
-  if (key === "salt") {
-    const t = Math.max(0.1, target);
-    return {
-      target: Math.round(t * 10) / 10,
-      lower: 0,
-      upper: Math.round(t * 10) / 10,
-    };
-  }
-  const t = Math.max(0.1, target);
-  return {
-    target: Math.round(t * 10) / 10,
-    lower: Math.round(t * 0.9 * 10) / 10,
-    upper: Math.round(t * 1.1 * 10) / 10,
-  };
+function ThresholdBar({
+  value,
+  lower,
+  upper,
+  mode,
+  ok,
+  label,
+}: {
+  value: number;
+  lower: number;
+  upper: number;
+  mode: "band" | "ceiling";
+  ok: boolean;
+  label: string;
+}) {
+  const scaleMax = Math.max(upper * 1.35, value * 1.15, 1);
+  return (
+    <div
+      className="relative h-2 rounded-full bg-slate-100 overflow-hidden"
+      role="progressbar"
+      aria-valuemin={mode === "ceiling" ? 0 : lower}
+      aria-valuemax={upper}
+      aria-valuenow={Math.round(value)}
+      aria-label={label}
+    >
+      {/* Target range background zone */}
+      {mode === "ceiling" ? (
+        <div
+          className="absolute inset-y-0 left-0 bg-emerald-100"
+          style={{ width: `${Math.min(100, (upper / scaleMax) * 100)}%` }}
+        />
+      ) : (
+        <div
+          className="absolute inset-y-0 bg-emerald-100"
+          style={{
+            left: `${Math.min(100, (lower / scaleMax) * 100)}%`,
+            width: `${Math.min(100 - (lower / scaleMax) * 100, ((upper - lower) / Math.max(scaleMax, 1)) * 100)}%`,
+          }}
+        />
+      )}
+      {/* Indicator bar: Emerald when within target, Vivid Rose/Red when exceeding or under limit */}
+      <div
+        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
+          ok ? "bg-emerald-600" : "bg-rose-600"
+        }`}
+        style={{ width: `${Math.min(100, (value / scaleMax) * 100)}%` }}
+      />
+    </div>
+  );
 }
 
-function guidanceModeFor(key: DayNutritionMetricKey): GuidanceMode {
-  if (key === "salt") return "ceiling";
-  if (key === "sugar") return "informational";
-  return "band";
-}
+function CompactMetricCell({ metric }: { metric: CompactMetric }) {
+  const hasUpper = metric.upper != null && metric.upper > 0;
+  const upper = metric.upper ?? 0;
+  const over = hasUpper && metric.value > upper;
+  const under = metric.mode === "band" && metric.value < metric.lower;
+  const hardFail = metric.isHardFail !== undefined ? metric.isHardFail : (over || under);
+  const limitText =
+    metric.limitText ??
+    (!hasUpper
+      ? "—"
+      : metric.mode === "ceiling"
+        ? `≤ ${formatQty(upper)}${metric.unit === "kcal" ? "" : metric.unit}`
+        : `${Math.round(metric.lower)}–${Math.round(upper)}`);
 
-function guidanceFor(
-  value: number,
-  band: Band,
-  mode: GuidanceMode = "band"
-): {
-  kind: "up" | "down" | "ok" | "info";
-  badge: string;
-  track: string;
-  text: string;
-  hint: string;
-} {
-  if (mode === "informational" && value <= 0) {
-    return {
-      kind: "info",
-      badge: "Chưa có dữ liệu",
-      track: "bg-surface-container-low",
-      text: "text-on-surface-variant",
-      hint: "Catalog hiện chưa ghi nhận đường cho món ăn.",
-    };
-  }
-
-  if (mode === "ceiling") {
-    if (value <= band.upper) {
-      return {
-        kind: "ok",
-        badge: "Trong ngưỡng",
-        track: "bg-surface-container-low",
-        text: "text-on-surface-variant",
-        hint: `Dưới hoặc bằng giới hạn ${band.upper}g/ngày.`,
-      };
-    }
-    const over = Math.round((value - band.upper) * 10) / 10;
-    return {
-      kind: "down",
-      badge: "Nên giảm",
-      track: "bg-red-50",
-      text: "text-red-800",
-      hint: `Vượt giới hạn khoảng ${over}g.`,
-    };
-  }
-
-  if (value < band.lower) {
-    const lowGap = Math.round((band.lower - value) * 10) / 10;
-    const highGap = Math.round((band.upper - value) * 10) / 10;
-    return {
-      kind: "up",
-      badge: "Nên tăng",
-      track: "bg-emerald-50",
-      text: "text-emerald-800",
-      hint: `Còn thiếu khoảng ${lowGap}–${highGap} để vào ngưỡng.`,
-    };
-  }
-  if (value > band.upper) {
-    const lowGap = Math.round((value - band.upper) * 10) / 10;
-    const highGap = Math.round((value - band.lower) * 10) / 10;
-    return {
-      kind: "down",
-      badge: "Nên giảm",
-      track: "bg-red-50",
-      text: "text-red-800",
-      hint: `Cần giảm khoảng ${lowGap}–${highGap} để vào ngưỡng.`,
-    };
-  }
-  return {
-    kind: "ok",
-    badge: "Trong ngưỡng",
-    track: "bg-surface-container-low",
-    text: "text-on-surface-variant",
-    hint: "Đang nằm trong khoảng gợi ý.",
-  };
+  return (
+    <div
+      className={`rounded-lg border px-2.5 py-2 min-w-0 transition-colors ${
+        hardFail
+          ? "border-rose-300 bg-rose-50/80 ring-1 ring-rose-300/60 shadow-xs"
+          : "border-outline-variant bg-surface-container-lowest"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-1">
+        <span
+          className={`text-[10px] font-bold uppercase tracking-wide ${
+            hardFail ? "text-rose-900" : "text-on-surface-variant"
+          }`}
+        >
+          {metric.label}
+        </span>
+        <span
+          className={`text-[10px] tabular-nums shrink-0 font-medium ${
+            hardFail ? "text-rose-700 font-bold" : "text-on-surface-variant"
+          }`}
+          title={metric.subText}
+        >
+          {limitText}
+        </span>
+      </div>
+      <p className="mt-0.5 flex items-baseline gap-0.5">
+        <span
+          className={`text-base font-bold tabular-nums leading-none ${
+            hardFail ? "text-rose-700" : "text-on-surface"
+          }`}
+        >
+          {metric.key === "calories" ? Math.round(metric.value) : formatQty(metric.value)}
+        </span>
+        <span
+          className={`text-[10px] ${
+            hardFail ? "text-rose-600" : "text-on-surface-variant"
+          }`}
+        >
+          {metric.unit}
+        </span>
+      </p>
+      <div className="mt-1.5">
+        <ThresholdBar
+          value={metric.value}
+          lower={metric.lower}
+          upper={upper > 0 ? upper : Math.max(metric.value, 1)}
+          mode={metric.mode}
+          ok={!hardFail}
+          label={`${metric.label}: ${metric.value}${metric.unit} (${limitText})`}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function DayNutritionDashboard({
@@ -167,58 +162,95 @@ export function DayNutritionDashboard({
   calories,
   saltG,
   sugarG,
+  carbG,
   targetCalories,
   targetSaltG,
   targetSugarG,
-  mealBreakdown,
+  targetCarbG,
+  mealCarbG,
+  carbPerMealLimit,
   dayWarnings = [],
   dayAdvisoryWarnings = [],
   kcalLower,
   kcalUpper,
 }: DayNutritionDashboardProps) {
-  const values: Record<DayNutritionMetricKey, number> = {
-    calories,
-    salt: saltG,
-    sugar: sugarG,
-  };
-  const targets: Record<DayNutritionMetricKey, number> = {
-    calories: Math.max(1, targetCalories),
-    salt: Math.max(0.1, targetSaltG),
-    sugar: Math.max(0.1, targetSugarG),
-  };
-  const calBand = bandFor("calories", targets.calories, kcalLower, kcalUpper);
+  const kcalTarget = Math.max(1, targetCalories);
+  const kcalLo = kcalLower ?? Math.round(kcalTarget * 0.9);
+  const kcalHi = kcalUpper ?? Math.round(kcalTarget * 1.1);
+
+  // Muối & Đường: Sử dụng giới hạn lâm sàng được chỉ định hoặc chuẩn khuyến cáo WHO / Bộ Y Tế (Muối ≤ 5g, Đường ≤ 25g)
+  const effectiveSaltLimit = targetSaltG != null && targetSaltG > 0 ? targetSaltG : 5;
+  const effectiveSugarLimit = targetSugarG != null && targetSugarG > 0 ? targetSugarG : 25;
+
+  const maxMealCarb = mealCarbG
+    ? Math.max(mealCarbG.breakfast, mealCarbG.lunch, mealCarbG.dinner, mealCarbG.snack)
+    : 0;
+  const resolvedCarbG = carbG ?? (mealCarbG ? Object.values(mealCarbG).reduce((a, b) => a + b, 0) : 0);
+  const carbOver = carbPerMealLimit != null && carbPerMealLimit > 0 && maxMealCarb > carbPerMealLimit;
+
+  // Dải dinh dưỡng Carb khuyến nghị (45–60% Kcal)
+  const carbLo = Math.round((kcalTarget * 0.45) / 4);
+  const carbHi = targetCarbG ?? Math.round((kcalTarget * 0.60) / 4);
+
+  const metrics: CompactMetric[] = [
+    {
+      key: "calories",
+      label: "Kcal",
+      unit: "kcal",
+      value: calories,
+      mode: "band",
+      lower: kcalLo,
+      upper: kcalHi,
+    },
+    {
+      key: "carb",
+      label: "Carb/bữa",
+      unit: "g",
+      value: maxMealCarb,
+      mode: "ceiling",
+      lower: 0,
+      upper: carbPerMealLimit ?? null,
+      limitText: carbPerMealLimit != null && carbPerMealLimit > 0 ? `≤ ${formatQty(carbPerMealLimit)}g` : "—",
+      subText: carbPerMealLimit != null && carbPerMealLimit > 0 ? `Trần lâm sàng ${carbPerMealLimit}g/bữa (bữa cao nhất: ${formatQty(maxMealCarb)}g)` : "Chưa đặt trần carb/bữa",
+      isHardFail: carbOver,
+    },
+    {
+      key: "salt",
+      label: "Muối",
+      unit: "g",
+      value: saltG,
+      mode: "ceiling",
+      lower: 0,
+      upper: effectiveSaltLimit,
+      limitText: `≤ ${formatQty(effectiveSaltLimit)}g`,
+      isHardFail: saltG > effectiveSaltLimit,
+    },
+    {
+      key: "sugar",
+      label: "Đường",
+      unit: "g",
+      value: sugarG,
+      mode: "ceiling",
+      lower: 0,
+      upper: effectiveSugarLimit,
+      limitText: `≤ ${formatQty(effectiveSugarLimit)}g`,
+      isHardFail: sugarG > effectiveSugarLimit,
+    },
+  ];
 
   return (
     <section
-      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md mb-lg shadow-xs"
-      aria-label={`Chỉ số dinh dưỡng ${dayLabel}`}
+      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-sm shadow-xs"
+      aria-label={`Tổng ngày ${dayLabel}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-xs mb-md">
-        <div>
-          <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
-            Tổng dinh dưỡng — {dayLabel}
-          </h3>
-          <p className="text-xs text-on-surface-variant mt-0.5">
-            Thanh có vùng xanh = khoảng đạt. Kalo ngày: {calBand.lower}–
-            {calBand.upper} kcal (mục tiêu ~{calBand.target}).
-          </p>
-        </div>
-        {mealBreakdown ? (
-          <p className="text-[11px] text-on-surface-variant tabular-nums shrink-0">
-            Sáng {mealBreakdown.breakfast} · Trưa {mealBreakdown.lunch} · Tối{" "}
-            {mealBreakdown.dinner} · Phụ {mealBreakdown.snack} kcal
-          </p>
-        ) : null}
-      </div>
+      <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-sm">
+        Tổng ngày — {dayLabel}
+      </h3>
 
       {dayWarnings.length > 0 && (
-        <div className="mb-md p-3 bg-rose-50/80 border border-rose-200/70 rounded-lg space-y-1">
-          <div className="flex items-center gap-1.5 text-rose-800">
-            <span className="material-symbols-outlined text-[16px]">error</span>
-            <strong className="text-[11px] font-bold">Vi phạm lâm sàng (cả ngày)</strong>
-          </div>
+        <div className="mb-sm p-2 bg-rose-50 border border-rose-200 rounded-lg space-y-0.5">
           {dayWarnings.map((w) => (
-            <p key={w} className="text-xs text-rose-900 leading-relaxed">
+            <p key={w} className="text-[11px] text-rose-900 leading-relaxed">
               {w}
             </p>
           ))}
@@ -226,191 +258,73 @@ export function DayNutritionDashboard({
       )}
 
       {dayAdvisoryWarnings.length > 0 && (
-        <div className="mb-md p-3 bg-slate-100 border border-slate-200/80 rounded-lg space-y-1">
-          <div className="flex items-center gap-1.5 text-slate-800">
-            <span className="material-symbols-outlined text-[16px]">info</span>
-            <strong className="text-[11px] font-bold">Gợi ý (không chặn duyệt)</strong>
-          </div>
+        <div className="mb-sm p-2 bg-surface-container-low border border-outline-variant rounded-lg space-y-0.5">
           {dayAdvisoryWarnings.map((w) => (
-            <p key={w} className="text-xs text-slate-700 leading-relaxed">
+            <p key={w} className="text-[11px] text-on-surface-variant leading-relaxed">
               {w}
             </p>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-        {METRICS.map((metric) => {
-          const value = values[metric.key];
-          const target = targets[metric.key];
-          const mode = guidanceModeFor(metric.key);
-          const band = bandFor(metric.key, target, kcalLower, kcalUpper);
-          const guide = guidanceFor(value, band, mode);
-          const scaleMax = Math.max(
-            mode === "ceiling" ? band.upper * 1.25 : band.upper * 1.2,
-            value,
-            1
-          );
-          const inBand =
-            mode === "ceiling"
-              ? value <= band.upper
-              : mode === "informational" && value <= 0
-                ? true
-                : value >= band.lower && value <= band.upper;
-
-          return (
-            <div
-              key={metric.key}
-              className={`rounded-lg border border-outline-variant p-sm ${guide.track}`}
-            >
-              <div className="flex items-start justify-between gap-sm mb-sm">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-xs text-on-surface">
-                    <span className="material-symbols-outlined text-[18px]">
-                      {metric.icon}
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wide">
-                      {metric.label}
-                    </span>
-                  </div>
-                  <p className="mt-1 flex items-baseline gap-1">
-                    <span
-                      className={`text-2xl font-bold tabular-nums leading-none ${
-                        inBand ? "text-on-surface" : "text-amber-800"
-                      }`}
-                    >
-                      {metric.format(value)}
-                    </span>
-                    <span className="text-xs text-on-surface-variant">
-                      {metric.unit}
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-on-surface-variant mt-1 tabular-nums">
-                    {metric.key === "salt" ? (
-                      <>
-                        Giới hạn ≤ {metric.format(band.upper)} {metric.unit}/ngày
-                      </>
-                    ) : metric.key === "sugar" && value <= 0 ? (
-                      <>Chưa có dữ liệu đường từ catalog</>
-                    ) : (
-                      <>
-                        Gợi ý {metric.format(band.lower)}–{metric.format(band.upper)}{" "}
-                        {metric.unit}
-                        <span className="text-on-surface-variant/80">
-                          {" "}
-                          (mục tiêu ~{metric.format(band.target)})
-                        </span>
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                <div
-                  className="flex flex-col items-center gap-0.5 shrink-0"
-                  aria-label={
-                    guide.kind === "up"
-                      ? `${metric.label}: nên tăng`
-                      : guide.kind === "down"
-                        ? `${metric.label}: nên giảm`
-                        : guide.kind === "info"
-                          ? `${metric.label}: chưa có dữ liệu`
-                          : `${metric.label}: trong ngưỡng`
-                  }
-                >
-                  {guide.kind === "up" && (
-                    <span className="w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                      <span className="material-symbols-outlined text-[24px]">
-                        arrow_upward
-                      </span>
-                    </span>
-                  )}
-                  {guide.kind === "down" && (
-                    <span className="w-10 h-10 rounded-lg bg-red-600 text-white flex items-center justify-center shadow-xs">
-                      <span className="material-symbols-outlined text-[24px]">
-                        arrow_downward
-                      </span>
-                    </span>
-                  )}
-                  {guide.kind === "ok" && (
-                    <span className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[22px]">
-                        check
-                      </span>
-                    </span>
-                  )}
-                  {guide.kind === "info" && (
-                    <span className="w-10 h-10 rounded-lg bg-surface-container-high text-on-surface-variant border border-outline-variant flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[20px]">
-                        info
-                      </span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-[10px] text-on-surface-variant mb-1 tabular-nums">
-                  <span>0</span>
-                  <span>
-                    {metric.key === "salt"
-                      ? `Giới hạn ≤ ${metric.format(band.upper)}`
-                      : `~${metric.format(band.target)} · ${metric.format(band.lower)}–${metric.format(band.upper)}`}
-                  </span>
-                  <span>{metric.format(band.upper)}+</span>
-                </div>
-                <div
-                  className="relative h-2 rounded-full bg-surface-container-low overflow-hidden"
-                  role="progressbar"
-                  aria-valuemin={band.lower}
-                  aria-valuemax={band.upper}
-                  aria-valuenow={Math.round(value)}
-                  aria-label={
-                    metric.key === "salt"
-                      ? `${metric.label}: giới hạn ${band.upper}`
-                      : `${metric.label}: ngưỡng ${band.lower}–${band.upper}`
-                  }
-                >
-                  {mode !== "ceiling" && (
-                    <div
-                      className="absolute inset-y-0 bg-emerald-200/70"
-                      style={{
-                        left: `${(band.lower / scaleMax) * 100}%`,
-                        width: `${((band.upper - band.lower) / scaleMax) * 100}%`,
-                      }}
-                    />
-                  )}
-                  {mode === "ceiling" && (
-                    <div
-                      className="absolute inset-y-0 bg-emerald-200/70"
-                      style={{
-                        left: 0,
-                        width: `${(band.upper / scaleMax) * 100}%`,
-                      }}
-                    />
-                  )}
-                  <div
-                    className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
-                      inBand ? "bg-primary/80" : "bg-amber-500/80"
-                    }`}
-                    style={{
-                      width: `${Math.min(100, (value / scaleMax) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-1.5 flex items-center justify-between gap-sm">
-                <span className={`text-[10px] font-bold ${guide.text}`}>
-                  {guide.badge}
-                </span>
-                <span className="text-[10px] text-on-surface-variant">
-                  {guide.hint}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        {metrics.map((metric) => (
+          <CompactMetricCell key={metric.key} metric={metric} />
+        ))}
       </div>
     </section>
+  );
+}
+
+export function MealMetricRow({
+  kcal,
+  saltG,
+  sugarG,
+  carbG,
+  carbLimit,
+}: {
+  kcal: number;
+  saltG?: number;
+  sugarG?: number;
+  carbG: number;
+  carbLimit?: number | null;
+}) {
+  const carbOver = carbLimit != null && carbG > carbLimit;
+  const cells: { label: string; value: string; warn?: boolean }[] = [
+    { label: "Kcal", value: `${Math.round(kcal)}` },
+    {
+      label: "Carb",
+      value:
+        carbLimit != null
+          ? `${formatQty(carbG)} / ${formatQty(carbLimit)}g`
+          : `${formatQty(carbG)}g`,
+      warn: carbOver,
+    },
+    { label: "Muối", value: `${formatQty(saltG ?? 0)}g` },
+    { label: "Đường", value: `${formatQty(sugarG ?? 0)}g` },
+  ];
+
+  return (
+    <div className="grid gap-1 grid-cols-2 sm:grid-cols-4">
+      {cells.map((cell) => (
+        <div
+          key={cell.label}
+          className={`rounded-md border px-2 py-1.5 min-w-0 ${
+            cell.warn
+              ? "border-rose-200 bg-rose-50"
+              : "border-outline-variant/60 bg-surface-container-low/40"
+          }`}
+        >
+          <p className="text-[10px] font-semibold text-on-surface-variant">{cell.label}</p>
+          <p
+            className={`text-xs font-bold tabular-nums ${
+              cell.warn ? "text-rose-900" : "text-on-surface"
+            }`}
+          >
+            {cell.value}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }

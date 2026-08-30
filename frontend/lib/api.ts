@@ -21,6 +21,7 @@ import {
   type FoodLogEntry,
   type GoalsOut,
   type GenerateMealPlanRequest,
+  type GuidelineSourceOut,
   type InteractionCheckInput,
   type InteractionCheckOutput,
   type MealPlanOutput,
@@ -283,6 +284,10 @@ export const api = {
 
   getMealPlan(id: string): Promise<MealPlanOutput> {
     return request(`/api/v1/meal-plans/${id}`);
+  },
+
+  getGuidelineSource(sourceId: string): Promise<GuidelineSourceOut> {
+    return request(`/api/v1/guidelines/${encodeURIComponent(sourceId)}`);
   },
 
   getMealPlanRequest(): Promise<MealPlanRequestOut> {

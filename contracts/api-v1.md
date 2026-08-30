@@ -1,6 +1,6 @@
 # API v1 Contract — VinNutri (FE ↔ BE)
 
-**Version:** 1.16 (2026-08-29 — Doctor Profile & Clinical Statistics: `GET|PUT /doctor/profile`. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.20 (2026-08-30 — `GET /guidelines/{source_id}` đọc nội dung trích dẫn. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -930,7 +930,41 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ---
 
-## 14. Health
+## 14. Guidelines (citation source)
+
+### `GET /guidelines/{source_id}`
+**Role:** `patient` hoặc `doctor` (đã đăng nhập). Đọc nội dung nguồn trích dẫn để bác sĩ/bệnh nhân xem guideline khi click citation trên thực đơn hoặc chat.
+
+`source_id` là giá trị trong `MealPlanOutput.citations[]` hoặc `FoodItem.citations[]` (ví dụ `byt_vn_notes.md`, `ada_diabetes.md`, `food_catalog_demo#f_yen_mach`). Client phải `encodeURIComponent`.
+
+- **Guideline file** (`*.md` nằm trong `backend/data/guidelines/`): trả toàn bộ markdown + tiêu đề lấy từ heading đầu tiên.
+- **Catalog món** (id chứa `#` hoặc không phải file guideline): `kind="catalog"`, `body` giải thích nguồn catalog — không bịa nội dung y văn.
+- Path traversal / id không hợp lệ → `400 INVALID_SOURCE`. File guideline không tồn tại → `404 GUIDELINE_NOT_FOUND`.
+
+```json
+// Response 200 — guideline
+{
+  "id": "byt_vn_notes.md",
+  "kind": "guideline",
+  "title": "Hướng Dẫn Bộ Y Tế Việt Nam — Quản Lý Đái Tháo Đường Type 2",
+  "body": "# Hướng Dẫn Bộ Y Tế Việt Nam …\n\n…"
+}
+// Response 200 — catalog citation
+{
+  "id": "food_catalog_demo#f_yen_mach",
+  "kind": "catalog",
+  "title": "Nguồn catalog thực phẩm",
+  "body": "Citation `food_catalog_demo#f_yen_mach` trỏ tới món trong catalog dinh dưỡng, không phải guideline lâm sàng."
+}
+// Error 400
+{ "code": "INVALID_SOURCE", "detail": "Mã trích dẫn không hợp lệ." }
+// Error 404
+{ "code": "GUIDELINE_NOT_FOUND", "detail": "Không tìm thấy nguồn trích dẫn." }
+```
+
+---
+
+## 15. Health
 
 ### `GET /health`
 **Role:** không cần auth. **Không** có prefix `/api/v1` (root-level).
@@ -978,7 +1012,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.19**.
+- Version hiện tại: **1.20**.
+- **Changelog 1.19 → 1.20 (2026-08-30):** thêm `GET /guidelines/{source_id}` (role `patient`|`doctor`) — đọc nội dung file guideline RAG hoặc ghi chú catalog khi click citation trên UI duyệt thực đơn. Không breaking.
 - **Changelog 1.18 → 1.19 (2026-08-29):** validate range ràng buộc lâm sàng thống nhất FE+BE (`target_kcal` 800–4000, `carb_per_meal` 0–200, `sodium_daily` 0–5000, `salt_daily_g` 0–15, `sugar_daily_g` 0–100, `treatment_goals` 3–80 ký tự / tối đa 12). UI bác sĩ và hồ sơ BN dùng thanh kéo trong các khoảng này. 422 nếu vượt range. Không breaking với payload trong range cũ (trừ `target_kcal` < 800 hoặc muối > 15 / đường > 100).
 - **Changelog 1.17 → 1.18 (2026-08-29):** `PUT /doctor/patients/{id}/constraints` nhận thêm `carb_per_meal`, `sodium_daily`, `treatment_goals` (cùng bộ chỉ số với hồ sơ BN). Onboarding bệnh nhân không gửi field lâm sàng. Không breaking — field mới optional.
 - **Changelog 1.16 → 1.17 (2026-08-29):** HITL ràng buộc lâm sàng — `POST /profile` không còn áp `target_kcal`/`restrictions`/`treatment_goals` ngay; lưu `proposed_*` tới khi doctor `approve` (chép sang cột hiệu lực) hoặc `PUT .../constraints` (ghi hiệu lực, hủy đề xuất). `PatientProfile` / `DoctorPatientSummary` thêm `proposed_*` optional. Meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/agent-io-schema.md` v1.11. Không breaking — field mới default `null`.

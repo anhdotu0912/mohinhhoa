@@ -10,6 +10,7 @@ import {
   validateConstraintValues,
   validateTreatmentGoals,
 } from "@/lib/clinical-constraints";
+import { displaySaltG, sodiumDailyFromSaltG } from "@/lib/nutrient-display";
 import { TREATMENT_GOAL_OPTIONS } from "@/lib/profile-mappers";
 import { asRouteId } from "@/lib/route-params";
 import { ApiError, type DoctorPatientSummary } from "@/lib/types";
@@ -21,17 +22,19 @@ type ConstraintForm = {
   sugar: number;
   targetKcal: number;
   carbPerMeal: number;
-  sodiumDaily: number;
   selectedGoals: string[];
 };
 
 function defaultsFrom(patient: DoctorPatientSummary): ConstraintForm {
+  const salt = clampClinical(
+    "salt_daily_g",
+    displaySaltG(patient.salt_daily_g, patient.sodium_daily)
+  );
   return {
-    salt: clampClinical("salt_daily_g", patient.salt_daily_g),
+    salt,
     sugar: clampClinical("sugar_daily_g", patient.sugar_daily_g),
     targetKcal: clampClinical("target_kcal", patient.target_kcal),
     carbPerMeal: clampClinical("carb_per_meal", patient.carb_per_meal),
-    sodiumDaily: clampClinical("sodium_daily", patient.sodium_daily),
     selectedGoals: [...(patient.treatment_goals ?? [])],
   };
 }
@@ -51,7 +54,6 @@ export default function PatientConstraintsTabPage() {
     sugar: CLINICAL_LIMITS.sugar_daily_g.default,
     targetKcal: CLINICAL_LIMITS.target_kcal.default,
     carbPerMeal: CLINICAL_LIMITS.carb_per_meal.default,
-    sodiumDaily: CLINICAL_LIMITS.sodium_daily.default,
     selectedGoals: [],
   });
   const [customGoalInput, setCustomGoalInput] = useState("");
@@ -136,7 +138,7 @@ export default function PatientConstraintsTabPage() {
     const validationError = validateConstraintValues({
       target_kcal: form.targetKcal,
       carb_per_meal: form.carbPerMeal,
-      sodium_daily: form.sodiumDaily,
+      sodium_daily: sodiumDailyFromSaltG(form.salt),
       salt_daily_g: form.salt,
       sugar_daily_g: form.sugar,
       treatment_goals: form.selectedGoals,
@@ -153,7 +155,7 @@ export default function PatientConstraintsTabPage() {
         salt_daily_g: form.salt,
         sugar_daily_g: form.sugar,
         carb_per_meal: form.carbPerMeal,
-        sodium_daily: form.sodiumDaily,
+        sodium_daily: sodiumDailyFromSaltG(form.salt),
         treatment_goals: form.selectedGoals,
       });
       setPatient(updated);
@@ -217,6 +219,11 @@ export default function PatientConstraintsTabPage() {
   }
 
   const pending = patient.constraints_status === "pending_doctor_review";
+  const currentSaltG = displaySaltG(patient.salt_daily_g, patient.sodium_daily);
+  const proposedSaltG = displaySaltG(
+    patient.proposed_salt_daily_g,
+    patient.proposed_sodium_daily
+  );
 
   return (
     <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
@@ -289,29 +296,16 @@ export default function PatientConstraintsTabPage() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-semibold">Natri / ngày</td>
+                  <td className="px-4 py-2.5 font-semibold">Muối / ngày</td>
                   <td className="px-4 py-2.5 font-mono tabular-nums">
-                    {patient.sodium_daily != null ? `${patient.sodium_daily} mg` : "—"}
+                    {currentSaltG != null ? `${currentSaltG} g` : "—"}
                   </td>
                   <td className="px-4 py-2.5 font-mono tabular-nums font-bold">
-                    {patient.proposed_sodium_daily != null
-                      ? `${patient.proposed_sodium_daily} mg`
-                      : "—"}
+                    {proposedSaltG != null ? `${proposedSaltG} g` : "—"}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-semibold">Muối</td>
-                  <td className="px-4 py-2.5 font-mono tabular-nums">
-                    {patient.salt_daily_g != null ? `${patient.salt_daily_g} g` : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 font-mono tabular-nums font-bold">
-                    {patient.proposed_salt_daily_g != null
-                      ? `${patient.proposed_salt_daily_g} g`
-                      : "—"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 font-semibold">Đường tự do</td>
+                  <td className="px-4 py-2.5 font-semibold">Đường / ngày</td>
                   <td className="px-4 py-2.5 font-mono tabular-nums">
                     {patient.sugar_daily_g != null ? `${patient.sugar_daily_g} g` : "—"}
                   </td>
@@ -371,7 +365,7 @@ export default function PatientConstraintsTabPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
         <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-2">
@@ -422,34 +416,11 @@ export default function PatientConstraintsTabPage() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-violet-600 text-[18px]">water_drop</span>
-                <span>Natri / ngày</span>
-              </label>
-              <span className="font-mono text-xs font-bold bg-violet-500/10 text-violet-900 border border-violet-500/20 px-2.5 py-0.5 rounded-md tabular-nums">
-                {form.sodiumDaily} mg
-              </span>
-            </div>
-            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
-              Hợp lệ {CLINICAL_LIMITS.sodium_daily.min}–{CLINICAL_LIMITS.sodium_daily.max} mg. Planner lấy min với muối × 400 nếu cả hai có giá trị.
-            </p>
-          </div>
-          <ConstraintRangeInput
-            limitKey="sodium_daily"
-            value={form.sodiumDaily}
-            disabled={saving}
-            onChange={(value) => setForm((prev) => ({ ...prev, sodiumDaily: value }))}
-          />
-        </div>
-
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-amber-600 text-[18px]">grain</span>
-                <span>Muối ăn</span>
+                <span className="material-symbols-outlined text-amber-600 text-[18px]">science</span>
+                <span>Muối / ngày</span>
               </label>
               <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-900 border border-amber-500/20 px-2.5 py-0.5 rounded-md tabular-nums">
-                {form.salt} g/ngày
+                {form.salt} g
               </span>
             </div>
             <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
@@ -469,10 +440,10 @@ export default function PatientConstraintsTabPage() {
             <div className="flex justify-between items-center mb-2">
               <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-sky-600 text-[18px]">icecream</span>
-                <span>Đường tự do</span>
+                <span>Đường / ngày</span>
               </label>
               <span className="font-mono text-xs font-bold bg-sky-500/10 text-sky-900 border border-sky-500/20 px-2.5 py-0.5 rounded-md tabular-nums">
-                {form.sugar} g/ngày
+                {form.sugar} g
               </span>
             </div>
             <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">

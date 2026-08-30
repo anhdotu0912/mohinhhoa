@@ -34,6 +34,7 @@ import {
   validateTreatmentGoals,
 } from "@/lib/clinical-constraints";
 import { ConstraintRangeInput } from "@/components/shared/ConstraintRangeInput";
+import { displaySaltG, sodiumDailyFromSaltG } from "@/lib/nutrient-display";
 import {
   ApiError,
   type CatalogItem,
@@ -337,7 +338,6 @@ type EditFormState = {
   preferencesText: string;
   targetKcal: number;
   carbPerMeal: number;
-  sodiumDaily: number;
   saltDaily: number;
   sugarDaily: number;
 };
@@ -380,11 +380,13 @@ function profileToForm(
       "carb_per_meal",
       clinicalRestrictions?.carb_per_meal
     ),
-    sodiumDaily: clampClinical(
-      "sodium_daily",
-      clinicalRestrictions?.sodium_daily
+    saltDaily: clampClinical(
+      "salt_daily_g",
+      displaySaltG(
+        clinicalRestrictions?.salt_daily_g,
+        clinicalRestrictions?.sodium_daily
+      )
     ),
-    saltDaily: clampClinical("salt_daily_g", clinicalRestrictions?.salt_daily_g),
     sugarDaily: clampClinical(
       "sugar_daily_g",
       clinicalRestrictions?.sugar_daily_g
@@ -776,7 +778,7 @@ export default function PatientProfilePage() {
     return validateConstraintValues({
       target_kcal: form.targetKcal,
       carb_per_meal: form.carbPerMeal,
-      sodium_daily: form.sodiumDaily,
+      sodium_daily: sodiumDailyFromSaltG(form.saltDaily),
       salt_daily_g: form.saltDaily,
       sugar_daily_g: form.sugarDaily,
       treatment_goals: form.selectedGoals,
@@ -802,7 +804,7 @@ export default function PatientProfilePage() {
 
     const restrictions: ProfileUpsert["restrictions"] = {
       carb_per_meal: form.carbPerMeal,
-      sodium_daily: form.sodiumDaily,
+      sodium_daily: sodiumDailyFromSaltG(form.saltDaily),
       salt_daily_g: form.saltDaily,
       sugar_daily_g: form.sugarDaily,
     };
@@ -1983,7 +1985,7 @@ export default function PatientProfilePage() {
                   </div>
 
                   {/* Macros & Restrictions Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                     <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] text-on-surface-variant font-medium">
@@ -2020,39 +2022,6 @@ export default function PatientProfilePage() {
                     <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] text-on-surface-variant font-medium">
-                          Natri / ngày
-                        </span>
-                        {editing && form ? (
-                          <span className="text-sm font-bold text-on-surface tabular-nums">
-                            {form.sodiumDaily} mg
-                          </span>
-                        ) : null}
-                      </div>
-                      {editing && form ? (
-                        <>
-                          <ConstraintRangeInput
-                            limitKey="sodium_daily"
-                            value={form.sodiumDaily}
-                            onChange={(value) =>
-                              setForm({ ...form, sodiumDaily: value })
-                            }
-                          />
-                          <p className="text-[10px] text-on-surface-variant">
-                            {CLINICAL_LIMITS.sodium_daily.min}–{CLINICAL_LIMITS.sodium_daily.max} mg
-                          </p>
-                        </>
-                      ) : (
-                        <ClinicalEffectiveValue
-                          effective={profile.restrictions?.sodium_daily}
-                          proposed={profile.proposed_restrictions?.sodium_daily}
-                          unit="mg"
-                        />
-                      )}
-                    </div>
-
-                    <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-on-surface-variant font-medium">
                           Muối / ngày
                         </span>
                         {editing && form ? (
@@ -2076,8 +2045,14 @@ export default function PatientProfilePage() {
                         </>
                       ) : (
                         <ClinicalEffectiveValue
-                          effective={profile.restrictions?.salt_daily_g}
-                          proposed={profile.proposed_restrictions?.salt_daily_g}
+                          effective={displaySaltG(
+                            profile.restrictions?.salt_daily_g,
+                            profile.restrictions?.sodium_daily
+                          )}
+                          proposed={displaySaltG(
+                            profile.proposed_restrictions?.salt_daily_g,
+                            profile.proposed_restrictions?.sodium_daily
+                          )}
                           unit="g"
                         />
                       )}
@@ -2086,7 +2061,7 @@ export default function PatientProfilePage() {
                     <div className="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] text-on-surface-variant font-medium">
-                          Đường tự do / ngày
+                          Đường / ngày
                         </span>
                         {editing && form ? (
                           <span className="text-sm font-bold text-on-surface tabular-nums">

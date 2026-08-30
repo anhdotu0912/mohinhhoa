@@ -4,13 +4,100 @@ import React, { useEffect, useState } from "react";
 import type { FoodItem, Meal } from "@/lib/types";
 import { ApiError } from "@/lib/types";
 import { api } from "@/lib/api";
-import { slotImage, slotMeta, sumMealNutrition } from "@/lib/meal-plan-display";
+import { slotMeta, sumMealNutrition } from "@/lib/meal-plan-display";
 import { MealItemRow } from "../MealItemRow";
+import { NutrientChips } from "@/components/shared/NutrientChips";
 
 interface ApprovedMealSlotListProps {
   meals: Meal[];
   emptyLabel: string;
   onMealsChange?: (meals: Meal[]) => void;
+}
+
+function ApprovedMealSlotCard({
+  meal,
+  mealIdx,
+  onReplaceItem,
+}: {
+  meal: Meal;
+  mealIdx: number;
+  onReplaceItem: (mealIdx: number, itemIdx: number, next: FoodItem) => void;
+}) {
+  const [showSlotNutrients, setShowSlotNutrients] = useState(false);
+  const meta = slotMeta(meal.slot);
+  const items = meal.items ?? [];
+  const nutrition = sumMealNutrition(meal);
+
+  return (
+    <div
+      key={`${meal.slot}-${mealIdx}`}
+      className="p-3 sm:p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3 sm:gap-3.5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{meta.icon}</span>
+          </div>
+          <span className="text-xs sm:text-sm font-bold text-slate-900">{meta.label}</span>
+          {nutrition.kcal > 0 && (
+            <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
+              {nutrition.kcal} kcal
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-50 rounded-md border border-slate-200/60">
+          Kế hoạch thực đơn
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          {items.length > 0 ? (
+            items.map((item, idx) => (
+              <MealItemRow
+                key={`${meal.slot}-${idx}`}
+                item={item}
+                onChange={(next) => onReplaceItem(mealIdx, idx, next)}
+              />
+            ))
+          ) : (
+            <div className="text-xs text-slate-500 italic py-1">
+              Chưa có danh sách món cho bữa này.
+            </div>
+          )}
+        </div>
+
+        {/* Nút Xem thêm thành phần dinh dưỡng bữa */}
+        <div className="pt-0.5">
+          <button
+            type="button"
+            onClick={() => setShowSlotNutrients((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#006857] py-0.5 px-1.5 rounded-md hover:bg-emerald-50/60 transition-colors cursor-pointer"
+          >
+            <span>Thành phần bữa</span>
+            <span
+              className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
+                showSlotNutrients ? "rotate-180 text-[#006857]" : "text-slate-400"
+              }`}
+            >
+              expand_more
+            </span>
+          </button>
+
+          {showSlotNutrients && (
+            <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <NutrientChips
+                values={nutrition}
+                layer="detail"
+                compact
+                omit={["kcal"]}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ApprovedMealSlotList({
@@ -49,79 +136,14 @@ export function ApprovedMealSlotList({
 
   return (
     <div className="space-y-3.5">
-      {localMeals.map((meal, mealIdx) => {
-        const meta = slotMeta(meal.slot);
-        const items = meal.items ?? [];
-        const nutrition = sumMealNutrition(meal);
-        const imageSrc = slotImage(meal.slot);
-
-        return (
-          <div
-            key={`${meal.slot}-${mealIdx}`}
-            className="p-3 sm:p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3 sm:gap-3.5"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
-                  <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{meta.icon}</span>
-                </div>
-                <span className="text-xs sm:text-sm font-bold text-slate-900">{meta.label}</span>
-                {nutrition.kcal > 0 && (
-                  <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
-                    {nutrition.kcal} kcal
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-50 rounded-md border border-slate-200/60">
-                Kế hoạch thực đơn
-              </span>
-            </div>
-
-            <div className="flex items-start gap-2.5 sm:gap-3.5">
-              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70 shadow-2xs">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageSrc} alt={meta.label} className="w-full h-full object-cover" />
-              </div>
-
-              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                {items.length > 0 ? (
-                  items.map((item, idx) => (
-                    <MealItemRow
-                      key={`${meal.slot}-${idx}`}
-                      item={item}
-                      onChange={(next) => replaceItem(mealIdx, idx, next)}
-                    />
-                  ))
-                ) : (
-                  <div className="text-xs text-slate-500 italic py-1">
-                    Chưa có danh sách món cho bữa này.
-                  </div>
-                )}
-
-                {(nutrition.protein > 0 || nutrition.carbs > 0 || nutrition.fat > 0) && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] font-semibold">
-                    {nutrition.protein > 0 && (
-                      <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200/70">
-                        Đạm: {nutrition.protein}g
-                      </span>
-                    )}
-                    {nutrition.carbs > 0 && (
-                      <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200/70">
-                        Carb: {nutrition.carbs}g
-                      </span>
-                    )}
-                    {nutrition.fat > 0 && (
-                      <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200/70">
-                        Béo: {nutrition.fat}g
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+      {localMeals.map((meal, mealIdx) => (
+        <ApprovedMealSlotCard
+          key={`${meal.slot}-${mealIdx}`}
+          meal={meal}
+          mealIdx={mealIdx}
+          onReplaceItem={replaceItem}
+        />
+      ))}
     </div>
   );
 }

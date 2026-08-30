@@ -674,3 +674,45 @@ def test_meal_plan_not_found(client):
     response = client.get("/api/v1/meal-plans/does-not-exist", headers=headers)
     assert response.status_code == 404
     assert response.json()["code"] == "MEAL_PLAN_NOT_FOUND"
+
+
+def test_guideline_source_requires_auth(client):
+    response = client.get("/api/v1/guidelines/byt_vn_notes.md")
+    assert response.status_code == 401
+
+
+def test_guideline_source_returns_markdown(client):
+    headers = _login(client, DOCTOR)
+    response = client.get("/api/v1/guidelines/byt_vn_notes.md", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["id"] == "byt_vn_notes.md"
+    assert body["kind"] == "guideline"
+    assert "Bộ Y Tế" in body["title"] or "Đái Tháo Đường" in body["title"]
+    assert body["body"].startswith("#")
+
+
+def test_guideline_source_catalog_citation(client):
+    headers = _login(client, PATIENT)
+    response = client.get(
+        "/api/v1/guidelines/food_catalog_demo%23f_yen_mach",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["kind"] == "catalog"
+    assert "f_yen_mach" in body["body"]
+
+
+def test_guideline_source_rejects_traversal(client):
+    headers = _login(client, DOCTOR)
+    response = client.get("/api/v1/guidelines/..%2Fmain.py", headers=headers)
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_SOURCE"
+
+
+def test_guideline_source_not_found(client):
+    headers = _login(client, DOCTOR)
+    response = client.get("/api/v1/guidelines/no_such_file.md", headers=headers)
+    assert response.status_code == 404
+    assert response.json()["code"] == "GUIDELINE_NOT_FOUND"

@@ -304,68 +304,51 @@ export function HealthMetricsPanel() {
 
               {!loading && (
                 <>
-                  {/* Meal Plan Health Impact Header Card */}
-                  <section className="bg-gradient-to-br from-[#006857] via-[#005446] to-[#043e34] rounded-2xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden">
-                    {/* Background Pattern */}
-                    <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 bg-emerald-400/20 text-emerald-200 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">
-                            <span className="material-symbols-outlined text-[13px]">verified</span>
-                            Hiệu quả Thực đơn Dinh dưỡng
-                          </span>
-                        </div>
-                        <h3 className="font-extrabold text-base sm:text-lg text-white leading-tight">
-                          Đường huyết ổn định trong vùng an toàn
-                        </h3>
-                        <p className="text-xs text-emerald-100/90 leading-relaxed max-w-xl">
-                          Chế độ ăn kiểm soát carbohydrate và GI thấp giúp giảm biên độ dao động
-                          đường huyết và bảo vệ mạch máu trước biến chứng.
-                        </p>
-                      </div>
-
-                      {/* Quick Highlight Stats */}
-                      <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 shrink-0 bg-white/10 backdrop-blur-xs p-2.5 rounded-xl border border-white/15">
-                        <div className="text-center px-2">
-                          <p className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wider">
-                            Đường lúc đói
-                          </p>
-                          <p className="text-sm sm:text-base font-extrabold text-white mt-0.5 tabular-nums">
-                            {latestGlucose != null ? `${latestGlucose} mmol/L` : "—"}
-                          </p>
-                          {impactSummary.glucoseDelta !== 0 && (
-                            <p
-                              className={`text-[10px] font-bold mt-0.5 ${
-                                impactSummary.isGlucoseImproved
-                                  ? "text-emerald-300"
-                                  : "text-amber-300"
-                              }`}
-                            >
-                              {impactSummary.isGlucoseImproved ? "↓ Giảm" : "↑ Tăng"}{" "}
-                              {Math.abs(impactSummary.glucoseDelta)} mmol/L
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="text-center px-2 border-l border-white/15">
-                          <p className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wider">
-                            Trong chuẩn ADA
-                          </p>
-                          <p className="text-sm sm:text-base font-extrabold text-emerald-300 mt-0.5 tabular-nums">
-                            {impactSummary.timeInRangePct}%
-                          </p>
-                          <p className="text-[10px] text-emerald-200/80 mt-0.5 font-medium">
-                            Mục tiêu &gt; 70%
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  {/* 4 Vital Metric Cards at Top */}
+                  <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                    <EnhancedVitalTile
+                      icon="monitor_weight"
+                      tone="blue"
+                      label="Cân nặng"
+                      value={latestWeight != null ? `${latestWeight}` : null}
+                      unit="kg"
+                      delta={weightDelta}
+                      status={weightStatus}
+                    />
+                    <EnhancedVitalTile
+                      icon="favorite"
+                      tone="rose"
+                      label="Huyết áp"
+                      value={
+                        latestBP.sys != null && latestBP.dia != null
+                          ? `${latestBP.sys}/${latestBP.dia}`
+                          : null
+                      }
+                      unit="mmHg"
+                      status={bpStatus}
+                    />
+                    <EnhancedVitalTile
+                      icon="water_drop"
+                      tone="amber"
+                      label="Đường lúc đói"
+                      value={latestGlucose != null ? `${latestGlucose}` : null}
+                      unit="mmol/L"
+                      delta={glucoseDelta}
+                      status={glucoseStatus}
+                    />
+                    <EnhancedVitalTile
+                      icon="straighten"
+                      tone="indigo"
+                      label="BMI"
+                      value={latestBmi != null ? `${latestBmi}` : null}
+                      unit=""
+                      delta={bmiDelta}
+                      status={bmiStatus}
+                    />
                   </section>
 
                   {/* Main Tab Navigation */}
-                  <div className="flex items-center gap-1 border-b border-slate-200 text-xs font-bold">
+                  <div className="flex items-center gap-1 border-b border-slate-200 text-xs font-bold pt-1">
                     <button
                       type="button"
                       onClick={() => setActiveTab("chart")}
@@ -455,49 +438,6 @@ export function HealthMetricsPanel() {
                     </div>
                   )}
 
-                  {/* 4 Enhanced Vital Tiles */}
-                  <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <EnhancedVitalTile
-                      icon="monitor_weight"
-                      tone="blue"
-                      label="Cân nặng"
-                      value={latestWeight != null ? `${latestWeight}` : null}
-                      unit="kg"
-                      delta={weightDelta}
-                      status={weightStatus}
-                    />
-                    <EnhancedVitalTile
-                      icon="favorite"
-                      tone="rose"
-                      label="Huyết áp"
-                      value={
-                        latestBP.sys != null && latestBP.dia != null
-                          ? `${latestBP.sys}/${latestBP.dia}`
-                          : null
-                      }
-                      unit="mmHg"
-                      status={bpStatus}
-                    />
-                    <EnhancedVitalTile
-                      icon="water_drop"
-                      tone="amber"
-                      label="Đường lúc đói"
-                      value={latestGlucose != null ? `${latestGlucose}` : null}
-                      unit="mmol/L"
-                      delta={glucoseDelta}
-                      status={glucoseStatus}
-                    />
-                    <EnhancedVitalTile
-                      icon="straighten"
-                      tone="indigo"
-                      label="BMI"
-                      value={latestBmi != null ? `${latestBmi}` : null}
-                      unit=""
-                      delta={bmiDelta}
-                      status={bmiStatus}
-                    />
-                  </section>
-
                   {/* Action Button */}
                   <div className="pt-1">
                     <button
@@ -536,20 +476,11 @@ function EnhancedVitalTile({
   delta?: MetricDeltaCalculation | null;
   status?: MetricClinicalStatus | null;
 }) {
-  const tones: Record<string, string> = {
-    blue: "bg-blue-50 text-blue-700 border-blue-100",
-    rose: "bg-rose-50 text-rose-700 border-rose-100",
-    amber: "bg-amber-50 text-amber-800 border-amber-100",
-    indigo: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  };
-
   return (
-    <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 flex flex-col justify-between gap-2.5 min-w-0 shadow-2xs">
+    <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 flex flex-col justify-between gap-2 min-w-0 shadow-2xs">
       <div className="flex items-center justify-between gap-1">
-        <div
-          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center border ${tones[tone]}`}
-        >
-          <span className="material-symbols-outlined text-[16px] sm:text-[18px]">{icon}</span>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-100 text-slate-700 border border-slate-200/80">
+          <span className="material-symbols-outlined text-[16px]">{icon}</span>
         </div>
         {status && (
           <span
@@ -561,15 +492,15 @@ function EnhancedVitalTile({
       </div>
 
       <div className="min-w-0">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">
+        <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider truncate">
           {label}
         </p>
         <div className="flex items-baseline gap-1 mt-0.5 min-w-0">
-          <span className="text-lg sm:text-xl font-extrabold text-slate-900 tabular-nums truncate">
+          <span className="text-base sm:text-lg font-extrabold text-slate-900 tabular-nums truncate">
             {value ?? "—"}
           </span>
           {value && unit && (
-            <span className="text-[11px] text-slate-500 font-semibold shrink-0">{unit}</span>
+            <span className="text-[10px] text-slate-500 font-semibold shrink-0">{unit}</span>
           )}
         </div>
       </div>
@@ -577,10 +508,10 @@ function EnhancedVitalTile({
       {/* Delta indicator */}
       {delta && !delta.isNeutral ? (
         <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px]">
-          <span className="text-slate-400">So với ban đầu:</span>
+          <span className="text-slate-400">So ban đầu:</span>
           <span
             className={`font-bold tabular-nums inline-flex items-center gap-0.5 ${
-              delta.isImproved ? "text-emerald-700" : "text-amber-700"
+              delta.isImproved ? "text-emerald-700" : "text-slate-700"
             }`}
           >
             {delta.isImproved ? "↓" : "↑"} {delta.formattedDelta}

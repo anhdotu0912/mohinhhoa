@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { DayNutritionDashboard } from "@/components/doctor/DayNutritionDashboard";
+import { DayNutritionDashboard, MealMetricRow } from "@/components/doctor/DayNutritionDashboard";
+import { GuidelineReader } from "@/components/doctor/GuidelineReader";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
 import { doctorChartHref } from "@/lib/doctor-routes";
 import { api, assetUrl } from "@/lib/api";
@@ -15,28 +16,35 @@ import {
   dayKcalBand,
   dayPlanToUi,
   flattenStructuredWarnings,
-  mealKcalBand,
+  formatPortionLabel,
+  formatQty,
   mealPlanToEditedPayload,
   mealPlanToUiItem,
+  mergeNutritionTargets,
   slotCalories,
-  targetsFromProfileSnapshot,
+  slotCarbG,
+  slotProteinG,
+  slotFatG,
+  slotSaltG,
+  slotSugarG,
   type MealSlotKey,
   type NutritionWarningSlots,
 } from "@/lib/meal-plan-mappers";
 import { MealDishItem, MealPlanItem } from "@/lib/plans-store";
-import { ApiError, type FoodCatalogItem, type MealPlanOutput } from "@/lib/types";
+import { NutrientChips } from "@/components/shared/NutrientChips";
+import { toNutrientValues } from "@/lib/nutrient-display";
+import { ApiError, type ApplyMode, type FoodCatalogItem, type GuidelineSourceOut, type MealPlanOutput, type MealPlanScheduleOut } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
 import { formatDateFull, formatDateIso, parseFlexibleDate } from "@/lib/plan-expiry";
 import { buildHistoryHref } from "@/lib/plan-slot-intent";
-import type { ApplyMode, MealPlanScheduleOut } from "@/lib/types";
 
 type MealSlot = MealSlotKey;
 
 const SLOT_LABELS: Record<MealSlot, { title: string; icon: string; iconClass: string }> = {
-  breakfast: { title: "Bữa sáng (07:00 - 08:00)", icon: "wb_sunny", iconClass: "text-amber-500" },
-  lunch: { title: "Bữa trưa (11:30 - 12:30)", icon: "sunny", iconClass: "text-amber-600" },
-  dinner: { title: "Bữa tối (18:00 - 19:00)", icon: "nights_stay", iconClass: "text-indigo-500" },
-  snack: { title: "Bữa phụ (15:30)", icon: "cookie", iconClass: "text-emerald-600" },
+  breakfast: { title: "Bữa sáng", icon: "wb_sunny", iconClass: "text-amber-500" },
+  lunch: { title: "Bữa trưa", icon: "sunny", iconClass: "text-amber-600" },
+  dinner: { title: "Bữa tối", icon: "nights_stay", iconClass: "text-indigo-500" },
+  snack: { title: "Bữa phụ", icon: "cookie", iconClass: "text-emerald-600" },
 };
 
 function clonePlan(plan: MealPlanOutput): MealPlanOutput {
@@ -102,21 +110,32 @@ export default function PlanReviewDetailPage() {
   const [foodTotal, setFoodTotal] = useState(0);
   const [foodLoading, setFoodLoading] = useState(false);
   const [foodError, setFoodError] = useState<string | null>(null);
-  /** Mũi tên mở/thu gọn nội dung từng bữa. */
-  const [expandedSlots, setExpandedSlots] = useState<Record<MealSlot, boolean>>({
-    breakfast: true,
-    lunch: true,
-    dinner: true,
-    snack: true,
-  });
+  const [openCitation, setOpenCitation] = useState<string | null>(null);
+  const [citationLoading, setCitationLoading] = useState(false);
+  const [citationError, setCitationError] = useState<string | null>(null);
+  const [citationData, setCitationData] = useState<GuidelineSourceOut | null>(null);
 
   const daysList = plan?.days && plan.days.length > 0 ? plan.days : [];
   const currentDayData =
     daysList.find((d) => d.dayIndex === activeDayIndex) || daysList[0] || null;
 
   const nutritionTargets = useMemo(
-    () => targetsFromProfileSnapshot(rawPlan?.profile_snapshot),
-    [rawPlan?.profile_snapshot]
+    () =>
+      mergeNutritionTargets(rawPlan?.profile_snapshot, {
+        targetKcal: patient?.targetKcal,
+        saltDailyG: patient?.saltDailyG,
+        sugarDailyG: patient?.sugarDailyG,
+        carbPerMeal: patient?.carbPerMeal,
+        sodiumDaily: patient?.sodiumDaily,
+      }),
+    [
+      rawPlan?.profile_snapshot,
+      patient?.targetKcal,
+      patient?.saltDailyG,
+      patient?.sugarDailyG,
+      patient?.carbPerMeal,
+      patient?.sodiumDaily,
+    ]
   );
 
   const slotKcal = useMemo(
@@ -129,20 +148,89 @@ export default function PlanReviewDetailPage() {
     [breakfast, lunch, dinner, snack]
   );
 
+  const slotCarb = useMemo(
+    () => ({
+      breakfast: slotCarbG(breakfast),
+      lunch: slotCarbG(lunch),
+      dinner: slotCarbG(dinner),
+      snack: slotCarbG(snack),
+    }),
+    [breakfast, lunch, dinner, snack]
+  );
+
+  const slotProtein = useMemo(
+    () => ({
+      breakfast: slotProteinG(breakfast),
+      lunch: slotProteinG(lunch),
+      dinner: slotProteinG(dinner),
+      snack: slotProteinG(snack),
+    }),
+    [breakfast, lunch, dinner, snack]
+  );
+
+  const slotFat = useMemo(
+    () => ({
+      breakfast: slotFatG(breakfast),
+      lunch: slotFatG(lunch),
+      dinner: slotFatG(dinner),
+      snack: slotFatG(snack),
+    }),
+    [breakfast, lunch, dinner, snack]
+  );
+
+  const slotSugar = useMemo(
+    () => ({
+      breakfast: slotSugarG(breakfast),
+      lunch: slotSugarG(lunch),
+      dinner: slotSugarG(dinner),
+      snack: slotSugarG(snack),
+    }),
+    [breakfast, lunch, dinner, snack]
+  );
+
+  const slotSalt = useMemo(
+    () => ({
+      breakfast: slotSaltG(breakfast),
+      lunch: slotSaltG(lunch),
+      dinner: slotSaltG(dinner),
+      snack: slotSaltG(snack),
+    }),
+    [breakfast, lunch, dinner, snack]
+  );
+
   const dayCalories =
     slotKcal.breakfast + slotKcal.lunch + slotKcal.dinner + slotKcal.snack;
 
-  const daySalt =
-    breakfast.reduce((sum, item) => sum + item.salt, 0) +
-    lunch.reduce((sum, item) => sum + item.salt, 0) +
-    dinner.reduce((sum, item) => sum + item.salt, 0) +
-    snack.reduce((sum, item) => sum + item.salt, 0);
+  const dayCarb = useMemo(() => {
+    const sum = slotCarb.breakfast + slotCarb.lunch + slotCarb.dinner + slotCarb.snack;
+    return Math.round(sum * 10) / 10;
+  }, [slotCarb]);
 
-  const daySugar =
-    breakfast.reduce((sum, item) => sum + item.sugar, 0) +
-    lunch.reduce((sum, item) => sum + item.sugar, 0) +
-    dinner.reduce((sum, item) => sum + item.sugar, 0) +
-    snack.reduce((sum, item) => sum + item.sugar, 0);
+  const dayProtein = useMemo(() => {
+    const sum = slotProtein.breakfast + slotProtein.lunch + slotProtein.dinner + slotProtein.snack;
+    return Math.round(sum * 10) / 10;
+  }, [slotProtein]);
+
+  const dayFat = useMemo(() => {
+    const sum = slotFat.breakfast + slotFat.lunch + slotFat.dinner + slotFat.snack;
+    return Math.round(sum * 10) / 10;
+  }, [slotFat]);
+
+  const daySalt = useMemo(() => {
+    const sodiumMg = [...breakfast, ...lunch, ...dinner, ...snack].reduce(
+      (sum, item) => sum + (item.sodiumMg ?? item.salt * 1000),
+      0
+    );
+    return Math.round((sodiumMg / 1000) * 10) / 10;
+  }, [breakfast, lunch, dinner, snack]);
+
+  const daySugar = useMemo(() => {
+    const sum = [...breakfast, ...lunch, ...dinner, ...snack].reduce(
+      (total, item) => total + (item.sugar || 0),
+      0
+    );
+    return Math.round(sum * 10) / 10;
+  }, [breakfast, lunch, dinner, snack]);
 
   const activeWarningSlots = useMemo(
     () => warningSlotsForDay(breakfast, lunch, dinner, snack),
@@ -283,6 +371,33 @@ export default function PlanReviewDetailPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const closeCitation = useCallback(() => {
+    setOpenCitation(null);
+    setCitationData(null);
+    setCitationError(null);
+    setCitationLoading(false);
+  }, []);
+
+  const handleOpenCitation = (sourceId: string) => {
+    setOpenCitation(sourceId);
+    setCitationData(null);
+    setCitationError(null);
+    setCitationLoading(true);
+    void api
+      .getGuidelineSource(sourceId)
+      .then((data) => {
+        setCitationData(data);
+        setCitationError(null);
+      })
+      .catch((err) => {
+        setCitationData(null);
+        setCitationError(
+          err instanceof ApiError ? err.message : "Không tải được nội dung trích dẫn."
+        );
+      })
+      .finally(() => setCitationLoading(false));
   };
 
   useEffect(() => {
@@ -554,13 +669,17 @@ export default function PlanReviewDetailPage() {
 
   const handlePickFood = (food: FoodCatalogItem) => {
     if (!addingToSlot) return;
-    const saltG = Math.round(((food.macros?.sodium_mg ?? 0) / 1000) * 10) / 10;
+    const saltG = (food.macros?.sodium_mg ?? 0) / 1000;
     const newItem: MealDishItem = {
       name: food.name,
-      calories: Math.round(food.kcal || 0),
+      portion: food.portion || "",
+      calories: food.kcal || 0,
       salt: saltG,
-      sugar: 0,
+      sodiumMg: food.macros?.sodium_mg ?? 0,
+      sugar: food.macros?.sugar_g ?? 0,
+      fat: food.macros?.fat_g ?? 0,
       carbG: food.macros?.carb_g ?? 0,
+      proteinG: food.macros?.protein_g ?? 0,
       foodId: food.id,
       alternatives: [],
     };
@@ -573,17 +692,16 @@ export default function PlanReviewDetailPage() {
     showToast(`Đã thêm «${food.name}».`);
   };
 
-  const toggleSlotExpanded = (slot: MealSlot) => {
-    setExpandedSlots((prev) => ({ ...prev, [slot]: !prev[slot] }));
-  };
-
-  const targetSaltG =
-    nutritionTargets.sodiumDailyMg != null
-      ? Math.round((nutritionTargets.sodiumDailyMg / 1000) * 10) / 10
-      : 5;
-  const targetSugarG = 25;
+  const targetSaltG = nutritionTargets.saltDisplayG ?? null;
+  const targetSugarG = nutritionTargets.sugarDisplayLimit ?? null;
   const applyAlternative = (meal: MealSlot, index: number, alt: MealDishItem) => {
+    if (!canEdit) return;
+    if (editingSlot && editingSlot !== meal) {
+      showToast("Hãy lưu hoặc hủy chỉnh sửa bữa hiện tại trước.");
+      return;
+    }
     markDirty();
+    setEditingSlot(meal);
     const replace = (list: MealDishItem[]) => {
       const current = list[index];
       if (!current) return list;
@@ -601,6 +719,7 @@ export default function PlanReviewDetailPage() {
     if (meal === "lunch") setLunch(replace);
     if (meal === "dinner") setDinner(replace);
     if (meal === "snack") setSnack(replace);
+    showToast(`Đã đổi sang «${alt.name}».`);
   };
 
   const slotSwaps = (slot: MealSlot) =>
@@ -612,60 +731,28 @@ export default function PlanReviewDetailPage() {
     const slotWarnings = warningsBySlot[slot];
     const slotAdvisory = advisoryBySlot[slot];
     const swaps = slotSwaps(slot);
-    const expanded = expandedSlots[slot];
     const mealKcal = slotKcal[slot];
-    const band = mealKcalBand(nutritionTargets.targetKcal, slot);
-    const inBand = mealKcal >= band.lower && mealKcal <= band.upper;
-    const mealShare =
-      dayCalories > 0 ? Math.round((mealKcal / dayCalories) * 100) : 0;
+    const mealSugar = slotSugar[slot];
+    const mealSalt = slotSalt[slot];
+    const mealCarb = slotCarb[slot];
+    const carbLimit = nutritionTargets.carbDisplayLimit ?? null;
 
     return (
       <div
         key={slot}
         className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-xs"
       >
-        <div className="flex items-center justify-between gap-sm pb-sm border-b border-outline-variant/60">
-          <div className="flex items-center gap-xs min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={() => toggleSlotExpanded(slot)}
-              className="flex items-center gap-0.5 shrink-0 rounded-lg border border-outline-variant px-1 py-0.5 text-on-surface-variant hover:bg-surface-variant cursor-pointer"
-              aria-label={expanded ? `Thu gọn ${meta.title}` : `Mở rộng ${meta.title}`}
-              title={expanded ? "Thu gọn" : "Mở rộng để xem chi tiết kcal"}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {expanded ? "keyboard_arrow_up" : "keyboard_arrow_down"}
-              </span>
-            </button>
+        <div className="flex items-center justify-between gap-sm pb-sm">
+          <div className="flex items-center gap-xs min-w-0">
             <span className={`material-symbols-outlined text-[20px] ${meta.iconClass}`}>
               {meta.icon}
             </span>
-            <div className="min-w-0">
-              <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm leading-tight">
-                {meta.title}
-              </h4>
-              <p className="text-[11px] text-on-surface-variant mt-0.5">
-                <strong
-                  className={`font-bold text-sm tabular-nums ${
-                    inBand ? "text-on-surface" : "text-amber-800"
-                  }`}
-                >
-                  {mealKcal} kcal
-                </strong>
-                <span className="ml-1 tabular-nums">
-                  · gợi ý {band.lower}–{band.upper} kcal
-                </span>
-                <span className="ml-1">· {items.length} món</span>
-              </p>
-            </div>
+            <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm leading-tight">
+              {meta.title}
+            </h4>
             {slotWarnings.length > 0 && (
-              <span className="text-[10px] font-bold text-red-800 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded shrink-0">
+              <span className="text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shrink-0">
                 {slotWarnings.length} vi phạm
-              </span>
-            )}
-            {slotAdvisory.length > 0 && slotWarnings.length === 0 && (
-              <span className="text-[10px] font-medium text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded shrink-0">
-                {slotAdvisory.length} gợi ý
               </span>
             )}
           </div>
@@ -708,110 +795,73 @@ export default function PlanReviewDetailPage() {
                   className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-outline-variant text-on-surface hover:bg-surface-variant cursor-pointer disabled:opacity-50 flex items-center gap-0.5"
                 >
                   <span className="material-symbols-outlined text-[14px]">edit</span>
-                  Chỉnh sửa món ăn
+                  Sửa món
                 </button>
               )}
             </div>
           )}
         </div>
 
-        {expanded && (
-          <div className="pt-sm space-y-sm">
-            <div>
-              <div className="flex items-center justify-between text-[10px] text-on-surface-variant mb-1 tabular-nums">
-                <span>0</span>
-                <span>
-                  Mục tiêu bữa ~{band.target} · khoảng {band.lower}–{band.upper}
-                </span>
-                <span>{band.upper}+</span>
-              </div>
-              <div className="relative h-2 rounded-full bg-surface-container-low overflow-hidden">
-                {/* Vùng gợi ý */}
-                <div
-                  className="absolute inset-y-0 bg-emerald-200/70"
-                  style={{
-                    left: `${(band.lower / Math.max(band.upper * 1.2, 1)) * 100}%`,
-                    width: `${((band.upper - band.lower) / Math.max(band.upper * 1.2, 1)) * 100}%`,
-                  }}
-                />
-                <div
-                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
-                    inBand ? "bg-primary/80" : "bg-amber-500/80"
-                  }`}
-                  style={{
-                    width: `${Math.min(100, (mealKcal / Math.max(band.upper * 1.2, 1)) * 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="text-[10px] text-on-surface-variant mt-1">
-                {inBand
-                  ? "Kalo bữa đang trong khoảng gợi ý."
-                  : mealKcal < band.lower
-                    ? `Còn thiếu khoảng ${band.lower - mealKcal}–${band.upper - mealKcal} kcal để vào ngưỡng.`
-                    : `Cần giảm khoảng ${mealKcal - band.upper}–${mealKcal - band.lower} kcal để vào ngưỡng.`}
-                {dayCalories > 0 ? ` · ${mealShare}% tổng ngày.` : null}
-              </p>
+        <div className="space-y-sm">
+          <MealMetricRow
+            kcal={mealKcal}
+            saltG={mealSalt}
+            sugarG={mealSugar}
+            carbG={mealCarb}
+            carbLimit={carbLimit}
+          />
+
+          {slotWarnings.length > 0 && (
+            <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg space-y-1">
+              {slotWarnings.map((w) => (
+                <p key={w} className="text-xs text-rose-900 leading-relaxed">
+                  {w}
+                </p>
+              ))}
             </div>
+          )}
 
-            {slotWarnings.length > 0 && (
-              <div className="p-3 bg-rose-50/80 border border-rose-200/70 rounded-lg space-y-1">
-                <div className="flex items-center gap-1.5 text-rose-800">
-                  <span className="material-symbols-outlined text-[16px]">error</span>
-                  <strong className="text-[11px] font-bold">Vi phạm lâm sàng</strong>
-                </div>
-                {slotWarnings.map((w) => (
-                  <p key={w} className="text-xs text-rose-900 leading-relaxed">
-                    {w}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {slotAdvisory.length > 0 && (
-              <div className="p-3 bg-slate-100 border border-slate-200/80 rounded-lg space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-800">
-                  <span className="material-symbols-outlined text-[16px]">info</span>
-                  <strong className="text-[11px] font-bold">Gợi ý (không chặn duyệt)</strong>
-                </div>
-                {slotAdvisory.map((w) => (
-                  <p key={w} className="text-xs text-slate-700 leading-relaxed">
-                    {w}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {swaps.length > 0 && (
-              <div className="p-3 bg-slate-100 border border-slate-200/80 rounded-lg text-xs text-slate-800 space-y-1">
-                <strong className="font-bold block text-[11px] text-slate-900">
-                  Đổi món do tương tác thuốc–thực phẩm
-                </strong>
-                {swaps.map((s, idx) => (
-                  <p key={idx} className="text-slate-700">
-                    {(s.from || "—") + " → " + s.to}
-                    {s.reason ? ` — ${s.reason}` : ""}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-xs">
-              {items.length === 0 ? (
-                <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
-              ) : (
-                items.map((item, idx) => (
-                  <DishRow
-                    key={`${slot}-${item.foodId || item.name}-${idx}`}
-                    item={item}
-                    isEditing={isEditing}
-                    onRemove={() => handleRemoveDish(slot, idx)}
-                    onSwap={(alt) => applyAlternative(slot, idx, alt)}
-                  />
-                ))
-              )}
+          {slotAdvisory.length > 0 && (
+            <div className="p-2.5 bg-surface-container-low border border-outline-variant rounded-lg space-y-1">
+              {slotAdvisory.map((w) => (
+                <p key={w} className="text-xs text-on-surface-variant leading-relaxed">
+                  {w}
+                </p>
+              ))}
             </div>
+          )}
+
+          {swaps.length > 0 && (
+            <div className="p-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs space-y-1">
+              <strong className="font-bold block text-[11px] text-on-surface">
+                Đổi món do tương tác thuốc–thực phẩm
+              </strong>
+              {swaps.map((s, idx) => (
+                <p key={idx} className="text-on-surface-variant">
+                  {(s.from || "—") + " → " + s.to}
+                  {s.reason ? ` — ${s.reason}` : ""}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-xs">
+            {items.length === 0 ? (
+              <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
+            ) : (
+              items.map((item, idx) => (
+                <DishRow
+                  key={`${slot}-${item.foodId || item.name}-${idx}`}
+                  item={item}
+                  isEditing={isEditing}
+                  canSwap={canEdit && (editingSlot === null || editingSlot === slot)}
+                  onRemove={() => handleRemoveDish(slot, idx)}
+                  onSwap={(alt) => applyAlternative(slot, idx, alt)}
+                />
+              ))
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   };
@@ -853,59 +903,43 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      {/* Sticky top action & navigation bar */}
-      <div className="sticky top-0 z-30 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3 transition-all">
-        <div className="max-w-[1600px] w-full mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Left: Back button + Plan info + Status Badges */}
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <Link
-              href={doctorChartHref(patientId, "meals")}
-              className="p-1.5 rounded-lg border border-outline-variant/60 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors shrink-0 flex items-center justify-center"
-              title="Quay lại danh sách thực đơn"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-bold text-base sm:text-lg text-on-surface tracking-tight truncate max-w-md">
-                  {plan.planTitle}
-                </h1>
-                {status === "pending" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    Chờ duyệt
-                  </span>
-                )}
-                {status === "approved" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
-                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                    Đã duyệt
-                  </span>
-                )}
-                {status === "edited" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
-                    <span className="material-symbols-outlined text-[13px]">edit_note</span>
-                    Đã chỉnh sửa
-                  </span>
-                )}
-                {status === "rejected" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                    <span className="material-symbols-outlined text-[13px]">cancel</span>
-                    Đã từ chối
-                  </span>
-                )}
-                {hardWarningCount > 0 && isReviewable && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
-                    {hardWarningCount} vi phạm lâm sàng
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-on-surface-variant mt-0.5 truncate">
-                Bệnh nhân: <strong className="font-semibold text-on-surface">{patient.name}</strong> ({patient.id})
-                {daysList.length ? ` · ${daysList.length} ngày` : ""}
-                {plan.createdAt ? ` · Tạo: ${plan.createdAt}` : ""}
-              </p>
-            </div>
+      <div className="sticky top-[8.5rem] z-10 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3">
+        <div className="max-w-[1600px] w-full mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            {status === "pending" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Chờ duyệt
+              </span>
+            )}
+            {status === "approved" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/70">
+                <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                Đã duyệt
+              </span>
+            )}
+            {status === "edited" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200/70">
+                <span className="material-symbols-outlined text-[13px]">edit_note</span>
+                Đã chỉnh sửa
+              </span>
+            )}
+            {status === "rejected" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                <span className="material-symbols-outlined text-[13px]">cancel</span>
+                Đã từ chối
+              </span>
+            )}
+            {hardWarningCount > 0 && isReviewable && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200/70">
+                {hardWarningCount} vi phạm lâm sàng
+              </span>
+            )}
+            {plan.createdAt ? (
+              <span className="text-[11px] text-on-surface-variant">
+                Tạo {plan.createdAt}
+              </span>
+            ) : null}
           </div>
 
           {/* Right: Review helper notice & action buttons */}
@@ -1057,12 +1091,14 @@ export default function PlanReviewDetailPage() {
         <DayNutritionDashboard
           dayLabel={currentDayData?.dayName || `Ngày ${activeDayIndex}`}
           calories={dayCalories}
+          carbG={dayCarb}
           saltG={daySalt}
           sugarG={daySugar}
           targetCalories={nutritionTargets.targetKcal}
           targetSaltG={targetSaltG}
           targetSugarG={targetSugarG}
-          mealBreakdown={slotKcal}
+          mealCarbG={slotCarb}
+          carbPerMealLimit={nutritionTargets.carbDisplayLimit ?? null}
           dayWarnings={dayOnlyWarnings}
           dayAdvisoryWarnings={dayAdvisoryWarnings}
           kcalLower={dayBand.lower}
@@ -1101,14 +1137,24 @@ export default function PlanReviewDetailPage() {
               ) : (
                 <ul className="space-y-2 text-xs text-on-surface-variant">
                   {plan.citations.map((cite, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-lg border border-outline-variant/40 font-medium"
-                    >
-                      <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
-                        verified
-                      </span>
-                      <span className="break-words leading-relaxed">{cite}</span>
+                    <li key={idx}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCitation(cite)}
+                        className="w-full text-left flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-lg border border-outline-variant/40 font-medium hover:border-primary/50 hover:bg-surface-container-low cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
+                          menu_book
+                        </span>
+                        <span className="min-w-0">
+                          <span className="break-words leading-relaxed text-on-surface">
+                            {cite}
+                          </span>
+                          <span className="block text-[10px] text-primary font-semibold mt-0.5">
+                            Xem nội dung
+                          </span>
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -1120,7 +1166,7 @@ export default function PlanReviewDetailPage() {
 
       {addingToSlot && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-scaleUp overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <h4 className="font-h2 text-h2 font-bold text-on-surface text-base">
                 Thêm món vào{" "}
@@ -1171,18 +1217,16 @@ export default function PlanReviewDetailPage() {
                 </p>
               ) : (
                 foodResults.map((food) => {
-                  const saltG =
-                    Math.round(((food.macros?.sodium_mg ?? 0) / 1000) * 10) / 10;
                   return (
                     <button
                       key={food.id}
                       type="button"
                       onClick={() => handlePickFood(food)}
-                      className="w-full text-left px-4 py-3 hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                      className="w-full min-w-0 text-left px-3.5 py-2.5 hover:bg-surface-container-low/60 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-2 min-w-0">
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-on-surface break-words">
+                          <p className="text-xs font-bold text-on-surface leading-snug">
                             {food.name}
                           </p>
                           <p className="text-[11px] text-on-surface-variant mt-0.5">
@@ -1190,12 +1234,17 @@ export default function PlanReviewDetailPage() {
                             {food.category ? ` · ${food.category}` : ""}
                           </p>
                         </div>
-                        <div className="text-right shrink-0 text-[11px] text-on-surface-variant font-medium tabular-nums">
-                          <p className="font-bold text-on-surface">
-                            {Math.round(food.kcal)} kcal
-                          </p>
-                          <p>Muối {saltG}g</p>
-                        </div>
+                        <NutrientChips
+                          values={toNutrientValues({
+                            kcal: food.kcal,
+                            carbG: food.macros?.carb_g,
+                            sodiumMg: food.macros?.sodium_mg,
+                            sugarG: food.macros?.sugar_g,
+                          })}
+                          omit={["protein", "fat"]}
+                          layer="summary"
+                          compact
+                        />
                       </div>
                     </button>
                   );
@@ -1214,6 +1263,16 @@ export default function PlanReviewDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {openCitation && (
+        <GuidelineReader
+          sourceId={openCitation}
+          loading={citationLoading}
+          error={citationError}
+          data={citationData}
+          onClose={closeCitation}
+        />
       )}
 
       {rejectModalOpen && (
@@ -1255,29 +1314,37 @@ export default function PlanReviewDetailPage() {
 function DishRow({
   item,
   isEditing,
+  canSwap,
   onRemove,
   onSwap,
 }: {
   item: MealDishItem;
   isEditing: boolean;
+  canSwap: boolean;
   onRemove: () => void;
   onSwap: (alt: MealDishItem) => void;
 }) {
   const alts = item.alternatives || [];
+  const portion = formatPortionLabel(item.portion);
   return (
     <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-lg text-xs space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-bold text-on-surface font-body break-words min-w-0 text-xs">
-          {item.name}
-        </span>
-        <div className="flex items-center gap-3 text-on-surface-variant shrink-0 font-medium">
-          <span className="tabular-nums font-bold text-on-surface">{item.calories} kcal</span>
-          <span className="tabular-nums">Muối: {item.salt}g</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="font-bold text-on-surface font-body text-xs leading-snug">
+            {item.name}
+          </span>
+          {portion ? (
+            <p className="text-[11px] text-on-surface-variant mt-0.5 tabular-nums">
+              Khẩu phần {portion}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex items-start gap-2 text-on-surface-variant shrink-0 font-medium">
           {isEditing && (
             <button
               type="button"
               onClick={onRemove}
-              className="text-rose-500 hover:text-rose-700 ml-1 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+              className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition-colors"
               aria-label={`Xóa ${item.name}`}
             >
               <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1285,19 +1352,29 @@ function DishRow({
           )}
         </div>
       </div>
+      <NutrientChips
+        values={toNutrientValues({
+          kcal: item.calories,
+          carbG: item.carbG,
+          saltG: item.salt,
+          sodiumMg: item.sodiumMg,
+          sugarG: item.sugar,
+        })}
+        omit={["protein", "fat"]}
+        layer="detail"
+        compact
+      />
       {alts.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-outline-variant/30">
-          <span className="text-[10px] uppercase font-bold text-on-surface-variant">
-            Thay thế:
-          </span>
+          <span className="text-[10px] font-bold text-on-surface-variant">Thay thế:</span>
           {alts.map((alt) => (
             <button
               key={alt.foodId || alt.name}
               type="button"
               onClick={() => onSwap(alt)}
-              disabled={!isEditing}
-              className="px-2.5 py-0.5 rounded-md border border-outline-variant/60 text-[11px] font-medium text-on-surface-variant hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default shadow-2xs"
-              title={`${alt.calories} kcal`}
+              disabled={!canSwap}
+              className="px-2.5 py-0.5 rounded-md border border-outline-variant/60 text-[11px] font-medium text-on-surface hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default cursor-pointer"
+              title={`Đổi sang ${alt.name} · ${formatQty(alt.calories)} kcal`}
             >
               {alt.name}
             </button>

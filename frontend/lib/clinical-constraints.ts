@@ -55,7 +55,7 @@ export const CLINICAL_LIMITS: Record<ClinicalLimitKey, ClinicalLimitSpec> = {
     step: 1,
     default: 25,
     unit: "g",
-    label: "Đường tự do / ngày",
+    label: "Đường / ngày",
   },
 };
 
