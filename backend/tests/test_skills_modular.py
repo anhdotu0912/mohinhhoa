@@ -110,6 +110,18 @@ class TestPrimitiveSkills:
         assert res["interactions"] is not None
         assert len(res["interactions"].interactions) >= 1
         assert "rau muống" in res["answer"].lower()
+        assert "drug_food_interactions#warfarin_rau_muong" in res["citations"]
+        assert "byt_qd_5481_t2d.md" in res["citations"]
+
+    def test_check_drug_food_interaction_unmatched_still_has_citations(self):
+        res = check_drug_food_interaction(
+            message="Uống metformin có ăn bưởi được không?",
+            medications=["metformin"],
+            allergies=[],
+        )
+        assert res["citations"], "interaction_check must always return citations for the patient UI"
+        assert "byt_qd_5481_t2d.md" in res["citations"]
+        assert "ada_diabetes.md" in res["citations"]
 
     def test_check_drug_food_interaction_with_allergy_priority(self):
         res = check_drug_food_interaction(

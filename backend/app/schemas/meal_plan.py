@@ -239,6 +239,14 @@ class DoctorNoteOut(BaseModel):
     notes: list[DoctorNoteItem] = Field(default_factory=list)
 
 
+class CitationChunk(BaseModel):
+    """A RAG passage that was actually injected into the answer prompt."""
+    chunk_id: str = ""
+    text: str = ""
+    source: str = ""
+    score: float = 0.0
+
+
 class AgentRunOutput(BaseModel):
     """Output of run_agent facade."""
     intent: str = "unknown"
@@ -249,6 +257,7 @@ class AgentRunOutput(BaseModel):
     food_log_id: str | None = None
     alert_ids: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
+    citation_chunks: list[CitationChunk] = Field(default_factory=list)
     guardrail_triggered: bool = False
     weekly_compliance: WeeklyComplianceOut | None = None
     doctor_note: DoctorNoteOut | None = None

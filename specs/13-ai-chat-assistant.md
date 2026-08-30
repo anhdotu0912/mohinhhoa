@@ -29,7 +29,7 @@ Là **bệnh nhân**, tôi muốn gõ 1 câu hỏi tự nhiên (ví dụ "hôm n
 3. `intent_classifier` phân loại 1 trong 6 intent (LLM ưu tiên, fallback keyword) + phát hiện `secondary_intents[]`.
 4. Route tới node tương ứng (`meal_plan_node`/`interaction_check_node`/`rag_qa_node`/`food_log_node`/`refuse_node`/`unknown_node`).
 5. `apply_guardrails` hậu kiểm: sanitize từng `recommendation` (nếu có `interactions`), enforce citation cho `rag_qa`, enforce output safety cho mọi intent (có thể ép về `refuse`).
-6. Trả `AgentRunOutput` với `message`, `citations[]` (nếu có), `secondary_intents[]`, `guardrail_triggered` (bool).
+6. Trả `AgentRunOutput` với `message`, `citations[]` (id nguồn), `citation_chunks[]` (đoạn RAG đã nhồi vào prompt khi intent `rag_qa`), `secondary_intents[]`, `guardrail_triggered` (bool). FE hiện `citation_chunks[].text`, không dùng card tóm tắt hardcode thay cho chunk.
 
 **`POST /chat/stream` (SSE, as-built):** FE nhận luồng event gồm status steps (hiển thị "đang suy nghĩ"/"đang tra cứu"...), token stream thật cho `rag_qa` (chunk mô phỏng cho intent khác), và event `correction` khi `apply_guardrails` thay đổi câu trả lời so với bản gốc (`agents/streaming.py`).
 

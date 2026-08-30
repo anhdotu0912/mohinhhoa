@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import { ApiError, type AgentRunOutput, type MealPlanOutput } from "@/lib/types";
+import { ApiError, type AgentRunOutput, type CitationChunk, type MealPlanOutput } from "@/lib/types";
 import { ChatThinkingSteps, ChatTypingDots, type ThinkingStep } from "@/components/patient/ChatThinkingSteps";
 import { isWeeklyPlanQuery } from "@/lib/patient-chat-mock-intents";
 import { usePatientPanel } from "@/components/patient-chat/PatientPanelProvider";
@@ -74,25 +74,68 @@ const SAMPLE_CHIPS = [
 
 const BOT_VIDEO_SRC = "/video/video_chatbot.mp4";
 
-function CitationsAccordion({ citations }: { citations: string[] }) {
+function formatCitationLabel(raw: string): string {
+  const kbPair = raw.match(/drug_food_interactions#(.+)$/i);
+  if (kbPair?.[1]) {
+    return `KB tương tác: ${kbPair[1].replace(/_/g, " ")}`;
+  }
+  return raw.replace(/_/g, " ").replace(/\.(md|pdf)$/i, "");
+}
+
+function citationSourceKeys(citations: string[], chunks: CitationChunk[]): string[] {
+  if (chunks.length > 0) {
+    const keys: string[] = [];
+    const seen = new Set<string>();
+    for (const chunk of chunks) {
+      const key = chunk.source || `${chunk.source}#${chunk.chunk_id}`;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        keys.push(key);
+      }
+    }
+    return keys;
+  }
+  return citations;
+}
+
+function excerptsForCitation(citation: string, chunks: CitationChunk[]): CitationChunk[] {
+  const citeBase = citation.split("#")[0];
+  return chunks.filter((chunk) => {
+    if (chunk.source === citation) return true;
+    if (`${chunk.source}#${chunk.chunk_id}` === citation) return true;
+    return chunk.source === citeBase;
+  });
+}
+
+function CitationsAccordion({
+  citations,
+  citationChunks,
+}: {
+  citations: string[];
+  citationChunks: CitationChunk[];
+}) {
   const [open, setOpen] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<string | null>(null);
 
-  if (!citations || citations.length === 0) return null;
+  const items = citationSourceKeys(citations, citationChunks);
+  if (items.length === 0) return null;
+
+  const selectedExcerpts = selectedCitation
+    ? excerptsForCitation(selectedCitation, citationChunks)
+    : [];
 
   return (
     <div className="pt-1.5 text-xs">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-medium py-1 px-2 rounded-md hover:bg-slate-200/50 transition-colors cursor-pointer group"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 text-slate-500 hover:text-[#006857] text-xs font-medium py-1 cursor-pointer"
       >
-        <span className="material-symbols-outlined text-[15px] text-emerald-600 group-hover:scale-110 transition-transform">
-          menu_book
-        </span>
-        <span>Nguồn trích dẫn y khoa ({citations.length})</span>
+        <span className="material-symbols-outlined text-[15px] text-[#006857]">menu_book</span>
+        <span>Nguồn trích dẫn y khoa ({items.length})</span>
         <span
-          className={`material-symbols-outlined text-[15px] text-slate-400 group-hover:text-slate-600 transition-transform duration-200 ${
+          className={`material-symbols-outlined text-[15px] text-slate-400 transition-transform duration-150 ${
             open ? "rotate-180" : ""
           }`}
         >
@@ -101,30 +144,34 @@ function CitationsAccordion({ citations }: { citations: string[] }) {
       </button>
 
       {open && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 pl-1 animate-in fade-in duration-200">
-          {citations.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setSelectedCitation(c)}
-              className="bg-white hover:bg-emerald-50/80 border border-slate-200/90 hover:border-emerald-300 px-2.5 py-1 rounded-lg text-[11px] text-slate-700 hover:text-[#006857] font-semibold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 group/btn"
-              title="Click để xem chi tiết tài liệu chuyên môn"
-            >
-              <span className="material-symbols-outlined text-[13px] text-emerald-600 group-hover/btn:scale-110 transition-transform">
-                description
-              </span>
-              <span>{c.replace(/_/g, " ").replace(/\.md$/i, "")}</span>
-              <span className="material-symbols-outlined text-[12px] text-slate-400 group-hover/btn:text-emerald-700">
-                open_in_new
-              </span>
-            </button>
+        <ul className="mt-1.5 rounded-xl border border-slate-200/80 bg-white overflow-hidden divide-y divide-slate-100">
+          {items.map((c) => (
+            <li key={c}>
+              <button
+                type="button"
+                onClick={() => setSelectedCitation(c)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 cursor-pointer focus-visible:outline-none focus-visible:bg-slate-50"
+                title="Xem đoạn đã dùng để trả lời"
+              >
+                <span className="material-symbols-outlined text-[16px] text-[#006857] shrink-0">
+                  description
+                </span>
+                <span className="flex-1 min-w-0 text-[12px] font-medium text-slate-700 truncate">
+                  {formatCitationLabel(c)}
+                </span>
+                <span className="material-symbols-outlined text-[16px] text-slate-300 shrink-0">
+                  chevron_right
+                </span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {selectedCitation && (
         <CitationDetailModal
           citation={selectedCitation}
+          excerpts={selectedExcerpts}
           onClose={() => setSelectedCitation(null)}
         />
       )}
@@ -286,6 +333,7 @@ export default function PatientChatHomePage() {
     intent: response.intent,
     secondaryIntents: response.secondary_intents ?? [],
     citations: response.citations ?? [],
+    citationChunks: response.citation_chunks ?? [],
     guardrailTriggered: response.guardrail_triggered,
     mealPlanId: response.meal_plan_id,
     mealPreview: response.meal_preview ?? null,
@@ -677,9 +725,13 @@ export default function PatientChatHomePage() {
                           )}
 
                           {/* Citations (Gemini Dropdown Accordion) */}
-                          {msg.citations && msg.citations.length > 0 && (
-                            <CitationsAccordion citations={msg.citations} />
-                          )}
+                          {(msg.citations && msg.citations.length > 0) ||
+                          (msg.citationChunks && msg.citationChunks.length > 0) ? (
+                            <CitationsAccordion
+                              citations={msg.citations ?? []}
+                              citationChunks={msg.citationChunks ?? []}
+                            />
+                          ) : null}
 
                           {getEscalationReason(msg) ? (
                             <AskDoctorCta

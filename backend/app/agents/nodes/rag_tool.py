@@ -104,9 +104,13 @@ def _build_rag_context(
     return rag_context, citations
 
 
+# Must stay in lockstep with build_agent_run_output — only these chunks are shown to the patient.
+RAG_PROMPT_CHUNK_LIMIT = 2
+
+
 def _build_rag_prompt(message: str, rag_context: list[dict], profile: dict) -> str:
     """Build the structured clinical prompt for RAG answer generation using lean context."""
-    context_texts = [c["text"] for c in rag_context[:2]]
+    context_texts = [c["text"] for c in rag_context[:RAG_PROMPT_CHUNK_LIMIT]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     diseases_list = profile.get("disease", [])

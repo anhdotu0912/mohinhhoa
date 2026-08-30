@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import type { CitationChunk } from "@/lib/types";
 
 export interface CitationInfo {
   code: string;
@@ -136,6 +137,97 @@ export function parseCitationData(rawCitation: string): CitationInfo {
     };
   }
 
+  if (
+    norm.includes("drug food interaction") ||
+    norm.includes("drug_food_interaction") ||
+    rawCitation.toLowerCase().includes("drug_food_interactions#")
+  ) {
+    const pair = rawCitation.includes("#")
+      ? rawCitation.split("#")[1].replace(/_/g, " ")
+      : "cặp thuốc–thực phẩm";
+
+    return {
+      code: "KB Tương tác thuốc–thực phẩm",
+      title: `Tương tác thuốc – thực phẩm: ${pair}`,
+      officialName:
+        "Cơ sở dữ liệu tương tác thuốc–thực phẩm VinNutri (đối chiếu Dược thư Quốc gia & hướng dẫn lâm sàng BYT/ADA)",
+      issuer: "VinNutri Clinical KB · Bộ Y Tế Việt Nam",
+      year: "2024",
+      badge: "Dược lâm sàng",
+      summary:
+        "Mục KB nội bộ ghi nhận cơ chế tương tác, mức độ nguy hiểm và khuyến nghị xử trí khi thuốc đang dùng gặp thực phẩm cụ thể. Nguồn được đối chiếu với hướng dẫn dinh dưỡng đái tháo đường của Bộ Y Tế và ADA Standards of Care.",
+      keyPoints: [
+        {
+          label: "Cặp đã tra cứu",
+          detail: `Khóa nguồn: ${pair}. Hệ thống chỉ cảnh báo đổi món / hỏi bác sĩ — không tự ý đổi thuốc hay liều.`,
+          icon: "medication",
+        },
+        {
+          label: "Cách dùng kết quả",
+          detail:
+            "Nếu mức độ là Nguy hiểm hoặc Cần chú ý: hạn chế thực phẩm tương ứng và trao đổi với bác sĩ điều trị trước khi thay đổi chế độ ăn lâu dài.",
+          icon: "health_and_safety",
+        },
+      ],
+      clinicalNote:
+        "Thông tin mang tính tham khảo dinh dưỡng. Không thay thế chỉ định thuốc, theo dõi INR/đường huyết hay quyết định lâm sàng của bác sĩ.",
+    };
+  }
+
+  if (norm.includes("byt vn notes") || (norm.includes("byt") && norm.includes("notes"))) {
+    return {
+      code: "BYT · Ghi chú dinh dưỡng",
+      title: "Ghi chú dinh dưỡng lâm sàng đái tháo đường (VinNutri / BYT)",
+      officialName: "Tóm lược hướng dẫn dinh dưỡng thực hành theo phác đồ Bộ Y Tế Việt Nam",
+      issuer: "Bộ Y Tế Việt Nam",
+      year: "2020",
+      badge: "Hướng dẫn quốc gia",
+      summary:
+        "Tài liệu nội bộ hệ thống dùng để đối chiếu nguyên tắc ăn uống cho người đái tháo đường: kiểm soát carbohydrate, hạn chế rượu bia, và an toàn khi dùng thuốc hạ đường huyết.",
+      keyPoints: [
+        {
+          label: "Nguyên tắc ăn uống",
+          detail: "Ưu tiên thực phẩm GI thấp, kiểm soát khẩu phần tinh bột, hạn chế đường tự do và rượu bia.",
+          icon: "restaurant",
+        },
+        {
+          label: "An toàn thuốc–thực phẩm",
+          detail: "Mọi khuyến nghị đổi món khi có tương tác đều hướng người bệnh trao đổi với bác sĩ, không tự điều chỉnh thuốc.",
+          icon: "shield",
+        },
+      ],
+      clinicalNote:
+        "Áp dụng như tài liệu tham khảo dinh dưỡng. Liều thuốc và xét nghiệm theo dõi do bác sĩ quyết định.",
+    };
+  }
+
+  if (norm.includes("3510") || norm.includes("neuropathy") || norm.includes("than kinh")) {
+    return {
+      code: "QĐ 3510/QĐ-BYT",
+      title: "Hướng dẫn chẩn đoán & điều trị bệnh thần kinh đái tháo đường",
+      officialName: "Quyết định số 3510/QĐ-BYT của Bộ Y Tế về bệnh thần kinh đái tháo đường",
+      issuer: "Bộ Y Tế Việt Nam",
+      year: "2014",
+      badge: "Phác đồ Quốc gia",
+      summary:
+        "Hướng dẫn chuyên môn về biến chứng thần kinh do đái tháo đường, bao gồm lưu ý dinh dưỡng và tương tác khi dùng thuốc hỗ trợ thần kinh.",
+      keyPoints: [
+        {
+          label: "Kiểm soát đường huyết",
+          detail: "Ổn định đường huyết là nền tảng làm chậm tiến triển bệnh thần kinh ngoại vi.",
+          icon: "monitoring",
+        },
+        {
+          label: "An toàn khi dùng thuốc",
+          detail: "Một số thuốc hỗ trợ thần kinh (ALA, pregabalin, duloxetine) có cảnh báo khi dùng cùng rượu hoặc sữa — cần hỏi bác sĩ.",
+          icon: "medication",
+        },
+      ],
+      clinicalNote:
+        "Không tự ý thêm hoặc ngưng thuốc điều trị bệnh thần kinh. Mọi thay đổi phác đồ do bác sĩ chuyên khoa quyết định.",
+    };
+  }
+
   if (norm.includes("food") || norm.includes("db") || norm.includes("thuc pham") || norm.includes("#")) {
     const foodName = rawCitation.includes("#")
       ? rawCitation.split("#")[1].replace(/_/g, " ")
@@ -189,13 +281,17 @@ export function parseCitationData(rawCitation: string): CitationInfo {
   };
 }
 
+export interface CitationDetailModalProps {
+  citation: string | null;
+  excerpts?: CitationChunk[];
+  onClose: () => void;
+}
+
 export function CitationDetailModal({
   citation,
+  excerpts = [],
   onClose,
-}: {
-  citation: string | null;
-  onClose: () => void;
-}) {
+}: CitationDetailModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -216,8 +312,7 @@ export function CitationDetailModal({
   const data = parseCitationData(citation);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3.5 sm:p-5 overflow-y-auto">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       <div
         role="button"
         tabIndex={0}
@@ -226,118 +321,92 @@ export function CitationDetailModal({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") onClose();
         }}
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity cursor-pointer animate-in fade-in duration-150"
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm cursor-pointer"
       />
 
-      {/* Centered Modal Dialog */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="citation-modal-title"
-        className="relative w-full max-w-lg max-h-[88vh] bg-white rounded-2xl shadow-2xl z-10 flex flex-col border border-slate-200/90 overflow-hidden my-auto animate-in zoom-in-95 fade-in duration-200"
+        className="relative w-full max-w-lg max-h-[88vh] bg-white rounded-2xl shadow-[0_24px_64px_rgba(25,28,28,0.18)] z-10 flex flex-col border border-slate-200/90 overflow-hidden my-auto animate-in fade-in duration-200 selection:bg-emerald-100 selection:text-slate-900"
       >
-        {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-start justify-between gap-3 bg-slate-50/80 shrink-0">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-start justify-between gap-3 shrink-0">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/90 shadow-2xs shrink-0 mt-0.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
               <span className="material-symbols-outlined text-[22px]">menu_book</span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-300">
-                  {data.badge}
-                </span>
-                <span className="text-[11px] text-slate-500 font-semibold">
-                  Năm {data.year}
-                </span>
-              </div>
               <h3
                 id="citation-modal-title"
-                className="font-bold text-sm sm:text-base text-slate-900 mt-1 leading-snug"
+                className="text-[15px] sm:text-base font-bold text-slate-900 leading-snug tracking-tight"
               >
                 {data.title}
               </h3>
+              <p className="mt-1 text-[12px] text-slate-500">
+                {data.badge} · {data.year}
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold text-[#006857] tabular-nums">
+                {data.code}
+              </p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 -mr-1 -mt-0.5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006857]/30"
             title="Đóng (ESC)"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
-        {/* Body Content */}
-        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-          {/* Official Document Reference */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-700 space-y-1">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Văn bản pháp lý &amp; Cơ quan ban hành
-            </p>
-            <p className="font-semibold text-slate-900 leading-relaxed">
+        <div className="px-5 sm:px-6 py-5 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+          <div className="px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200/80">
+            <p className="text-[13px] font-medium text-slate-800 leading-relaxed">
               {data.officialName}
             </p>
-            <p className="text-slate-500 font-medium">
-              Cơ quan: <strong className="text-slate-800">{data.issuer}</strong>
-            </p>
+            <p className="text-[12px] text-slate-500 mt-1">{data.issuer}</p>
           </div>
 
-          {/* Overview Summary */}
-          <div className="space-y-1">
-            <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Mô tả nội dung hướng dẫn
-            </p>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              {data.summary}
-            </p>
-          </div>
-
-          {/* Key Clinical Recommendations */}
-          <div className="space-y-2.5 pt-1">
-            <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Các nguyên tắc chuyên môn then chốt
-            </p>
-            <div className="space-y-2">
-              {data.keyPoints.map((pt, idx) => (
+          {excerpts.length > 0 ? (
+            <section className="space-y-3">
+              <h4 className="text-[13px] font-semibold text-slate-900">
+                Đoạn đã dùng để trả lời
+              </h4>
+              {excerpts.map((excerpt, idx) => (
                 <div
-                  key={idx}
-                  className="p-3 rounded-xl border border-slate-200/80 bg-white shadow-2xs flex items-start gap-2.5"
+                  key={excerpt.chunk_id || idx}
+                  className="px-3.5 py-3 rounded-xl bg-white border border-slate-200/80"
                 >
-                  <span className="material-symbols-outlined text-[18px] text-[#006857] shrink-0 mt-0.5">
-                    {pt.icon}
-                  </span>
-                  <div className="min-w-0 text-xs">
-                    <p className="font-bold text-slate-900">{pt.label}</p>
-                    <p className="text-slate-600 mt-0.5 leading-relaxed">{pt.detail}</p>
-                  </div>
+                  {excerpts.length > 1 ? (
+                    <p className="text-[11px] font-medium text-slate-400 mb-1.5">
+                      Đoạn {idx + 1}
+                    </p>
+                  ) : null}
+                  <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {excerpt.text}
+                  </p>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Clinical Safety Disclaimer */}
-          <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2">
-            <span className="material-symbols-outlined text-[17px] text-amber-600 shrink-0 mt-0.5">
-              health_and_safety
-            </span>
-            <p className="leading-relaxed">
-              <strong>Lưu ý an toàn:</strong> {data.clinicalNote}
+            </section>
+          ) : (
+            <p className="text-[13px] text-slate-500 leading-relaxed">
+              Không có đoạn retrieve cho lượt trả lời này. Nguồn được ghi nhận:{" "}
+              <span className="font-medium text-slate-700">{citation}</span>.
             </p>
-          </div>
+          )}
+
+          <p className="text-[12px] text-slate-500 leading-relaxed border-t border-slate-100 pt-4">
+            Thông tin mang tính tham khảo dinh dưỡng, không thay thế chỉ định của bác sĩ.
+          </p>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 sm:px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
-          <span className="text-[11px] text-slate-500 font-medium">
-            Hệ thống Dinh dưỡng Lâm sàng VinNutri
-          </span>
+        <div className="px-5 sm:px-6 py-3.5 border-t border-slate-100 flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-[#006857] hover:bg-[#005245] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+            className="px-4 py-2 bg-[#006857] hover:bg-[#005245] text-white rounded-xl text-[13px] font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#006857]/40 focus-visible:ring-offset-2"
           >
             Đã hiểu
           </button>

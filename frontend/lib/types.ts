@@ -648,6 +648,13 @@ export interface DoctorNoteOut {
   notes?: DoctorNoteItem[];
 }
 
+export interface CitationChunk {
+  chunk_id: string;
+  text: string;
+  source: string;
+  score?: number;
+}
+
 export interface AgentRunOutput {
   intent: string;
   secondary_intents?: string[];
@@ -657,6 +664,7 @@ export interface AgentRunOutput {
   food_log_id?: string | null;
   alert_ids: string[];
   citations: string[];
+  citation_chunks?: CitationChunk[];
   guardrail_triggered: boolean;
   weekly_compliance?: WeeklyComplianceOut | null;
   doctor_note?: DoctorNoteOut | null;
@@ -685,6 +693,7 @@ export interface ChatMessageOut {
   intent?: string | null;
   secondary_intents?: string[];
   citations?: string[];
+  citation_chunks?: CitationChunk[];
   guardrail_triggered?: boolean;
   meal_plan_id?: string | null;
   meal_preview?: MealPreviewOut | null;

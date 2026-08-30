@@ -67,6 +67,14 @@ def test_replace_messages_with_meal_preview(client):
             "text": "Dựa trên hồ sơ của bạn...",
             "intent": "meal_plan",
             "citations": ["dinh_duong_dai_thao_duong.md"],
+            "citation_chunks": [
+                {
+                    "chunk_id": "dinh_duong_dai_thao_duong.md#1",
+                    "text": "Mục tiêu HbA1c < 7.0%.",
+                    "source": "dinh_duong_dai_thao_duong.md",
+                    "score": 0.88,
+                }
+            ],
             "meal_preview": {
                 "date": "2026-08-23",
                 "day_index": 0,
@@ -107,6 +115,8 @@ def test_replace_messages_with_meal_preview(client):
     ai_msg = body["messages"][1]
     assert ai_msg["intent"] == "meal_plan"
     assert ai_msg["meal_preview"]["meal_plan_id"] == "plan-demo"
+    assert ai_msg["citation_chunks"][0]["text"] == "Mục tiêu HbA1c < 7.0%."
+    assert ai_msg["citation_chunks"][0]["source"] == "dinh_duong_dai_thao_duong.md"
 
     listed = client.get("/api/v1/chat/sessions", headers=headers)
     match = next(s for s in listed.json() if s["id"] == created["id"])

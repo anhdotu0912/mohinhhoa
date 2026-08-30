@@ -88,6 +88,32 @@ def get_patient_meal_plan(
 # ---------------------------------------------------------------------------
 # 2. check_drug_food_interaction & check_allergy_match
 # ---------------------------------------------------------------------------
+_INTERACTION_GUIDELINE_CITATIONS = [
+    "byt_qd_5481_t2d.md",
+    "ada_diabetes.md",
+]
+
+
+def _flatten_citation_sources(sources: object) -> list[str]:
+    """Normalize InteractionItem.sources (list[str] or nested dict) into citation keys."""
+    if not sources:
+        return []
+    if isinstance(sources, str):
+        text = sources.strip()
+        return [text] if text else []
+    if isinstance(sources, dict):
+        out: list[str] = []
+        for value in sources.values():
+            out.extend(_flatten_citation_sources(value))
+        return out
+    if isinstance(sources, (list, tuple, set)):
+        out: list[str] = []
+        for item in sources:
+            out.extend(_flatten_citation_sources(item))
+        return out
+    return []
+
+
 _ALLERGY_FOOD_MAP: dict[str, list[str]] = {
     "hải sản": [
         "tôm", "cua", "mực", "nghêu", "sò", "ốc", "hàu", "bạch tuộc",
@@ -205,7 +231,12 @@ def check_drug_food_interaction(
         else:
             answer_text = f"✅ Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra trong cơ sở dữ liệu."
 
-    all_sources = list({src for item in interactions for src in item.sources})
+    kb_sources: list[str] = []
+    for item in interactions:
+        kb_sources.extend(_flatten_citation_sources(getattr(item, "sources", None)))
+    # Always attach clinical guidelines so the patient UI can show
+    # "Tài liệu tham khảo" even when the queried pair is unmatched/safe.
+    all_sources = list(dict.fromkeys(kb_sources + _INTERACTION_GUIDELINE_CITATIONS))
 
     return {
         "answer": answer_text,

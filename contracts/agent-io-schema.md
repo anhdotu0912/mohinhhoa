@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VinNutri
 
-**Version:** 1.12 (2026-08-31 — `AgentRunOutput.unmatched_pairs[]` cho chat escalation HITL. Xem changelog ở §7 Versioning.)
+**Version:** 1.13 (2026-08-31 — `AgentRunOutput.citation_chunks[]` là đoạn RAG đã nhồi vào prompt. Xem changelog ở §7 Versioning.)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -251,6 +251,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
   "food_log_id": null,
   "alert_ids": [],
   "citations": ["byt_vn_notes.md"],
+  "citation_chunks": [],
   "guardrail_triggered": false,
   "weekly_compliance": null,
   "doctor_note": null,
@@ -259,6 +260,19 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 }
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
+
+**`citation_chunks[]` (as-built 2026-08-31):** đoạn retrieve **đã nhồi vào prompt** khi gen `message` (cùng slice `rag_context[:2]` với `_build_rag_prompt`). Shape `{chunk_id, text, source, score}`. Khác `citations[]` (chỉ id nguồn cho guardrail). Rỗng khi intent không RAG (ví dụ `meal_plan` ở JSON trên), khi guardrail `missing_citations` xóa nguồn, hoặc khi không có `text`. FE hiện `text` của chunk, không dùng card tóm tắt hardcode. Ví dụ `rag_qa`:
+
+```json
+"citation_chunks": [
+  {
+    "chunk_id": "byt_qd_5481_t2d.md#2",
+    "text": "Mục tiêu HbA1c < 7.0% đối với hầu hết người lớn ĐTĐ típ 2.",
+    "source": "byt_qd_5481_t2d.md",
+    "score": 0.82
+  }
+]
+```
 
 **Ví dụ khi intent = `weekly_compliance`:**
 ```json
@@ -431,7 +445,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.12**.
+- Version hiện tại của contract này: **1.13**.
+- **Changelog 1.12 → 1.13 (2026-08-31):** `AgentRunOutput.citation_chunks[]` (optional, default `[]`) — đoạn RAG đã đưa vào prompt (`chunk_id`, `text`, `source`, `score`). `citations[]` giữ id nguồn. Đồng bộ `contracts/api-v1.md` v1.22. Không breaking.
 - **Changelog 1.11 → 1.12 (2026-08-31):** `AgentRunOutput.unmatched_pairs[]` (optional, default `[]`) — map từ `interaction_check` để chat hiện CTA hỏi bác sĩ khi KB không có cặp thuốc–thực phẩm. Đồng bộ `contracts/api-v1.md` v1.21. Không breaking.
 - **Changelog 1.10 → 1.11 (2026-08-29):** HITL ràng buộc lâm sàng — `PatientProfile` thêm `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` (optional, default `null`). `POST /profile` không còn ghi đè `target_kcal`/`restrictions`/`treatment_goals` hiệu lực; meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/api-v1.md` v1.17, `specs/02`, `specs/04`. Không breaking — field mới optional, cột hiệu lực giữ nguyên shape.
 - **Changelog 1.9 → 1.10 (2026-08-28):** `DoctorNoteOut` thêm `doctor_avatar`, `notes[]`, `has_more`; `note`/`created_at`/`tags` giữ là reminder mới nhất. Nguồn chỉ `manual_reminder` (bỏ fallback `adjustment_note`). Tên/ảnh từ bác sĩ được gán, không hallucinate. Đồng bộ `contracts/api-v1.md` v1.15. Không breaking — field mới optional/default.

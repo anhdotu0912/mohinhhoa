@@ -1,6 +1,6 @@
 # API v1 Contract — VinNutri (FE ↔ BE)
 
-**Version:** 1.21 (2026-08-31 — Chat escalation HITL: bệnh nhân hỏi bác sĩ khi AI không chắc. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.22 (2026-08-31 — `citation_chunks[]` trên AgentRunOutput / ChatMessage: đoạn RAG đã dùng để gen câu trả lời. Xem changelog ở mục Versioning cuối file)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -717,7 +717,7 @@ Query optional `days` (default `7`, min `1`, max `90`). `patient_id` trong respo
 ```json
 // Request
 { "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
-// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[] as-built và field optional weekly_compliance / doctor_note as-built)
+// Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[], citation_chunks[], weekly_compliance / doctor_note)
 // Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
 ```
 **Multi-intent (as-built):** `intent_classifier` phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) qua keyword pattern — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
@@ -838,6 +838,14 @@ Thay toàn bộ mảng tin nhắn (snapshot sau khi stream `done`/`error`).
       "intent": "meal_plan",
       "secondary_intents": [],
       "citations": ["dinh_duong_dai_thao_duong.md"],
+      "citation_chunks": [
+        {
+          "chunk_id": "dinh_duong_dai_thao_duong.md#1",
+          "text": "Đoạn guideline đã retrieve và nhồi vào prompt.",
+          "source": "dinh_duong_dai_thao_duong.md",
+          "score": 0.8
+        }
+      ],
       "guardrail_triggered": false,
       "meal_plan_id": "plan_uuid",
       "meal_preview": { /* MealPreviewOut */ },
@@ -856,7 +864,7 @@ Thay toàn bộ mảng tin nhắn (snapshot sau khi stream `done`/`error`).
 
 **ChatMessageOut** — field optional (snake_case):
 - `id`, `sender` ∈ `user|ai`, `text`
-- `intent`, `secondary_intents[]`, `citations[]`, `guardrail_triggered`, `meal_plan_id`
+- `intent`, `secondary_intents[]`, `citations[]`, `citation_chunks[]` (`{chunk_id, text, source, score}` — đoạn RAG đã nhồi vào prompt; default `[]`), `guardrail_triggered`, `meal_plan_id`
 - `meal_preview` (MealPreviewOut), `weekly_compliance` (WeeklyComplianceOut), `doctor_note` (DoctorNoteOut)
 - `meal_plan_week` (MealPlanOutput), `show_weekly_plan`, `thinking_steps[]`, `corrected`, `correction_reason`
 - `unmatched_pairs[]` (`{drug, food}` — optional, default `[]`)
@@ -1111,7 +1119,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.21**.
+- Version hiện tại: **1.22**.
+- **Changelog 1.21 → 1.22 (2026-08-31):** `AgentRunOutput.citation_chunks[]` và `ChatMessageOut.citation_chunks[]` — đoạn RAG (`text`) đã dùng để gen câu chat. `citations[]` vẫn là id nguồn. Đồng bộ `contracts/agent-io-schema.md` v1.13. Không breaking.
 - **Changelog 1.20 → 1.21 (2026-08-31):** Chat escalation HITL — `POST/GET /chat/escalations`, `POST .../messages`; `GET/POST /doctor/escalations` + `.../resolve`. Notification type mới `escalation_sent` | `escalation_reply` (`related_ids.escalation_id`). `AgentRunOutput.unmatched_pairs[]` optional. `ChatMessageOut` thêm `unmatched_pairs[]`, `escalation_id`. Không breaking.
 - **Changelog 1.19 → 1.20 (2026-08-30):** thêm `GET /guidelines/{source_id}` (role `patient`|`doctor`) — đọc nội dung file guideline RAG hoặc ghi chú catalog khi click citation trên UI duyệt thực đơn. Không breaking.
 - **Changelog 1.18 → 1.19 (2026-08-29):** validate range ràng buộc lâm sàng thống nhất FE+BE (`target_kcal` 800–4000, `carb_per_meal` 0–200, `sodium_daily` 0–5000, `salt_daily_g` 0–15, `sugar_daily_g` 0–100, `treatment_goals` 3–80 ký tự / tối đa 12). UI bác sĩ và hồ sơ BN dùng thanh kéo trong các khoảng này. 422 nếu vượt range. Không breaking với payload trong range cũ (trừ `target_kcal` < 800 hoặc muối > 15 / đường > 100).

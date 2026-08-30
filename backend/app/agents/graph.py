@@ -15,13 +15,14 @@ from langgraph.graph import END, StateGraph
 
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
-from app.agents.nodes.rag_tool import rag_qa_node
+from app.agents.nodes.rag_tool import RAG_PROMPT_CHUNK_LIMIT, rag_qa_node
 from app.agents.state import AgentState
 from app.guardrails.rules import enforce_output_safety
 from app.guardrails.source_check import enforce_citation_guardrail
 from app.schemas.meal_plan import (
     AgentRunInput,
     AgentRunOutput,
+    CitationChunk,
     DoctorNoteOut,
     MealPreviewOut,
     MetricsDeltaAdviceOut,
@@ -504,6 +505,33 @@ def reset_compiled_graph() -> None:
 
 # --- Facade ---
 
+def _citation_chunks_from_state(final_state: AgentState) -> list[CitationChunk]:
+    """Expose only the passages that were injected into the RAG prompt."""
+    if not final_state.get("citations"):
+        return []
+    rag_context = final_state.get("rag_context") or []
+    chunks: list[CitationChunk] = []
+    for item in rag_context[:RAG_PROMPT_CHUNK_LIMIT]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            score = float(item.get("score") or 0.0)
+        except (TypeError, ValueError):
+            score = 0.0
+        chunks.append(
+            CitationChunk(
+                chunk_id=str(item.get("chunk_id") or ""),
+                text=text,
+                source=str(item.get("source") or ""),
+                score=score,
+            )
+        )
+    return chunks
+
+
 def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
     """Map final graph state to AgentRunOutput (shared by sync and streaming paths)."""
     meal_plan_obj = final_state.get("meal_plan")
@@ -548,6 +576,7 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
         food_log_id=None,
         alert_ids=[],
         citations=final_state.get("citations", []),
+        citation_chunks=_citation_chunks_from_state(final_state),
         guardrail_triggered=bool(final_state.get("guardrail_flags")),
         weekly_compliance=weekly_compliance,
         doctor_note=doctor_note,
