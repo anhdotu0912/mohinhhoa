@@ -376,7 +376,7 @@ export default function HomePage() {
                 Đồng hành cùng Bệnh nhân &amp; Chuyên gia Y tế
               </h2>
               <p className="text-xs sm:text-sm lg:text-[14.5px] text-slate-600 leading-relaxed">
-                Kết nối liền mạch giữa việc tự quản lý tại nhà của người bệnh và sự giám sát chuyên môn từ bác sĩ.
+                Kết nối liền mạch giữa việc tự quản lý tại nhà của người bệnh/sự giám sát chuyên môn từ bác sĩ.
               </p>
 
               {/* Toggle Audience Tabs - Adaptive Grid on Mobile */}
