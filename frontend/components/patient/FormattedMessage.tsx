@@ -7,13 +7,27 @@ interface FormattedMessageProps {
   isStreaming?: boolean;
 }
 
+function cleanInlineDishPortions(raw: string): string {
+  if (!raw) return "";
+  // Strip raw multiplier like (×1.47) or (x1.47)
+  let res = raw.replace(/\s*\([×xX*]\s*[0-9.]+\)/gi, "");
+  // Strip "theo công thức"
+  res = res.replace(/\s*theo công thức/gi, "");
+  // Normalize nested parentheses like "(1 chén (~150g))" -> "(1 chén · 150g)"
+  res = res.replace(/\(\s*([^\(\)]+?)\s*\([~≈]?\s*(\d+\s*[a-zA-Zà-ỹÀ-Ỹ/]+)\)\s*\)/g, "($1 · $2)");
+  // Normalize "(~150g)" -> "(150g)"
+  res = res.replace(/\([~≈]\s*(\d+\s*[a-zA-Zà-ỹÀ-Ỹ/]+)\)/g, "($1)");
+  return res;
+}
+
 /**
  * Parses inline markdown like **bold**, *italic*, and renders text with strong tags.
  */
 function renderInlineFormatting(content: string): React.ReactNode {
   if (!content) return null;
+  const cleaned = cleanInlineDishPortions(content);
   // Regex to split by **bold** or *italic*
-  const parts = content.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  const parts = cleaned.split(/(\*\*.*?\*\*|\*.*?\*)/g);
 
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {

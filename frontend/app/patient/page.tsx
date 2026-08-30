@@ -21,6 +21,7 @@ import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
 import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
 import { FormattedMessage } from "@/components/patient/FormattedMessage";
 import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
+import { CitationDetailModal } from "@/components/patient-chat/panels/CitationDetailModal";
 import { APP_NAME } from "@/lib/brand";
 
 export type { Message };
@@ -73,6 +74,8 @@ const BOT_VIDEO_SRC = "/video/video_chatbot.mp4";
 
 function CitationsAccordion({ citations }: { citations: string[] }) {
   const [open, setOpen] = useState(false);
+  const [selectedCitation, setSelectedCitation] = useState<string | null>(null);
+
   if (!citations || citations.length === 0) return null;
 
   return (
@@ -85,7 +88,7 @@ function CitationsAccordion({ citations }: { citations: string[] }) {
         <span className="material-symbols-outlined text-[15px] text-emerald-600 group-hover:scale-110 transition-transform">
           menu_book
         </span>
-        <span>Nguồn trích dẫn ({citations.length})</span>
+        <span>Nguồn trích dẫn y khoa ({citations.length})</span>
         <span
           className={`material-symbols-outlined text-[15px] text-slate-400 group-hover:text-slate-600 transition-transform duration-200 ${
             open ? "rotate-180" : ""
@@ -98,14 +101,30 @@ function CitationsAccordion({ citations }: { citations: string[] }) {
       {open && (
         <div className="flex flex-wrap items-center gap-1.5 pt-2 pl-1 animate-in fade-in duration-200">
           {citations.map((c, i) => (
-            <span
+            <button
               key={i}
-              className="bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 px-2.5 py-0.5 rounded-md text-[11px] text-slate-700 font-medium transition-colors shadow-2xs"
+              type="button"
+              onClick={() => setSelectedCitation(c)}
+              className="bg-white hover:bg-emerald-50/80 border border-slate-200/90 hover:border-emerald-300 px-2.5 py-1 rounded-lg text-[11px] text-slate-700 hover:text-[#006857] font-semibold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 group/btn"
+              title="Click để xem chi tiết tài liệu chuyên môn"
             >
-              {c.replace(/_/g, " ").replace(/\.md$/i, "")}
-            </span>
+              <span className="material-symbols-outlined text-[13px] text-emerald-600 group-hover/btn:scale-110 transition-transform">
+                description
+              </span>
+              <span>{c.replace(/_/g, " ").replace(/\.md$/i, "")}</span>
+              <span className="material-symbols-outlined text-[12px] text-slate-400 group-hover/btn:text-emerald-700">
+                open_in_new
+              </span>
+            </button>
           ))}
         </div>
+      )}
+
+      {selectedCitation && (
+        <CitationDetailModal
+          citation={selectedCitation}
+          onClose={() => setSelectedCitation(null)}
+        />
       )}
     </div>
   );

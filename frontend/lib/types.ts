@@ -126,6 +126,14 @@ export interface DayTotals {
   protein_g: number;
   fat_g: number;
   sodium_mg: number;
+  sugar_g?: number;
+}
+
+export interface GuidelineSourceOut {
+  id: string;
+  kind: "guideline" | "catalog";
+  title: string;
+  body: string;
 }
 
 export interface DayPlan {

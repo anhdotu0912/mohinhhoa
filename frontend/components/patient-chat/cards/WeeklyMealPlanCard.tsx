@@ -17,6 +17,7 @@ import {
   MealPlanEmptyState,
   MealPlanLoadingState,
 } from "./ApprovedMealSlotList";
+import { NutrientChips } from "@/components/shared/NutrientChips";
 
 interface WeeklyMealPlanCardProps {
   plan?: MealPlanOutput | null;
@@ -66,6 +67,8 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
   const nutrition = resolveDayNutrition(selectedDay);
   const meals = selectedDay?.meals ?? [];
   const isToday = selectedDayIndex === todayIndex;
+
+  const [showNutrients, setShowNutrients] = useState(false);
 
   const handleMealsChange = (nextMeals: Meal[]) => {
     if (!plan) return;
@@ -189,32 +192,39 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
         onMealsChange={handleMealsChange}
       />
 
-      {(nutrition.kcal > 0 || nutrition.protein > 0 || nutrition.carbs > 0 || nutrition.fat > 0) && (
-        <div className="p-3 bg-slate-50/90 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[17px] text-[#006857]">fact_check</span>
-            <span className="text-slate-600 font-medium">Tổng năng lượng:</span>
-            {nutrition.kcal > 0 && (
-              <span className="font-bold text-slate-900 text-xs sm:text-sm tabular-nums">{nutrition.kcal} kcal</span>
-            )}
+      {meals.length > 0 && (
+        <div className="p-3 bg-slate-50/90 border border-slate-200/80 rounded-xl flex flex-col gap-2 transition-all">
+          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 min-w-0">
+              <span className="material-symbols-outlined text-[17px] text-[#006857]">fact_check</span>
+              <span>Tổng dinh dưỡng ngày ({selectedLabel?.full})</span>
+              {nutrition.kcal > 0 && (
+                <span className="text-[11px] font-extrabold text-[#006857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                  {nutrition.kcal} kcal
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNutrients((v) => !v)}
+              className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-[#006857] hover:text-[#005245] bg-white hover:bg-emerald-50 px-2.5 py-1 rounded-lg border border-slate-200 hover:border-emerald-300 transition-all shadow-2xs cursor-pointer ml-auto sm:ml-0"
+            >
+              <span>{showNutrients ? "Ẩn thành phần" : "Xem thêm thành phần"}</span>
+              <span
+                className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
+                  showNutrients ? "rotate-180" : ""
+                }`}
+              >
+                expand_more
+              </span>
+            </button>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 text-slate-600 font-medium text-[11px] sm:text-xs flex-wrap">
-            {nutrition.protein > 0 && (
-              <span>
-                Đạm: <strong className="text-slate-900">{nutrition.protein}g</strong>
-              </span>
-            )}
-            {nutrition.carbs > 0 && (
-              <span>
-                Carb: <strong className="text-slate-900">{nutrition.carbs}g</strong>
-              </span>
-            )}
-            {nutrition.fat > 0 && (
-              <span>
-                Béo: <strong className="text-slate-900">{nutrition.fat}g</strong>
-              </span>
-            )}
-          </div>
+
+          {showNutrients && (
+            <div className="pt-2 border-t border-slate-200/60 animate-in fade-in slide-in-from-top-1 duration-150">
+              <NutrientChips values={nutrition} layer="summary" compact />
+            </div>
+          )}
         </div>
       )}
 

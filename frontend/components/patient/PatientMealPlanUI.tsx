@@ -2,63 +2,20 @@
 
 import React, { useState } from "react";
 import type { MealDishItem } from "@/lib/plans-store";
+import { formatPortionLabel } from "@/lib/meal-plan-mappers";
+import { NutrientChips } from "@/components/shared/NutrientChips";
+import { toNutrientValues } from "@/lib/nutrient-display";
 
-type NutrientKind = "kcal" | "salt" | "sugar";
-
-const NUTRIENT_META: Record<
-  NutrientKind,
-  { icon: string; label: string; unit: string; iconClass: string }
-> = {
-  kcal: {
-    icon: "local_fire_department",
-    label: "Kcal",
-    unit: "kcal",
-    iconClass: "text-amber-600",
-  },
-  salt: {
-    icon: "grain",
-    label: "Muối",
-    unit: "g",
-    iconClass: "text-sky-700",
-  },
-  sugar: {
-    icon: "cake",
-    label: "Đường",
-    unit: "g",
-    iconClass: "text-rose-600",
-  },
-};
-
-export function NutrientChip({
-  kind,
-  value,
-  compact = false,
-}: {
-  kind: NutrientKind;
-  value: number;
-  compact?: boolean;
-}) {
-  const meta = NUTRIENT_META[kind];
-  const display =
-    kind === "kcal" ? Math.round(value).toLocaleString("vi-VN") : value.toFixed(1);
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 text-slate-800 tabular-nums ${
-        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
-      }`}
-      title={`${meta.label}: ${display} ${meta.unit}`}
-    >
-      <span
-        className={`material-symbols-outlined ${meta.iconClass} ${compact ? "text-[12px]" : "text-[14px]"}`}
-        aria-hidden
-      >
-        {meta.icon}
-      </span>
-      <span className="font-semibold">{display}</span>
-      <span className="text-slate-500 font-normal">{meta.unit}</span>
-    </span>
-  );
+function dishValues(food: MealDishItem) {
+  return toNutrientValues({
+    kcal: food.calories,
+    carbG: food.carbG,
+    proteinG: food.proteinG,
+    fatG: food.fat,
+    saltG: food.salt,
+    sodiumMg: food.sodiumMg,
+    sugarG: food.sugar,
+  });
 }
 
 export function NutrientChipsRow({
@@ -68,13 +25,7 @@ export function NutrientChipsRow({
   food: MealDishItem;
   compact?: boolean;
 }) {
-  return (
-    <div className={`flex flex-wrap ${compact ? "gap-1" : "gap-1.5"}`}>
-      <NutrientChip kind="kcal" value={food.calories || 0} compact={compact} />
-      <NutrientChip kind="salt" value={food.salt} compact={compact} />
-      <NutrientChip kind="sugar" value={food.sugar ?? 0} compact={compact} />
-    </div>
-  );
+  return <NutrientChips values={dishValues(food)} layer="detail" compact={compact} />;
 }
 
 function DishNutrientsPanel({
@@ -209,16 +160,31 @@ function MetricProgressBar({
 
 export function DayNutritionProgress({
   calories,
+  carbG,
   saltG,
+  sugarG,
   targetCalories,
+  targetCarbG,
   targetSaltG,
+  targetSugarG,
 }: {
   calories: number;
+  carbG: number;
   saltG: number;
+  sugarG: number;
   targetCalories: number | null;
+  targetCarbG: number | null;
   targetSaltG: number | null;
+  targetSugarG: number | null;
 }) {
-  if (targetCalories == null && targetSaltG == null) return null;
+  if (
+    targetCalories == null &&
+    targetCarbG == null &&
+    targetSaltG == null &&
+    targetSugarG == null
+  ) {
+    return null;
+  }
 
   return (
     <div
@@ -227,7 +193,7 @@ export function DayNutritionProgress({
     >
       {targetCalories != null && (
         <MetricProgressBar
-          label="Năng lượng"
+          label="Kcal"
           icon="local_fire_department"
           value={calories}
           target={targetCalories}
@@ -235,12 +201,32 @@ export function DayNutritionProgress({
           mode="band"
         />
       )}
+      {targetCarbG != null && (
+        <MetricProgressBar
+          label="Carb"
+          icon="grain"
+          value={carbG}
+          target={targetCarbG}
+          unit="g"
+          mode="ceiling"
+        />
+      )}
       {targetSaltG != null && (
         <MetricProgressBar
           label="Muối"
-          icon="grain"
+          icon="science"
           value={saltG}
           target={targetSaltG}
+          unit="g"
+          mode="ceiling"
+        />
+      )}
+      {targetSugarG != null && (
+        <MetricProgressBar
+          label="Đường"
+          icon="cake"
+          value={sugarG}
+          target={targetSugarG}
           unit="g"
           mode="ceiling"
         />
@@ -495,6 +481,12 @@ export function DishCard({
     );
   }
 
+  const displayPortion = portion
+    ? formatPortionLabel(portion)
+    : item.portion
+      ? formatPortionLabel(item.portion)
+      : null;
+
   return (
     <article
       className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm cursor-pointer"
@@ -510,9 +502,9 @@ export function DishCard({
       aria-expanded={expanded}
     >
       <p className="text-sm sm:text-base font-semibold text-slate-900 leading-snug">{item.name}</p>
-      {portion && (
+      {displayPortion && (
         <p className="text-xs text-slate-600 mt-1">
-          Khẩu phần: <span className="font-medium">{portion}</span>
+          Khẩu phần: <span className="font-medium">{displayPortion}</span>
         </p>
       )}
       <DishNutrientsPanel food={item} expanded={expanded} />

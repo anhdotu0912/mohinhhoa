@@ -7,6 +7,7 @@ import type {
   MealPlanOutput,
 } from "./types";
 import type { DayMealPlan, MealDishItem, MealPlanItem } from "./plans-store";
+import { displaySaltG } from "./nutrient-display";
 
 function sodiumToSaltG(sodiumMg: number): number {
   return Math.round((sodiumMg / 1000) * 10) / 10;
@@ -16,25 +17,26 @@ function saltGToSodiumMg(saltG: number): number {
   return Math.round(saltG * 1000);
 }
 
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 export function foodItemToDish(item: FoodItem): MealDishItem {
+  const sodiumMg = item.macros?.sodium_mg ?? 0;
   return {
     name: item.name,
-    calories: Math.round(item.kcal),
-    salt: sodiumToSaltG(item.macros?.sodium_mg ?? 0),
+    portion: item.portion || "",
+    calories: item.kcal ?? 0,
+    salt: sodiumMg / 1000,
+    sodiumMg,
     sugar: item.macros?.sugar_g ?? 0,
-    fat: Math.round((item.macros?.fat_g ?? 0) * 10) / 10,
+    fat: item.macros?.fat_g ?? 0,
     carbG: item.macros?.carb_g ?? 0,
+    proteinG: item.macros?.protein_g ?? 0,
     foodId: item.food_id,
-    alternatives: (item.alternatives || []).map((alt) => ({
-      name: alt.name,
-      calories: Math.round(alt.kcal),
-      salt: sodiumToSaltG(alt.macros?.sodium_mg ?? 0),
-      sugar: alt.macros?.sugar_g ?? 0,
-      fat: Math.round((alt.macros?.fat_g ?? 0) * 10) / 10,
-      carbG: alt.macros?.carb_g ?? 0,
-      foodId: alt.food_id,
-      alternatives: [],
-    })),
+    alternatives: (item.alternatives || []).map((alt) =>
+      foodItemToDish({ ...alt, alternatives: [] })
+    ),
   };
 }
 
@@ -53,6 +55,44 @@ function sumDaySugar(day: DayPlan): number {
   return Math.round(total * 10) / 10;
 }
 
+export function formatQty(n: number, digits = 1): string {
+  const rounded = Math.round(n * 10 ** digits) / 10 ** digits;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(digits);
+}
+
+export function formatPortionLabel(portion?: string | null): string {
+  if (!portion?.trim()) return "";
+  let raw = portion.trim();
+  const factorMatch = raw.match(/\([×xX*]\s*([0-9.]+)\)\s*$/i);
+  const factor = factorMatch ? Number(factorMatch[1]) : 1;
+  const scale = Number.isFinite(factor) && factor > 0 ? factor : 1;
+  raw = raw.replace(/\([×xX*]\s*[0-9.]+\)\s*$/gi, "").trim();
+  raw = raw.replace(/\s*phần ăn được\s*/gi, " ").replace(/\s+/g, " ").trim();
+  raw = raw.replace(/\s*theo công thức\s*/gi, " ").replace(/\s+/g, " ").trim();
+
+  const gramMatch = raw.match(/^(\d+(?:\.\d+)?)\s*g\b/i);
+  if (gramMatch) {
+    return `${formatQty(Number(gramMatch[1]) * scale)} g`;
+  }
+
+  const mlMatch = raw.match(/~\s*(\d+(?:\.\d+)?)\s*ml/i);
+  if (mlMatch && Math.abs(scale - 1) >= 0.05) {
+    const ml = Math.round(Number(mlMatch[1]) * scale);
+    return raw.replace(/~\s*\d+(?:\.\d+)?\s*ml/i, `~${ml}ml`);
+  }
+
+  if (Math.abs(scale - 1) >= 0.05) {
+    const countMatch = raw.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+    if (countMatch) {
+      const baseNum = Number(countMatch[1]);
+      const unit = countMatch[2]?.trim() || "phần";
+      return `${formatQty(baseNum * scale)} ${unit}`.trim();
+    }
+  }
+
+  return raw || "1 phần";
+}
+
 export function dayPlanToUi(day: DayPlan): DayMealPlan {
   return {
     dayIndex: day.day_index,
@@ -61,9 +101,10 @@ export function dayPlanToUi(day: DayPlan): DayMealPlan {
     lunch: slotItems(day.meals, "lunch"),
     dinner: slotItems(day.meals, "dinner"),
     snack: slotItems(day.meals, "snack"),
-    totalCalories: Math.round(day.totals?.kcal ?? 0),
+    totalCalories: round1(day.totals?.kcal ?? 0),
     totalSalt: sodiumToSaltG(day.totals?.sodium_mg ?? 0),
-    totalSugar: sumDaySugar(day),
+    totalSugar:
+      day.totals?.sugar_g != null ? round1(day.totals.sugar_g) : sumDaySugar(day),
     warnings: day.warnings || [],
   };
 }
@@ -125,24 +166,31 @@ export function mealPlanToUiItem(
 }
 
 function emptyMacros(): Macros {
-  return { carb_g: 0, protein_g: 0, fat_g: 0, sodium_mg: 0 };
+  return { carb_g: 0, protein_g: 0, fat_g: 0, sodium_mg: 0, sugar_g: 0 };
 }
 
 export function dishToFoodItem(
   dish: MealDishItem,
   previous?: FoodItem | null
 ): FoodItem {
+  const sodiumMg =
+    dish.sodiumMg != null
+      ? dish.sodiumMg
+      : dish.salt != null
+        ? saltGToSodiumMg(dish.salt)
+        : previous?.macros?.sodium_mg ?? 0;
   const macros: Macros = {
     ...(previous?.macros || emptyMacros()),
-    sodium_mg: saltGToSodiumMg(dish.salt),
-    carb_g:
-      dish.carbG != null
-        ? dish.carbG
-        : previous?.macros?.carb_g ?? 0,
+    sodium_mg: sodiumMg,
+    carb_g: dish.carbG != null ? dish.carbG : previous?.macros?.carb_g ?? 0,
+    protein_g:
+      dish.proteinG != null ? dish.proteinG : previous?.macros?.protein_g ?? 0,
+    fat_g: dish.fat != null ? dish.fat : previous?.macros?.fat_g ?? 0,
+    sugar_g: dish.sugar != null ? dish.sugar : previous?.macros?.sugar_g ?? 0,
   };
   return {
     name: dish.name,
-    portion: previous?.portion || "",
+    portion: dish.portion || previous?.portion || "",
     kcal: dish.calories,
     macros,
     food_id: dish.foodId ?? previous?.food_id ?? null,
@@ -190,6 +238,7 @@ export function recomputeDayTotals(meals: Meal[]): DayTotals {
     protein_g: 0,
     fat_g: 0,
     sodium_mg: 0,
+    sugar_g: 0,
   };
   for (const meal of meals) {
     for (const item of meal.items) {
@@ -198,14 +247,16 @@ export function recomputeDayTotals(meals: Meal[]): DayTotals {
       totals.protein_g += item.macros?.protein_g || 0;
       totals.fat_g += item.macros?.fat_g || 0;
       totals.sodium_mg += item.macros?.sodium_mg || 0;
+      totals.sugar_g = (totals.sugar_g || 0) + (item.macros?.sugar_g || 0);
     }
   }
   return {
-    kcal: Math.round(totals.kcal * 10) / 10,
-    carb_g: Math.round(totals.carb_g * 10) / 10,
-    protein_g: Math.round(totals.protein_g * 10) / 10,
-    fat_g: Math.round(totals.fat_g * 10) / 10,
-    sodium_mg: Math.round(totals.sodium_mg * 10) / 10,
+    kcal: round1(totals.kcal),
+    carb_g: round1(totals.carb_g),
+    protein_g: round1(totals.protein_g),
+    fat_g: round1(totals.fat_g),
+    sodium_mg: round1(totals.sodium_mg),
+    sugar_g: round1(totals.sugar_g || 0),
   };
 }
 
@@ -327,7 +378,10 @@ export function countHardNutritionWarnings(
 }
 
 function slotSodiumMg(items: MealDishItem[]): number {
-  return items.reduce((sum, item) => sum + item.salt, 0) * 1000;
+  return items.reduce((sum, item) => {
+    if (item.sodiumMg != null) return sum + item.sodiumMg;
+    return sum + item.salt * 1000;
+  }, 0);
 }
 
 function allSlotKcal(slots: NutritionWarningSlots): number {
@@ -379,30 +433,117 @@ export function countPlanWarnings(plan: MealPlanOutput): number {
 }
 
 export function slotCalories(items: MealDishItem[]): number {
-  return items.reduce((sum, item) => sum + (item.calories || 0), 0);
+  const sum = items.reduce((total, item) => total + (item.calories || 0), 0);
+  return round1(sum);
 }
 
 export function slotCarbG(items: MealDishItem[]): number {
-  return items.reduce((sum, item) => sum + (item.carbG || 0), 0);
+  return round1(items.reduce((sum, item) => sum + (item.carbG || 0), 0));
+}
+
+export function slotProteinG(items: MealDishItem[]): number {
+  return round1(items.reduce((sum, item) => sum + (item.proteinG || 0), 0));
+}
+
+export function slotFatG(items: MealDishItem[]): number {
+  return round1(items.reduce((sum, item) => sum + (item.fat || 0), 0));
+}
+
+export function slotSugarG(items: MealDishItem[]): number {
+  return round1(items.reduce((sum, item) => sum + (item.sugar || 0), 0));
+}
+
+export function slotSaltG(items: MealDishItem[]): number {
+  return round1(slotSodiumMg(items) / 1000);
 }
 
 export type NutritionTargets = {
   targetKcal: number;
   sodiumDailyMg?: number | null;
+  saltDailyG?: number | null;
+  /** Trần carb/bữa từ snapshot — null = chưa gán, không chặn duyệt. */
   carbPerMealG?: number | null;
+  /** Trần đường/ngày từ snapshot — null = chưa gán, không chặn duyệt. */
+  sugarDailyG?: number | null;
+  /** Trần hiển thị trên dashboard — snapshot, không thì ràng buộc đang dùng. */
+  carbDisplayLimit?: number | null;
+  sugarDisplayLimit?: number | null;
+  saltDisplayG?: number | null;
+  carbFromDefault?: boolean;
+  sugarFromDefault?: boolean;
 };
+
+function finiteOrNull(n?: number | null): number | null {
+  return n != null && Number.isFinite(n) ? n : null;
+}
+
+export function mergeNutritionTargets(
+  snapshot: Record<string, unknown> | null | undefined,
+  patient?: {
+    targetKcal?: number;
+    saltDailyG?: number;
+    sugarDailyG?: number;
+    carbPerMeal?: number;
+    sodiumDaily?: number;
+  }
+): NutritionTargets {
+  const base = targetsFromProfileSnapshot(snapshot);
+  const patientKcal =
+    patient?.targetKcal != null && Number.isFinite(patient.targetKcal)
+      ? patient.targetKcal
+      : null;
+  const snapshotHasKcal = snapshot?.target_kcal != null && Number.isFinite(Number(snapshot.target_kcal));
+  const liveCarb = finiteOrNull(patient?.carbPerMeal);
+  const liveSugar = finiteOrNull(patient?.sugarDailyG);
+  const liveSalt = displaySaltG(
+    finiteOrNull(patient?.saltDailyG),
+    finiteOrNull(patient?.sodiumDaily)
+  );
+
+  return {
+    ...base,
+    targetKcal: snapshotHasKcal ? base.targetKcal : patientKcal || base.targetKcal,
+    sodiumDailyMg: base.sodiumDailyMg,
+    carbPerMealG: base.carbPerMealG,
+    sugarDailyG: base.sugarDailyG,
+    carbDisplayLimit: base.carbPerMealG ?? liveCarb,
+    sugarDisplayLimit: base.sugarDailyG ?? liveSugar,
+    saltDisplayG: displaySaltG(base.saltDailyG, base.sodiumDailyMg) ?? liveSalt,
+    carbFromDefault: base.carbPerMealG == null && liveCarb == null,
+    sugarFromDefault: base.sugarDailyG == null && liveSugar == null,
+  };
+}
 
 export function targetsFromProfileSnapshot(
   snapshot: Record<string, unknown> | null | undefined
 ): NutritionTargets {
   const targetKcal = Number(snapshot?.target_kcal ?? 1800) || 1800;
   const restrictions = (snapshot?.restrictions || {}) as Record<string, unknown>;
+  const carbRaw =
+    restrictions.carb_per_meal != null ? Number(restrictions.carb_per_meal) : null;
+  const sugarRaw =
+    restrictions.sugar_daily_g != null ? Number(restrictions.sugar_daily_g) : null;
+  const saltRaw =
+    restrictions.salt_daily_g != null ? Number(restrictions.salt_daily_g) : null;
+  const sodiumRaw =
+    restrictions.sodium_daily != null ? Number(restrictions.sodium_daily) : null;
+  const carbOk = carbRaw != null && Number.isFinite(carbRaw);
+  const sugarOk = sugarRaw != null && Number.isFinite(sugarRaw);
+  const saltOk = saltRaw != null && Number.isFinite(saltRaw);
+  const sodiumOk = sodiumRaw != null && Number.isFinite(sodiumRaw);
+  const saltDailyG = saltOk ? saltRaw : null;
+  const sodiumDailyMg = sodiumOk ? sodiumRaw : null;
   return {
     targetKcal,
-    sodiumDailyMg:
-      restrictions.sodium_daily != null ? Number(restrictions.sodium_daily) : null,
-    carbPerMealG:
-      restrictions.carb_per_meal != null ? Number(restrictions.carb_per_meal) : null,
+    sodiumDailyMg,
+    saltDailyG,
+    carbPerMealG: carbOk ? carbRaw : null,
+    sugarDailyG: sugarOk ? sugarRaw : null,
+    carbDisplayLimit: carbOk ? (carbRaw as number) : null,
+    sugarDisplayLimit: sugarOk ? (sugarRaw as number) : null,
+    saltDisplayG: displaySaltG(saltDailyG, sodiumDailyMg),
+    carbFromDefault: !carbOk,
+    sugarFromDefault: !sugarOk,
   };
 }
 
@@ -434,11 +575,29 @@ export function computeNutritionWarningBundle(
   if (targets.sodiumDailyMg) {
     if (daySodiumMg > targets.sodiumDailyMg) {
       hard.day.push(
-        `Tổng natri/ngày ${Math.round(daySodiumMg)}mg vượt giới hạn ${targets.sodiumDailyMg}mg.`
+        `Tổng muối/ngày ${sodiumToSaltG(daySodiumMg)}g vượt giới hạn ${sodiumToSaltG(targets.sodiumDailyMg)}g.`
       );
     } else if (daySodiumMg >= targets.sodiumDailyMg * 0.85) {
       advisory.day.push(
-        `Natri/ngày ${Math.round(daySodiumMg)}mg sắp chạm giới hạn ${targets.sodiumDailyMg}mg.`
+        `Muối/ngày ${sodiumToSaltG(daySodiumMg)}g sắp chạm giới hạn ${sodiumToSaltG(targets.sodiumDailyMg)}g.`
+      );
+    }
+  }
+
+  const daySugar = round1(
+    slotSugarG(slots.breakfast) +
+      slotSugarG(slots.lunch) +
+      slotSugarG(slots.dinner) +
+      slotSugarG(slots.snack)
+  );
+  if (targets.sugarDailyG) {
+    if (daySugar > targets.sugarDailyG) {
+      hard.day.push(
+        `Tổng đường/ngày ${daySugar}g vượt giới hạn ${targets.sugarDailyG}g.`
+      );
+    } else if (daySugar >= targets.sugarDailyG * 0.85) {
+      advisory.day.push(
+        `Đường/ngày ${daySugar}g sắp chạm giới hạn ${targets.sugarDailyG}g.`
       );
     }
   }
@@ -451,15 +610,22 @@ export function computeNutritionWarningBundle(
   ];
 
   for (const { key, label, items } of slotMeta) {
+    const carbG = slotCarbG(items);
+    if (targets.carbPerMealG != null && carbG > targets.carbPerMealG) {
+      hard[key].push(
+        `${label} có lượng carb ${carbG}g vượt ngưỡng cho phép (${targets.carbPerMealG}g/bữa).`
+      );
+    }
+
     const kcal = Math.round(slotCalories(items));
     const band = mealKcalBand(targets.targetKcal, key);
     if (kcal < band.lower) {
       advisory[key].push(
-        `${label}: ${kcal} kcal — thấp hơn gợi ý ${band.lower}–${band.upper} kcal (còn thiếu ~${band.lower - kcal} kcal).`
+        `${label}: ${kcal} kcal — thấp hơn phân bổ gợi ý ~${band.target} kcal (không chặn duyệt).`
       );
     } else if (kcal > band.upper) {
       advisory[key].push(
-        `${label}: ${kcal} kcal — cao hơn gợi ý ${band.lower}–${band.upper} kcal (cần giảm ~${kcal - band.upper} kcal).`
+        `${label}: ${kcal} kcal — cao hơn phân bổ gợi ý ~${band.target} kcal (không chặn duyệt).`
       );
     }
   }

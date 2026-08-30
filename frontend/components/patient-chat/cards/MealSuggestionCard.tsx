@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import type { Meal, MealPreviewOut } from "@/lib/types";
 import { usePatientPanel } from "../PatientPanelProvider";
 import {
@@ -9,6 +9,8 @@ import {
   slotMeta,
   todayDayIndex,
 } from "@/lib/meal-plan-display";
+import { NutrientChips } from "@/components/shared/NutrientChips";
+import { toNutrientValues } from "@/lib/nutrient-display";
 import {
   ApprovedMealSlotList,
   MealPlanEmptyState,
@@ -37,6 +39,7 @@ function mealsFromPreview(preview: MealPreviewOut): Meal[] {
 
 export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
   const { openPanel } = usePatientPanel();
+  const [showNutrients, setShowNutrients] = useState(false);
   const meals = useMemo(() => (preview ? mealsFromPreview(preview) : []), [preview]);
   const dayLabel = preview ? dayLabelFromPreview(preview) : "hôm nay";
   const nutrition = mealsToDayTotals(meals);
@@ -95,11 +98,7 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
 
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs sm:text-sm font-bold text-slate-900">{slotHeading}</h3>
-        {nutrition.kcal > 0 ? (
-          <span className="text-[11px] sm:text-xs font-bold text-[#006857] bg-emerald-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-emerald-200 tabular-nums">
-            {isSingleSlot ? `${nutrition.kcal} kcal` : `Tổng ngày: ${nutrition.kcal} kcal`}
-          </span>
-        ) : meals.length > 0 ? (
+        {meals.length > 0 ? (
           <span className="text-[11px] sm:text-xs font-bold text-[#006857]">{meals.length} bữa ăn</span>
         ) : null}
       </div>
@@ -112,6 +111,53 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
             : `Chưa có thực đơn được kích hoạt cho ${dayLabel}.`
         }
       />
+
+      {meals.length > 0 && (
+        <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 flex flex-col gap-2 transition-all">
+          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 min-w-0">
+              <span className="material-symbols-outlined text-[17px] text-[#006857]">pie_chart</span>
+              <span>Tổng giá trị dinh dưỡng</span>
+              {nutrition.kcal > 0 && (
+                <span className="text-[11px] font-extrabold text-[#006857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                  {nutrition.kcal} kcal
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNutrients((v) => !v)}
+              className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-[#006857] hover:text-[#005245] bg-white hover:bg-emerald-50 px-2.5 py-1 rounded-lg border border-slate-200 hover:border-emerald-300 transition-all shadow-2xs cursor-pointer ml-auto sm:ml-0"
+            >
+              <span>{showNutrients ? "Ẩn thành phần" : "Xem thêm thành phần"}</span>
+              <span
+                className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
+                  showNutrients ? "rotate-180" : ""
+                }`}
+              >
+                expand_more
+              </span>
+            </button>
+          </div>
+
+          {showNutrients && (
+            <div className="pt-2 border-t border-slate-200/60 animate-in fade-in slide-in-from-top-1 duration-150">
+              <NutrientChips
+                values={toNutrientValues({
+                  kcal: nutrition.kcal,
+                  carbG: nutrition.carb_g,
+                  proteinG: nutrition.protein_g,
+                  fatG: nutrition.fat_g,
+                  sodiumMg: nutrition.sodium_mg,
+                  sugarG: nutrition.sugar_g,
+                })}
+                layer="summary"
+                compact
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="pt-1">
         <button

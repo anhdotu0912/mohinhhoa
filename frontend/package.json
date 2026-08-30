@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "verify:nutrition": "npx --yes tsx lib/meal-plan-nutrition-warnings.check.ts",
-    "verify:constraints": "npx --yes tsx lib/clinical-constraints.check.ts"
+    "verify:constraints": "npx --yes tsx lib/clinical-constraints.check.ts",
+    "verify:nutrients": "npx --yes tsx lib/nutrient-display.check.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

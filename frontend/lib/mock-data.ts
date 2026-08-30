@@ -39,6 +39,8 @@ export interface Patient {
   targetKcal?: number;
   saltDailyG?: number;
   sugarDailyG?: number;
+  carbPerMeal?: number;
+  sodiumDaily?: number;
   constraintsStatus?: "confirmed" | "pending_doctor_review";
   mealPlanRequestStatus?: "none" | "pending";
   mealPlanRequestNote?: string | null;
@@ -105,6 +107,8 @@ export function doctorPatientToUi(p: DoctorPatientSummary): Patient {
     targetKcal: p.target_kcal,
     saltDailyG: p.salt_daily_g ?? undefined,
     sugarDailyG: p.sugar_daily_g ?? undefined,
+    carbPerMeal: p.carb_per_meal ?? undefined,
+    sodiumDaily: p.sodium_daily ?? undefined,
     constraintsStatus: p.constraints_status ?? "confirmed",
     mealPlanRequestStatus: p.meal_plan_request_status ?? "none",
     mealPlanRequestNote: p.meal_plan_request_note ?? null,

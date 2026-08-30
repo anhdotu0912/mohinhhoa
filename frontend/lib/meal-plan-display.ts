@@ -1,4 +1,11 @@
 import type { DayPlan, DayTotals, FoodItem, Meal, MealPlanOutput } from "@/lib/types";
+import {
+  emptyNutrientValues,
+  saltGToSodiumMg,
+  sodiumMgToSaltG,
+  toNutrientValues,
+  type NutrientValues,
+} from "@/lib/nutrient-display";
 
 export type CanonicalSlot = "morning" | "noon" | "evening" | "snack";
 
@@ -39,11 +46,8 @@ export const DAY_LABELS = [
   { short: "CN", full: "Chủ nhật", index: 6, dayIndex: 7 },
 ] as const;
 
-export interface MealNutrition {
-  kcal: number;
-  protein: number;
+export interface MealNutrition extends NutrientValues {
   carbs: number;
-  fat: number;
 }
 
 export function normalizeSlot(slot: string): CanonicalSlot {
@@ -73,36 +77,78 @@ export function findDayPlan(
   return plan.days.find((d) => d.day_index === apiDayIndex) ?? null;
 }
 
+function addNutrition(a: MealNutrition, b: MealNutrition): MealNutrition {
+  const carb = a.carb + b.carb;
+  return {
+    kcal: a.kcal + b.kcal,
+    carb,
+    carbs: carb,
+    protein: a.protein + b.protein,
+    fat: a.fat + b.fat,
+    salt: Math.round((a.salt + b.salt) * 10) / 10,
+    sugar: Math.round((a.sugar + b.sugar) * 10) / 10,
+  };
+}
+
+function emptyMealNutrition(): MealNutrition {
+  const base = emptyNutrientValues();
+  return { ...base, carbs: base.carb };
+}
+
 export function sumMealNutrition(meal: Meal): MealNutrition {
   const items = meal.items ?? [];
+  const summed = items.reduce<NutrientValues>((acc, item) => {
+    const n = toNutrientValues({
+      kcal: item.kcal,
+      carbG: item.macros?.carb_g,
+      proteinG: item.macros?.protein_g,
+      fatG: item.macros?.fat_g,
+      sodiumMg: item.macros?.sodium_mg,
+      sugarG: item.macros?.sugar_g,
+    });
+    return {
+      kcal: acc.kcal + n.kcal,
+      carb: acc.carb + n.carb,
+      protein: acc.protein + n.protein,
+      fat: acc.fat + n.fat,
+      salt: acc.salt + n.salt,
+      sugar: acc.sugar + n.sugar,
+    };
+  }, emptyNutrientValues());
+  const carb = Math.round(summed.carb);
   return {
-    kcal: Math.round(items.reduce((acc, it) => acc + (it.kcal || 0), 0)),
-    protein: Math.round(items.reduce((acc, it) => acc + (it.macros?.protein_g || 0), 0)),
-    carbs: Math.round(items.reduce((acc, it) => acc + (it.macros?.carb_g || 0), 0)),
-    fat: Math.round(items.reduce((acc, it) => acc + (it.macros?.fat_g || 0), 0)),
+    kcal: Math.round(summed.kcal),
+    carb,
+    carbs: carb,
+    protein: Math.round(summed.protein),
+    fat: Math.round(summed.fat),
+    salt: Math.round(summed.salt * 10) / 10,
+    sugar: Math.round(summed.sugar * 10) / 10,
   };
 }
 
 export function resolveDayNutrition(day: DayPlan | null): MealNutrition {
-  if (!day) return { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  if (!day) return emptyMealNutrition();
   const fromItems = (day.meals ?? []).reduce<MealNutrition>(
-    (acc, meal) => {
-      const n = sumMealNutrition(meal);
-      return {
-        kcal: acc.kcal + n.kcal,
-        protein: acc.protein + n.protein,
-        carbs: acc.carbs + n.carbs,
-        fat: acc.fat + n.fat,
-      };
-    },
-    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    (acc, meal) => addNutrition(acc, sumMealNutrition(meal)),
+    emptyMealNutrition()
   );
   const totals = day.totals;
+  const carb = totals?.carb_g ? Math.round(totals.carb_g) : fromItems.carb;
+  const salt =
+    totals?.sodium_mg != null && totals.sodium_mg > 0
+      ? sodiumMgToSaltG(totals.sodium_mg)
+      : fromItems.salt;
+  const sugar =
+    totals?.sugar_g != null && totals.sugar_g > 0 ? totals.sugar_g : fromItems.sugar;
   return {
     kcal: totals?.kcal ? Math.round(totals.kcal) : fromItems.kcal,
+    carb,
+    carbs: carb,
     protein: totals?.protein_g ? Math.round(totals.protein_g) : fromItems.protein,
-    carbs: totals?.carb_g ? Math.round(totals.carb_g) : fromItems.carbs,
     fat: totals?.fat_g ? Math.round(totals.fat_g) : fromItems.fat,
+    salt,
+    sugar,
   };
 }
 
@@ -120,23 +166,16 @@ export function isApprovedPlan(plan: MealPlanOutput | null | undefined): boolean
 
 export function mealsToDayTotals(meals: Meal[], previous?: DayTotals | null): DayTotals {
   const nutrition = meals.reduce(
-    (acc, meal) => {
-      const n = sumMealNutrition(meal);
-      return {
-        kcal: acc.kcal + n.kcal,
-        protein: acc.protein + n.protein,
-        carbs: acc.carbs + n.carbs,
-        fat: acc.fat + n.fat,
-      };
-    },
-    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    (acc, meal) => addNutrition(acc, sumMealNutrition(meal)),
+    emptyMealNutrition()
   );
   return {
     kcal: nutrition.kcal,
     protein_g: nutrition.protein,
-    carb_g: nutrition.carbs,
+    carb_g: nutrition.carb,
     fat_g: nutrition.fat,
-    sodium_mg: previous?.sodium_mg ?? 0,
+    sodium_mg: saltGToSodiumMg(nutrition.salt) || previous?.sodium_mg || 0,
+    sugar_g: nutrition.sugar || previous?.sugar_g,
   };
 }
 

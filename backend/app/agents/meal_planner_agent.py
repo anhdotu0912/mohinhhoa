@@ -428,13 +428,37 @@ def _food_kcal(food: dict) -> float:
 
 def _format_scaled_portion(base_portion: str, factor: float) -> str:
     base = (base_portion or "1 phần").strip()
-    match = re.search(r"^(.*?)\s*\(×([0-9.]+)\)$", base)
+    match = re.search(r"^(.*?)\s*\([×xX*]([0-9.]+)\)$", base)
     if match:
         base = match.group(1).strip()
         factor = float(match.group(2)) * factor
+
+    base = re.sub(r"\s*phần ăn được\s*", " ", base, flags=re.IGNORECASE).strip()
+    base = re.sub(r"\s*theo công thức\s*", " ", base, flags=re.IGNORECASE).strip()
+
     if abs(factor - 1.0) < 0.05:
         return base or "1 phần"
-    return f"{base} (×{factor:.2f})"
+
+    gram_m = re.match(r"^(\d+(?:\.\d+)?)\s*g\b(.*)$", base, flags=re.IGNORECASE)
+    if gram_m:
+        g = float(gram_m.group(1)) * factor
+        g_str = f"{g:.0f}" if g == int(g) or abs(g - round(g)) < 0.05 else f"{g:.1f}"
+        return f"{g_str} g"
+
+    ml_m = re.search(r"~\s*(\d+(?:\.\d+)?)\s*ml", base, flags=re.IGNORECASE)
+    if ml_m:
+        ml = round(float(ml_m.group(1)) * factor)
+        return re.sub(r"~\s*\d+(?:\.\d+)?\s*ml", f"~{ml}ml", base, flags=re.IGNORECASE)
+
+    count_m = re.match(r"^(\d+(?:\.\d+)?)\s*(.*)$", base)
+    if count_m:
+        val = float(count_m.group(1)) * factor
+        val_str = f"{val:.0f}" if val == int(val) or abs(val - round(val)) < 0.05 else f"{val:.1f}"
+        unit = count_m.group(2).strip() or "phần"
+        return f"{val_str} {unit}"
+
+    factor_str = f"{factor:.1f}" if factor != int(factor) else f"{int(factor)}"
+    return f"{factor_str} phần"
 
 
 def _scale_food_dict(food: dict, factor: float) -> dict:
