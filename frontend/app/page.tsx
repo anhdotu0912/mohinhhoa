@@ -141,11 +141,10 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setMobileHeroTab("overview")}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                    mobileHeroTab === "overview"
-                      ? "bg-white text-[#0f766e] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${mobileHeroTab === "overview"
+                    ? "bg-white text-[#0f766e] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">info</span>
                   <span>Tổng quan</span>
@@ -153,11 +152,10 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => setMobileHeroTab("chat")}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                    mobileHeroTab === "chat"
-                      ? "bg-white text-[#0f766e] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${mobileHeroTab === "chat"
+                    ? "bg-white text-[#0f766e] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">smart_toy</span>
                   <span>Xem Trợ lý AI</span>
@@ -169,9 +167,8 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-center">
 
               {/* Left Column: Clinical Value Proposition (Visible on Desktop OR when mobileHeroTab === 'overview') */}
-              <div className={`w-full flex flex-col items-start text-left gap-3.5 sm:gap-4 ${
-                mobileHeroTab === "overview" ? "flex" : "hidden lg:flex"
-              }`}>
+              <div className={`w-full flex flex-col items-start text-left gap-3.5 sm:gap-4 ${mobileHeroTab === "overview" ? "flex" : "hidden lg:flex"
+                }`}>
 
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-[#0f766e] text-[11px] font-bold">
                   <span className="material-symbols-outlined text-[14px]">verified</span>
@@ -218,20 +215,19 @@ export default function HomePage() {
                     <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Món ăn Việt phân tích</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-2 sm:pl-5">
-                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
+                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">Tài liệu</span>
                     <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Dữ liệu RAG y văn</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-2 sm:pl-5">
-                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">100%</span>
+                    <span className="text-base sm:text-xl lg:text-2xl font-extrabold text-[#0f766e]">Thuốc</span>
                     <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">Rà soát tương tác thuốc</span>
                   </div>
                 </div>
               </div>
 
               {/* Right Column: Clean Looping Video & Chat Preview (Visible on Desktop OR when mobileHeroTab === 'chat') */}
-              <div className={`w-full items-center justify-center lg:justify-end animate-hero-slide-left animation-delay-200 ${
-                mobileHeroTab === "chat" ? "flex flex-col" : "hidden lg:flex"
-              }`}>
+              <div className={`w-full items-center justify-center lg:justify-end animate-hero-slide-left animation-delay-200 ${mobileHeroTab === "chat" ? "flex flex-col" : "hidden lg:flex"
+                }`}>
                 <div className="w-full max-w-[480px]">
                   <ClinicalChatLoopPreview />
                 </div>
@@ -274,9 +270,7 @@ export default function HomePage() {
                   <h3 className="text-base sm:text-xl font-bold text-white mb-1.5">
                     RAG y văn trên 1.200+ món ăn truyền thống
                   </h3>
-                  <p className="text-xs text-teal-50/90 leading-relaxed mb-4">
-                    Định lượng chi tiết các món ăn quen thuộc hàng ngày: từ phở, bún riêu, canh chua cá lóc đến thịt kho tàu, giúp bệnh nhân ăn ngon mà vẫn an toàn.
-                  </p>
+
                 </div>
                 <div className="z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 pt-2.5 border-t border-teal-500/30">
                   <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
@@ -284,12 +278,12 @@ export default function HomePage() {
                     <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Chỉ số đường huyết</div>
                   </div>
                   <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
-                    <div className="text-xs sm:text-sm font-bold text-teal-300">Natri &amp; Kali</div>
-                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Bệnh thận &amp; HA</div>
+                    <div className="text-xs sm:text-sm font-bold text-teal-300">Kcal, Muối, Đường</div>
+                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Thành phần thực phẩm</div>
                   </div>
                   <div className="bg-white/10 p-2 sm:p-2.5 rounded-xl border border-white/10 flex sm:flex-col justify-between sm:justify-start items-center sm:items-start">
-                    <div className="text-xs sm:text-sm font-bold text-teal-300">Purin mg</div>
-                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Khắc chế cơn Gút</div>
+                    <div className="text-xs sm:text-sm font-bold text-teal-300">Kiểm soát chỉ số cơ thể</div>
+                    <div className="text-[10px] text-teal-100/80 sm:mt-0.5">Ghi nhận chỉ số</div>
                   </div>
                 </div>
               </div>
@@ -391,8 +385,8 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setActiveAudienceTab("patient")}
                   className={`px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center ${activeAudienceTab === "patient"
-                      ? "bg-white text-[#0f766e] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-[#0f766e] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
                   Dành cho Người bệnh
@@ -401,8 +395,8 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setActiveAudienceTab("doctor")}
                   className={`px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all text-center ${activeAudienceTab === "doctor"
-                      ? "bg-white text-[#0f766e] shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-[#0f766e] shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                     }`}
                 >
                   Dành cho Bác sĩ &amp; CSYT
