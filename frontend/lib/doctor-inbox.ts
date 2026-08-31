@@ -1,11 +1,14 @@
 import type {
   ClaimQueueItem,
   DoctorPatientSummary,
+  EscalationListItem,
   MealPlanOutput,
 } from "@/lib/types";
+import { ESCALATION_REASON_LABEL } from "@/lib/escalation";
 import {
   doctorChartHref,
   doctorGenerateHref,
+  doctorInboxHref,
   doctorReviewHref,
   type InboxJobType,
 } from "@/lib/doctor-routes";
@@ -64,6 +67,12 @@ export const INBOX_TYPE_META: Record<
     chipClass: "bg-violet-50 text-violet-800 border-violet-200/70",
     iconWrap: "bg-violet-500/10 text-violet-700",
   },
+  chat_escalation: {
+    label: "Hỏi bác sĩ",
+    icon: "forum",
+    chipClass: "bg-teal-50 text-teal-800 border-teal-200/70",
+    iconWrap: "bg-teal-500/10 text-teal-800",
+  },
 };
 
 function isPendingPlan(status: string | null | undefined): boolean {
@@ -78,7 +87,8 @@ function planTitle(plan: MealPlanOutput): string {
 export function buildInboxJobs(
   patients: DoctorPatientSummary[],
   plans: MealPlanOutput[],
-  claimQueue: ClaimQueueItem[] = []
+  claimQueue: ClaimQueueItem[] = [],
+  escalations: EscalationListItem[] = []
 ): InboxJob[] {
   const byId = new Map(patients.map((p) => [p.id, p]));
   const jobs: InboxJob[] = [];
@@ -216,6 +226,30 @@ export function buildInboxJobs(
       sortAt: item.created_at || "",
       claimKind: item.kind,
       transferId: item.transfer_id ?? null,
+    });
+  }
+
+  for (const row of escalations) {
+    const patient = byId.get(row.patient_id);
+    const preview = (row.question_text || "").trim();
+    jobs.push({
+      id: `escalation:${row.id}`,
+      type: "chat_escalation",
+      patientId: row.patient_id,
+      patientName: row.patient_name || patient?.name || "Bệnh nhân",
+      patientAvatar: row.patient_avatar || patient?.avatar || null,
+      patientCondition: patient?.condition_label || "",
+      patientDisease: row.patient_disease?.length
+        ? row.patient_disease
+        : patient?.disease || [],
+      patientAge: patient?.age,
+      patientGender: patient?.gender,
+      title: preview.length > 72 ? `${preview.slice(0, 71)}…` : preview || "Câu hỏi từ chat",
+      subtitle: ESCALATION_REASON_LABEL[row.reason],
+      href: doctorInboxHref("chat_escalation", { escalation: row.id }),
+      cta: "Trả lời",
+      urgency: row.status === "waiting_doctor" ? "soon" : "normal",
+      sortAt: row.updated_at || row.created_at || "",
     });
   }
 

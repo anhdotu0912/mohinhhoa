@@ -214,13 +214,12 @@ Roadmap 14 ngày gốc đã **superseded**. Backlog đóng gap as-built → Nort
 
 | Ưu tiên | Việc | Owner |
 |---|---|---|
-| **P2** | Wire `validate_interaction_output`/`sanitize_recommendation` (đã viết ở `guardrails/rules.py`, chưa có nơi gọi) vào runtime | BE1 |
 | **P2** | Chuyển `rag_qa_node` sang `retrieve_hybrid()` (BM25+dense RRF đã có trong `retriever.py`, chat hiện vẫn dense-only) | BE1 |
 | **P2/FE** | Nối `/patient` home dashboard + phần mock còn lại của `/doctor` dashboard với API thật; dọn `frontend/lib/plans-store.ts` (dead code) | FE |
 | **P3** | LLM dual-provider fallback OpenAI↔DeepSeek tự động (`adrs/004`) | BE1 |
 | **Could Have** | Danh sách đi chợ, gợi ý điểm bán, Export PDF, intent mới "lời khuyên khi chỉ số cơ thể đổi" (`specs/12`) | — |
 
-**Đã Done (core), không chặn North Star:** Doctor Compliance View (`specs/10`), Clinical Constraints HITL (`specs/04`), Food Log (`specs/09`), Patient Metrics time-series (`specs/12`), optimistic lock review, request-adjustment, guardrails wired.
+**Đã Done (core), không chặn North Star:** Doctor Compliance View (`specs/10`), Clinical Constraints HITL (`specs/04`), Food Log (`specs/09`), Patient Metrics time-series (`specs/12`), optimistic lock review, request-adjustment, guardrails wired (gồm per-recommendation T01).
 
 ---
 

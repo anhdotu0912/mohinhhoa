@@ -23,6 +23,7 @@ _PAYLOAD_FIELDS = (
     "intent",
     "secondary_intents",
     "citations",
+    "citation_chunks",
     "guardrail_triggered",
     "meal_plan_id",
     "meal_preview",
@@ -34,6 +35,8 @@ _PAYLOAD_FIELDS = (
     "thinking_steps",
     "corrected",
     "correction_reason",
+    "unmatched_pairs",
+    "escalation_id",
 )
 
 

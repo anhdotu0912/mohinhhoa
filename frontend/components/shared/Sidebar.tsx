@@ -198,9 +198,10 @@ export function Sidebar({ role, activeItem }: SidebarProps) {
       api.listDoctorPatients(),
       api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
       api.listClaimQueue().catch(() => []),
+      api.listDoctorEscalations("open").catch(() => []),
     ])
-      .then(([patients, plans, claimQueue]) => {
-        if (!cancelled) setInboxCount(buildInboxJobs(patients, plans, claimQueue).length);
+      .then(([patients, plans, claimQueue, escalations]) => {
+        if (!cancelled) setInboxCount(buildInboxJobs(patients, plans, claimQueue, escalations).length);
       })
       .catch(() => {
         if (!cancelled) setInboxCount(0);

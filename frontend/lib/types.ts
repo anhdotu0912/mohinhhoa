@@ -225,7 +225,9 @@ export type NotificationType =
   | "plan_expiring"
   | "plan_expired"
   | "adherence_checkin"
-  | "manual_reminder";
+  | "manual_reminder"
+  | "escalation_sent"
+  | "escalation_reply";
 
 export type NotificationStatus =
   | "pending"
@@ -646,6 +648,13 @@ export interface DoctorNoteOut {
   notes?: DoctorNoteItem[];
 }
 
+export interface CitationChunk {
+  chunk_id: string;
+  text: string;
+  source: string;
+  score?: number;
+}
+
 export interface AgentRunOutput {
   intent: string;
   secondary_intents?: string[];
@@ -655,10 +664,12 @@ export interface AgentRunOutput {
   food_log_id?: string | null;
   alert_ids: string[];
   citations: string[];
+  citation_chunks?: CitationChunk[];
   guardrail_triggered: boolean;
   weekly_compliance?: WeeklyComplianceOut | null;
   doctor_note?: DoctorNoteOut | null;
   metrics_delta_advice?: MetricsDeltaAdviceOut | null;
+  unmatched_pairs?: UnmatchedPair[];
 }
 
 export type ChatStreamEvent =
@@ -682,6 +693,7 @@ export interface ChatMessageOut {
   intent?: string | null;
   secondary_intents?: string[];
   citations?: string[];
+  citation_chunks?: CitationChunk[];
   guardrail_triggered?: boolean;
   meal_plan_id?: string | null;
   meal_preview?: MealPreviewOut | null;
@@ -693,6 +705,8 @@ export interface ChatMessageOut {
   thinking_steps?: ChatThinkingStepOut[];
   corrected?: boolean;
   correction_reason?: string | null;
+  unmatched_pairs?: UnmatchedPair[];
+  escalation_id?: string | null;
 }
 
 export interface ChatSessionSummaryOut {
@@ -712,6 +726,73 @@ export interface ChatSessionOut {
   messages: ChatMessageOut[];
   created_at: string;
   updated_at: string;
+}
+
+export type EscalationReason =
+  | "missing_citations"
+  | "unknown"
+  | "refuse"
+  | "unmatched_kb";
+
+export type EscalationStatus =
+  | "waiting_doctor"
+  | "waiting_patient"
+  | "resolved";
+
+export interface EscalationMessageOut {
+  id: string;
+  sender: "patient" | "doctor";
+  body: string;
+  created_at: string;
+  kind: "note" | "reply" | "context";
+}
+
+export interface EscalationOut {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  patient_name?: string | null;
+  patient_avatar?: string | null;
+  patient_disease?: string[];
+  session_id?: string | null;
+  ai_message_id?: string | null;
+  question_text: string;
+  answer_text: string;
+  reason: EscalationReason;
+  patient_note: string;
+  status: EscalationStatus;
+  messages: EscalationMessageOut[];
+  notification_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string | null;
+}
+
+export interface EscalationListItem {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  patient_name?: string | null;
+  patient_avatar?: string | null;
+  patient_disease?: string[];
+  question_text: string;
+  reason: EscalationReason;
+  status: EscalationStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EscalationCreatePayload {
+  session_id: string;
+  ai_message_id: string;
+  note?: string;
+  question_text?: string;
+  answer_text?: string;
+  intent?: string | null;
+  citations?: string[];
+  correction_reason?: string | null;
+  unmatched_pairs?: UnmatchedPair[];
+  guardrail_triggered?: boolean;
 }
 
 export class ApiError extends Error {

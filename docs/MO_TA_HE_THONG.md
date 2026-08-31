@@ -255,7 +255,7 @@ Một user / một ngày VN / một slot = một log (upsert). `logged_at` timez
 **Lazy notification hết hạn:** `GET /meal-plans/me` materialize một lần `plan_expiring` / `plan_expired` khi bucket ADR-011 tương ứng.
 
 ### 3.5 Tương tác với AI
-**Status:** Done (core) → `specs/13-ai-chat-assistant.md`. Planned: hybrid RAG, wire `validate_interaction_output`/`sanitize_recommendation`, dual-provider LLM.
+**Status:** Done (core) → `specs/13-ai-chat-assistant.md`. Planned: hybrid RAG, dual-provider LLM.
 
 | Use case | Mô tả |
 |---|---|
@@ -273,7 +273,7 @@ Một user / một ngày VN / một slot = một log (upsert). `logged_at` timez
 1. BN gõ câu hoặc bấm chip; session lưu qua `/chat/sessions` (transcript UI, **không** đưa vào `run_agent` — mỗi lượt stateless).
 2. `POST /api/v1/chat/stream` (ưu tiên) hoặc `POST /chat`: `profile_loader` (DB) → `intent_classifier` → node tương ứng → `apply_guardrails`.
 3. Intent: `greeting` \| `meal_plan` \| `interaction_check` \| `food_log` \| `rag_qa` \| `refuse` \| `unknown` \| `weekly_compliance` \| `doctor_note`. Câu ghép → `secondary_intents[]` (gợi ý hỏi lại, không chạy song song).
-4. Guardrails: `enforce_citation_guardrail` (RAG thiếu citation → redact) + `enforce_output_safety` (chặn đổi thuốc). SSE có thể emit `correction`. Helpers `validate_interaction_output` / `sanitize_recommendation` **chưa** gọi runtime.
+4. Guardrails: `enforce_citation_guardrail` (RAG thiếu citation → redact) + `enforce_interaction_recommendations` (sanitize từng `recommendation`) + `enforce_output_safety` (chặn đổi thuốc). SSE có thể emit `correction`.
 5. FE render text + citations + card (`meal_preview`, `weekly_compliance`, `doctor_note`, `meal_plan_week`).
 
 ---
@@ -302,7 +302,6 @@ Không còn P0 interaction-501, HITL constraints, hay optimistic lock — các m
 
 | Ưu tiên | Việc | Ghi chú |
 |---|---|---|
-| Should / P1 | Wire `validate_interaction_output` / `sanitize_recommendation` vào runtime | Đã viết ở `guardrails/rules.py`, chưa gọi |
 | Should / P1 | `rag_qa_node` dùng `retrieve_hybrid()` | BM25+dense đã có trong `retriever.py`, chat vẫn dense-only |
 | Should | Corpus guideline RAG (`data/guidelines/*.md` trừ `patient_faq.md`) | Nhiều file còn placeholder |
 | Should | Intent lời khuyên khi chỉ số đổi | `specs/12` §6 |

@@ -52,10 +52,16 @@ export function NotificationsPanel() {
     }
   };
 
+  const openedFromChat =
+    typeof notificationsView === "object" && "escalationId" in notificationsView;
+  const escalationIdFromView = openedFromChat ? notificationsView.escalationId : null;
   const selectedNotification =
     typeof notificationsView === "object" && "detailId" in notificationsView
       ? notifications.find((n) => n.id === notificationsView.detailId) || null
-      : null;
+      : escalationIdFromView
+        ? notifications.find((n) => n.related_ids?.escalation_id === escalationIdFromView) ||
+          null
+        : null;
 
   const unreadCount = notifications.filter(
     (n) => n.status === "pending" || n.status === "sent"
@@ -95,6 +101,10 @@ export function NotificationsPanel() {
         return "bg-amber-500";
       case "plan_expired":
         return "bg-rose-500";
+      case "escalation_sent":
+        return "bg-teal-600";
+      case "escalation_reply":
+        return "bg-emerald-600";
       case "meal_reminder":
       case "adherence_checkin":
         return "bg-blue-500";
@@ -112,8 +122,34 @@ export function NotificationsPanel() {
         </span>
       );
     }
+    if (type === "escalation_sent") {
+      return (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-bold shrink-0">
+          <span className="material-symbols-outlined text-[12px]">forum</span>
+          Đã gửi
+        </span>
+      );
+    }
+    if (type === "escalation_reply") {
+      return (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold shrink-0">
+          <span className="material-symbols-outlined text-[12px]">mark_chat_read</span>
+          Bác sĩ phản hồi
+        </span>
+      );
+    }
     return null;
   };
+
+  if (openedFromChat && escalationIdFromView) {
+    return (
+      <NotificationDetailModal
+        notification={selectedNotification}
+        escalationId={escalationIdFromView}
+        onClose={closePanel}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">

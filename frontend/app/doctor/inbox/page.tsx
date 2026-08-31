@@ -16,6 +16,7 @@ import {
 } from "@/lib/doctor-inbox";
 import { doctorChartHref, doctorInboxHref, type InboxJobType } from "@/lib/doctor-routes";
 import { ApiError, type MealPlanOutput } from "@/lib/types";
+import { EscalationThreadPanel } from "@/components/doctor/EscalationThreadPanel";
 
 const PAGE_SIZE = 10;
 
@@ -26,6 +27,7 @@ const FILTERS: { id: "all" | InboxJobType; label: string; icon: string }[] = [
   { id: "generate_request", label: "Yêu cầu tạo TD", icon: "restaurant_menu" },
   { id: "plan_expiry", label: "Hết hạn", icon: "event_busy" },
   { id: "patient_claim", label: "Chờ nhận", icon: "person_add" },
+  { id: "chat_escalation", label: "Hỏi bác sĩ", icon: "forum" },
 ];
 
 function isInboxType(value: string | null): value is InboxJobType {
@@ -34,7 +36,8 @@ function isInboxType(value: string | null): value is InboxJobType {
     value === "constraints" ||
     value === "generate_request" ||
     value === "plan_expiry" ||
-    value === "patient_claim"
+    value === "patient_claim" ||
+    value === "chat_escalation"
   );
 }
 
@@ -83,6 +86,7 @@ function InboxContent() {
   const typeParam = searchParams.get("type");
   const urgencyFilter = searchParams.get("urgency") === "soon";
   const activeType: "all" | InboxJobType = isInboxType(typeParam) ? typeParam : "all";
+  const openEscalationId = searchParams.get("escalation");
 
   useEffect(() => {
     setHydrated(true);
@@ -95,12 +99,13 @@ function InboxContent() {
       else setLoading(true);
       setError(null);
       try {
-        const [patients, plans, claimQueue] = await Promise.all([
+        const [patients, plans, claimQueue, escalations] = await Promise.all([
           api.listDoctorPatients(),
           api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
           api.listClaimQueue().catch(() => []),
+          api.listDoctorEscalations("open").catch(() => []),
         ]);
-        setJobs(buildInboxJobs(patients, plans, claimQueue));
+        setJobs(buildInboxJobs(patients, plans, claimQueue, escalations));
       } catch (err) {
         setJobs([]);
         setError(
@@ -167,6 +172,7 @@ function InboxContent() {
       generate_request: 0,
       plan_expiry: 0,
       patient_claim: 0,
+      chat_escalation: 0,
     };
     for (const job of jobs) next[job.type] += 1;
     return next;
@@ -221,10 +227,46 @@ function InboxContent() {
               Việc cần xử lý
             </h1>
             <p className="text-xs md:text-sm text-on-surface-variant mt-1 font-medium">
-              Duyệt thực đơn, xác nhận ràng buộc, nhận bệnh nhân mới và xử lý chuyển tiếp
+              Duyệt thực đơn, xác nhận ràng buộc, trả lời câu hỏi chat và nhận bệnh nhân mới
             </p>
           </div>
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <div className="group relative min-w-[260px] flex-1 sm:flex-none sm:w-[280px]">
+              <label htmlFor="inbox-search" className="sr-only">
+                Tìm công việc theo tên bệnh nhân, mã BN hoặc bệnh lý
+              </label>
+              <span
+                className={`material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none transition-colors ${
+                  searchQuery
+                    ? "text-primary"
+                    : "text-on-surface-variant group-focus-within:text-primary"
+                }`}
+              >
+                search
+              </span>
+              <input
+                id="inbox-search"
+                type="text"
+                role="searchbox"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="search"
+                placeholder="Tìm tên, mã BN, bệnh lý…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-9 bg-surface-container-lowest border border-outline-variant/70 rounded-lg text-xs font-medium text-on-surface placeholder:text-on-surface-variant caret-primary selection:bg-primary/15 hover:border-outline focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Xoá tìm kiếm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center size-7 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={() => void load(true)}
@@ -250,8 +292,8 @@ function InboxContent() {
           </div>
         </div>
 
-        {/* 5 Clinical KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {/* Clinical KPI Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {/* Card 1: Khẩn cấp / Ưu tiên */}
           <button
             type="button"
@@ -262,7 +304,7 @@ function InboxContent() {
                   : doctorInboxHref("all", { urgency: "soon" })
               )
             }
-            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
               urgencyFilter
                 ? "border-rose-400 ring-2 ring-rose-400/20 bg-rose-50/20"
                 : "border-outline-variant/60 hover:border-rose-300"
@@ -290,7 +332,7 @@ function InboxContent() {
           <button
             type="button"
             onClick={() => router.push(doctorInboxHref("plan_review"))}
-            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
               activeType === "plan_review"
                 ? "border-amber-400 ring-2 ring-amber-400/20 bg-amber-50/20"
                 : "border-outline-variant/60 hover:border-amber-300"
@@ -318,7 +360,7 @@ function InboxContent() {
           <button
             type="button"
             onClick={() => router.push(doctorInboxHref("constraints"))}
-            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
               activeType === "constraints"
                 ? "border-sky-400 ring-2 ring-sky-400/20 bg-sky-50/20"
                 : "border-outline-variant/60 hover:border-sky-300"
@@ -342,11 +384,39 @@ function InboxContent() {
             </div>
           </button>
 
-          {/* Card 4: Hết hạn & Yêu cầu mới */}
+          {/* Card 4: Hỏi bác sĩ */}
+          <button
+            type="button"
+            onClick={() => router.push(doctorInboxHref("chat_escalation"))}
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
+              activeType === "chat_escalation"
+                ? "border-teal-400 ring-2 ring-teal-400/20 bg-teal-50/20"
+                : "border-outline-variant/60 hover:border-teal-300"
+            }`}
+          >
+            <div className="w-11 h-11 rounded-lg bg-teal-500/10 text-teal-800 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[22px]">forum</span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block truncate">
+                Hỏi bác sĩ
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-2xl font-black text-teal-900 tabular-nums">
+                  {counts.chat_escalation}
+                </span>
+                <span className="text-[11px] text-on-surface-variant/80 font-medium">
+                  câu hỏi
+                </span>
+              </div>
+            </div>
+          </button>
+
+          {/* Card 5: Hết hạn & Yêu cầu mới */}
           <button
             type="button"
             onClick={() => router.push(doctorInboxHref("plan_expiry"))}
-            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
               activeType === "plan_expiry"
                 ? "border-emerald-400 ring-2 ring-emerald-400/20 bg-emerald-50/20"
                 : "border-outline-variant/60 hover:border-emerald-300"
@@ -373,7 +443,7 @@ function InboxContent() {
           <button
             type="button"
             onClick={() => router.push(doctorInboxHref("patient_claim"))}
-            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+            className={`p-4 rounded-xl bg-surface-container-lowest border shadow-2xs flex items-center gap-3.5 text-left transition-all cursor-pointer min-w-0 ${
               activeType === "patient_claim"
                 ? "border-violet-400 ring-2 ring-violet-400/20 bg-violet-50/20"
                 : "border-outline-variant/60 hover:border-violet-300"
@@ -396,64 +466,6 @@ function InboxContent() {
               </div>
             </div>
           </button>
-        </div>
-
-        {/* Search & Filter Toolbar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-          {/* Tab Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {FILTERS.map((filter) => {
-              const selected = !urgencyFilter && activeType === filter.id;
-              return (
-                <Link
-                  key={filter.id}
-                  href={doctorInboxHref(filter.id)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                    selected
-                      ? "bg-primary text-on-primary shadow-2xs"
-                      : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {filter.icon}
-                  </span>
-                  <span>{filter.label}</span>
-                  <span
-                    className={`ml-0.5 px-1.5 py-0.2 rounded-md text-[10px] font-extrabold tabular-nums ${
-                      selected
-                        ? "bg-white/20 text-white"
-                        : "bg-surface-container-high text-on-surface-variant"
-                    }`}
-                  >
-                    {counts[filter.id]}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Search Box */}
-          <div className="relative min-w-[240px] sm:w-72">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm theo tên BN, mã BN, bệnh lý..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-8 py-2 bg-surface-container-lowest border border-outline-variant/70 rounded-lg text-xs font-medium text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs placeholder:text-on-surface-variant/60"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Error Alert */}
@@ -503,6 +515,8 @@ function InboxContent() {
                   ? "Không có bệnh nhân đang chờ nhận"
                   : activeType === "constraints"
                   ? "Không có đề xuất ràng buộc chờ duyệt"
+                  : activeType === "chat_escalation"
+                  ? "Không có câu hỏi chat chờ trả lời"
                   : "Không có công việc trong danh mục này"}
               </p>
               <p className="text-xs text-on-surface-variant mt-1 max-w-md mx-auto">
@@ -516,6 +530,8 @@ function InboxContent() {
                   ? "Khi bệnh nhân tự đăng ký hoặc đồng nghiệp chuyển hồ sơ, việc nhận sẽ hiện ở đây."
                   : activeType === "constraints"
                   ? "Khi bệnh nhân gửi kcal, muối, đường hoặc mục tiêu điều trị mới, việc duyệt hiện ở đây và trên tab Ràng buộc của hồ sơ bệnh nhân."
+                  : activeType === "chat_escalation"
+                  ? "Khi bệnh nhân chuyển câu hỏi AI không chắc chắn, việc trả lời hiện ở đây."
                   : "Chọn tab “Tất cả” hoặc chọn danh mục khác để kiểm tra công việc còn lại."}
               </p>
             </div>
@@ -682,7 +698,14 @@ function InboxContent() {
                         ) : (
                           <>
                             <Link
-                              href={job.href}
+                              href={
+                                job.type === "chat_escalation"
+                                  ? doctorInboxHref(activeType, {
+                                      urgency: urgencyFilter ? "soon" : undefined,
+                                      escalation: job.id.replace(/^escalation:/, ""),
+                                    })
+                                  : job.href
+                              }
                               className="inline-flex items-center justify-center gap-1.5 h-9 md:h-10 px-4 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 shrink-0"
                             >
                               <span>{job.cta}</span>
@@ -720,6 +743,16 @@ function InboxContent() {
           </div>
         )}
       </main>
+      {openEscalationId ? (
+        <EscalationThreadPanel
+          escalationId={openEscalationId}
+          onClose={() => router.push(doctorInboxHref(activeType, urgencyFilter ? { urgency: "soon" } : undefined))}
+          onResolved={() => {
+            void load(true);
+            router.push(doctorInboxHref(activeType, urgencyFilter ? { urgency: "soon" } : undefined));
+          }}
+        />
+      ) : null}
     </>
   );
 }

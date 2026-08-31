@@ -39,8 +39,8 @@
 - [x] Custom Embedding gọi Gemini API trong `backend/app/rag/embeddings.py`, giữ `SentenceTransformerEmbeddingFunction` local làm fallback offline.
 - [x] Rotation pool API key Gemini (`GEMINI_API_KEY=key-1,key-2,…`) trước khi fallback MiniLM — `app/rag/gemini_keys.py`.
 
-### P1 (Should) — Guardrails bổ sung (→ `specs/13`, `adrs/006`)
-- [ ] Wire `validate_interaction_output` và `sanitize_recommendation` từ `rules.py` vào runtime flow (`interaction_check_node` hoặc `apply_guardrails`) — hiện đã viết đầy đủ nhưng không có nơi gọi.
+### Done — Guardrails per-recommendation (→ `specs/13`, `adrs/006`, T01)
+- [x] Wire `validate_interaction_output` và `sanitize_recommendation` vào runtime (`enforce_interaction_recommendations`): `interaction_checker_agent` / `check_interactions` / skill (trước khi ghép `answer`) + `apply_guardrails` hậu kiểm structured items.
 
 ### P1 (Should) — Hybrid RAG retrieval (→ `specs/13-ai-chat-assistant.md`)
 - [ ] Chuyển `rag_qa_node` (`nodes/rag_tool.py`) sang dùng `retrieve_hybrid()` (BM25+dense RRF) thay vì dense-only — `retrieve_hybrid()` đã implement trong `retriever.py` nhưng chưa được gọi.

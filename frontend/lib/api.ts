@@ -11,6 +11,9 @@ import {
   type ChatStreamEvent,
   type ClaimQueueItem,
   type DoctorColleague,
+  type EscalationCreatePayload,
+  type EscalationListItem,
+  type EscalationOut,
   type DoctorPatientSummary,
   type DoctorConstraintsUpdate,
   type DoctorPatientUpdate,
@@ -690,6 +693,46 @@ export const api = {
     return request(`/api/v1/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
       method: "PUT",
       body: { messages },
+    });
+  },
+
+  createChatEscalation(payload: EscalationCreatePayload): Promise<EscalationOut> {
+    return request("/api/v1/chat/escalations", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  getChatEscalation(id: string): Promise<EscalationOut> {
+    return request(`/api/v1/chat/escalations/${encodeURIComponent(id)}`);
+  },
+
+  replyChatEscalation(id: string, body: string): Promise<EscalationOut> {
+    return request(`/api/v1/chat/escalations/${encodeURIComponent(id)}/messages`, {
+      method: "POST",
+      body: { body },
+    });
+  },
+
+  listDoctorEscalations(status?: string): Promise<EscalationListItem[]> {
+    const q = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request(`/api/v1/doctor/escalations${q}`);
+  },
+
+  getDoctorEscalation(id: string): Promise<EscalationOut> {
+    return request(`/api/v1/doctor/escalations/${encodeURIComponent(id)}`);
+  },
+
+  replyDoctorEscalation(id: string, body: string): Promise<EscalationOut> {
+    return request(`/api/v1/doctor/escalations/${encodeURIComponent(id)}/messages`, {
+      method: "POST",
+      body: { body },
+    });
+  },
+
+  resolveDoctorEscalation(id: string): Promise<EscalationOut> {
+    return request(`/api/v1/doctor/escalations/${encodeURIComponent(id)}/resolve`, {
+      method: "POST",
     });
   },
 

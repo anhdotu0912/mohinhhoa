@@ -1,6 +1,6 @@
 # Tasks — VinNutri (P-014)
 
-Tổng quan phân công & North Star demo flow. Backlog chi tiết theo MoSCoW: [`roadmap-mvp.md`](roadmap-mvp.md). Ownership rút gọn theo role: [`be1-ai-core.md`](be1-ai-core.md) · [`be2-platform.md`](be2-platform.md) · [`fe-frontend.md`](fe-frontend.md). **Kiểm thử toàn hệ thống:** [`test/README.md`](test/README.md) (checklist spec 00–13, coverage, template bug).
+Tổng quan phân công & North Star demo flow. **Chỉ mục việc còn lại (spawn task nhỏ):** [`queue.md`](queue.md). Backlog chi tiết theo MoSCoW: [`roadmap-mvp.md`](roadmap-mvp.md). Ownership rút gọn theo role: [`be1-ai-core.md`](be1-ai-core.md) · [`be2-platform.md`](be2-platform.md) · [`fe-frontend.md`](fe-frontend.md). **Kiểm thử toàn hệ thống:** [`test/README.md`](test/README.md) (checklist spec 00–13, coverage, template bug).
 
 ## Phân công 3 người
 

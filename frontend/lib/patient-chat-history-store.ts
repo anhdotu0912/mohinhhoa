@@ -6,6 +6,7 @@ import type {
   ChatMessageOut,
   ChatSessionOut,
   ChatSessionSummaryOut,
+  CitationChunk,
   MealPlanOutput,
   MealPreviewOut,
   WeeklyComplianceOut,
@@ -20,6 +21,7 @@ export interface ChatMessage {
   intent?: string;
   secondaryIntents?: string[];
   citations?: string[];
+  citationChunks?: CitationChunk[];
   guardrailTriggered?: boolean;
   mealPlanId?: string | null;
   mealPreview?: MealPreviewOut | null;
@@ -31,6 +33,8 @@ export interface ChatMessage {
   thinkingSteps?: ThinkingStep[];
   corrected?: boolean;
   correctionReason?: string;
+  unmatchedPairs?: { drug: string; food: string }[];
+  escalationId?: string | null;
 }
 
 export interface ChatSession {
@@ -57,6 +61,7 @@ function apiMessageToLocal(message: ChatMessageOut): ChatMessage {
     intent: message.intent ?? undefined,
     secondaryIntents: message.secondary_intents ?? [],
     citations: message.citations ?? [],
+    citationChunks: message.citation_chunks ?? [],
     guardrailTriggered: message.guardrail_triggered ?? false,
     mealPlanId: message.meal_plan_id ?? null,
     mealPreview: message.meal_preview ?? null,
@@ -67,6 +72,8 @@ function apiMessageToLocal(message: ChatMessageOut): ChatMessage {
     thinkingSteps: (message.thinking_steps ?? []) as ThinkingStep[],
     corrected: message.corrected ?? false,
     correctionReason: message.correction_reason ?? undefined,
+    unmatchedPairs: message.unmatched_pairs ?? [],
+    escalationId: message.escalation_id ?? null,
   };
 }
 
@@ -78,6 +85,7 @@ function localMessageToApi(message: ChatMessage): ChatMessageOut {
     intent: message.intent ?? null,
     secondary_intents: message.secondaryIntents ?? [],
     citations: message.citations ?? [],
+    citation_chunks: message.citationChunks ?? [],
     guardrail_triggered: message.guardrailTriggered ?? false,
     meal_plan_id: message.mealPlanId ?? null,
     meal_preview: message.mealPreview ?? null,
@@ -88,6 +96,8 @@ function localMessageToApi(message: ChatMessage): ChatMessageOut {
     thinking_steps: message.thinkingSteps ?? [],
     corrected: message.corrected ?? false,
     correction_reason: message.correctionReason ?? null,
+    unmatched_pairs: message.unmatchedPairs ?? [],
+    escalation_id: message.escalationId ?? null,
   };
 }
 

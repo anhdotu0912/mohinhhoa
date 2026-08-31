@@ -17,6 +17,11 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.rag.embeddings import embed_query_texts
+from app.rag.qdrant import get_qdrant_client
+
+logger = logging.getLogger(__name__)
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +39,7 @@ class RetrievedChunk:
 
 
 def _get_qdrant_client():
-    import qdrant_client
-    if settings.QDRANT_URL:
-        return qdrant_client.QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY or None,
-        )
-    persist_dir = os.path.join(_BACKEND_DIR, settings.QDRANT_PERSIST_DIR)
-    return qdrant_client.QdrantClient(path=persist_dir)
+    return get_qdrant_client()
 
 
 def retrieve_foods(
@@ -60,9 +58,15 @@ def retrieve_foods(
         exclude_tags: Exclude foods with these tags (e.g. ["allergen-shellfish"])
         client: Optional Qdrant client
     """
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    try:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+    except ImportError as exc:
+        logger.warning("Qdrant food_items skipped: %s", exc)
+        return []
 
     client = client or _get_qdrant_client()
+    if client is None:
+        return []
     query_vectors = embed_query_texts([query])
     if not query_vectors:
         return []
@@ -124,9 +128,15 @@ def retrieve_guidelines(
         source_filter: Filter by guideline source (e.g. "ada_diabetes")
         client: Optional Qdrant client
     """
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    try:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+    except ImportError as exc:
+        logger.warning("Qdrant guidelines skipped: %s", exc)
+        return []
 
     client = client or _get_qdrant_client()
+    if client is None:
+        return []
     query_vectors = embed_query_texts([query])
     if not query_vectors:
         return []
