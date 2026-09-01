@@ -18,6 +18,7 @@ import {
 import { MealSuggestionCard } from "@/components/patient-chat/cards/MealSuggestionCard";
 import { WeeklyComplianceCard } from "@/components/patient-chat/cards/WeeklyComplianceCard";
 import { DoctorNoteCard } from "@/components/patient-chat/cards/DoctorNoteCard";
+import { MetricsDeltaAdviceCard } from "@/components/patient-chat/cards/MetricsDeltaAdviceCard";
 import { WeeklyMealPlanCard } from "@/components/patient-chat/cards/WeeklyMealPlanCard";
 import { FormattedMessage } from "@/components/patient/FormattedMessage";
 import { AssignedDoctorStatus } from "@/components/patient/AssignedDoctorStatus";
@@ -339,6 +340,7 @@ export default function PatientChatHomePage() {
     mealPreview: response.meal_preview ?? null,
     weeklyCompliance: response.weekly_compliance ?? null,
     doctorNote: response.doctor_note ?? null,
+    metricsDeltaAdvice: response.metrics_delta_advice ?? null,
     showWeeklyPlan: extras?.showWeeklyPlan ?? false,
     mealPlanWeek: extras?.mealPlanWeek ?? null,
     unmatchedPairs: response.unmatched_pairs ?? [],
@@ -722,6 +724,9 @@ export default function PatientChatHomePage() {
                           )}
                           {msg.doctorNote && (
                             <DoctorNoteCard data={msg.doctorNote} />
+                          )}
+                          {msg.metricsDeltaAdvice && (
+                            <MetricsDeltaAdviceCard data={msg.metricsDeltaAdvice} />
                           )}
 
                           {/* Citations (Gemini Dropdown Accordion) */}

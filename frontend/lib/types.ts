@@ -517,9 +517,19 @@ export interface MetricsHistoryPoint {
   recorded_at: string;
 }
 
+export interface FieldDelta {
+  field: string;
+  label: string;
+  before?: number | null;
+  after?: number | null;
+  unit?: string;
+  changed: boolean;
+}
+
 export interface MetricsDeltaAdviceOut {
   message: string;
   changed_fields: string[];
+  field_deltas?: FieldDelta[];
   citations: string[];
   ask_doctor: boolean;
 }

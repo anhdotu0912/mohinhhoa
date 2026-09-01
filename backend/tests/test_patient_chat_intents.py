@@ -276,6 +276,43 @@ def test_run_agent_metrics_delta_advice_force_intent(db_session):
     assert "chỉ số" in (output.message or "").lower()
 
 
+def test_run_agent_metrics_delta_advice_includes_small_deltas(db_session):
+    """Chat output must expose per-field before/after even below threshold."""
+    from datetime import timedelta
+
+    from app.models.body_metrics import BodyMetricsEntry
+    from app.services.metrics_delta_advice import advice_from_latest_entries
+
+    reset_compiled_graph()
+    user_id = "demo_patient_metrics_deltas"
+    now = datetime.now()
+    db_session.add(
+        BodyMetricsEntry(
+            user_id=user_id,
+            recorded_by="patient",
+            recorded_at=now - timedelta(seconds=2),
+            weight=70.0,
+        )
+    )
+    db_session.add(
+        BodyMetricsEntry(
+            user_id=user_id,
+            recorded_by="patient",
+            recorded_at=now,
+            weight=70.4,  # below 1 kg threshold — still shown
+        )
+    )
+    db_session.commit()
+
+    advice = advice_from_latest_entries(db_session, user_id)
+    assert advice is not None
+    assert advice.changed_fields == []
+    weight_delta = next(d for d in advice.field_deltas if d.field == "weight")
+    assert weight_delta.before == 70.0
+    assert weight_delta.after == 70.4
+    assert weight_delta.changed is False
+
+
 def test_unknown_node_fatigue_and_symptom_empathy():
     from app.agents.graph import unknown_node
 

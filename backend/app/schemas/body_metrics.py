@@ -7,11 +7,23 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 
 
+class FieldDeltaOut(BaseModel):
+    """Per-field before → after comparison (includes sub-threshold deltas)."""
+
+    field: str
+    label: str
+    before: float | None = None
+    after: float | None = None
+    unit: str = ""
+    changed: bool = False
+
+
 class MetricsDeltaAdviceOut(BaseModel):
     """Observational caption when body metrics change beyond threshold."""
 
     message: str
     changed_fields: list[str] = Field(default_factory=list)
+    field_deltas: list[FieldDeltaOut] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
     ask_doctor: bool = False
 
