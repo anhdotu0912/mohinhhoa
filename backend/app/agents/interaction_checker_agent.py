@@ -217,14 +217,26 @@ _STOP_WORDS_FOOD = {
     "gì", "nào", "gì không", "sao không", "được không", "không", "thì sao", "được",
     "thuốc", "viên", "bệnh", "tiểu đường", "đái tháo đường", "kỵ", "kiêng", "kị",
     "tương tác", "tác dụng phụ", "bị", "đang", "dùng", "uống", "ăn", "với", "cùng",
-    "khi", "có", "nên", "metformin", "glipizide", "sitagliptin", "atorvastatin",
-    "insulin", "gliclazide", "empagliflozin", "lisinopril", "amlodipine",
+    "khi", "có", "nên", "thì", "là", "và", "metformin", "glipizide", "sitagliptin",
+    "atorvastatin", "insulin", "gliclazide", "empagliflozin", "lisinopril", "amlodipine",
     "tôi", "em", "anh", "chị", "bác sĩ", "cho", "hỏi", "với", "ạ",
+    # Common OTC drug names outside the diabetes/cardio KB scope — not resolvable via
+    # resolve_medication(), so without this they leak into the extracted "food" string.
+    "panadol", "paracetamol", "efferalgan", "aspirin", "ibuprofen",
 }
 
 
-def extract_foods_from_message(message: str) -> tuple[list[str], bool]:
+def extract_foods_from_message(
+    message: str,
+    medications: list[str] | None = None,
+) -> tuple[list[str], bool]:
     """Extract food items mentioned in user message.
+
+    Args:
+        medications: patient's actual medication names (e.g. from profile). Filtered
+            out of the extracted candidate on top of the static stop-word list, since
+            a drug not in that hardcoded set (e.g. "panadol") would otherwise leak
+            into the "food" string and get treated as part of the dish name.
 
     Returns:
         (foods_list, is_specific_query)
@@ -233,6 +245,7 @@ def extract_foods_from_message(message: str) -> tuple[list[str], bool]:
     """
     message_lower = message.lower().strip()
     kb = load_interaction_kb()
+    stop_words = _STOP_WORDS_FOOD | {m.lower().strip() for m in (medications or []) if m}
 
     # 1. Match against known KB foods & aliases
     matched_kb: list[str] = []
@@ -267,7 +280,7 @@ def extract_foods_from_message(message: str) -> tuple[list[str], bool]:
         for m in matches:
             candidate = m.strip()
             words = candidate.split()
-            filtered_words = [w for w in words if w not in _STOP_WORDS_FOOD]
+            filtered_words = [w for w in words if w not in stop_words]
             clean_candidate = " ".join(filtered_words).strip()
             if clean_candidate and len(clean_candidate) >= 2 and clean_candidate not in extracted_candidates:
                 extracted_candidates.append(clean_candidate)

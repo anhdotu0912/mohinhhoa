@@ -30,6 +30,7 @@ from app.agents.skills.registry import (
 from app.agents.skills.utility_skills import (
     ask_clarification,
     chit_chat_greeting,
+    detect_clinical_danger,
     emergency_triage_check,
     refuse_unsafe_medication,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "get_doctor_notes",
     # Utility skills
     "emergency_triage_check",
+    "detect_clinical_danger",
     "ask_clarification",
     "chit_chat_greeting",
     "refuse_unsafe_medication",

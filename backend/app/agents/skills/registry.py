@@ -132,6 +132,7 @@ SKILL_REGISTRY: dict[str, SkillDefinition] = {
             "Hỏi xem thực đơn ăn uống trong ngày hoặc trong tuần (dùng skill get_patient_meal_plan).",
             "Hỏi danh sách nhóm thực phẩm kiến thức chung (ví dụ: 'các loại trái cây ít đường' — dùng skill search_medical_guidelines).",
             "Yêu cầu kê đơn thuốc mới hoặc tự ý thay đổi liều lượng thuốc (dùng skill refuse_unsafe_medication).",
+            "Hỏi về tác dụng phụ, hướng dẫn liều dùng, hoặc điều chỉnh lối sống (lượng nước uống, tần suất bữa ăn, cài đặt bơm insulin...) liên quan đến thuốc — không phải hỏi 1 món ăn/nhóm thực phẩm cụ thể ăn được không (dùng skill search_medical_guidelines). Ví dụ: 'Đang dùng Dapagliflozin cần lưu ý lượng nước uống thế nào?', 'Tiêm Ozempic bị buồn nôn nên điều chỉnh ăn uống ra sao?'.",
         ],
         parameters_schema={
             "properties": {
@@ -164,6 +165,8 @@ SKILL_REGISTRY: dict[str, SkillDefinition] = {
             "Chỉ số GI của gạo lứt là bao nhiêu?",
             "Lợi ích của cá hồi đối với kiểm soát đường huyết?",
             "Bị đái tháo đường type 2 cần kiêng những gì?",
+            "Đang dùng Dapagliflozin cần lưu ý lượng nước uống thế nào? (tác dụng phụ/lối sống khi dùng thuốc — không phải hỏi 1 món ăn cụ thể)",
+            "Tiêm Ozempic bị buồn nôn nên điều chỉnh ăn uống ra sao?",
         ],
         never_use=[
             "Bệnh nhân hỏi xem thực đơn cụ thể đã tạo trong ứng dụng (dùng skill get_patient_meal_plan).",
@@ -550,7 +553,13 @@ def get_lean_state_for_intent(state: dict[str, Any], intent: str) -> dict[str, A
             "db": db,
         }
 
-    if intent in ("greeting", "refuse"):
+    if intent == "greeting":
+        return {
+            "message": message,
+            "disease": profile_dict.get("disease", []),
+        }
+
+    if intent == "refuse":
         return {
             "message": message,
         }

@@ -105,7 +105,10 @@ def _build_rag_context(
 
 
 # Must stay in lockstep with build_agent_run_output — only these chunks are shown to the patient.
-RAG_PROMPT_CHUNK_LIMIT = 2
+# _build_rag_context retrieves at most 3 items (top_k_guidelines=2 + top_k_foods=1, food always
+# last) — the limit must be 3, not 2, or the food chunk is silently dropped from both the prompt
+# and citation_chunks even though it still appears in citations[] (source string only).
+RAG_PROMPT_CHUNK_LIMIT = 3
 
 
 def _build_rag_prompt(message: str, rag_context: list[dict], profile: dict) -> str:
@@ -131,8 +134,8 @@ QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ):
 2. TUYỆT ĐỐI KHÔNG SUY DIỄN LAN MAN: KHÔNG tự động giải thích tác dụng phụ của thuốc, phác đồ điều trị, hoặc tiền sử dị ứng không liên quan nếu người dùng chỉ hỏi kiến thức dinh dưỡng/thực phẩm chung.
 3. CẤU TRÚC TRÌNH BÀY KHOA HỌC:
    - 🎯 **Kết luận trực diện:** Phân loại rõ ràng (NÊN ĂN / CẦN HẠN CHẾ hoặc Có/Không).
-   - 🔬 **Phân tích dinh dưỡng & GI/GL:** Nêu ngắn gọn chỉ số đường huyết (GI/GL), tinh bột, chất xơ và lợi ích chuyển hóa.
-   - 💡 **Khuyến nghị khẩu phần & Cách chế biến:** Khẩu phần hợp lý và cách nấu lành mạnh (hấp, luộc, áp chảo ít dầu).
+   - 🔬 **Phân tích dinh dưỡng & GI/GL:** Nêu chỉ số đường huyết (GI/GL), tinh bột, chất xơ và lợi ích chuyển hóa — CHỈ nêu số liệu cụ thể (GI/GL/gram/ngưỡng mmol-L/tên sản phẩm) khi số đó THỰC SỰ xuất hiện trong TÀI LIỆU Y KHOA THAM KHẢO ở trên. Nếu tài liệu không có số liệu định lượng cho món/chủ đề này, hãy nói rõ "Tài liệu tham khảo hiện có chưa nêu số liệu cụ thể cho [chủ đề]" và chỉ đưa nguyên tắc định tính chung — TUYỆT ĐỐI KHÔNG tự bịa số liệu hay tên thương hiệu không có trong tài liệu.
+   - 💡 **Khuyến nghị khẩu phần & Cách chế biến:** Khẩu phần hợp lý (nếu tài liệu có nêu) và cách nấu lành mạnh (hấp, luộc, áp chảo ít dầu).
    - ⚠️ **Lưu ý an toàn chung:** 1-2 lời khuyên ngắn về kiểm soát đường huyết sau ăn, không tự ý bỏ bữa hay ngưng thuốc điều trị.
    - 📚 **Nguồn tham khảo:** {authority_str}."""
 
