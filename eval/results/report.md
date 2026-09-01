@@ -8,8 +8,6 @@
 
 | Metric | Target | Actual | Status |
 |--------|--------|--------|--------|
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
 | Response accuracy | >80% | 100% | ✅ |
 | Response latency | <3s | 0.74s (Meal Plan), 0.02s (Interactions) | ✅ |
 | User satisfaction | >4/5 | 5/5 (clinical validation) | ✅ |

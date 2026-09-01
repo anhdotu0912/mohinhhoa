@@ -42,7 +42,7 @@ graph TB
     end
 
     subgraph ExternalLLM["LLM & Embedding Provider"]
-        LLMModel["OpenAI GPT-4o-mini / DeepSeek"]
+        LLMModel["OpenAI GPT-4o-mini (default)<br/>or DeepSeek via LLM_PROVIDER"]
         EmbedModel["Gemini gemini-embedding-2<br/>(Fallback MiniLM)"]
     end
 
@@ -159,7 +159,7 @@ sequenceDiagram
     API->>DB: Lưu PatientProfile
     
     Doctor->>FE: Yêu cầu AI sinh thực đơn tuần
-    FE->>API: POST /api/v1/doctor/patients/{id}/generate
+    FE->>API: POST /api/v1/doctor/patients/{id}/meal-plans/generate
     API->>Agent: Gọi Meal Planner Agent
     Agent->>Qdrant: Truy vấn guidelines dinh dưỡng & thực phẩm phù hợp
     Agent->>Agent: Lọc dị ứng -> Tính Kcal/Macros -> Kiểm tra tương tác Metformin
@@ -226,7 +226,7 @@ graph LR
 | **Vector Store** | Qdrant | Hỗ trợ hybrid search mượt mà, lưu trữ cục bộ persistent, chi phí tối ưu hơn Pinecone | [ADR-001](adrs/001-vector-database-choice.md) |
 | **Agent Orchestration** | LangGraph | Hỗ trợ StateGraph tuần tự, kiểm soát chặt chẽ luồng rẽ nhánh y tế và Guardrails | [ADR-002](adrs/002-agent-orchestration-langgraph.md) |
 | **Embedding Model** | Gemini `gemini-embedding-2` | Hiểu ngữ nghĩa tiếng Việt y tế tốt, có fallback local MiniLM | [ADR-003](adrs/003-embedding-model-choice.md) |
-| **LLM Provider** | OpenAI GPT-4o-mini / DeepSeek | Cân bằng giữa chi phí, tốc độ và độ chính xác phân loại intent | [ADR-004](adrs/004-llm-provider-and-fallback-strategy.md) |
+| **LLM Provider** | OpenAI GPT-4o-mini (default), đổi qua `LLM_PROVIDER=deepseek` khi cần | Provider-agnostic qua 1 entry point, fallback rule-based khi thiếu key; dual-provider fallback OpenAI↔DeepSeek tự động là quyết định mới nhưng **Planned, chưa code** | [ADR-004](adrs/004-llm-provider-and-fallback-strategy.md) |
 | **Database** | PostgreSQL | Toàn vẹn dữ liệu quan hệ, ACID cho hồ sơ y tế và lịch sử tuân thủ | [ADR-005](adrs/005-database-choice.md) |
 | **HITL & Guardrails** | Strict Doctor Approval + Citation Guard | Đảm bảo an toàn bệnh nhân, tuân thủ nguyên tắc y khoa không kê đơn tùy tiện | [ADR-006](adrs/006-hitl-guardrails-strategy.md) |
 | **Notification Engine** | Event-Driven Materialize-Ahead | Tối ưu tài nguyên, không phụ thuộc cronjob phức tạp trên server free-tier | [ADR-007](adrs/007-compliance-notification-strategy.md) |

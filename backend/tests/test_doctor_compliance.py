@@ -268,9 +268,10 @@ def test_compliance_includes_food_logs(client):
     data = res.json()
     assert data["checkins_done"] == 2
     assert data["checkins_as_planned"] == 1
-    assert data["overall_adherence_pct"] == 75
+    # morning as_planned (30%) + noon custom (15%) = 45%
+    assert data["overall_adherence_pct"] == 45
     by_date = {row["date"]: row["adherence_pct"] for row in data["daily_series"]}
-    assert by_date[today.isoformat()] == 75
+    assert by_date[today.isoformat()] == 45
 
 
 def test_compliance_dedupes_duplicate_slot_same_vn_day(client, db_session):
@@ -298,7 +299,8 @@ def test_compliance_dedupes_duplicate_slot_same_vn_day(client, db_session):
     out = ComplianceService(db_session).get_patient_compliance("user_dup", days=7)
     assert out.checkins_done == 1
     assert out.checkins_as_planned == 0
-    assert out.overall_adherence_pct == 50
+    # Deduplicated to latest (custom morning = 30 * 0.5 = 15%)
+    assert out.overall_adherence_pct == 15
 
 
 def test_compliance_food_log_utc_evening_counts_on_vn_next_day(client):
@@ -334,8 +336,67 @@ def test_compliance_food_log_utc_evening_counts_on_vn_next_day(client):
     assert res.status_code == 200
     data = res.json()
     by_date = {row["date"]: row["adherence_pct"] for row in data["daily_series"]}
-    assert by_date[today_vn.isoformat()] == 100
+    # 1 main meal (evening as_planned) = 30%
+    assert by_date[today_vn.isoformat()] == 30
     assert by_date[yesterday_vn.isoformat()] is None
+
+
+def test_compliance_weighted_slots_all_combinations(client, db_session):
+    """Verify 3 main meals = 30% each, snack = 10%, unlogged = 0%."""
+    today_vn = vn_today()
+    start, _end = vn_day_bounds_utc(day=today_vn)
+
+    # Day 1: only morning as_planned -> 30%
+    db_session.add(
+        FoodLog(
+            user_id="user_weights",
+            slot="morning",
+            type="as_planned",
+            logged_at=start + timedelta(hours=8),
+        )
+    )
+    db_session.flush()
+    out = ComplianceService(db_session).get_patient_compliance("user_weights", days=1)
+    assert out.overall_adherence_pct == 30
+
+    # Add noon as_planned -> 30 + 30 = 60%
+    db_session.add(
+        FoodLog(
+            user_id="user_weights",
+            slot="noon",
+            type="as_planned",
+            logged_at=start + timedelta(hours=12),
+        )
+    )
+    db_session.flush()
+    out = ComplianceService(db_session).get_patient_compliance("user_weights", days=1)
+    assert out.overall_adherence_pct == 60
+
+    # Add evening as_planned -> 30 + 30 + 30 = 90%
+    db_session.add(
+        FoodLog(
+            user_id="user_weights",
+            slot="evening",
+            type="as_planned",
+            logged_at=start + timedelta(hours=18),
+        )
+    )
+    db_session.flush()
+    out = ComplianceService(db_session).get_patient_compliance("user_weights", days=1)
+    assert out.overall_adherence_pct == 90
+
+    # Add snack as_planned -> 90 + 10 = 100%
+    db_session.add(
+        FoodLog(
+            user_id="user_weights",
+            slot="snack",
+            type="as_planned",
+            logged_at=start + timedelta(hours=15),
+        )
+    )
+    db_session.flush()
+    out = ComplianceService(db_session).get_patient_compliance("user_weights", days=1)
+    assert out.overall_adherence_pct == 100
 
 
 def test_compliance_events_include_reminder_and_food_log(client):

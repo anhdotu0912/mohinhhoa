@@ -5,6 +5,33 @@
 
 ---
 
+## Tuần 0: 2026-07-23 - 2026-08-03 (Khởi tạo dự án & Lên ý tưởng)
+
+### Mục tiêu tuần này
+- [x] Khởi tạo repository từ template BTC AI20K, xác nhận 4 thành viên team và phân công vai trò sơ bộ (AI Engineer, Backend, Frontend, Clinical QA & AI Evaluator).
+- [x] Chọn đề bài: AI Agent trợ lý dinh dưỡng lâm sàng cho bệnh nhân đái tháo đường Type 2, xác định North Star demo flow.
+- [x] Thống nhất kiến trúc tổng thể client-server (FastAPI + Next.js + LangGraph) trước khi bắt tay code chi tiết.
+
+### Đã hoàn thành
+- Repo khởi tạo (`Initial commit`) từ template chuẩn BTC.
+- Thảo luận & chốt bài toán, đối tượng người dùng (bệnh nhân + bác sĩ/chuyên gia dinh dưỡng), phạm vi MVP theo MoSCoW.
+- Khởi tạo lại dự án theo kiến trúc client-server, dựng khung FastAPI backend và placeholder frontend, cấu hình Docker ban đầu.
+
+### Khó khăn & Giải pháp
+| Khó khăn | Giải pháp | Kết quả |
+|---|---|---|
+| Có sẵn bản nháp code cũ (`fe_old`/`be_old`) không theo cấu trúc client-server rõ ràng, dễ tạo nợ kỹ thuật nếu build tiếp lên đó. | Quyết định khởi tạo lại dự án theo kiến trúc client-server chuẩn, lên kế hoạch migrate dần phần dùng được ở tuần sau thay vì giữ nguyên code cũ. | Nền tảng kiến trúc sạch ngay từ đầu, tránh phải refactor lớn giữa chừng. |
+
+### Bài học
+- Dành thời gian thống nhất kiến trúc & phân công trước khi code giúp tránh làm lại nhiều ở các tuần sau.
+
+### Kế hoạch tuần sau
+- [ ] Migration toàn bộ phần dùng được từ code cũ (`fe_old`/`be_old`) sang cấu trúc mới, dọn dẹp file tạm.
+- [ ] Dựng khung Frontend Next.js phân tách rõ `/patient` và `/doctor`.
+- [ ] Bắt đầu module xác thực (JWT) và hồ sơ bệnh nhân (`PatientProfile`).
+
+---
+
 ## Week 1: 2026-08-08 - 2026-08-14
 
 ### Mục tiêu tuần này
@@ -107,3 +134,39 @@
 - [ ] Quay Video Demo sản phẩm chất lượng cao (thời lượng 3–5 phút) bám sát kịch bản North Star Flow.
 - [ ] Thiết kế hoàn thiện Slide thuyết trình Pitch Deck (10 slides chuẩn) cho sự kiện Demo Day.
 - [ ] Tiến hành diễn tập thuyết trình (Rehearsal) và kiểm tra lại toàn bộ 10 Deliverables theo checklist BTC.
+
+---
+
+## Week 4: 2026-08-25 - 2026-09-01
+
+### Mục tiêu tuần này
+- [x] Đảm bảo an toàn tuyệt đối cho cảnh báo dị ứng thực phẩm (tách riêng khỏi luồng kiểm tra tương tác thuốc).
+- [x] Refactor & responsive toàn bộ giao diện Bác sĩ và Bệnh nhân; thu hẹp đúng phạm vi bệnh lý về nhóm đái tháo đường (Type 1, tiền tiểu đường, thai kỳ).
+- [x] Triển khai phân quyền nhiều bác sĩ, chuyển luồng tạo tài khoản demo sang CLI script tương tác, dọn dẹp repo và ổn định lại CI.
+- [x] Đổi tên chính thức dự án thành **VinNutri**, bổ sung tính năng chat trực tiếp bệnh nhân–bác sĩ.
+- [x] Nâng cao độ trung thực của RAG (RAG faithfulness), safety escalation và routing `interaction_check` trước Demo Day.
+
+### Đã hoàn thành
+- Guardrails: tách nhánh xử lý dị ứng riêng trong `interaction_check_node` — tuyệt đối không xác nhận an toàn khi món ăn nằm trong danh mục dị ứng của bệnh nhân, có gợi ý thay thế an toàn và unit test hồi quy đi kèm.
+- Kiến trúc Skills module hóa + benchmark đánh giá cho agent (`feat(skills)`), guardrails 2 tầng (two-tier clinical safety filter) kết hợp prompt state pruning.
+- Thu hẹp & làm giàu đúng phạm vi dữ liệu bệnh lý: bổ sung tiểu đường Type 1/tiền tiểu đường/thai kỳ, loại bỏ các bệnh không liên quan để tập trung sâu vào đề bài.
+- Refactor toàn diện UI bác sĩ (dashboard, bảng danh sách, biểu đồ) và thêm responsive đầy đủ cho giao diện bệnh nhân trên mobile.
+- Triển khai phân quyền nhiều bác sĩ; chuyển luồng tạo tài khoản demo sang CLI script tương tác (không hardcode mật khẩu trong repo).
+- Dọn dẹp repo (xóa file tạm, dữ liệu trùng lặp), ổn định lại pipeline CI sau vài lần fix/tắt tạm.
+- Đổi tên chính thức dự án thành **VinNutri**, thêm chat trực tiếp bệnh nhân–bác sĩ, sửa hiển thị chunk nguồn trích dẫn trong chat AI.
+- Cải thiện safety escalation, RAG faithfulness và routing `interaction_check` trong LangGraph agent; nâng cấp biểu đồ tổng quan chỉ số sức khỏe (`MetricsOverlayChart`).
+
+### Khó khăn & Giải pháp
+| Khó khăn | Giải pháp | Kết quả |
+|---|---|---|
+| CI pipeline gãy nhiều lần trong lúc dọn dẹp repo quy mô lớn (xóa file trùng, refactor UI hàng loạt). | Tạm thời tắt CI check, sửa lỗi từng phần rồi bật lại thay vì để CI đỏ kéo dài. | CI chạy ổn định trở lại trước Demo Day, không chặn merge các tính năng khác. |
+| Guardrail cũ dùng chung logic với kiểm tra tương tác thuốc, có rủi ro xác nhận nhầm "an toàn" với món ăn gây dị ứng. | Tách hẳn nhánh xử lý dị ứng, ưu tiên tuyệt đối trên mọi luồng trả lời, bổ sung unit test hồi quy riêng. | Loại bỏ hoàn toàn rủi ro xác nhận sai an toàn với thực phẩm gây dị ứng — an toàn y khoa được đặt lên hàng đầu. |
+
+### Bài học
+- Thu hẹp đúng phạm vi bệnh lý (chỉ nhóm đái tháo đường) giúp chất lượng RAG/guideline sâu và chính xác hơn thay vì dàn trải nhiều bệnh lý.
+- Testing và CI cần được ưu tiên song song với tính năng mới trong giai đoạn dọn dẹp, không nên dồn lại xử lý cuối cùng.
+
+### Kế hoạch tiếp theo (hoàn tất submission)
+- [ ] Hoàn thiện đầy đủ 10 deliverables nộp BTC (Video Demo, Pitch Deck, xác nhận Live URL, Worklog).
+- [ ] Rà soát lần cuối toàn bộ tài liệu `specs/`, `adrs/`, `contracts/` trước khi nộp.
+- [ ] Diễn tập thuyết trình Demo Day.

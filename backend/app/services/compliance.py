@@ -16,7 +16,16 @@ from app.models.notification import Notification
 from app.schemas.doctor import ComplianceDayPoint, ComplianceEvent, PatientComplianceOut
 
 ADHERENCE_SCORES = {"yes": 100, "partial": 50, "no": 0}
-FOOD_LOG_SCORES = {"as_planned": 100, "custom": 50}
+SLOT_WEIGHTS = {
+    "morning": 30,
+    "noon": 30,
+    "evening": 30,
+    "snack": 10,
+}
+FOOD_LOG_MULTIPLIERS = {
+    "as_planned": 1.0,
+    "custom": 0.5,
+}
 ALERT_SEVERITIES = {"Nguy hiểm", "Cần chú ý"}
 CHECKIN_SEVERITY_LABELS = {"yes": "Tuân thủ", "partial": "Một phần", "no": "Không tuân thủ"}
 CHECKIN_TITLE_LABELS = {
@@ -25,6 +34,19 @@ CHECKIN_TITLE_LABELS = {
     "no": "Check-in — Không theo thực đơn",
 }
 FOOD_LOG_SLOT_LABELS = {"morning": "sáng", "noon": "trưa", "evening": "tối", "snack": "phụ"}
+
+
+def _normalize_slot(slot: str) -> str:
+    s = (slot or "").lower().strip()
+    if s in ("morning", "breakfast"):
+        return "morning"
+    if s in ("noon", "lunch"):
+        return "noon"
+    if s in ("evening", "dinner"):
+        return "evening"
+    if s in ("snack", "afternoon_snack", "extra"):
+        return "snack"
+    return s
 
 
 class ComplianceService:
@@ -46,7 +68,7 @@ class ComplianceService:
             .all()
         )
 
-        by_day: dict[date, list[int]] = defaultdict(list)
+        checkin_by_day: dict[date, list[int]] = defaultdict(list)
         checkins_done = 0
         checkins_as_planned = 0
 
@@ -58,16 +80,14 @@ class ComplianceService:
             if adherence not in ADHERENCE_SCORES:
                 continue
             score = ADHERENCE_SCORES[adherence]
-            by_day[event_date].append(score)
+            checkin_by_day[event_date].append(score)
             checkins_done += 1
             if adherence == "yes":
                 checkins_as_planned += 1
 
-        food_by_day, food_done, food_as_planned = _aggregate_food_logs(
+        food_by_day_pct, food_done, food_as_planned = _aggregate_food_logs(
             self.db, patient_id, start_date, today
         )
-        for event_date, scores in food_by_day.items():
-            by_day[event_date].extend(scores)
         checkins_done += food_done
         checkins_as_planned += food_as_planned
 
@@ -76,8 +96,12 @@ class ComplianceService:
 
         for offset in range(days):
             d = start_date + timedelta(days=offset)
-            if d in by_day:
-                pct = round(sum(by_day[d]) / len(by_day[d]))
+            if d in food_by_day_pct:
+                pct = food_by_day_pct[d]
+                day_scores_for_overall.append(float(pct))
+                daily_series.append(ComplianceDayPoint(date=d.isoformat(), adherence_pct=pct))
+            elif d in checkin_by_day:
+                pct = round(sum(checkin_by_day[d]) / len(checkin_by_day[d]))
                 day_scores_for_overall.append(float(pct))
                 daily_series.append(ComplianceDayPoint(date=d.isoformat(), adherence_pct=pct))
             else:
@@ -157,7 +181,8 @@ def _latest_food_logs_by_vn_slot(
         event_date = _food_log_calendar_date(log, plan_cache, db)
         if event_date is None:
             continue
-        key = (event_date, log.slot)
+        norm_slot = _normalize_slot(log.slot)
+        key = (event_date, norm_slot)
         prev = best.get(key)
         if prev is None or (log.logged_at and (prev.logged_at is None or log.logged_at > prev.logged_at)):
             best[key] = log
@@ -169,22 +194,38 @@ def _aggregate_food_logs(
     patient_id: str,
     start_date: date,
     today: date,
-) -> tuple[dict[date, list[int]], int, int]:
-    """Derive slot-level adherence scores from structured food logs (spec 09)."""
-    by_day: dict[date, list[int]] = defaultdict(list)
+) -> tuple[dict[date, int], int, int]:
+    """Derive day-level adherence percentage from structured food logs (spec 09).
+
+    Rule:
+    - 3 main meals (morning, noon, evening): 30% each (as_planned = 30%, custom = 15%)
+    - 1 snack (snack): 10% (as_planned = 10%, custom = 5%)
+    - Unlogged slot: 0%
+    - Day adherence percentage is sum of logged slot points, capped at 100%.
+    """
+    day_logs: dict[date, dict[str, FoodLog]] = defaultdict(dict)
     checkins_done = 0
     checkins_as_planned = 0
 
     for event_date, log in _latest_food_logs_by_vn_slot(db, patient_id):
         if event_date < start_date or event_date > today:
             continue
-        score = FOOD_LOG_SCORES.get(log.type, 50)
-        by_day[event_date].append(score)
+        norm_slot = _normalize_slot(log.slot)
+        day_logs[event_date][norm_slot] = log
         checkins_done += 1
         if log.type == "as_planned":
             checkins_as_planned += 1
 
-    return by_day, checkins_done, checkins_as_planned
+    by_day_pct: dict[date, int] = {}
+    for event_date, slots in day_logs.items():
+        day_score = 0.0
+        for norm_slot, log in slots.items():
+            weight = SLOT_WEIGHTS.get(norm_slot, 0)
+            multiplier = FOOD_LOG_MULTIPLIERS.get(log.type, 0.5)
+            day_score += weight * multiplier
+        by_day_pct[event_date] = min(100, round(day_score))
+
+    return by_day_pct, checkins_done, checkins_as_planned
 
 
 def _event_in_window(at: datetime | None, start_date: date, today: date) -> bool:

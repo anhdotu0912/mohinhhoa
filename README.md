@@ -4,6 +4,18 @@ Prototype giúp bệnh nhân đái tháo đường Type 2 nhận thực đơn 7 
 
 Tài liệu chi tiết: [`CLAUDE.md`](CLAUDE.md) · [`docs/MO_TA_HE_THONG.md`](docs/MO_TA_HE_THONG.md) · [`tasks/roadmap-mvp.md`](tasks/roadmap-mvp.md)
 
+**🔗 Live Demo:** [https://c014-vinnutri.vercel.app/](https://c014-vinnutri.vercel.app/)
+
+---
+
+## Vấn đề (Problem)
+
+Bệnh nhân mắc bệnh mãn tính (đái tháo đường Type 2 và các bệnh lý liên quan) phải tự lập thực đơn hàng ngày phù hợp với bệnh lý, thuốc đang dùng và dị ứng — nhưng thường thiếu công cụ hỗ trợ, dễ ăn nhầm thực phẩm tương tác nguy hiểm với thuốc (vd. rượu bia với Metformin) và không có ai nhắc nhở tuân thủ giữa các lần tái khám. Bác sĩ/chuyên gia dinh dưỡng thì không đủ thời gian soạn thực đơn cá nhân hoá cho từng bệnh nhân.
+
+## Giải pháp (Solution)
+
+**VinNutri** là AI Agent trợ lý dinh dưỡng lâm sàng: sinh thực đơn 7 ngày cá nhân hoá dựa trên hồ sơ bệnh lý (RAG trên guideline y khoa Việt Nam + ADA), tự động kiểm tra tương tác thuốc–thực phẩm và dị ứng, cảnh báo khi vi phạm. Mọi thực đơn AI sinh ra đều phải qua bác sĩ duyệt trước khi đến tay bệnh nhân (Human-in-the-Loop bắt buộc), và mọi số liệu tư vấn đều có nguồn trích dẫn để tránh hallucination. Bệnh nhân nhận nhắc nhở tuân thủ (Compliance Notification), ghi nhật ký ăn uống và theo dõi chỉ số sức khoẻ theo thời gian; bác sĩ có dashboard quản lý hàng đợi duyệt và theo dõi tuân thủ của bệnh nhân.
+
 ---
 
 ## Yêu cầu
@@ -264,6 +276,17 @@ SMTP_PASSWORD="xxxx xxxx xxxx xxxx"
 Nếu chưa cấu hình SMTP, API trả `503 EMAIL_NOT_CONFIGURED`.
 
 Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`.
+
+---
+
+## Team
+
+| Thành viên | Vai trò |
+|---|---|
+| Nguyễn Thiên Tài | AI Engineer |
+| Hoàng Văn Quang | Backend Engineer |
+| Đỗ Tú Anh | Frontend Engineer |
+| Thiều Thị Ngọc Ánh | Clinical QA & AI Evaluator |
 
 ---
 
