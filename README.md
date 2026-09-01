@@ -5,6 +5,8 @@ Prototype giúp bệnh nhân đái tháo đường Type 2 nhận thực đơn 7 
 Tài liệu chi tiết: [`CLAUDE.md`](CLAUDE.md) · [`docs/MO_TA_HE_THONG.md`](docs/MO_TA_HE_THONG.md) · [`tasks/roadmap-mvp.md`](tasks/roadmap-mvp.md)
 
 **🔗 Live Demo:** [https://c014-vinnutri.vercel.app/](https://c014-vinnutri.vercel.app/)
+**🎥 Video Demo:** [Google Drive](https://drive.google.com/drive/folders/1YrySh5rVyVGAyLuNVVEDhZjmaoVwaKv5?usp=drive_link)
+**📊 Pitch Deck:** [Google Drive](https://drive.google.com/drive/folders/1q6dLVxHxKL_8zdsNF4rW-St1f3dEmW6w?usp=drive_link)
 
 ---
 

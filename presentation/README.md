@@ -2,8 +2,10 @@
 
 ## Files
 
-- `pitch_deck.pptx` — Slide thuyết trình Demo Day
-- `video_demo.mp4` — Video demo sản phẩm (tối đa 5 phút)
+Do dung lượng file lớn (.pptx/.mp4), 2 tài liệu này được lưu trên Google Drive thay vì commit vào repo:
+
+- **Pitch Deck** (`pitch_deck.pptx` — Slide thuyết trình Demo Day): [Google Drive](https://drive.google.com/drive/folders/1q6dLVxHxKL_8zdsNF4rW-St1f3dEmW6w?usp=drive_link)
+- **Video Demo** (`video_demo.mp4` — Video demo sản phẩm, tối đa 5 phút): [Google Drive](https://drive.google.com/drive/folders/1YrySh5rVyVGAyLuNVVEDhZjmaoVwaKv5?usp=drive_link)
 
 ## Pitch Deck Structure (10 slides)
 
