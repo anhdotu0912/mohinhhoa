@@ -28,9 +28,15 @@ def test_maps_only_prompt_chunks():
                 },
                 {
                     "chunk_id": "c3",
+                    "text": "Hạn chế natri dưới 2300mg/ngày.",
+                    "source": "byt_qd_5481_t2d.md",
+                    "score": 0.7,
+                },
+                {
+                    "chunk_id": "c4",
                     "text": extra,
                     "source": "ada_diabetes.md",
-                    "score": 0.7,
+                    "score": 0.6,
                 },
             ],
             "secondary_intents": [],
@@ -38,10 +44,11 @@ def test_maps_only_prompt_chunks():
         }
     )
 
-    assert RAG_PROMPT_CHUNK_LIMIT == 2
-    assert len(out.citation_chunks) == 2
+    assert RAG_PROMPT_CHUNK_LIMIT == 3
+    assert len(out.citation_chunks) == 3
     assert out.citation_chunks[0].text == "Mục tiêu HbA1c < 7%."
     assert out.citation_chunks[1].text == "Carb 50–60% năng lượng."
+    assert out.citation_chunks[2].text == "Hạn chế natri dưới 2300mg/ngày."
     assert all(extra not in chunk.text for chunk in out.citation_chunks)
     assert out.citation_chunks[0].source == "byt_qd_5481_t2d.md"
     assert out.citation_chunks[0].score == 0.91

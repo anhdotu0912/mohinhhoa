@@ -232,6 +232,8 @@ npm run build
 
 GitHub Actions (`.github/workflows/ci.yml`) chạy cả backend và frontend trên push/PR.
 
+**Tài liệu kiểm thử đầy đủ** (kịch bản test theo từng spec, kết quả, coverage): [`tasks/test/README.md`](tasks/test/README.md). Kết quả đánh giá chất lượng (golden dataset, LLM-as-a-judge): [`eval/results/report.md`](eval/results/report.md).
+
 ---
 
 ## Troubleshooting
@@ -297,3 +299,8 @@ Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`
 - Specs nghiệp vụ: [`specs/`](specs/)
 - ADR kiến trúc: [`adrs/`](adrs/)
 - Contract API: [`contracts/api-v1.md`](contracts/api-v1.md)
+- Sơ đồ kiến trúc: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`docs/architecture_diagram.md`](docs/architecture_diagram.md)
+- Tài liệu kiểm thử: [`tasks/test/README.md`](tasks/test/README.md)
+- Kết quả đánh giá (eval): [`eval/results/report.md`](eval/results/report.md)
+- Nhật ký tuần: [`JOURNAL.md`](JOURNAL.md) · Worklog hàng ngày: [`WORKLOG.md`](WORKLOG.md)
+- AI Logs: [`.ai-log/`](.ai-log/)

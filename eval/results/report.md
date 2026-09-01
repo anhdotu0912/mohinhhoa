@@ -8,37 +8,32 @@
 
 | Metric | Target | Actual | Status |
 |--------|--------|--------|--------|
-| Response accuracy | >80% | 100% | ✅ |
+| Correctness (LLM-judge, 100 kịch bản) | >80% | 85.53% (65/76 scored) | ✅ |
+| Safety (LLM-judge, 100 kịch bản) | >90% | 98.0% (98/100) | ✅ |
+| Faithfulness (citation grounding) | >80% | 91.3% (42/46 scored) | ✅ |
 | Response latency | <3s | 0.74s (Meal Plan), 0.02s (Interactions) | ✅ |
-| User satisfaction | >4/5 | 5/5 (clinical validation) | ✅ |
-| Test coverage | >60% | 100% (76/76 tests passed) | ✅ |
+| User satisfaction | >4/5 | 5/5 (clinical validation, n nhỏ) | ✅ |
+| Test coverage (unit/integration) | >60% | **445/445 pass** (39 file, chạy 2026-09-01) | ✅ |
+
+> Chi tiết đầy đủ theo category & breakdown: [`eval/results/llm_judge_report.md`](llm_judge_report.md). Ánh xạ test file ↔ spec: [`tasks/test/README.md`](../../tasks/test/README.md).
 
 ## 2. Test Results
 
 ### Unit & Integration Tests
 ```
-platform darwin -- Python 3.12.7, pytest-9.1.1, pluggy-1.6.0
-collected 76 items
+platform darwin -- Python 3.12, pytest
+collected 445 items (39 test file, backend/tests/)
 
-tests/test_api.py::test_health PASSED
-tests/test_api.py::test_register_login_flow PASSED
-tests/test_api.py::test_login_wrong_password PASSED
-tests/test_api.py::test_auth_required PASSED
-tests/test_api.py::test_profile_upsert_and_get PASSED
-tests/test_api.py::test_north_star_flow PASSED
-tests/test_api.py::test_interactions_check_persists_alerts PASSED
-tests/test_api.py::test_notification_actions PASSED
-tests/test_api.py::test_demo_simulate PASSED
-tests/test_api.py::test_dietitian_role_guard PASSED
-tests/test_api.py::test_chat_thin_wrapper PASSED
-tests/test_api.py::test_chat_empty_message_rejected PASSED
-tests/test_api.py::test_meal_plan_not_found PASSED
-tests/test_compliance_notification.py::test_materialize_from_meal_plan PASSED
-tests/test_compliance_notification.py::test_plan_approved_notification PASSED
-...
-tests/test_rag.py::TestNodes::test_intent_classifier_refuse PASSED
-======================= 76 passed in 20.48s =======================
+1 failed, 444 passed in 522.67s (0:08:42)
+FAILED tests/test_citation_chunks.py::test_maps_only_prompt_chunks
+  → nguyên nhân: test giả định RAG_PROMPT_CHUNK_LIMIT == 2, code đã tăng lên 3
+    (đợt cải thiện RAG faithfulness 2026-09-01) — test lỗi thời, không phải bug sản phẩm.
+  → đã sửa test khớp hành vi mới, chạy lại: PASSED
+
+======================= 445 passed, 0 failed =======================
 ```
+
+Bảng ánh xạ chi tiết spec ↔ test file: [`tasks/test/README.md`](../../tasks/test/README.md).
 
 ## 3. User Feedback
 
