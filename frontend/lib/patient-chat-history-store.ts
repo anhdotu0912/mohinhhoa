@@ -11,6 +11,7 @@ import type {
   MealPreviewOut,
   WeeklyComplianceOut,
   DoctorNoteOut,
+  MetricsDeltaAdviceOut,
 } from "@/lib/types";
 import type { ThinkingStep } from "@/components/patient/ChatThinkingSteps";
 
@@ -27,6 +28,7 @@ export interface ChatMessage {
   mealPreview?: MealPreviewOut | null;
   weeklyCompliance?: WeeklyComplianceOut | null;
   doctorNote?: DoctorNoteOut | null;
+  metricsDeltaAdvice?: MetricsDeltaAdviceOut | null;
   mealPlanWeek?: MealPlanOutput | null;
   showWeeklyPlan?: boolean;
   isStreaming?: boolean;
@@ -67,6 +69,7 @@ function apiMessageToLocal(message: ChatMessageOut): ChatMessage {
     mealPreview: message.meal_preview ?? null,
     weeklyCompliance: message.weekly_compliance ?? null,
     doctorNote: message.doctor_note ?? null,
+    metricsDeltaAdvice: message.metrics_delta_advice ?? null,
     mealPlanWeek: message.meal_plan_week ?? null,
     showWeeklyPlan: message.show_weekly_plan ?? false,
     thinkingSteps: (message.thinking_steps ?? []) as ThinkingStep[],
@@ -91,6 +94,7 @@ function localMessageToApi(message: ChatMessage): ChatMessageOut {
     meal_preview: message.mealPreview ?? null,
     weekly_compliance: message.weeklyCompliance ?? null,
     doctor_note: message.doctorNote ?? null,
+    metrics_delta_advice: message.metricsDeltaAdvice ?? null,
     meal_plan_week: message.mealPlanWeek ?? null,
     show_weekly_plan: message.showWeeklyPlan ?? false,
     thinking_steps: message.thinkingSteps ?? [],

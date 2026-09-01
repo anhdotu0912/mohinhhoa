@@ -110,7 +110,7 @@ export default function HomePage() {
                 <Link
                   href="/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full bg-[#0f766e] text-white font-semibold text-sm py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-[0.99]"
+                  className="w-full bg-[#0f766e] hover:bg-[#115e59] text-white font-semibold text-sm py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.99]"
                 >
                   <span>Bắt đầu miễn phí ngay</span>
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

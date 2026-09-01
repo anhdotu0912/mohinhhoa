@@ -1017,6 +1017,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 }
 // Response 200 → BodyMetricsEntry + optional delta_advice (MetricsDeltaAdviceOut)
 // delta_advice chỉ có khi lần ghi vượt ngưỡng so với bản ghi trước (cùng ngày: so với giá trị trước khi merge)
+// MetricsDeltaAdviceOut gồm field_deltas[] (mọi field đo được kèm before/after, kể cả delta nhỏ) — xem agent-io-schema v1.14
 // Error 400 METRICS_EMPTY — không có field nào
 ```
 
@@ -1119,7 +1120,8 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.22**.
+- Version hiện tại: **1.23**.
+- **Changelog 1.22 → 1.23 (2026-08-31):** `POST /metrics` / chat `metrics_delta_advice` — `MetricsDeltaAdviceOut` thêm `field_deltas[]` (mọi field đo được kèm `before`/`after`/`changed`, kể cả delta nhỏ dưới ngưỡng) để FE render bảng so sánh chỉ số trong chat. Không breaking — field mới optional default `[]`. Đồng bộ `contracts/agent-io-schema.md` v1.14, `specs/12`.
 - **Changelog 1.21 → 1.22 (2026-08-31):** `AgentRunOutput.citation_chunks[]` và `ChatMessageOut.citation_chunks[]` — đoạn RAG (`text`) đã dùng để gen câu chat. `citations[]` vẫn là id nguồn. Đồng bộ `contracts/agent-io-schema.md` v1.13. Không breaking.
 - **Changelog 1.20 → 1.21 (2026-08-31):** Chat escalation HITL — `POST/GET /chat/escalations`, `POST .../messages`; `GET/POST /doctor/escalations` + `.../resolve`. Notification type mới `escalation_sent` | `escalation_reply` (`related_ids.escalation_id`). `AgentRunOutput.unmatched_pairs[]` optional. `ChatMessageOut` thêm `unmatched_pairs[]`, `escalation_id`. Không breaking.
 - **Changelog 1.19 → 1.20 (2026-08-30):** thêm `GET /guidelines/{source_id}` (role `patient`|`doctor`) — đọc nội dung file guideline RAG hoặc ghi chú catalog khi click citation trên UI duyệt thực đơn. Không breaking.

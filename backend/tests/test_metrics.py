@@ -177,4 +177,50 @@ def test_record_metrics_delta_advice_when_weight_jumps(client):
     assert advice is not None
     assert "weight" in advice["changed_fields"]
     assert advice["message"]
+    weight_delta = next(d for d in advice.get("field_deltas", []) if d["field"] == "weight")
+    assert weight_delta["before"] == 70.0
+    assert weight_delta["after"] == 72.0
+    assert weight_delta["changed"] is True
 
+
+
+def test_build_metrics_delta_advice_first_record_no_false_comparison():
+    """Chat path (require_threshold=False): a single record must not claim a
+    change vs 'lần trước' — there is no previous record yet."""
+    from app.services.metrics_delta_advice import build_metrics_delta_advice
+
+    advice = build_metrics_delta_advice(
+        None,
+        {"weight": 70.0, "glucose_fasting": 8.5},
+        require_threshold=False,
+    )
+    assert advice is not None
+    assert "lần đầu" in advice.message
+    assert "70" in advice.message
+    assert "chưa đổi rõ" not in advice.message
+    assert advice.ask_doctor is True  # glucose 8.5 > 7.2 guideline
+    # field_deltas: every measured field, before=None (no baseline yet)
+    fields = {d.field: d for d in advice.field_deltas}
+    assert set(fields) == {"weight", "glucose_fasting"}
+    assert fields["weight"].before is None
+    assert fields["weight"].after == 70.0
+    assert fields["weight"].changed is False
+
+
+def test_build_metrics_delta_advice_no_change_includes_latest_values():
+    from app.services.metrics_delta_advice import build_metrics_delta_advice
+
+    advice = build_metrics_delta_advice(
+        {"weight": 70.0},
+        {"weight": 70.4},
+        require_threshold=False,
+    )
+    assert advice is not None
+    assert "chưa đổi rõ" in advice.message
+    assert "70.4" in advice.message
+    # small delta (below threshold) is still exposed for the UI
+    (weight_delta,) = advice.field_deltas
+    assert weight_delta.field == "weight"
+    assert weight_delta.before == 70.0
+    assert weight_delta.after == 70.4
+    assert weight_delta.changed is False

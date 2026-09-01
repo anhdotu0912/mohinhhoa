@@ -193,7 +193,7 @@ export function QueueDrawer() {
                       </span>
                       <button
                         onClick={() => handleNavigateReview(job.patientId)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-container transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 hover:underline transition-colors cursor-pointer"
                       >
                         <span>So sánh & Duyệt</span>
                         <span className="material-symbols-outlined text-[16px]">

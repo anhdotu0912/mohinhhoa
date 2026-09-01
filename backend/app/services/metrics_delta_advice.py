@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.body_metrics import BodyMetricsEntry
-from app.schemas.body_metrics import MetricsDeltaAdviceOut
+from app.schemas.body_metrics import FieldDeltaOut, MetricsDeltaAdviceOut
 from app.services.metrics_format import parse_blood_pressure, parse_glucose_mmol
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ THRESHOLDS: dict[str, float] = {
     "glucose_fasting": 1.0,
     "glucose_postprandial": 1.0,
     "systolic": 10.0,
+    "diastolic": 10.0,
     "waist_cm": 2.0,
     "hba1c": 0.3,
 }
@@ -31,6 +32,7 @@ FIELD_LABELS: dict[str, str] = {
     "glucose_fasting": "đường huyết lúc đói",
     "glucose_postprandial": "đường huyết sau ăn",
     "systolic": "huyết áp tâm thu",
+    "diastolic": "huyết áp tâm trương",
     "waist_cm": "vòng eo",
     "hba1c": "HbA1c",
 }
@@ -40,6 +42,7 @@ FIELD_UNITS: dict[str, str] = {
     "glucose_fasting": "mmol/L",
     "glucose_postprandial": "mmol/L",
     "systolic": "mmHg",
+    "diastolic": "mmHg",
     "waist_cm": "cm",
     "hba1c": "%",
 }
@@ -123,6 +126,83 @@ def _format_delta_line(field: str, previous: dict[str, Any], current: dict[str, 
     return f"{label} {before:g} → {after:g} {unit}"
 
 
+_CURRENT_VALUE_ORDER = [
+    "weight",
+    "systolic",
+    "glucose_fasting",
+    "glucose_postprandial",
+    "hba1c",
+    "waist_cm",
+]
+
+
+_DELTA_FIELD_ORDER = [
+    "weight",
+    "systolic",
+    "diastolic",
+    "glucose_fasting",
+    "glucose_postprandial",
+    "hba1c",
+    "waist_cm",
+]
+
+
+def build_field_deltas(
+    previous: dict[str, Any] | None,
+    current: dict[str, Any] | None,
+    changed_fields: list[str],
+) -> list[FieldDeltaOut]:
+    """All measured fields of the latest record, with before/after values.
+
+    Includes sub-threshold deltas so the UI can show small changes too.
+    `before` is None when the field is first recorded (no baseline).
+    """
+    if not current:
+        return []
+    deltas: list[FieldDeltaOut] = []
+    for field in _DELTA_FIELD_ORDER:
+        after = _num(current.get(field))
+        if after is None:
+            continue
+        before = _num(previous.get(field)) if previous else None
+        deltas.append(
+            FieldDeltaOut(
+                field=field,
+                label=FIELD_LABELS[field],
+                before=before,
+                after=after,
+                unit=FIELD_UNITS[field],
+                changed=field in changed_fields,
+            )
+        )
+    return deltas
+
+
+def _format_current_values(current: dict[str, Any]) -> str:
+    """One-line summary of the latest recorded values (labels + units)."""
+    parts: list[str] = []
+    for field in _CURRENT_VALUE_ORDER:
+        if field == "systolic":
+            sys_v = _num(current.get("systolic"))
+            if sys_v is None:
+                continue
+            dia_v = _num(current.get("diastolic"))
+            if dia_v is not None:
+                parts.append(f"huyết áp {sys_v:g}/{dia_v:g} {FIELD_UNITS['systolic']}")
+            else:
+                parts.append(
+                    f"{FIELD_LABELS['systolic']} {sys_v:g} {FIELD_UNITS['systolic']}"
+                )
+            continue
+        value = _num(current.get(field))
+        if value is None:
+            continue
+        parts.append(f"{FIELD_LABELS[field]} {value:g} {FIELD_UNITS[field]}")
+    if not parts:
+        return ""
+    return "Chỉ số gần nhất của bạn: " + "; ".join(parts) + "."
+
+
 def _template_message(
     changed: list[str],
     previous: dict[str, Any],
@@ -177,13 +257,29 @@ def build_metrics_delta_advice(
     changed = detect_changed_fields(previous, current)
     if require_threshold and not changed:
         return None
-    if not changed:
+    if previous is None:
+        values = _format_current_values(current)
+        base = f"{values} " if values else ""
         return MetricsDeltaAdviceOut(
             message=(
-                "Chỉ số mới nhất chưa đổi rõ so với lần trước. "
-                "Tiếp tục ghi nhận đều để theo dõi xu hướng."
+                f"{base}Bạn mới ghi nhận chỉ số lần đầu — hãy ghi nhận thêm vài "
+                "lần nữa để tôi nhận xét xu hướng."
             ),
             changed_fields=[],
+            field_deltas=build_field_deltas(previous, current, []),
+            citations=[],
+            ask_doctor=_outside_guideline(current),
+        )
+    if not changed:
+        values = _format_current_values(current)
+        base = f"{values} " if values else ""
+        return MetricsDeltaAdviceOut(
+            message=(
+                f"{base}Chỉ số mới nhất chưa đổi rõ so với lần trước; tiếp tục "
+                "ghi nhận đều để theo dõi xu hướng."
+            ),
+            changed_fields=[],
+            field_deltas=build_field_deltas(previous, current, []),
             citations=[],
             ask_doctor=_outside_guideline(current),
         )
@@ -194,6 +290,7 @@ def build_metrics_delta_advice(
     return MetricsDeltaAdviceOut(
         message=message,
         changed_fields=changed,
+        field_deltas=build_field_deltas(previous, current, changed),
         citations=[],
         ask_doctor=_outside_guideline(current),
     )

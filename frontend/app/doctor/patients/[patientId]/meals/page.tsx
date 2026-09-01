@@ -422,7 +422,7 @@ export default function PatientMealPlansListPage() {
                               className={`px-md py-1.5 rounded-lg font-body-bold text-xs font-semibold transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 ${
                                 plan.status === "approved" || plan.status === "edited"
                                   ? "bg-emerald-700 text-white hover:bg-emerald-800"
-                                  : "bg-primary text-on-primary hover:bg-primary-container"
+                                  : "bg-primary text-on-primary hover:bg-primary/90"
                               }`}
                             >
                               <span>So sánh & Xem</span>

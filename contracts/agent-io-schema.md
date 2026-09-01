@@ -351,17 +351,23 @@ meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_co
 
 **`WeeklyMealPlanCard` (FE, không intent mới):** câu "thực đơn tuần / xem thực đơn / lịch ăn 7 ngày" vẫn classify về `meal_plan` (mở rộng pattern classifier hiện có). FE gọi `GET /meal-plans/me` khi render card — **không** thêm intent riêng.
 
-**`metrics_delta_advice` — as-built (2026-08-26):** intent "lời khuyên khi chỉ số cơ thể đổi" (`specs/12`). Node so sánh 2 bản ghi gần nhất; nếu delta vượt ngưỡng (cân ≥1 kg, glucose ≥1 mmol/L, tâm thu ≥10 mmHg, vòng eo ≥2 cm, HbA1c ≥0.3 điểm) thì soạn 1–2 câu nhận xét quan sát + citation RAG nếu có. **HITL:** không chẩn đoán, không đổi thuốc/liều; `ask_doctor=true` khi chỉ số ngoài ngưỡng guideline T2DM hoặc câu trả lời bị guardrail. Field `metrics_delta_advice` populated khi intent khớp; `null` khi intent khác. Cùng schema được `POST /metrics` trả về optional `delta_advice` khi lần ghi vừa rồi vượt ngưỡng.
+**`metrics_delta_advice` — as-built (2026-08-26):** intent "lời khuyên khi chỉ số cơ thể đổi" (`specs/12`). Node so sánh 2 bản ghi gần nhất; nếu delta vượt ngưỡng (cân ≥1 kg, glucose ≥1 mmol/L, tâm thu/tâm trương ≥10 mmHg, vòng eo ≥2 cm, HbA1c ≥0.3 điểm) thì soạn 1–2 câu nhận xét quan sát + citation RAG nếu có. **HITL:** không chẩn đoán, không đổi thuốc/liều; `ask_doctor=true` khi chỉ số ngoài ngưỡng guideline T2DM hoặc câu trả lời bị guardrail. Field `metrics_delta_advice` populated khi intent khớp; `null` khi intent khác. Cùng schema được `POST /metrics` trả về optional `delta_advice` khi lần ghi vừa rồi vượt ngưỡng.
 
 ```json
 // MetricsDeltaAdviceOut
 {
   "message": "Cân nặng tăng 1.2 kg so với lần ghi trước. Đây là diễn biến cần theo dõi cùng bác sĩ — không phải chẩn đoán.",
   "changed_fields": ["weight"],
+  "field_deltas": [
+    { "field": "weight", "label": "cân nặng", "before": 70.0, "after": 71.2, "unit": "kg", "changed": true },
+    { "field": "glucose_fasting", "label": "đường huyết lúc đói", "before": 6.8, "after": 6.9, "unit": "mmol/L", "changed": false }
+  ],
   "citations": [],
   "ask_doctor": false
 }
 ```
+
+**`field_deltas[]` — as-built (2026-08-31):** mọi field đo được ở bản ghi mới nhất (`weight`, `systolic`, `diastolic`, `glucose_fasting`, `glucose_postprandial`, `hba1c`, `waist_cm`) kèm `before`/`after` — **kể cả delta nhỏ dưới ngưỡng** — để FE render bảng so sánh trong chat. `before = null` khi field mới ghi nhận lần đầu; `changed` = delta ≥ ngưỡng (`changed_fields`). Không breaking — field mới optional default `[]`.
 
 **`meal_preview` — optional:** populated khi intent = `meal_plan` và patient có thực đơn trong DB để hiển thị. FE dùng field này render UI bữa ăn trong chat. `null` khi không có plan hoặc intent khác.
 
@@ -445,7 +451,8 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.13**.
+- Version hiện tại của contract này: **1.14**.
+- **Changelog 1.13 → 1.14 (2026-08-31):** `MetricsDeltaAdviceOut` thêm `field_deltas[]` (optional, default `[]`) — mọi field đo được ở bản ghi mới nhất kèm `before`/`after`/`changed`, **kể cả delta nhỏ dưới ngưỡng**; `changed` theo `changed_fields`. Đồng bộ `contracts/api-v1.md` v1.23, `specs/12`. Không breaking — field mới optional default `[]`.
 - **Changelog 1.12 → 1.13 (2026-08-31):** `AgentRunOutput.citation_chunks[]` (optional, default `[]`) — đoạn RAG đã đưa vào prompt (`chunk_id`, `text`, `source`, `score`). `citations[]` giữ id nguồn. Đồng bộ `contracts/api-v1.md` v1.22. Không breaking.
 - **Changelog 1.11 → 1.12 (2026-08-31):** `AgentRunOutput.unmatched_pairs[]` (optional, default `[]`) — map từ `interaction_check` để chat hiện CTA hỏi bác sĩ khi KB không có cặp thuốc–thực phẩm. Đồng bộ `contracts/api-v1.md` v1.21. Không breaking.
 - **Changelog 1.10 → 1.11 (2026-08-29):** HITL ràng buộc lâm sàng — `PatientProfile` thêm `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` (optional, default `null`). `POST /profile` không còn ghi đè `target_kcal`/`restrictions`/`treatment_goals` hiệu lực; meal planner chỉ đọc giá trị đã duyệt. Đồng bộ `contracts/api-v1.md` v1.17, `specs/02`, `specs/04`. Không breaking — field mới optional, cột hiệu lực giữ nguyên shape.
