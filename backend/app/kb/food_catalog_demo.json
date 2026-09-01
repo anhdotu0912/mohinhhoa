@@ -1,0 +1,824 @@
+[
+  {
+    "id": "f_com_lut",
+    "name": "Cơm gạo lứt",
+    "portion": "1 chén (~150g)",
+    "kcal": 190,
+    "macros": {
+      "carb_g": 40,
+      "protein_g": 4,
+      "fat_g": 1.2,
+      "sodium_mg": 5,
+      "sugar_g": 1
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_com_lut_do",
+      "f_khoai_lang"
+    ]
+  },
+  {
+    "id": "f_com_lut_do",
+    "name": "Cơm gạo lứt đỏ",
+    "portion": "1 chén (~150g)",
+    "kcal": 185,
+    "macros": {
+      "carb_g": 38,
+      "protein_g": 4.2,
+      "fat_g": 1.4,
+      "sodium_mg": 5,
+      "sugar_g": 1
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_com_lut",
+      "f_yen_mach"
+    ]
+  },
+  {
+    "id": "f_banh_mi_cam",
+    "name": "Bánh mì nguyên cám",
+    "portion": "2 lát",
+    "kcal": 180,
+    "macros": {
+      "carb_g": 34,
+      "protein_g": 7,
+      "fat_g": 2,
+      "sodium_mg": 220,
+      "sugar_g": 2
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_yen_mach",
+      "f_com_lut"
+    ]
+  },
+  {
+    "id": "f_yen_mach",
+    "name": "Cháo yến mạch",
+    "portion": "1 bát (~250ml)",
+    "kcal": 220,
+    "macros": {
+      "carb_g": 38,
+      "protein_g": 8,
+      "fat_g": 4,
+      "sodium_mg": 40,
+      "sugar_g": 2
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_banh_mi_cam",
+      "f_khoai_lang"
+    ]
+  },
+  {
+    "id": "f_bun_gao_lut",
+    "name": "Bún gạo lứt",
+    "portion": "1 tô vừa",
+    "kcal": 210,
+    "macros": {
+      "carb_g": 44,
+      "protein_g": 5,
+      "fat_g": 1,
+      "sodium_mg": 15,
+      "sugar_g": 1
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_com_lut",
+      "f_bun_tuoi"
+    ]
+  },
+  {
+    "id": "f_bun_tuoi",
+    "name": "Bún tươi",
+    "portion": "1 tô vừa",
+    "kcal": 200,
+    "macros": {
+      "carb_g": 44,
+      "protein_g": 4,
+      "fat_g": 0.5,
+      "sodium_mg": 20,
+      "sugar_g": 1
+    },
+    "category": "tinh_bot",
+    "tags": [],
+    "alternative_ids": [
+      "f_bun_gao_lut",
+      "f_com_lut"
+    ]
+  },
+  {
+    "id": "f_pho_ga",
+    "name": "Phở gà ít béo (nước dùng trong)",
+    "portion": "1 tô vừa",
+    "kcal": 280,
+    "macros": {
+      "carb_g": 42,
+      "protein_g": 18,
+      "fat_g": 5,
+      "sodium_mg": 480,
+      "sugar_g": 2
+    },
+    "category": "tinh_bot",
+    "tags": [],
+    "alternative_ids": [
+      "f_yen_mach",
+      "f_bun_gao_lut"
+    ]
+  },
+  {
+    "id": "f_khoai_lang",
+    "name": "Khoai lang luộc",
+    "portion": "1 củ vừa (~150g)",
+    "kcal": 130,
+    "macros": {
+      "carb_g": 30,
+      "protein_g": 2,
+      "fat_g": 0.2,
+      "sodium_mg": 8,
+      "sugar_g": 2
+    },
+    "category": "tinh_bot",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_com_lut",
+      "f_yen_mach"
+    ]
+  },
+  {
+    "id": "f_uc_ga",
+    "name": "Ức gà luộc",
+    "portion": "100g",
+    "kcal": 150,
+    "macros": {
+      "carb_g": 0,
+      "protein_g": 28,
+      "fat_g": 3.2,
+      "sodium_mg": 55,
+      "sugar_g": 0
+    },
+    "category": "thit",
+    "tags": [],
+    "alternative_ids": [
+      "f_ga_hap",
+      "f_thit_heo_than"
+    ]
+  },
+  {
+    "id": "f_ga_hap",
+    "name": "Gà hấp gừng sả",
+    "portion": "100g",
+    "kcal": 160,
+    "macros": {
+      "carb_g": 1,
+      "protein_g": 26,
+      "fat_g": 5,
+      "sodium_mg": 70,
+      "sugar_g": 0
+    },
+    "category": "thit",
+    "tags": [],
+    "alternative_ids": [
+      "f_uc_ga",
+      "f_dau_hu_hap"
+    ]
+  },
+  {
+    "id": "f_thit_heo_than",
+    "name": "Thịt heo thăn luộc",
+    "portion": "80g",
+    "kcal": 170,
+    "macros": {
+      "carb_g": 0,
+      "protein_g": 24,
+      "fat_g": 7,
+      "sodium_mg": 60,
+      "sugar_g": 0
+    },
+    "category": "thit",
+    "tags": [],
+    "alternative_ids": [
+      "f_uc_ga",
+      "f_ga_hap"
+    ]
+  },
+  {
+    "id": "f_thit_bo_nac",
+    "name": "Thịt bò nạc xào",
+    "portion": "80g",
+    "kcal": 185,
+    "macros": {
+      "carb_g": 2,
+      "protein_g": 22,
+      "fat_g": 9,
+      "sodium_mg": 90,
+      "sugar_g": 0
+    },
+    "category": "thit",
+    "tags": [],
+    "alternative_ids": [
+      "f_uc_ga",
+      "f_thit_heo_than"
+    ]
+  },
+  {
+    "id": "f_ca_basa",
+    "name": "Cá basa hấp",
+    "portion": "100g",
+    "kcal": 170,
+    "macros": {
+      "carb_g": 0,
+      "protein_g": 20,
+      "fat_g": 9,
+      "sodium_mg": 70,
+      "sugar_g": 0
+    },
+    "category": "hai_san",
+    "tags": [],
+    "alternative_ids": [
+      "f_ca_loc",
+      "f_uc_ga"
+    ]
+  },
+  {
+    "id": "f_ca_hoi",
+    "name": "Cá hồi áp chảo",
+    "portion": "100g",
+    "kcal": 200,
+    "macros": {
+      "carb_g": 0,
+      "protein_g": 22,
+      "fat_g": 12,
+      "sodium_mg": 55,
+      "sugar_g": 0
+    },
+    "category": "hai_san",
+    "tags": [],
+    "alternative_ids": [
+      "f_ca_basa",
+      "f_ca_loc"
+    ]
+  },
+  {
+    "id": "f_ca_loc",
+    "name": "Cá lóc hấp bầu",
+    "portion": "100g",
+    "kcal": 165,
+    "macros": {
+      "carb_g": 2,
+      "protein_g": 24,
+      "fat_g": 6,
+      "sodium_mg": 65,
+      "sugar_g": 0
+    },
+    "category": "hai_san",
+    "tags": [],
+    "alternative_ids": [
+      "f_ca_basa",
+      "f_uc_ga"
+    ]
+  },
+  {
+    "id": "f_tom_luoc",
+    "name": "Tôm luộc",
+    "portion": "80g",
+    "kcal": 110,
+    "macros": {
+      "carb_g": 1,
+      "protein_g": 22,
+      "fat_g": 1.5,
+      "sodium_mg": 140,
+      "sugar_g": 0
+    },
+    "category": "hai_san",
+    "tags": [
+      "allergen-shellfish"
+    ],
+    "alternative_ids": [
+      "f_uc_ga",
+      "f_dau_hu_hap"
+    ]
+  },
+  {
+    "id": "f_dau_hu_sot",
+    "name": "Đậu hũ sốt cà",
+    "portion": "100g",
+    "kcal": 120,
+    "macros": {
+      "carb_g": 8,
+      "protein_g": 10,
+      "fat_g": 6,
+      "sodium_mg": 180,
+      "sugar_g": 2
+    },
+    "category": "dau",
+    "tags": [
+      "allergen-soy"
+    ],
+    "alternative_ids": [
+      "f_dau_hu_hap",
+      "f_uc_ga"
+    ]
+  },
+  {
+    "id": "f_dau_hu_hap",
+    "name": "Đậu hũ hấp",
+    "portion": "100g",
+    "kcal": 90,
+    "macros": {
+      "carb_g": 3,
+      "protein_g": 9,
+      "fat_g": 5,
+      "sodium_mg": 15,
+      "sugar_g": 0
+    },
+    "category": "dau",
+    "tags": [
+      "allergen-soy"
+    ],
+    "alternative_ids": [
+      "f_dau_hu_sot",
+      "f_ga_hap"
+    ]
+  },
+  {
+    "id": "f_dau_phu_luoc",
+    "name": "Đậu phụ luộc",
+    "portion": "100g",
+    "kcal": 85,
+    "macros": {
+      "carb_g": 2,
+      "protein_g": 9,
+      "fat_g": 4.5,
+      "sodium_mg": 12,
+      "sugar_g": 0
+    },
+    "category": "dau",
+    "tags": [
+      "allergen-soy"
+    ],
+    "alternative_ids": [
+      "f_dau_hu_hap",
+      "f_dau_hu_sot"
+    ]
+  },
+  {
+    "id": "f_trung_luoc",
+    "name": "Trứng luộc",
+    "portion": "1 quả",
+    "kcal": 70,
+    "macros": {
+      "carb_g": 1,
+      "protein_g": 6,
+      "fat_g": 5,
+      "sodium_mg": 60,
+      "sugar_g": 0
+    },
+    "category": "trung_sua",
+    "tags": [],
+    "alternative_ids": [
+      "f_trung_op_la",
+      "f_sua_chua"
+    ]
+  },
+  {
+    "id": "f_trung_op_la",
+    "name": "Trứng ốp la",
+    "portion": "1 quả",
+    "kcal": 90,
+    "macros": {
+      "carb_g": 1,
+      "protein_g": 6,
+      "fat_g": 7,
+      "sodium_mg": 80,
+      "sugar_g": 0
+    },
+    "category": "trung_sua",
+    "tags": [],
+    "alternative_ids": [
+      "f_trung_luoc",
+      "f_sua_chua"
+    ]
+  },
+  {
+    "id": "f_sua_chua",
+    "name": "Sữa chua không đường",
+    "portion": "1 hũ (~100g)",
+    "kcal": 80,
+    "macros": {
+      "carb_g": 6,
+      "protein_g": 5,
+      "fat_g": 3.5,
+      "sodium_mg": 50,
+      "sugar_g": 4
+    },
+    "category": "trung_sua",
+    "tags": [],
+    "alternative_ids": [
+      "f_sua_tuoi",
+      "f_oi"
+    ]
+  },
+  {
+    "id": "f_sua_tuoi",
+    "name": "Sữa tươi không đường",
+    "portion": "200ml",
+    "kcal": 90,
+    "macros": {
+      "carb_g": 9,
+      "protein_g": 6,
+      "fat_g": 3.5,
+      "sodium_mg": 80,
+      "sugar_g": 9
+    },
+    "category": "trung_sua",
+    "tags": [],
+    "alternative_ids": [
+      "f_sua_chua",
+      "f_trung_luoc"
+    ]
+  },
+  {
+    "id": "f_rau_muong",
+    "name": "Rau muống luộc",
+    "portion": "1 đĩa",
+    "kcal": 25,
+    "macros": {
+      "carb_g": 3,
+      "protein_g": 2,
+      "fat_g": 0.2,
+      "sodium_mg": 15,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_rau_ngot",
+      "f_cai_bo_xoi"
+    ]
+  },
+  {
+    "id": "f_rau_ngot",
+    "name": "Rau ngót luộc",
+    "portion": "1 đĩa",
+    "kcal": 20,
+    "macros": {
+      "carb_g": 3,
+      "protein_g": 2,
+      "fat_g": 0.1,
+      "sodium_mg": 10,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_rau_cu",
+      "f_cai_bo_xoi"
+    ]
+  },
+  {
+    "id": "f_bong_cai",
+    "name": "Bông cải xanh luộc",
+    "portion": "1 đĩa",
+    "kcal": 30,
+    "macros": {
+      "carb_g": 5,
+      "protein_g": 2.5,
+      "fat_g": 0.3,
+      "sodium_mg": 20,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_mang_tay",
+      "f_rau_ngot"
+    ]
+  },
+  {
+    "id": "f_mang_tay",
+    "name": "Măng tây luộc",
+    "portion": "1 đĩa",
+    "kcal": 25,
+    "macros": {
+      "carb_g": 4,
+      "protein_g": 2.2,
+      "fat_g": 0.2,
+      "sodium_mg": 8,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_bong_cai",
+      "f_rau_cu"
+    ]
+  },
+  {
+    "id": "f_cai_bo_xoi",
+    "name": "Cải bó xôi xào tỏi",
+    "portion": "1 đĩa",
+    "kcal": 35,
+    "macros": {
+      "carb_g": 4,
+      "protein_g": 3,
+      "fat_g": 1,
+      "sodium_mg": 40,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_rau_ngot",
+      "f_bong_cai"
+    ]
+  },
+  {
+    "id": "f_bau",
+    "name": "Bầu luộc",
+    "portion": "1 đĩa",
+    "kcal": 15,
+    "macros": {
+      "carb_g": 3,
+      "protein_g": 0.8,
+      "fat_g": 0.1,
+      "sodium_mg": 5,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_rau_ngot",
+      "f_rau_cu"
+    ]
+  },
+  {
+    "id": "f_rau_cu",
+    "name": "Rau củ luộc thập cẩm",
+    "portion": "1 đĩa",
+    "kcal": 40,
+    "macros": {
+      "carb_g": 8,
+      "protein_g": 2,
+      "fat_g": 0.3,
+      "sodium_mg": 18,
+      "sugar_g": 1
+    },
+    "category": "rau",
+    "tags": [],
+    "alternative_ids": [
+      "f_bong_cai",
+      "f_mang_tay"
+    ]
+  },
+  {
+    "id": "f_oi",
+    "name": "Ổi",
+    "portion": "1 quả vừa",
+    "kcal": 50,
+    "macros": {
+      "carb_g": 12,
+      "protein_g": 1,
+      "fat_g": 0.5,
+      "sodium_mg": 2,
+      "sugar_g": 8
+    },
+    "category": "trai_cay",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_tao",
+      "f_le"
+    ]
+  },
+  {
+    "id": "f_tao",
+    "name": "Táo",
+    "portion": "1 quả vừa",
+    "kcal": 55,
+    "macros": {
+      "carb_g": 14,
+      "protein_g": 0.3,
+      "fat_g": 0.2,
+      "sodium_mg": 1,
+      "sugar_g": 11
+    },
+    "category": "trai_cay",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_oi",
+      "f_le"
+    ]
+  },
+  {
+    "id": "f_du_du",
+    "name": "Đu đủ chín",
+    "portion": "1 miếng (~150g)",
+    "kcal": 60,
+    "macros": {
+      "carb_g": 15,
+      "protein_g": 0.6,
+      "fat_g": 0.2,
+      "sodium_mg": 3,
+      "sugar_g": 9
+    },
+    "category": "trai_cay",
+    "tags": [],
+    "alternative_ids": [
+      "f_oi",
+      "f_tao"
+    ]
+  },
+  {
+    "id": "f_le",
+    "name": "Lê",
+    "portion": "1 quả vừa",
+    "kcal": 50,
+    "macros": {
+      "carb_g": 13,
+      "protein_g": 0.4,
+      "fat_g": 0.1,
+      "sodium_mg": 1,
+      "sugar_g": 10
+    },
+    "category": "trai_cay",
+    "tags": [
+      "diabetes-friendly"
+    ],
+    "alternative_ids": [
+      "f_tao",
+      "f_oi"
+    ]
+  },
+  {
+    "id": "f_cherry",
+    "name": "Cherry",
+    "portion": "10 quả",
+    "kcal": 45,
+    "macros": {
+      "carb_g": 11,
+      "protein_g": 0.8,
+      "fat_g": 0.2,
+      "sodium_mg": 0,
+      "sugar_g": 8
+    },
+    "category": "trai_cay",
+    "tags": [],
+    "alternative_ids": [
+      "f_oi",
+      "f_tao"
+    ]
+  },
+  {
+    "id": "f_canh_rau_ngot",
+    "name": "Canh rau ngót",
+    "portion": "1 bát",
+    "kcal": 40,
+    "macros": {
+      "carb_g": 4,
+      "protein_g": 3,
+      "fat_g": 1,
+      "sodium_mg": 180,
+      "sugar_g": 1
+    },
+    "category": "canh",
+    "tags": [],
+    "alternative_ids": [
+      "f_canh_bi_dao",
+      "f_canh_cai"
+    ]
+  },
+  {
+    "id": "f_canh_bi_dao",
+    "name": "Canh bí đao",
+    "portion": "1 bát",
+    "kcal": 35,
+    "macros": {
+      "carb_g": 6,
+      "protein_g": 1.5,
+      "fat_g": 0.5,
+      "sodium_mg": 160,
+      "sugar_g": 1
+    },
+    "category": "canh",
+    "tags": [],
+    "alternative_ids": [
+      "f_canh_rau_ngot",
+      "f_canh_cai"
+    ]
+  },
+  {
+    "id": "f_canh_cai",
+    "name": "Canh cải xanh",
+    "portion": "1 bát",
+    "kcal": 30,
+    "macros": {
+      "carb_g": 4,
+      "protein_g": 2,
+      "fat_g": 0.5,
+      "sodium_mg": 150,
+      "sugar_g": 1
+    },
+    "category": "canh",
+    "tags": [],
+    "alternative_ids": [
+      "f_canh_bi_dao",
+      "f_canh_rau_ngot"
+    ]
+  },
+  {
+    "id": "f_canh_ga_nam",
+    "name": "Canh gà nấm",
+    "portion": "1 bát",
+    "kcal": 80,
+    "macros": {
+      "carb_g": 4,
+      "protein_g": 8,
+      "fat_g": 3,
+      "sodium_mg": 220,
+      "sugar_g": 1
+    },
+    "category": "canh",
+    "tags": [],
+    "alternative_ids": [
+      "f_canh_rau_ngot",
+      "f_canh_bi_dao"
+    ]
+  },
+  {
+    "id": "f_nuoc_loc",
+    "name": "Nước lọc",
+    "portion": "1 ly",
+    "kcal": 0,
+    "macros": {
+      "carb_g": 0,
+      "protein_g": 0,
+      "fat_g": 0,
+      "sodium_mg": 0,
+      "sugar_g": 0
+    },
+    "category": "do_uong",
+    "tags": [],
+    "alternative_ids": [
+      "f_tra_xanh"
+    ]
+  },
+  {
+    "id": "f_tra_xanh",
+    "name": "Trà xanh không đường",
+    "portion": "1 ly",
+    "kcal": 2,
+    "macros": {
+      "carb_g": 0.4,
+      "protein_g": 0,
+      "fat_g": 0,
+      "sodium_mg": 1,
+      "sugar_g": 0
+    },
+    "category": "do_uong",
+    "tags": [],
+    "alternative_ids": [
+      "f_nuoc_loc"
+    ]
+  },
+  {
+    "id": "f_hat_hanh_nhan",
+    "name": "Hạt hạnh nhân",
+    "portion": "15g",
+    "kcal": 90,
+    "macros": {
+      "carb_g": 3,
+      "protein_g": 3,
+      "fat_g": 8,
+      "sodium_mg": 1,
+      "sugar_g": 1
+    },
+    "category": "trai_cay",
+    "tags": [],
+    "alternative_ids": [
+      "f_oi",
+      "f_sua_chua"
+    ]
+  }
+]

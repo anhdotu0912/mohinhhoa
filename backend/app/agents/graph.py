@@ -1,0 +1,725 @@
+"""LangGraph agent graph — compiles the full agent workflow.
+
+Flow: profile_loader → intent_classifier → conditional routing →
+      (rag_qa / meal_plan / interaction_check / refuse) → apply_guardrails
+
+Provides `run_agent()` facade function for BE2 to call.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Literal
+
+from langgraph.graph import END, StateGraph
+
+from app.agents.nodes.intent_classifier import intent_classifier
+from app.agents.nodes.profile_loader import profile_loader
+from app.agents.nodes.rag_tool import RAG_PROMPT_CHUNK_LIMIT, rag_qa_node
+from app.agents.state import AgentState
+from app.guardrails.rules import enforce_output_safety, get_refuse_message
+from app.guardrails.source_check import enforce_citation_guardrail
+from app.schemas.meal_plan import (
+    AgentRunInput,
+    AgentRunOutput,
+    CitationChunk,
+    DoctorNoteOut,
+    MealPreviewOut,
+    MetricsDeltaAdviceOut,
+    WeeklyComplianceOut,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _generate_allergy_blocked_answer(
+    message: str,
+    medications: list[str],
+    foods: list[str],
+    matched_allergies: list[str],
+    interactions: list,
+) -> str:
+    """Generate a clear, medically safe response when queried food is blocked by patient's allergy."""
+    meds_str = ", ".join(m.capitalize() for m in medications) or "thuốc điều trị hiện tại"
+    food_names_str = ", ".join(f.capitalize() for f in foods)
+    allergy_names_str = ", ".join(a.capitalize() for a in matched_allergies)
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            prompt = (
+                f"Bạn là chuyên gia an toàn dinh dưỡng y tế và sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
+                f"Bệnh nhân có tiền sử DỊ ỨNG: [{allergy_names_str}].\n"
+                f"Thuốc bệnh nhân đang dùng: [{meds_str}].\n"
+                f"Câu hỏi của bệnh nhân: \"{message}\"\n"
+                f"Thực phẩm được hỏi: [{food_names_str}] thuộc nhóm dị ứng [{allergy_names_str}].\n\n"
+                "YÊU CẦU BẮT BUỘC (TUYỆT ĐỐI KHÔNG TỰ MÂU THUẪN, KHÔNG NÓI AN TOÀN KHI ĐÃ BỊ DỊ ỨNG):\n"
+                "1. Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man (như 'Chào bạn, cảm ơn bạn...', 'Dựa trên kết quả...').\n"
+                "2. TUYỆT ĐỐI KHÔNG dùng đường kẻ `---`.\n"
+                "3. Cấu trúc đúng 3 phần rõ ràng, cách nhau bởi 1 dòng trống (double newline):\n\n"
+                f"🚫 **KHÔNG NÊN ĂN (Cảnh báo dị ứng):**\n"
+                f"• Khẳng định rõ {food_names_str} thuộc nhóm dị ứng {allergy_names_str} trong hồ sơ của bạn. Tuyệt đối không nên ăn/dùng để tránh nguy cơ dị ứng hoặc sốc phản vệ.\n\n"
+                f"💊 **Về thuốc đang sử dụng ({meds_str}):**\n"
+                f"• Giải thích ngắn gọn: Mặc dù {food_names_str} không có tương tác hóa học xấu với {meds_str}, nhưng do yếu tố dị ứng nên bạn bắt buộc phải kiêng hoàn toàn.\n\n"
+                f"💡 **Gợi ý thực phẩm thay thế an toàn:**\n"
+                f"• Đưa ra 2-3 nguồn thực phẩm lành mạnh thay thế giàu dinh dưỡng (đạm, chất béo tốt) an toàn cho người đái tháo đường và không gây dị ứng {allergy_names_str} (ví dụ: thịt ức gà, thịt nạc, trứng, đậu phụ, quả bơ, dầu thực vật, hạt chia...).\n\n"
+                "Trình bày khoa học, súc tích, định dạng markdown chuẩn."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM allergy blocked answer generation failed: %s", e)
+
+    return (
+        f"🚫 **KHÔNG NÊN ĂN (Cảnh báo dị ứng):**\n"
+        f"• Hồ sơ của bạn ghi nhận tiền sử dị ứng **{allergy_names_str}**, trong khi **{food_names_str}** thuộc nhóm này. Bạn **tuyệt đối không nên ăn** để tránh nguy cơ dị ứng hoặc sốc phản vệ.\n\n"
+        f"💊 **Về thuốc đang sử dụng ({meds_str}):**\n"
+        f"• Mặc dù {food_names_str} không ghi nhận tương tác nguy hiểm với thuốc bạn đang dùng, nhưng vì lý do dị ứng nên bạn **bắt buộc phải kiêng hoàn toàn**.\n\n"
+        f"💡 **Gợi ý thực phẩm thay thế an toàn:**\n"
+        f"• **Bổ sung chất đạm:** Thịt ức gà, thịt nạc lợn, trứng, đậu phụ.\n"
+        f"• **Bổ sung chất béo tốt:** Quả bơ, dầu ô liu, hạt chia, hạt óc chó."
+    )
+
+
+def _generate_unmatched_kb_answer(
+    message: str,
+    medications: list[str],
+    foods: list[str],
+    unmatched_pairs: list,
+) -> str:
+    """Generate an honest response when queried drug-food pairs have no KB match.
+
+    Never claim a confirmed safety verdict here — the KB genuinely has no data
+    for these pairs, so the answer must say so explicitly instead of asserting
+    "đã tra cứu y khoa xác nhận an toàn" (that was the hallucination bug this
+    function replaces: absence of a KB match is not proof of safety).
+    """
+    meds_str = ", ".join(m.capitalize() for m in medications)
+    food_names_str = ", ".join(foods)
+    pairs_str = ", ".join(
+        f"{p.drug.capitalize()} + {p.food}" for p in unmatched_pairs
+    ) or f"{meds_str} + {food_names_str}"
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            prompt = (
+                f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
+                f"Thuốc bệnh nhân đang dùng: {meds_str}.\n"
+                f"Câu hỏi của bệnh nhân: \"{message}\"\n"
+                f"Kết quả tra cứu: cơ sở dữ liệu tương tác thuốc-thực phẩm nội bộ KHÔNG có dữ liệu cho cặp {pairs_str}.\n\n"
+                "YÊU CẦU BẮT BUỘC (TUYỆT ĐỐI KHÔNG BỊA KẾT LUẬN AN TOÀN KHI KHÔNG CÓ DỮ LIỆU):\n"
+                "- Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man.\n"
+                "- TUYỆT ĐỐI KHÔNG dùng đường kẻ `---`.\n"
+                "- TUYỆT ĐỐI KHÔNG khẳng định 'an toàn', 'đã xác nhận', 'tra cứu y khoa xác nhận không có tương tác' — vì thực tế KHÔNG có dữ liệu để kết luận.\n"
+                "- Trình bày KHOA HỌC, ngắn gọn theo 3 mục rõ ràng, cách nhau bởi 1 dòng trống (double newline):\n\n"
+                f"1. ⚠️ **Chưa đủ dữ liệu xác nhận:** Nêu rõ cơ sở dữ liệu tương tác thuốc-thực phẩm hiện chưa có thông tin cụ thể cho {pairs_str}, nên KHÔNG thể khẳng định an toàn tuyệt đối.\n"
+                f"2. 🥗 **Giá trị dinh dưỡng chung:** Nêu 1-2 điểm nổi bật về {food_names_str} (chỉ số đường huyết GI, chất xơ, đạm...), không liên quan đến thuốc.\n"
+                f"3. 💡 **Khuyến nghị:** Nên hỏi bác sĩ hoặc dược sĩ điều trị để xác nhận cụ thể trước khi dùng, đặc biệt vì đang dùng {meds_str}."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM unmatched KB answer generation failed: %s", e)
+
+    return (
+        f"⚠️ **Chưa đủ dữ liệu xác nhận:** Cơ sở dữ liệu tương tác thuốc-thực phẩm hiện chưa có thông tin cụ thể cho **{pairs_str}**. "
+        f"Chúng tôi KHÔNG thể khẳng định an toàn tuyệt đối chỉ dựa trên việc không tìm thấy dữ liệu.\n\n"
+        f"🥗 **Giá trị dinh dưỡng chung:** {food_names_str.capitalize()} là thực phẩm phổ biến trong chế độ ăn, nhưng mức độ phù hợp còn tùy tình trạng bệnh lý cụ thể.\n\n"
+        f"💡 **Khuyến nghị:**\n"
+        f"• Hỏi bác sĩ hoặc dược sĩ điều trị để xác nhận cụ thể trước khi dùng, đặc biệt vì bạn đang dùng {meds_str}.\n"
+        f"• Theo dõi phản ứng cơ thể sau khi ăn nếu vẫn sử dụng."
+    )
+
+
+def _generate_clinical_refusal(
+    message: str,
+    profile: dict | None = None,
+    danger_hint: str | None = None,
+) -> str:
+    """Generate a content-rich escalation message for `refuse` intent.
+
+    Replaces the old static REFUSE_MESSAGE-only behavior: explains the relevant
+    clinical mechanism/risk (general medical knowledge — not a RAG citation claim,
+    so the Faithfulness rule doesn't apply here) and always ends with a clear
+    doctor referral. Never proposes a specific drug/dose change or a detailed
+    personalized meal plan for the dangerous scenario — apply_guardrails'
+    enforce_output_safety still runs on this output as a safety net regardless.
+    """
+    diseases = ", ".join(profile.get("disease", [])) if profile else ""
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            hint_line = (
+                f"Nguy cơ lâm sàng cụ thể đã phát hiện: {danger_hint}\n"
+                if danger_hint
+                else ""
+            )
+            prompt = (
+                "Bạn là trợ lý dinh dưỡng y tế cho bệnh nhân đái tháo đường & bệnh mạn tính. "
+                "Bệnh nhân vừa hỏi 1 câu cần ĐƯỢC TỪ CHỐI TRẢ LỜI TRỰC TIẾP vì vượt quá phạm vi an toàn "
+                "(cần bác sĩ đánh giá/quyết định), KHÔNG phải một câu hỏi dinh dưỡng thông thường.\n"
+                f"Bệnh nền: {diseases or 'không rõ'}.\n"
+                f"{hint_line}"
+                f'Câu hỏi của bệnh nhân: "{message}"\n\n'
+                "YÊU CẦU BẮT BUỘC:\n"
+                "1. Giải thích NGẮN GỌN (2-4 câu) tại sao đây là tình huống cần bác sĩ — nêu cơ chế/nguy cơ lâm sàng liên quan "
+                "nếu bạn biết (kiến thức y khoa chung, không cần trích nguồn).\n"
+                "2. TUYỆT ĐỐI KHÔNG đề xuất đổi thuốc, chỉnh liều lượng, hoặc chẩn đoán xác định.\n"
+                "3. TUYỆT ĐỐI KHÔNG đưa kế hoạch ăn uống chi tiết cá nhân hoá (không cho gram/kcal/khẩu phần cụ thể) cho tình huống nguy hiểm này.\n"
+                "4. CÓ THỂ nêu 1 nguyên tắc an toàn chung đã được y văn công nhận rộng rãi nếu liên quan trực tiếp (ví dụ tốc độ giảm cân an toàn 0.5-1kg/tuần), nhưng không thay thế cho việc gặp bác sĩ.\n"
+                "5. LUÔN kết thúc bằng khuyến nghị rõ ràng: gặp bác sĩ/chuyên khoa phù hợp (ghi rõ chuyên khoa nếu xác định được, ví dụ bác sĩ sản khoa, bác sĩ nội tiết, bác sĩ tim mạch).\n"
+                "6. Đi thẳng vào nội dung, không chào hỏi lan man. Định dạng markdown ngắn gọn, súc tích."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM clinical refusal generation failed: %s", e)
+
+    return get_refuse_message()
+
+
+def meal_plan_node(state: AgentState) -> AgentState:
+    """Read-only meal plan view — delegated to primitive skill get_patient_meal_plan with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, get_patient_meal_plan
+
+    lean = get_lean_state_for_intent(state, "meal_plan")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    message = lean.get("message", "")
+
+    preview, answer, citations, meal_plan_id = get_patient_meal_plan(db, user_id, message)
+    return {
+        **state,
+        "answer": answer,
+        "meal_preview": preview.model_dump(mode="json") if preview else None,
+        "meal_plan_id": meal_plan_id,
+        "meal_plan": None,
+        "citations": citations,
+    }
+
+
+def interaction_check_node(state: AgentState) -> AgentState:
+    """InteractionChecker node — delegated to primitive skill check_drug_food_interaction with state pruning."""
+    from app.agents.skills import check_drug_food_interaction, get_lean_state_for_intent
+
+    lean = get_lean_state_for_intent(state, "interaction_check")
+    medications = lean.get("medications") or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
+    allergies = lean.get("allergies") or []
+    message = lean.get("message", "")
+    user_id = lean.get("user_id")
+    db = lean.get("db")
+
+    try:
+        res = check_drug_food_interaction(
+            message=message,
+            medications=medications,
+            allergies=allergies,
+            user_id=user_id,
+            db=db,
+        )
+        return {
+            **state,
+            "answer": res["answer"],
+            "interactions": res["interactions"],
+            "citations": res["citations"],
+        }
+    except Exception as e:
+        logger.error("Interaction check failed: %s", e, exc_info=True)
+        return {
+            **state,
+            "answer": f"Lỗi khi kiểm tra tương tác: {str(e)}",
+            "interactions": None,
+            "errors": state.get("errors", []) + [str(e)],
+        }
+
+
+def food_log_node(state: AgentState) -> AgentState:
+    """Summarize recent food logs — delegated to primitive skill log_food_adherence with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, log_food_adherence
+
+    lean = get_lean_state_for_intent(state, "food_log")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, log_info = log_food_adherence(db, user_id, limit=4)
+    return {
+        **state,
+        "answer": answer,
+        "food_log": log_info,
+    }
+
+
+def weekly_compliance_node(state: AgentState) -> AgentState:
+    """Summarize patient weekly adherence — delegated to primitive skill get_weekly_adherence_summary with state pruning."""
+    from app.agents.skills import get_lean_state_for_intent, get_weekly_adherence_summary
+
+    lean = get_lean_state_for_intent(state, "weekly_compliance")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, weekly = get_weekly_adherence_summary(db, user_id, days=7)
+    return {
+        **state,
+        "answer": answer,
+        "weekly_compliance": weekly.model_dump(mode="json") if weekly else None,
+    }
+
+
+def greeting_node(state: AgentState) -> AgentState:
+    """Handle greetings, introductions, thanks, and polite chit-chat — delegated to utility skill chit_chat_greeting."""
+    from app.agents.skills import chit_chat_greeting, get_lean_state_for_intent
+
+    lean = get_lean_state_for_intent(state, "greeting")
+    message = lean.get("message", "")
+    diseases = lean.get("disease", [])
+    answer = chit_chat_greeting(message, diseases=diseases)
+    return {
+        **state,
+        "answer": answer,
+        "citations": [],
+    }
+
+
+def doctor_note_node(state: AgentState) -> AgentState:
+    """Load assigned doctor's manual_reminder list — delegated to primitive skill get_doctor_notes with state pruning."""
+    from app.agents.skills import get_doctor_notes, get_lean_state_for_intent
+
+    lean = get_lean_state_for_intent(state, "doctor_note")
+    db = lean.get("db")
+    user_id = lean.get("user_id", "")
+    answer, doctor_note = get_doctor_notes(db, user_id)
+    return {
+        **state,
+        "answer": answer,
+        "doctor_note": doctor_note.model_dump(mode="json") if doctor_note else None,
+    }
+
+
+def metrics_delta_advice_node(state: AgentState) -> AgentState:
+    """Observational comment when body metrics change — HITL, no diagnosis."""
+    db = state.get("db")
+    user_id = state.get("user_id", "")
+    if db is None or not user_id:
+        return {
+            **state,
+            "answer": "Không thể đọc chỉ số lúc này. Vui lòng thử lại sau.",
+            "metrics_delta_advice": None,
+        }
+
+    from app.services.metrics_delta_advice import advice_from_latest_entries
+
+    advice = advice_from_latest_entries(db, user_id)
+    if advice is None:
+        return {
+            **state,
+            "answer": (
+                "Bạn chưa có đủ dữ liệu chỉ số để nhận xét xu hướng. "
+                "Hãy ghi nhận chỉ số trong mục Chỉ số sức khỏe."
+            ),
+            "metrics_delta_advice": None,
+        }
+
+    extra = " Hãy trao đổi với bác sĩ nếu bạn lo ngại." if advice.ask_doctor else ""
+    return {
+        **state,
+        "answer": advice.message + extra,
+        "citations": list(advice.citations),
+        "metrics_delta_advice": advice.model_dump(mode="json"),
+    }
+
+
+def refuse_node(state: AgentState) -> AgentState:
+    """Handle requests outside scope — delegated to utility skill refuse_unsafe_medication."""
+    from app.agents.skills import refuse_unsafe_medication
+
+    message = state.get("message", "")
+    profile = state.get("profile") or {}
+    danger = state.get("clinical_danger")
+    flag = f"clinical_escalation_{danger['type']}" if danger else "refuse_medical_scope"
+    return {
+        **state,
+        "answer": refuse_unsafe_medication(
+            message, profile=profile, danger_hint=danger.get("hint") if danger else None
+        ),
+        "guardrail_flags": state.get("guardrail_flags", []) + [flag],
+    }
+
+
+def _generate_dynamic_unknown_answer(message: str, profile: dict) -> str:
+    """Generate a concise, empathetic, safety-conscious fallback answer using LLM."""
+    diseases = ", ".join(profile.get("disease", [])) if profile else ""
+    medications = ", ".join(profile.get("medications", [])) if profile else ""
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            profile_context = ""
+            if diseases or medications:
+                profile_context = f"\nHồ sơ bệnh nhân: Bệnh nền [{diseases or 'Chưa rõ'}], Thuốc [{medications or 'Chưa rõ'}]."
+
+            prompt = (
+                f"Bạn là Trợ lý Dinh dưỡng & Tuân thủ AI cho người bệnh mạn tính.{profile_context}\n"
+                f"Tin nhắn người dùng: \"{message}\"\n\n"
+                "QUY TẮC PHẢN HỒI (BẮT BUỘC CỰC KỲ NGẮN GỌN, DƯỚI 80 TỪ, TỐI ĐA 4 Ý, TUYỆT ĐỐI KHÔNG VIẾT VĂN MỞ ĐẦU LAN MAN):\n\n"
+                "1. Nếu người dùng kêu MỆT, CHOÁNG, ĐÓI LẢ hoặc có triệu chứng thể chất:\n"
+                "   - Ý 1: Khuyên ngồi/nằm nghỉ ngơi ngay ở nơi thoáng mát (1 câu ngắn).\n"
+                "   - Ý 2: 🛑 **Nếu nghi hạ đường huyết** (run tay, vã mồ hôi, đói cồn cào): Uống ngay 1/2 ly nước đường/nước trái cây hoặc 3-4 viên kẹo (quy tắc 15-15).\n"
+                "   - Ý 3: 🚨 **Cấp cứu:** Gọi ngay 115 hoặc báo người nhà nếu đau ngực, khó thở, hoặc mệt không giảm sau nghỉ ngơi.\n"
+                "   - Ý 4: 💡 Khi đã hồi phục, tôi có thể gợi ý các món ăn nhẹ giúp bạn bồi bổ sức khỏe.\n\n"
+                "2. Nếu là câu hỏi trò chuyện chung ngoài phạm vi:\n"
+                "   - Trả lời thân thiện trong 1-2 câu ngắn.\n"
+                "   - Nêu 3 chức năng chính: (1) Thực đơn 7 ngày, (2) Kiểm tra tương tác thuốc, (3) Tư vấn dinh dưỡng lâm sàng.\n\n"
+                "YÊU CẦU ĐỊNH DẠNG: Chia các ý cách nhau bởi 1 dòng trống (double newline) để hiển thị thoáng đãng. Không tự ý chẩn đoán hay kê đơn."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM dynamic unknown answer failed: %s", e)
+
+    return (
+        "Bạn hãy tạm dừng công việc và **ngồi hoặc nằm nghỉ ngơi ngay** ở nơi thoáng mát nhé.\n\n"
+        "🛑 **Nếu nghi hạ đường huyết** (run tay, vã mồ hôi, đói cồn cào): Uống ngay 1/2 ly nước đường/nước trái cây hoặc 3-4 viên kẹo (quy tắc 15-15).\n\n"
+        "🚨 **Cấp cứu:** Gọi ngay **115** hoặc báo người nhà nếu tức ngực, khó thở, hoặc mệt không thuyên giảm.\n\n"
+        "💡 Khi bạn đã cảm thấy đỡ hơn, tôi là Trợ lý Dinh dưỡng AI sẵn sàng hỗ trợ gợi ý thực đơn và các món ăn nhẹ bồi bổ thể trạng."
+    )
+
+
+def unknown_node(state: AgentState) -> AgentState:
+    """Handle unknown/unclassified intents with emergency triage check and empathetic fallback using pruned state."""
+    from app.agents.skills import emergency_triage_check, get_lean_state_for_intent
+
+    lean = get_lean_state_for_intent(state, "unknown")
+    message = lean.get("message", "")
+    triage = emergency_triage_check(message)
+    if triage is not None:
+        return {
+            **state,
+            "answer": triage["message"],
+            "guardrail_flags": state.get("guardrail_flags", []) + [f"emergency_triage_{triage['type']}"],
+        }
+
+    profile = lean.get("profile", {})
+    answer = _generate_dynamic_unknown_answer(message, profile)
+    return {
+        **state,
+        "answer": answer,
+    }
+
+
+def apply_guardrails(state: AgentState) -> AgentState:
+    """Post-process node: citation checks, unsafe recommendation blocking, and food safety filtering."""
+    intent = state.get("intent", "unknown")
+    answer = state.get("answer") or ""
+    citations = list(state.get("citations") or [])
+    flags = list(state.get("guardrail_flags") or [])
+
+    answer, citation_flags, citations = enforce_citation_guardrail(intent, answer, citations)
+    flags.extend(citation_flags)
+
+    answer, safety_flags, force_refuse = enforce_output_safety(answer)
+    flags.extend(safety_flags)
+    if force_refuse:
+        intent = "refuse"
+
+    # Deterministic Food Safety & Allergy Guardrail (Tier-2 Post-Generation Filter)
+    if not force_refuse and intent not in ("greeting", "refuse"):
+        from app.guardrails.food_safety import enforce_food_safety_guardrail
+
+        profile = state.get("profile") or {}
+        medications = profile.get("medications", []) if isinstance(profile, dict) else (getattr(profile, "medications", []) or [])
+        allergies = profile.get("allergies", []) if isinstance(profile, dict) else (getattr(profile, "allergies", []) or [])
+
+        answer, food_safety_flags = enforce_food_safety_guardrail(
+            answer=answer,
+            medications=medications,
+            allergies=allergies,
+            db=state.get("db"),
+        )
+        flags.extend(food_safety_flags)
+
+    return {
+        **state,
+        "intent": intent,
+        "answer": answer,
+        "citations": citations,
+        "guardrail_flags": flags,
+    }
+
+
+# --- Router ---
+
+def route_intent(state: AgentState) -> Literal[
+    "greeting",
+    "rag_qa",
+    "meal_plan",
+    "interaction_check",
+    "food_log",
+    "weekly_compliance",
+    "doctor_note",
+    "metrics_delta_advice",
+    "refuse",
+    "unknown",
+
+]:
+    """Route to the appropriate node based on classified intent."""
+    intent = state.get("intent", "unknown")
+
+    if intent in (
+        "greeting",
+        "rag_qa",
+        "meal_plan",
+        "interaction_check",
+        "food_log",
+        "weekly_compliance",
+        "doctor_note",
+        "metrics_delta_advice",
+        "refuse",
+    ):
+
+        return intent
+
+    return "unknown"
+
+
+# --- Build Graph ---
+
+def build_graph() -> StateGraph:
+    """Build and compile the LangGraph agent workflow."""
+    graph = StateGraph(AgentState)
+
+    graph.add_node("profile_loader", profile_loader)
+    graph.add_node("intent_classifier", intent_classifier)
+    graph.add_node("greeting", greeting_node)
+    graph.add_node("rag_qa", rag_qa_node)
+    graph.add_node("meal_plan", meal_plan_node)
+    graph.add_node("interaction_check", interaction_check_node)
+    graph.add_node("food_log", food_log_node)
+    graph.add_node("weekly_compliance", weekly_compliance_node)
+    graph.add_node("doctor_note", doctor_note_node)
+    graph.add_node("metrics_delta_advice", metrics_delta_advice_node)
+    graph.add_node("refuse", refuse_node)
+    graph.add_node("unknown", unknown_node)
+    graph.add_node("apply_guardrails", apply_guardrails)
+
+    graph.set_entry_point("profile_loader")
+    graph.add_edge("profile_loader", "intent_classifier")
+
+    graph.add_conditional_edges(
+        "intent_classifier",
+        route_intent,
+        {
+            "greeting": "greeting",
+            "rag_qa": "rag_qa",
+            "meal_plan": "meal_plan",
+            "interaction_check": "interaction_check",
+            "food_log": "food_log",
+            "weekly_compliance": "weekly_compliance",
+            "doctor_note": "doctor_note",
+            "metrics_delta_advice": "metrics_delta_advice",
+            "refuse": "refuse",
+            "unknown": "unknown",
+        },
+    )
+
+    graph.add_edge("greeting", "apply_guardrails")
+    graph.add_edge("rag_qa", "apply_guardrails")
+    graph.add_edge("meal_plan", "apply_guardrails")
+    graph.add_edge("interaction_check", "apply_guardrails")
+    graph.add_edge("food_log", "apply_guardrails")
+    graph.add_edge("weekly_compliance", "apply_guardrails")
+    graph.add_edge("doctor_note", "apply_guardrails")
+    graph.add_edge("metrics_delta_advice", "apply_guardrails")
+    graph.add_edge("refuse", "apply_guardrails")
+    graph.add_edge("unknown", "apply_guardrails")
+    graph.add_edge("apply_guardrails", END)
+
+    return graph
+
+
+# Compile once
+_compiled_graph = None
+
+
+def get_compiled_graph():
+    """Get or compile the agent graph (singleton)."""
+    global _compiled_graph
+    if _compiled_graph is None:
+        graph = build_graph()
+        _compiled_graph = graph.compile()
+        logger.info("Agent graph compiled successfully")
+    return _compiled_graph
+
+
+def reset_compiled_graph() -> None:
+    """Clear cached graph (for tests after graph structure changes)."""
+    global _compiled_graph
+    _compiled_graph = None
+
+
+# --- Facade ---
+
+def _citation_chunks_from_state(final_state: AgentState) -> list[CitationChunk]:
+    """Expose only the passages that were injected into the RAG prompt."""
+    if not final_state.get("citations"):
+        return []
+    rag_context = final_state.get("rag_context") or []
+    chunks: list[CitationChunk] = []
+    for item in rag_context[:RAG_PROMPT_CHUNK_LIMIT]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            score = float(item.get("score") or 0.0)
+        except (TypeError, ValueError):
+            score = 0.0
+        chunks.append(
+            CitationChunk(
+                chunk_id=str(item.get("chunk_id") or ""),
+                text=text,
+                source=str(item.get("source") or ""),
+                score=score,
+            )
+        )
+    return chunks
+
+
+def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
+    """Map final graph state to AgentRunOutput (shared by sync and streaming paths)."""
+    meal_plan_obj = final_state.get("meal_plan")
+    meal_plan_id = final_state.get("meal_plan_id") or (
+        meal_plan_obj.id if meal_plan_obj else None
+    )
+    meal_preview_raw = final_state.get("meal_preview")
+    meal_preview = None
+    if meal_preview_raw:
+        meal_preview = MealPreviewOut(**meal_preview_raw)
+
+    weekly_compliance_raw = final_state.get("weekly_compliance")
+    weekly_compliance = None
+    if weekly_compliance_raw:
+        weekly_compliance = WeeklyComplianceOut(**weekly_compliance_raw)
+
+    doctor_note_raw = final_state.get("doctor_note")
+    doctor_note = None
+    if doctor_note_raw:
+        doctor_note = DoctorNoteOut(**doctor_note_raw)
+
+    metrics_advice_raw = final_state.get("metrics_delta_advice")
+    metrics_delta_advice = None
+    if metrics_advice_raw:
+        metrics_delta_advice = MetricsDeltaAdviceOut(**metrics_advice_raw)
+
+    unmatched_pairs = []
+    interactions_raw = final_state.get("interactions")
+    if interactions_raw is not None:
+        raw_pairs = getattr(interactions_raw, "unmatched_pairs", None)
+        if raw_pairs is None and isinstance(interactions_raw, dict):
+            raw_pairs = interactions_raw.get("unmatched_pairs")
+        if raw_pairs:
+            unmatched_pairs = list(raw_pairs)
+
+    return AgentRunOutput(
+        intent=final_state.get("intent", "unknown"),
+        secondary_intents=final_state.get("secondary_intents", []),
+        message=final_state.get("answer", ""),
+        meal_plan_id=meal_plan_id,
+        meal_preview=meal_preview,
+        food_log_id=None,
+        alert_ids=[],
+        citations=final_state.get("citations", []),
+        citation_chunks=_citation_chunks_from_state(final_state),
+        guardrail_triggered=bool(final_state.get("guardrail_flags")),
+        weekly_compliance=weekly_compliance,
+        doctor_note=doctor_note,
+        metrics_delta_advice=metrics_delta_advice,
+        unmatched_pairs=unmatched_pairs,
+    )
+
+
+import os
+
+def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
+    """Run the agent graph with Langfuse tracing, token and cost tracking."""
+    compiled = get_compiled_graph()
+
+    initial_state: AgentState = {
+        "user_id": input_data.user_id,
+        "message": input_data.message,
+        "force_intent": input_data.force_intent,
+        "db": db,
+        "profile": {},
+        "intent": "unknown",
+        "secondary_intents": [],
+        "rag_context": [],
+        "meal_plan": None,
+        "meal_preview": None,
+        "meal_plan_id": None,
+        "food_log": None,
+        "interactions": None,
+        "weekly_compliance": None,
+        "doctor_note": None,
+        "metrics_delta_advice": None,
+        "answer": None,
+        "citations": [],
+        "guardrail_flags": [],
+        "errors": [],
+    }
+
+    # 1. Khởi tạo Langfuse Callback nếu có cấu hình API Key
+    callbacks = []
+    langfuse_metadata: dict = {}
+    if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+        try:
+            from langfuse.langchain import CallbackHandler
+
+            callbacks.append(CallbackHandler())
+            # langfuse>=3: user_id/tags/session_id are no longer CallbackHandler
+            # constructor kwargs — they must be passed via special `langfuse_*`
+            # keys inside the LangChain run's `metadata` instead (see
+            # CallbackHandler's handling of "langfuse_user_id"/"langfuse_tags").
+            langfuse_metadata = {
+                "langfuse_user_id": str(input_data.user_id) if input_data.user_id else "anonymous",
+                "langfuse_tags": ["p014-nutrition-agent", input_data.force_intent or "auto"],
+                "patient_id": str(input_data.user_id),
+            }
+        except Exception as e:
+            logger.warning("Không thể khởi tạo Langfuse Handler: %s", e)
+
+    config = {"callbacks": callbacks, "metadata": langfuse_metadata} if callbacks else None
+
+    # 2. Thực thi graph với config callbacks
+    try:
+        final_state = compiled.invoke(initial_state, config=config)
+    except Exception as e:
+        logger.error("Agent graph execution failed: %s", e, exc_info=True)
+        return AgentRunOutput(
+            intent="unknown",
+            secondary_intents=[],
+            message=f"Đã xảy ra lỗi trong quá trình xử lý: {str(e)}",
+            guardrail_triggered=False,
+        )
+
+    return build_agent_run_output(final_state)
+

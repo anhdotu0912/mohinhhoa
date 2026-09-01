@@ -1,0 +1,236 @@
+[
+  {
+    "id": "f301",
+    "name": "cơm gạo lứt",
+    "portion": "1 chén (150g)",
+    "kcal": 150,
+    "macros": {"carb_g": 30, "protein_g": 3, "fat_g": 1, "sodium_mg": 5},
+    "category": "tinh bột",
+    "tags": ["GI thấp", "tinh bột", "chủ yếu"]
+  },
+  {
+    "id": "f302",
+    "name": "thịt gà nạc luộc",
+    "portion": "100g",
+    "kcal": 150,
+    "macros": {"carb_g": 0, "protein_g": 30, "fat_g": 2, "sodium_mg": 50},
+    "category": "đạm động vật",
+    "tags": ["protein cao", "ít mỡ"]
+  },
+  {
+    "id": "f303",
+    "name": "rau muống luộc",
+    "portion": "1 chén (100g)",
+    "kcal": 20,
+    "macros": {"carb_g": 3, "protein_g": 2, "fat_g": 0, "sodium_mg": 5},
+    "category": "rau",
+    "tags": ["chất xơ", "rau xanh", "ít carb"]
+  },
+  {
+    "id": "f304",
+    "name": "cá hồi omega 3",
+    "portion": "100g",
+    "kcal": 200,
+    "macros": {"carb_g": 0, "protein_g": 20, "fat_g": 15, "sodium_mg": 50},
+    "category": "đạm động vật",
+    "tags": ["omega-3", "protein cao", "cá biển"]
+  },
+  {
+    "id": "f305",
+    "name": "đậu hũ",
+    "portion": "100g",
+    "kcal": 80,
+    "macros": {"carb_g": 2, "protein_g": 8, "fat_g": 4, "sodium_mg": 10},
+    "category": "đạm thực vật",
+    "tags": ["protein thực vật", "ít carb"]
+  },
+  {
+    "id": "f306",
+    "name": "táo",
+    "portion": "1 quả (150g)",
+    "kcal": 50,
+    "macros": {"carb_g": 14, "protein_g": 0, "fat_g": 0, "sodium_mg": 1},
+    "category": "quả",
+    "tags": ["trái cây", "GI thấp"]
+  },
+  {
+    "id": "f307",
+    "name": "nước mắm",
+    "portion": "1 muỗng canh (15ml)",
+    "kcal": 10,
+    "macros": {"carb_g": 1, "protein_g": 1, "fat_g": 0, "sodium_mg": 1000},
+    "category": "gia vị",
+    "tags": ["sodium cao", "mặn", "gia vị Việt"]
+  },
+  {
+    "id": "f308",
+    "name": "trứng luộc",
+    "portion": "1 quả (50g)",
+    "kcal": 70,
+    "macros": {"carb_g": 1, "protein_g": 6, "fat_g": 5, "sodium_mg": 60},
+    "category": "đạm động vật",
+    "tags": ["protein cao", "bữa sáng", "ít carb"]
+  },
+  {
+    "id": "f309",
+    "name": "yến mạch",
+    "portion": "1 chén khô (80g)",
+    "kcal": 300,
+    "macros": {"carb_g": 60, "protein_g": 10, "fat_g": 5, "sodium_mg": 5},
+    "category": "tinh bột",
+    "tags": ["GI thấp", "chất xơ", "bữa sáng"]
+  },
+  {
+    "id": "f310",
+    "name": "cherry",
+    "portion": "10 quả (68g)",
+    "kcal": 50,
+    "macros": {"carb_g": 12, "protein_g": 1, "fat_g": 0, "sodium_mg": 0},
+    "category": "quả",
+    "tags": ["trái cây", "GI thấp"]
+  },
+  {
+    "id": "f311",
+    "name": "bưởi",
+    "portion": "1/2 quả (150g)",
+    "kcal": 40,
+    "macros": {"carb_g": 10, "protein_g": 1, "fat_g": 0, "sodium_mg": 1},
+    "category": "quả",
+    "tags": ["trái cây", "GI thấp", "chỉ số đường huyết thấp"]
+  },
+  {
+    "id": "f312",
+    "name": "cơm trắng",
+    "portion": "1 chén (150g)",
+    "kcal": 190,
+    "macros": {"carb_g": 42, "protein_g": 4, "fat_g": 0, "sodium_mg": 2},
+    "category": "tinh bột",
+    "tags": ["GI cao", "hạn chế"]
+  },
+  {
+    "id": "f313",
+    "name": "bánh mì nguyên cám",
+    "portion": "2 lát (60g)",
+    "kcal": 140,
+    "macros": {"carb_g": 24, "protein_g": 6, "fat_g": 2, "sodium_mg": 210},
+    "category": "tinh bột",
+    "tags": ["GI thấp", "chất xơ", "bữa sáng"]
+  },
+  {
+    "id": "f314",
+    "name": "khoai lang",
+    "portion": "1 củ vừa (130g)",
+    "kcal": 115,
+    "macros": {"carb_g": 27, "protein_g": 2, "fat_g": 0, "sodium_mg": 40},
+    "category": "tinh bột",
+    "tags": ["chất xơ", "GI trung bình"]
+  },
+  {
+    "id": "f315",
+    "name": "thịt bò nạc",
+    "portion": "100g",
+    "kcal": 180,
+    "macros": {"carb_g": 0, "protein_g": 26, "fat_g": 8, "sodium_mg": 55},
+    "category": "đạm động vật",
+    "tags": ["protein cao", "giàu sắt"]
+  },
+  {
+    "id": "f316",
+    "name": "tôm",
+    "portion": "100g",
+    "kcal": 100,
+    "macros": {"carb_g": 0, "protein_g": 21, "fat_g": 1, "sodium_mg": 120},
+    "category": "đạm động vật",
+    "tags": ["protein cao", "ít carb", "allergen-shellfish"]
+  },
+  {
+    "id": "f317",
+    "name": "sữa chua không đường",
+    "portion": "1 hộp (100g)",
+    "kcal": 60,
+    "macros": {"carb_g": 5, "protein_g": 5, "fat_g": 3, "sodium_mg": 50},
+    "category": "sữa",
+    "tags": ["canxi", "không đường", "probiotic"]
+  },
+  {
+    "id": "f318",
+    "name": "sữa tươi không đường",
+    "portion": "1 ly (200ml)",
+    "kcal": 90,
+    "macros": {"carb_g": 5, "protein_g": 7, "fat_g": 5, "sodium_mg": 100},
+    "category": "sữa",
+    "tags": ["canxi", "không đường"]
+  },
+  {
+    "id": "f319",
+    "name": "bông cải xanh",
+    "portion": "1 chén (90g)",
+    "kcal": 30,
+    "macros": {"carb_g": 6, "protein_g": 3, "fat_g": 0, "sodium_mg": 30},
+    "category": "rau",
+    "tags": ["chất xơ", "vitamin C", "rau xanh"]
+  },
+  {
+    "id": "f320",
+    "name": "cà chua",
+    "portion": "1 quả (120g)",
+    "kcal": 22,
+    "macros": {"carb_g": 5, "protein_g": 1, "fat_g": 0, "sodium_mg": 6},
+    "category": "rau",
+    "tags": ["vitamin C", "ít carb"]
+  },
+  {
+    "id": "f321",
+    "name": "dưa leo",
+    "portion": "1 quả (100g)",
+    "kcal": 15,
+    "macros": {"carb_g": 4, "protein_g": 1, "fat_g": 0, "sodium_mg": 2},
+    "category": "rau",
+    "tags": ["ít calo", "nhiều nước"]
+  },
+  {
+    "id": "f322",
+    "name": "cam",
+    "portion": "1 quả (130g)",
+    "kcal": 60,
+    "macros": {"carb_g": 15, "protein_g": 1, "fat_g": 0, "sodium_mg": 0},
+    "category": "quả",
+    "tags": ["trái cây", "vitamin C", "GI trung bình"]
+  },
+  {
+    "id": "f323",
+    "name": "chuối",
+    "portion": "1 quả (120g)",
+    "kcal": 105,
+    "macros": {"carb_g": 27, "protein_g": 1, "fat_g": 0, "sodium_mg": 1},
+    "category": "quả",
+    "tags": ["trái cây", "kali", "GI trung bình cao"]
+  },
+  {
+    "id": "f324",
+    "name": "hạt điều",
+    "portion": "1 nắm (28g)",
+    "kcal": 160,
+    "macros": {"carb_g": 9, "protein_g": 5, "fat_g": 13, "sodium_mg": 3},
+    "category": "chất béo tốt",
+    "tags": ["ăn vặt", "chất béo không bão hòa"]
+  },
+  {
+    "id": "f325",
+    "name": "dầu ô liu",
+    "portion": "1 muỗng canh (15ml)",
+    "kcal": 120,
+    "macros": {"carb_g": 0, "protein_g": 0, "fat_g": 14, "sodium_mg": 0},
+    "category": "chất béo tốt",
+    "tags": ["gia vị", "chất béo không bão hòa"]
+  },
+  {
+    "id": "f326",
+    "name": "mì gói",
+    "portion": "1 gói (75g)",
+    "kcal": 350,
+    "macros": {"carb_g": 50, "protein_g": 7, "fat_g": 14, "sodium_mg": 1800},
+    "category": "tinh bột",
+    "tags": ["GI cao", "sodium cao", "hạn chế"]
+  }
+]

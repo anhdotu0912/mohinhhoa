@@ -118,8 +118,22 @@ def main():
         method="POST",
     )
 
+    ssl_context = None
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        import ssl
+        try:
+            import certifi
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ssl_context = ssl._create_unverified_context()
+    except Exception:
+        ssl_context = None
+
+    try:
+        kwargs = {"timeout": 10}
+        if ssl_context:
+            kwargs["context"] = ssl_context
+        with urllib.request.urlopen(req, **kwargs) as resp:
             print(f"[ai-log] Submitted {len(entries)} entries → {resp.status}", file=sys.stderr)
     except urllib.error.URLError as e:
         # Failure: restore the whole pending (including leftover) for next push.

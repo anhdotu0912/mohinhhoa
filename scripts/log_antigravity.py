@@ -58,9 +58,10 @@ if sys.platform == "win32":
 VN_TZ = timezone(timedelta(hours=7))
 GEMINI_HOME = Path.home() / ".gemini"
 
-# Antigravity has shipped under two folder names; prefer the newer IDE one.
+# Antigravity has shipped under multiple folder names; include the CLI as well.
 BRAIN_CANDIDATES = (
     GEMINI_HOME / "antigravity-ide" / "brain",
+    GEMINI_HOME / "antigravity-cli" / "brain",
     GEMINI_HOME / "antigravity" / "brain",
 )
 

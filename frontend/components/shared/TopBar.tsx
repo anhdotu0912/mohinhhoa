@@ -1,0 +1,120 @@
+/* eslint-disable @next/next/no-img-element */
+"use client";
+
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { useMobileMenu } from "@/components/shared/MobileMenuContext";
+import { resolveUserAvatar, userInitials } from "@/lib/avatar";
+import { useQueueStore } from "@/lib/queue-store";
+import { useAuthStore } from "@/lib/auth-store";
+
+type TopBarProps = {
+  title: string;
+  rightSlot?: ReactNode;
+  leftSlot?: ReactNode;
+  showUtilities?: boolean;
+};
+
+export function TopBar({
+  title,
+  rightSlot,
+  leftSlot,
+  showUtilities = true,
+}: TopBarProps) {
+  const { openMobileMenu, role } = useMobileMenu();
+  const { jobs, openDrawer } = useQueueStore();
+  const authAvatar = useAuthStore((s) => s.avatar);
+  const displayName = useAuthStore((s) => s.displayName);
+  const email = useAuthStore((s) => s.email);
+
+  const avatarSrc = resolveUserAvatar(authAvatar);
+  const avatarInitials = userInitials(displayName || email || (role === "doctor" ? "BS" : "BN"));
+  const profileHref = role === "doctor" ? "/doctor/profile" : "/patient/profile";
+
+  const activeJobsCount = jobs.filter(
+    (j) => j.status === "queued" || j.status === "processing"
+  ).length;
+  const isProcessing = jobs.some((j) => j.status === "processing");
+
+  return (
+    <header className="bg-white dark:bg-surface-container-lowest text-primary font-h2 text-h2 flex justify-between items-center h-16 px-lg w-full border-b border-outline-variant z-30 sticky top-0 shrink-0">
+      <div className="flex items-center justify-between w-full gap-md">
+        <div className="flex items-center gap-md min-w-0">
+          {role === "doctor" && (
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="md:hidden text-on-surface-variant hover:text-primary transition-colors mr-1 p-1 shrink-0"
+            >
+              <span className="material-symbols-outlined text-[24px]">menu</span>
+            </button>
+          )}
+
+          {leftSlot ?? (
+            <div className="font-bold text-primary text-base md:text-lg truncate">
+              {title}
+            </div>
+          )}
+        </div>
+
+        {rightSlot ? (
+          <div className="flex items-center gap-md shrink-0">{rightSlot}</div>
+        ) : null}
+
+        {showUtilities ? (
+          <div className="flex items-center gap-md shrink-0">
+            {role === "doctor" && (
+              <button
+                type="button"
+                onClick={openDrawer}
+                title="Hàng đợi tạo thực đơn AI"
+                className="relative text-on-surface-variant hover:text-primary transition-colors cursor-pointer w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant"
+              >
+                <span
+                  className={`material-symbols-outlined ${
+                    isProcessing ? "animate-spin text-emerald-600" : ""
+                  }`}
+                >
+                  {isProcessing ? "progress_activity" : "auto_awesome"}
+                </span>
+
+                {activeJobsCount > 0 && (
+                  <span
+                    className={`absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] px-1 bg-emerald-600 text-white font-bold text-[11px] rounded-full flex items-center justify-center shadow-xs ${
+                      isProcessing ? "animate-pulse ring-2 ring-emerald-300" : ""
+                    }`}
+                  >
+                    {activeJobsCount}
+                  </span>
+                )}
+              </button>
+            )}
+            <Link
+              href={profileHref}
+              title="Hồ sơ"
+              className="relative w-[32px] h-[32px] rounded-full border border-outline-variant overflow-hidden bg-primary/15 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            >
+              <div
+                translate="no"
+                className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary"
+              >
+                {avatarInitials}
+              </div>
+              {avatarSrc ? (
+                <img
+                  alt="User Avatar"
+                  className="relative z-10 w-full h-full object-cover"
+                  src={avatarSrc}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
+            </Link>
+          </div>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
