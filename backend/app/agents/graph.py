@@ -17,7 +17,7 @@ from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import RAG_PROMPT_CHUNK_LIMIT, rag_qa_node
 from app.agents.state import AgentState
-from app.guardrails.rules import enforce_output_safety
+from app.guardrails.rules import enforce_output_safety, get_refuse_message
 from app.guardrails.source_check import enforce_citation_guardrail
 from app.schemas.meal_plan import (
     AgentRunInput,
@@ -86,10 +86,24 @@ def _generate_allergy_blocked_answer(
     )
 
 
-def _generate_safe_food_answer(message: str, medications: list[str], foods: list[str]) -> str:
-    """Generate an informative, friendly response when no dangerous interaction is found for queried foods."""
+def _generate_unmatched_kb_answer(
+    message: str,
+    medications: list[str],
+    foods: list[str],
+    unmatched_pairs: list,
+) -> str:
+    """Generate an honest response when queried drug-food pairs have no KB match.
+
+    Never claim a confirmed safety verdict here — the KB genuinely has no data
+    for these pairs, so the answer must say so explicitly instead of asserting
+    "đã tra cứu y khoa xác nhận an toàn" (that was the hallucination bug this
+    function replaces: absence of a KB match is not proof of safety).
+    """
     meds_str = ", ".join(m.capitalize() for m in medications)
     food_names_str = ", ".join(foods)
+    pairs_str = ", ".join(
+        f"{p.drug.capitalize()} + {p.food}" for p in unmatched_pairs
+    ) or f"{meds_str} + {food_names_str}"
 
     try:
         from app.core.llm import get_chat_llm
@@ -100,14 +114,15 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
                 f"Bạn là chuyên gia dinh dưỡng y tế và an toàn sử dụng thuốc cho bệnh nhân đái tháo đường & bệnh mạn tính.\n"
                 f"Thuốc bệnh nhân đang dùng: {meds_str}.\n"
                 f"Câu hỏi của bệnh nhân: \"{message}\"\n"
-                f"Kết quả tra cứu y khoa: KHÔNG có tương tác nguy hiểm hoặc chống chỉ định nào giữa {meds_str} và {food_names_str}.\n\n"
-                "YÊU CẦU BẮT BUỘC:\n"
-                "- Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man (như 'Chào bạn, cảm ơn bạn...', 'Dựa trên kết quả...').\n"
+                f"Kết quả tra cứu: cơ sở dữ liệu tương tác thuốc-thực phẩm nội bộ KHÔNG có dữ liệu cho cặp {pairs_str}.\n\n"
+                "YÊU CẦU BẮT BUỘC (TUYỆT ĐỐI KHÔNG BỊA KẾT LUẬN AN TOÀN KHI KHÔNG CÓ DỮ LIỆU):\n"
+                "- Đi thẳng trực tiếp vào nội dung, TUYỆT ĐỐI KHÔNG viết lời chào hỏi, cảm ơn lan man.\n"
                 "- TUYỆT ĐỐI KHÔNG dùng đường kẻ `---`.\n"
+                "- TUYỆT ĐỐI KHÔNG khẳng định 'an toàn', 'đã xác nhận', 'tra cứu y khoa xác nhận không có tương tác' — vì thực tế KHÔNG có dữ liệu để kết luận.\n"
                 "- Trình bày KHOA HỌC, ngắn gọn theo 3 mục rõ ràng, cách nhau bởi 1 dòng trống (double newline):\n\n"
-                f"1. ✅ **Xác nhận an toàn:** Khẳng định {food_names_str} an toàn / có thể ăn được khi đang dùng {meds_str}.\n"
-                f"2. 🥗 **Giá trị dinh dưỡng & Lợi ích:** Nêu 1-2 điểm nổi bật về chỉ số đường huyết (GI), chất xơ, chất béo hoặc đạm có lợi cho sức khỏe.\n"
-                f"3. 💡 **Khuyến nghị sử dụng & Chế biến:** Khẩu phần hợp lý và phương pháp chế biến lành mạnh (hấp, luộc, áp chảo ít dầu; hạn chế đường/mỡ bão hòa)."
+                f"1. ⚠️ **Chưa đủ dữ liệu xác nhận:** Nêu rõ cơ sở dữ liệu tương tác thuốc-thực phẩm hiện chưa có thông tin cụ thể cho {pairs_str}, nên KHÔNG thể khẳng định an toàn tuyệt đối.\n"
+                f"2. 🥗 **Giá trị dinh dưỡng chung:** Nêu 1-2 điểm nổi bật về {food_names_str} (chỉ số đường huyết GI, chất xơ, đạm...), không liên quan đến thuốc.\n"
+                f"3. 💡 **Khuyến nghị:** Nên hỏi bác sĩ hoặc dược sĩ điều trị để xác nhận cụ thể trước khi dùng, đặc biệt vì đang dùng {meds_str}."
             )
             response = llm.invoke(prompt)
             if response and getattr(response, "content", None):
@@ -115,17 +130,69 @@ def _generate_safe_food_answer(message: str, medications: list[str], foods: list
                 if content:
                     return content
     except Exception as e:
-        logger.warning("LLM safe food answer generation failed: %s", e)
+        logger.warning("LLM unmatched KB answer generation failed: %s", e)
 
     return (
-        f"✅ **Xác nhận an toàn:** Không ghi nhận tương tác nguy hiểm giữa các thuốc bạn đang dùng ({meds_str}) và **{food_names_str}**.\n\n"
-        f"🥗 **Giá trị dinh dưỡng:** {food_names_str.capitalize()} là thực phẩm an toàn, có thể bổ sung vào thực đơn đối với người bệnh đái tháo đường.\n\n"
-        f"💡 **Khuyến nghị sử dụng & Chế biến:**\n"
-        f"• Ăn với khẩu phần vừa phải, cân đối tổng lượng carbohydrate trong toàn bộ bữa ăn.\n"
-        f"• Ưu tiên các phương pháp chế biến lành mạnh như hấp, luộc, hoặc áp chảo ít dầu."
+        f"⚠️ **Chưa đủ dữ liệu xác nhận:** Cơ sở dữ liệu tương tác thuốc-thực phẩm hiện chưa có thông tin cụ thể cho **{pairs_str}**. "
+        f"Chúng tôi KHÔNG thể khẳng định an toàn tuyệt đối chỉ dựa trên việc không tìm thấy dữ liệu.\n\n"
+        f"🥗 **Giá trị dinh dưỡng chung:** {food_names_str.capitalize()} là thực phẩm phổ biến trong chế độ ăn, nhưng mức độ phù hợp còn tùy tình trạng bệnh lý cụ thể.\n\n"
+        f"💡 **Khuyến nghị:**\n"
+        f"• Hỏi bác sĩ hoặc dược sĩ điều trị để xác nhận cụ thể trước khi dùng, đặc biệt vì bạn đang dùng {meds_str}.\n"
+        f"• Theo dõi phản ứng cơ thể sau khi ăn nếu vẫn sử dụng."
     )
 
 
+def _generate_clinical_refusal(
+    message: str,
+    profile: dict | None = None,
+    danger_hint: str | None = None,
+) -> str:
+    """Generate a content-rich escalation message for `refuse` intent.
+
+    Replaces the old static REFUSE_MESSAGE-only behavior: explains the relevant
+    clinical mechanism/risk (general medical knowledge — not a RAG citation claim,
+    so the Faithfulness rule doesn't apply here) and always ends with a clear
+    doctor referral. Never proposes a specific drug/dose change or a detailed
+    personalized meal plan for the dangerous scenario — apply_guardrails'
+    enforce_output_safety still runs on this output as a safety net regardless.
+    """
+    diseases = ", ".join(profile.get("disease", [])) if profile else ""
+
+    try:
+        from app.core.llm import get_chat_llm
+
+        llm = get_chat_llm(temperature=0.2)
+        if llm is not None:
+            hint_line = (
+                f"Nguy cơ lâm sàng cụ thể đã phát hiện: {danger_hint}\n"
+                if danger_hint
+                else ""
+            )
+            prompt = (
+                "Bạn là trợ lý dinh dưỡng y tế cho bệnh nhân đái tháo đường & bệnh mạn tính. "
+                "Bệnh nhân vừa hỏi 1 câu cần ĐƯỢC TỪ CHỐI TRẢ LỜI TRỰC TIẾP vì vượt quá phạm vi an toàn "
+                "(cần bác sĩ đánh giá/quyết định), KHÔNG phải một câu hỏi dinh dưỡng thông thường.\n"
+                f"Bệnh nền: {diseases or 'không rõ'}.\n"
+                f"{hint_line}"
+                f'Câu hỏi của bệnh nhân: "{message}"\n\n'
+                "YÊU CẦU BẮT BUỘC:\n"
+                "1. Giải thích NGẮN GỌN (2-4 câu) tại sao đây là tình huống cần bác sĩ — nêu cơ chế/nguy cơ lâm sàng liên quan "
+                "nếu bạn biết (kiến thức y khoa chung, không cần trích nguồn).\n"
+                "2. TUYỆT ĐỐI KHÔNG đề xuất đổi thuốc, chỉnh liều lượng, hoặc chẩn đoán xác định.\n"
+                "3. TUYỆT ĐỐI KHÔNG đưa kế hoạch ăn uống chi tiết cá nhân hoá (không cho gram/kcal/khẩu phần cụ thể) cho tình huống nguy hiểm này.\n"
+                "4. CÓ THỂ nêu 1 nguyên tắc an toàn chung đã được y văn công nhận rộng rãi nếu liên quan trực tiếp (ví dụ tốc độ giảm cân an toàn 0.5-1kg/tuần), nhưng không thay thế cho việc gặp bác sĩ.\n"
+                "5. LUÔN kết thúc bằng khuyến nghị rõ ràng: gặp bác sĩ/chuyên khoa phù hợp (ghi rõ chuyên khoa nếu xác định được, ví dụ bác sĩ sản khoa, bác sĩ nội tiết, bác sĩ tim mạch).\n"
+                "6. Đi thẳng vào nội dung, không chào hỏi lan man. Định dạng markdown ngắn gọn, súc tích."
+            )
+            response = llm.invoke(prompt)
+            if response and getattr(response, "content", None):
+                content = response.content.strip()
+                if content:
+                    return content
+    except Exception as e:
+        logger.warning("LLM clinical refusal generation failed: %s", e)
+
+    return get_refuse_message()
 
 
 def meal_plan_node(state: AgentState) -> AgentState:
@@ -219,7 +286,8 @@ def greeting_node(state: AgentState) -> AgentState:
 
     lean = get_lean_state_for_intent(state, "greeting")
     message = lean.get("message", "")
-    answer = chit_chat_greeting(message)
+    diseases = lean.get("disease", [])
+    answer = chit_chat_greeting(message, diseases=diseases)
     return {
         **state,
         "answer": answer,
@@ -280,10 +348,15 @@ def refuse_node(state: AgentState) -> AgentState:
     from app.agents.skills import refuse_unsafe_medication
 
     message = state.get("message", "")
+    profile = state.get("profile") or {}
+    danger = state.get("clinical_danger")
+    flag = f"clinical_escalation_{danger['type']}" if danger else "refuse_medical_scope"
     return {
         **state,
-        "answer": refuse_unsafe_medication(message),
-        "guardrail_flags": state.get("guardrail_flags", []) + ["refuse_medical_scope"],
+        "answer": refuse_unsafe_medication(
+            message, profile=profile, danger_hint=danger.get("hint") if danger else None
+        ),
+        "guardrail_flags": state.get("guardrail_flags", []) + [flag],
     }
 
 
@@ -616,22 +689,25 @@ def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
 
     # 1. Khởi tạo Langfuse Callback nếu có cấu hình API Key
     callbacks = []
+    langfuse_metadata: dict = {}
     if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
         try:
             from langfuse.langchain import CallbackHandler
 
-            langfuse_handler = CallbackHandler(
-                user_id=str(input_data.user_id) if input_data.user_id else "anonymous",
-                tags=["p014-nutrition-agent", input_data.force_intent or "auto"],
-                metadata={
-                    "patient_id": str(input_data.user_id),
-                },
-            )
-            callbacks.append(langfuse_handler)
+            callbacks.append(CallbackHandler())
+            # langfuse>=3: user_id/tags/session_id are no longer CallbackHandler
+            # constructor kwargs — they must be passed via special `langfuse_*`
+            # keys inside the LangChain run's `metadata` instead (see
+            # CallbackHandler's handling of "langfuse_user_id"/"langfuse_tags").
+            langfuse_metadata = {
+                "langfuse_user_id": str(input_data.user_id) if input_data.user_id else "anonymous",
+                "langfuse_tags": ["p014-nutrition-agent", input_data.force_intent or "auto"],
+                "patient_id": str(input_data.user_id),
+            }
         except Exception as e:
             logger.warning("Không thể khởi tạo Langfuse Handler: %s", e)
 
-    config = {"callbacks": callbacks} if callbacks else None
+    config = {"callbacks": callbacks, "metadata": langfuse_metadata} if callbacks else None
 
     # 2. Thực thi graph với config callbacks
     try:

@@ -35,8 +35,10 @@ class TestRagChunkPruning:
         assert len(context) <= 3
         assert len(citations) <= 3
 
-    def test_rag_prompt_uses_top_2_lean_chunks(self):
-        """Verify _build_rag_prompt consumes at most 2 chunks, preventing lost-in-the-middle bloat."""
+    def test_rag_prompt_uses_top_3_lean_chunks(self):
+        """Verify _build_rag_prompt consumes at most 3 chunks (2 guidelines + 1 food — the max
+        _build_rag_context ever retrieves), preventing lost-in-the-middle bloat. The limit is 3,
+        not 2, so the food chunk (always last in context order) isn't silently dropped."""
         mock_chunks = [
             {"chunk_id": f"chunk_{i}", "text": f"Hướng dẫn y khoa chi tiết phần {i}.", "source": "QĐ 5481", "score": 0.9 - i * 0.1}
             for i in range(10)
@@ -44,10 +46,11 @@ class TestRagChunkPruning:
         profile = {"disease": ["diabetes_t2"]}
         prompt = _build_rag_prompt("Tiểu đường nên ăn gì?", mock_chunks, profile)
 
-        # Chunk 0 and 1 should be in prompt, but chunk 2, 3, etc. should NOT be in prompt
+        # Chunk 0, 1, 2 should be in prompt, but chunk 3, 4, etc. should NOT be in prompt
         assert "Hướng dẫn y khoa chi tiết phần 0" in prompt
         assert "Hướng dẫn y khoa chi tiết phần 1" in prompt
-        assert "Hướng dẫn y khoa chi tiết phần 2" not in prompt
+        assert "Hướng dẫn y khoa chi tiết phần 2" in prompt
+        assert "Hướng dẫn y khoa chi tiết phần 3" not in prompt
         assert "Hướng dẫn y khoa chi tiết phần 9" not in prompt
 
 
@@ -111,7 +114,9 @@ class TestStatePruning:
 
     def test_prune_for_greeting_and_refuse(self, full_bloated_state):
         lean_greeting = get_lean_state_for_intent(full_bloated_state, "greeting")
-        assert set(lean_greeting.keys()) == {"message"}
+        # "disease" is kept (not full profile) so the greeting intro can name the
+        # patient's actual diabetes type instead of hard-coding "type 2".
+        assert set(lean_greeting.keys()) == {"message", "disease"}
 
         lean_refuse = get_lean_state_for_intent(full_bloated_state, "refuse")
         assert set(lean_refuse.keys()) == {"message"}

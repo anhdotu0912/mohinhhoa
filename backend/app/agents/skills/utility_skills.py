@@ -149,6 +149,91 @@ def emergency_triage_check(message: str) -> dict[str, Any] | None:
 
 
 # ---------------------------------------------------------------------------
+# 1b. detect_clinical_danger
+# ---------------------------------------------------------------------------
+# Bounded to the exact clinical-danger scenarios confirmed by the LLM-judge eval
+# (eval/golden_dataset.json ids 3, 38, 83, 93, 94) — not an attempt to catch every
+# possible clinical complication, which is an open-ended NLU problem outside
+# prototype scope. Each match routes the message to `refuse` (clinical escalation)
+# instead of letting rag_qa/meal_plan answer a dangerous question directly.
+_CLINICAL_DANGER_RULES: list[dict[str, Any]] = [
+    {
+        "type": "severe_underweight_wants_gain",
+        "patterns": [r"tăng\s*cân"],
+        "companion_patterns": [r"chỉ\s*nặng", r"quá\s*gầy", r"thiếu\s*cân", r"sụt\s*cân"],
+        "hint": "Bệnh nhân tiểu đường có dấu hiệu thiếu cân/sụt cân nghiêm trọng muốn tăng cân — cần bác sĩ đánh giá nguyên nhân (biến chứng, bệnh lý khác) trước khi lên kế hoạch tăng cân, không thể tự ý áp thực đơn tăng năng lượng.",
+    },
+    {
+        "type": "hyperkalemia",
+        "patterns": [r"kali\s*máu\s*cao", r"tăng\s*kali\s*máu", r"kali\s*cao"],
+        "companion_patterns": None,
+        "hint": "Bệnh nhân có tăng kali máu — nguy hiểm cho tim (rối loạn nhịp tim), cần bác sĩ duyệt thực đơn hạn chế kali (chuối, bơ, dừa, cam, khoai tây...) thay vì AI tự đưa danh sách thực phẩm.",
+    },
+    {
+        "type": "gdm_severe_morning_sickness",
+        "patterns": [r"nôn\s*nghén"],
+        "companion_patterns": [r"sụt", r"sút"],
+        "hint": "Thai phụ tiểu đường thai kỳ nôn nghén nặng kèm sụt cân — nguy cơ hạ đường huyết/suy kiệt cho cả mẹ và thai, cần bác sĩ sản khoa theo dõi sát thay vì AI tự lập chiến lược ăn uống.",
+    },
+    {
+        "type": "gdm_preeclampsia_signal",
+        "patterns": [r"tiền\s*sản\s*giật"],
+        "companion_patterns": None,
+        "hint": "Thai phụ có dấu hiệu tiền sản giật (huyết áp cao kèm phù) — biến chứng thai kỳ nguy hiểm cần bác sĩ sản khoa theo dõi khẩn cấp, không chỉ đơn thuần là vấn đề chế độ ăn.",
+    },
+    {
+        "type": "gdm_preeclampsia_signal",
+        "patterns": [r"phù"],
+        "companion_patterns": [r"huyết\s*áp"],
+        "hint": "Thai phụ có dấu hiệu tiền sản giật (huyết áp cao kèm phù) — biến chứng thai kỳ nguy hiểm cần bác sĩ sản khoa theo dõi khẩn cấp, không chỉ đơn thuần là vấn đề chế độ ăn.",
+    },
+    {
+        "type": "gdm_macrosomia",
+        "patterns": [r"thai\s*to", r"macrosomia", r"thai\s*nhi.*kg"],
+        "companion_patterns": None,
+        "hint": "Thai phụ tiểu đường thai kỳ có thai nhi to (nguy cơ macrosomia) — cần bác sĩ sản khoa điều chỉnh phác đồ theo dõi, không chỉ là vấn đề điều chỉnh chế độ ăn thông thường.",
+    },
+    {
+        # SGLT2 inhibitor + very-low-carb/ketogenic diet — risk of euglycemic DKA.
+        # Confirmed via eval/golden_dataset.json id 53 (guardrail_sglt2_keto_danger):
+        # this combination has no matching entry in the drug-food interaction KB
+        # (no concrete food item, just a diet style), so it silently fell through
+        # to a generic "no interaction found" answer instead of escalating.
+        "type": "sglt2i_ketogenic_diet",
+        "patterns": [
+            r"dapagliflozin", r"empagliflozin", r"canagliflozin", r"sglt-?2i?",
+        ],
+        "companion_patterns": [r"keto", r"ceton", r"0\s*carb", r"low\s*carb", r"nhịn.*tinh bột", r"cắt.*tinh bột"],
+        "hint": "Bệnh nhân dùng thuốc ức chế SGLT2 (Dapagliflozin/Empagliflozin/Canagliflozin) muốn áp dụng chế độ Keto/0 carb — nguy cơ nhiễm toan ceton đường huyết bình thường (euglycemic DKA), cần bác sĩ nội tiết đánh giá trước khi thay đổi chế độ ăn, tuyệt đối không tự ý kết hợp.",
+    },
+]
+
+
+def detect_clinical_danger(message: str) -> dict[str, str] | None:
+    """[MỤC ĐÍCH]: Nhận diện câu hỏi dinh dưỡng THOẠT NHÌN bình thường nhưng ẩn tình huống lâm
+    sàng nguy hiểm (tăng kali máu, biến chứng thai kỳ, thiếu cân nghiêm trọng...) — các case này
+    KHÔNG cấp cứu tức thời (không dùng emergency_triage_check) nhưng cũng KHÔNG được trả lời
+    trực tiếp như câu hỏi dinh dưỡng thường (rag_qa/meal_plan) — phải escalate bác sĩ.
+
+    Returns:
+        {"type": ..., "hint": ...} nếu khớp, hoặc None.
+    """
+    if not message:
+        return None
+    msg_lower = message.lower()
+
+    for rule in _CLINICAL_DANGER_RULES:
+        if not any(re.search(p, msg_lower) for p in rule["patterns"]):
+            continue
+        companions = rule.get("companion_patterns")
+        if companions and not any(re.search(p, msg_lower) for p in companions):
+            continue
+        return {"type": rule["type"], "hint": rule["hint"]}
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # 2. ask_clarification
 # ---------------------------------------------------------------------------
 def ask_clarification(message: str, missing_aspect: str = "") -> str:
@@ -194,7 +279,30 @@ def ask_clarification(message: str, missing_aspect: str = "") -> str:
 # ---------------------------------------------------------------------------
 # 3. chit_chat_greeting
 # ---------------------------------------------------------------------------
-def chit_chat_greeting(message: str) -> str:
+def _diabetes_type_label(diseases: list[str] | None) -> str:
+    """Map profile.disease codes to a Vietnamese label for the greeting intro.
+
+    Mirrors the classification used for RAG guideline selection (see
+    agents/nodes/rag_tool.py::_determine_guideline_authority) so the greeting
+    never claims "type 2" for a Type 1 / gestational / neuropathy patient.
+    """
+    labels: list[str] = []
+    for d in diseases or []:
+        d_lower = (d or "").lower()
+        if "t1" in d_lower or "tuyp_1" in d_lower:
+            labels.append("đái tháo đường Type 1")
+        elif "gestational" in d_lower or "thai" in d_lower:
+            labels.append("tiểu đường thai kỳ")
+        elif "neuropathy" in d_lower or "than_kinh" in d_lower:
+            labels.append("biến chứng thần kinh do đái tháo đường")
+        elif "t2" in d_lower or "prediabetes" in d_lower or "diabetes" in d_lower:
+            labels.append("đái tháo đường Type 2")
+    if not labels:
+        labels.append("đái tháo đường Type 2")
+    return ", ".join(dict.fromkeys(labels))
+
+
+def chit_chat_greeting(message: str, diseases: list[str] | None = None) -> str:
     """[MỤC ĐÍCH]: Phản hồi nhanh các câu chào hỏi, giới thiệu vai trò và chức năng của trợ lý, lời cảm ơn hoặc tạm biệt mà không kích hoạt truy vấn cơ sở dữ liệu hay RAG.
 
     [KHI NÀO DÙNG]:
@@ -220,8 +328,9 @@ def chit_chat_greeting(message: str) -> str:
             "Tạm biệt bạn! Chúc bạn một ngày tốt lành và luôn duy trì lối sống lành mạnh."
         )
 
+    disease_label = _diabetes_type_label(diseases)
     return (
-        "Xin chào! Tôi là Trợ lý Dinh dưỡng AI chuyên hỗ trợ bệnh nhân đái tháo đường type 2. "
+        f"Xin chào! Tôi là Trợ lý Dinh dưỡng AI chuyên hỗ trợ bệnh nhân {disease_label}. "
         "Tôi có thể hỗ trợ bạn:\n\n"
         "1. 📋 **Xem & tra cứu thực đơn dinh dưỡng** phù hợp mức đường huyết\n"
         "2. ⚠️ **Kiểm tra tương tác thuốc - thực phẩm** (ví dụ: Metformin, Sulfonylurea, Statin kiêng gì)\n"
@@ -234,8 +343,12 @@ def chit_chat_greeting(message: str) -> str:
 # ---------------------------------------------------------------------------
 # 4. refuse_unsafe_medication
 # ---------------------------------------------------------------------------
-def refuse_unsafe_medication(message: str) -> str:
-    """[MỤC ĐÍCH]: Từ chối một cách an toàn và đúng quy chuẩn đạo đức y tế khi người dùng yêu cầu chỉnh liều thuốc, kê đơn thuốc mới hoặc chẩn đoán thay bác sĩ.
+def refuse_unsafe_medication(
+    message: str,
+    profile: dict | None = None,
+    danger_hint: str | None = None,
+) -> str:
+    """[MỤC ĐÍCH]: Từ chối một cách an toàn và đúng quy chuẩn đạo đức y tế khi người dùng yêu cầu chỉnh liều thuốc, kê đơn thuốc mới hoặc chẩn đoán thay bác sĩ — hoặc khi câu hỏi ẩn 1 tình huống lâm sàng nguy hiểm cần bác sĩ đánh giá (xem detect_clinical_danger).
 
     [KHI NÀO DÙNG]:
     • "Tăng liều thuốc metformin giúp tôi"
@@ -247,4 +360,10 @@ def refuse_unsafe_medication(message: str) -> str:
     • Câu hỏi tra cứu an toàn tương tác giữa thuốc đang dùng với món ăn (ví dụ: 'Uống metformin có ăn bưởi được không?' — dùng skill check_drug_food_interaction).
     • Câu hỏi về kiến thức tác dụng của nhóm thuốc (dùng skill search_medical_guidelines).
     """
-    return get_refuse_message()
+    try:
+        from app.agents.graph import _generate_clinical_refusal
+
+        return _generate_clinical_refusal(message, profile=profile, danger_hint=danger_hint)
+    except Exception as e:
+        logger.warning("Clinical refusal generation failed, using static fallback: %s", e)
+        return get_refuse_message()

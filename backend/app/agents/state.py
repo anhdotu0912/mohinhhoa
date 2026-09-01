@@ -30,6 +30,7 @@ class AgentState(TypedDict, total=False):
     # Classification
     intent: str  # ... | weekly_compliance | doctor_note | metrics_delta_advice
     secondary_intents: list[str]  # multi-intent secondary detected intents
+    clinical_danger: dict | None  # set by detect_clinical_danger when intent="refuse" is a clinical escalation
 
     # RAG
     rag_context: list[RAGContext]

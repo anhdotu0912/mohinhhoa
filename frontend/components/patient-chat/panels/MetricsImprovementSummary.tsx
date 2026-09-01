@@ -5,8 +5,11 @@ import {
   METRIC_SERIES,
   calculateMetricDelta,
   getMetricClinicalStatus,
+  findBaselinePoint,
+  getActivePlanBaselineIso,
   type MetricSeriesId,
 } from "@/lib/metrics-series";
+import { parseFlexibleDate, formatDateFull } from "@/lib/plan-expiry";
 import type { MealPlanOutput, MetricsHistoryPoint, PatientProfile } from "@/lib/types";
 
 interface MetricsImprovementSummaryProps {
@@ -16,6 +19,16 @@ interface MetricsImprovementSummaryProps {
   activeTab: "comparison" | "nutrition" | "roadmap";
   onSelectTab?: (tab: "comparison" | "nutrition" | "roadmap") => void;
   onRecordClick?: () => void;
+}
+
+/** Source line for a guideline-derived claim — matches the citations[] convention
+ *  already used for MealPlanOutput / metrics_delta_advice per contracts/agent-io-schema.md. */
+function CitationFooter({ sources }: { sources: string[] }) {
+  return (
+    <p className="text-[10px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-100">
+      Nguồn: {sources.join(", ")}
+    </p>
+  );
 }
 
 export function MetricsImprovementSummary({
@@ -57,10 +70,8 @@ export function MetricsImprovementSummary({
   };
 
   const getBaselineValue = (id: MetricSeriesId): number | null => {
-    for (const p of sorted) {
-      const val = getMetricValue(p, id);
-      if (val != null) return val;
-    }
+    const pt = findBaselinePoint(sorted, (p) => getMetricValue(p, id) != null, activePlan);
+    if (pt) return getMetricValue(pt, id);
     if (!profile) return null;
     if (id === "weight" && profile.weight != null) return profile.weight;
     if (id === "bmi" && profile.bmi != null) return profile.bmi;
@@ -93,7 +104,22 @@ export function MetricsImprovementSummary({
   const hasHypertension = diseases.some((d) => /huyết áp|hypertension/i.test(d));
   const hasOverweight = (getLatestValue("bmi") ?? 23) >= 23;
   const currentWeight = getLatestValue("weight");
-  const targetWeightLoss = hasOverweight ? "1.5 – 2.0 kg/tháng" : "Duy trì ổn định";
+
+  // ADA Medical Nutrition Therapy: ≥5% weight loss brings meaningful glycemic/BP/lipid
+  // improvement; safe pace is 0.5–1 kg/week. This is a deterministic calculation from
+  // the guideline's own formula applied to the patient's real recorded weight — not a
+  // statistical extrapolation of noisy self-reported readings.
+  const weightLossPlan =
+    hasOverweight && currentWeight && currentWeight > 0
+      ? (() => {
+          const targetKg = Math.round(currentWeight * 0.05 * 10) / 10;
+          return {
+            targetKg,
+            minWeeks: Math.ceil(targetKg / 1.0),
+            maxWeeks: Math.ceil(targetKg / 0.5),
+          };
+        })()
+      : null;
 
   // Calculate average carb from active plan if available
   const avgCarbG = activePlan?.days?.length
@@ -102,6 +128,9 @@ export function MetricsImprovementSummary({
           activePlan.days.length
       )
     : 180;
+
+  const baselineSinceDate = parseFlexibleDate(getActivePlanBaselineIso(activePlan));
+  const baselineSinceLabel = baselineSinceDate ? formatDateFull(baselineSinceDate) : null;
 
   return (
     <div className="space-y-3.5">
@@ -171,6 +200,11 @@ export function MetricsImprovementSummary({
               <p className="text-slate-600 leading-relaxed">
                 Đánh giá mức độ cải thiện khi duy trì thực đơn dinh dưỡng kiểm soát đường huyết.
               </p>
+              {baselineSinceLabel && (
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  So với lúc bắt đầu thực đơn hiện tại ({baselineSinceLabel})
+                </p>
+              )}
             </div>
           </div>
 
@@ -337,7 +371,10 @@ export function MetricsImprovementSummary({
         </div>
       )}
 
-      {/* Tab 3: Dynamic Milestones Roadmap */}
+      {/* Tab 3: Evidence-cited timeline — guideline milestones + re-check schedule,
+          never a personal numeric forecast. Every claim traces to a source in
+          backend/data/guidelines/ so it satisfies the "no hallucinated health
+          numbers" rule the rest of the product follows. */}
       {activeTab === "roadmap" && (
         <div className="space-y-3">
           <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-xl flex items-start justify-between gap-3">
@@ -346,10 +383,10 @@ export function MetricsImprovementSummary({
                 <span className="material-symbols-outlined text-[#006857] text-[18px]">
                   timeline
                 </span>
-                Lộ trình dinh dưỡng {targetKcal} kcal/ngày
+                Lộ trình kỳ vọng theo phác đồ {targetKcal} kcal/ngày
               </h4>
               <p className="text-[11px] text-slate-600 leading-relaxed">
-                Dựa trên phác đồ của bệnh lý <strong>{diseases.join(", ")}</strong>:
+                Dựa trên khuyến nghị lâm sàng chung (ADA/BYT) cho bệnh lý <strong>{diseases.join(", ")}</strong> — không phải cam kết kết quả cá nhân. Tốc độ cải thiện thực tế tùy tuân thủ, cơ địa và chỉ định của bác sĩ.
               </p>
             </div>
             {isDoctorApproved && (
@@ -361,63 +398,84 @@ export function MetricsImprovementSummary({
           </div>
 
           <div className="relative pl-5 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-            {/* Week 1 */}
+            {/* Week 1-2: postprandial target — real ADA target, not a projection */}
             <div className="relative bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs">
               <div className="absolute -left-[19px] top-4 w-3.5 h-3.5 rounded-full bg-[#006857] border-2 border-white flex items-center justify-center" />
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-xs text-slate-900">
-                  Tuần 1: Thích nghi thực đơn ({targetKcal} kcal)
+                  Tuần 1 – 2: Thích nghi thực đơn ({targetKcal} kcal)
                 </span>
                 <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                  Giai đoạn 1
+                  Mục tiêu cần hướng tới
                 </span>
               </div>
               <p className="text-xs text-[#006857] font-semibold mt-1">
-                Đường sau ăn 2h &lt; 10.0 mmol/L, cắt giảm đỉnh nhọn
+                Đường sau ăn 1–2h &lt; 10.0 mmol/L
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                Carb GI thấp (~{avgCarbG}g/ngày) giúp đường huyết không tăng vọt sau ăn, giảm cảm giác thèm ngọt và mệt mỏi.
+                Carb GI thấp (~{avgCarbG}g/ngày), chia đều các bữa giúp hạn chế đỉnh đường huyết sau ăn.
               </p>
+              <CitationFooter sources={["ada_diabetes.md — mục tiêu đường huyết ADA"]} />
             </div>
 
-            {/* Week 2 - 4 */}
+            {/* Weight-loss timeline: deterministic calc from the ADA MNT formula
+                applied to the patient's real recorded weight, not a statistical
+                extrapolation of noisy daily readings. */}
             <div className="relative bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs">
               <div className="absolute -left-[19px] top-4 w-3.5 h-3.5 rounded-full bg-[#006857] border-2 border-white flex items-center justify-center" />
               <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-xs text-slate-900">
-                  Tuần 2 – 4: Phục hồi đường nền &amp; Cân nặng
-                </span>
+                <span className="font-bold text-xs text-slate-900">Giảm cân an toàn (nếu thừa cân)</span>
                 <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                  Giai đoạn 2
+                  Tính từ hồ sơ của bạn
                 </span>
               </div>
-              <p className="text-xs text-[#006857] font-semibold mt-1">
-                Đường lúc đói về ngưỡng 4.4 – 7.2 mmol/L · Giảm {targetWeightLoss}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                {hasHypertension
-                  ? "Tế bào gan tăng nhạy cảm với insulin; chế độ giảm muối giúp huyết áp ổn định."
-                  : "Tế bào gan tăng nhạy cảm với insulin, lượng mỡ nội tạng giảm giúp đường huyết lúc đói ổn định vững vàng."}
-              </p>
+              {weightLossPlan ? (
+                <>
+                  <p className="text-xs text-[#006857] font-semibold mt-1">
+                    Mục tiêu ~{weightLossPlan.targetKg} kg (5% cân nặng hiện tại {currentWeight} kg)
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                    Với tốc độ an toàn 0.5–1 kg/tuần theo ADA, thường mất khoảng {weightLossPlan.minWeeks}–{weightLossPlan.maxWeeks} tuần nếu duy trì đều đặn. Giảm ≥5% cân nặng đã cho thấy cải thiện đáng kể đường huyết, huyết áp và mỡ máu.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  Ghi nhận cân nặng để xem lộ trình giảm cân tính theo khuyến nghị ADA.
+                </p>
+              )}
+              <CitationFooter sources={["ada_diabetes.md — Medical Nutrition Therapy"]} />
             </div>
 
-            {/* Week 8 - 12 */}
+            {/* Re-check schedule instead of a numeric HbA1c promise */}
             <div className="relative bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs">
               <div className="absolute -left-[19px] top-4 w-3.5 h-3.5 rounded-full bg-[#006857] border-2 border-white flex items-center justify-center" />
               <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-xs text-slate-900">
-                  Tuần 8 – 12: Kiểm soát HbA1c bền vững
-                </span>
+                <span className="font-bold text-xs text-slate-900">Sau 3 tháng: đánh giá lại HbA1c</span>
                 <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200">
-                  Mục tiêu Bác sĩ
+                  Lịch tái khám
                 </span>
               </div>
               <p className="text-xs text-[#006857] font-semibold mt-1">
-                HbA1c giảm 0.5% – 1.0% (Mục tiêu &lt; 7.0%), ngừa biến chứng
+                Mục tiêu HbA1c &lt; 7.0%
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                Kết quả xét nghiệm 3 tháng phản ánh sự thích ứng của cơ thể với thực đơn dinh dưỡng, là cơ sở để bác sĩ cân nhắc liều thuốc.
+                Theo phác đồ ADA/BYT, HbA1c được xét nghiệm lại mỗi 3 tháng nếu chưa đạt mục tiêu, hoặc mỗi 6 tháng nếu đã ổn định. Đây là thời điểm bác sĩ đánh giá hiệu quả thực đơn và cân nhắc điều chỉnh phác đồ — không phải mốc tự AI đưa ra.
               </p>
+              <CitationFooter sources={["ada_diabetes.md", "byt_qd_5481_t2d.md — lịch tái khám"]} />
+            </div>
+
+            {/* Motivational, evidence-based — a population statistic from a landmark
+                trial, explicitly not framed as a personal guarantee. */}
+            <div className="relative bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs">
+              <div className="absolute -left-[19px] top-4 w-3.5 h-3.5 rounded-full bg-[#0369A1] border-2 border-white flex items-center justify-center" />
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[15px] text-[#0369A1]">insights</span>
+                <span className="font-bold text-xs text-slate-900">Vì sao kiểm soát tốt lại quan trọng</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Trong nghiên cứu dài hạn DCCT/EDIC, bệnh nhân duy trì HbA1c dưới 7% giảm 76% nguy cơ tiến triển bệnh võng mạc do đái tháo đường. Đây là số liệu thống kê từ nghiên cứu trên nhiều bệnh nhân, không phải kết quả cam kết cho riêng bạn.
+              </p>
+              <CitationFooter sources={["bien_chung_va_phong_ngua.md — DCCT/EDIC"]} />
             </div>
           </div>
         </div>

@@ -177,6 +177,7 @@ def check_drug_food_interaction(
     • Hỏi xem thực đơn ăn uống trong ngày hoặc trong tuần (dùng skill get_patient_meal_plan).
     • Hỏi danh sách nhóm thực phẩm kiến thức chung (ví dụ: 'các loại trái cây ít đường' — dùng skill search_medical_guidelines).
     • Yêu cầu kê đơn thuốc mới hoặc tự ý thay đổi liều lượng thuốc (dùng skill refuse_unsafe_medication).
+    • Hỏi về tác dụng phụ, hướng dẫn liều dùng, hoặc điều chỉnh lối sống (lượng nước uống, tần suất bữa ăn, cài đặt bơm insulin...) liên quan đến thuốc — không phải hỏi 1 món ăn/nhóm thực phẩm cụ thể ăn được không (dùng skill search_medical_guidelines). Ví dụ: 'Đang dùng Dapagliflozin cần lưu ý lượng nước uống thế nào?', 'Tiêm Ozempic bị buồn nôn nên điều chỉnh ăn uống ra sao?'.
     """
     from app.agents.interaction_checker_agent import (
         extract_foods_from_message,
@@ -185,7 +186,7 @@ def check_drug_food_interaction(
     )
 
     allergies = allergies or []
-    foods, is_specific_query = extract_foods_from_message(message)
+    foods, is_specific_query = extract_foods_from_message(message, medications=medications)
     allergy_warnings = check_allergy_match(allergies, foods)
 
     check_input = InteractionCheckInput(
@@ -226,8 +227,10 @@ def check_drug_food_interaction(
         answer_text = "\n\n".join(lines)
     else:
         if is_specific_query and foods:
-            from app.agents.graph import _generate_safe_food_answer
-            answer_text = _generate_safe_food_answer(message, medications, foods)
+            from app.agents.graph import _generate_unmatched_kb_answer
+            answer_text = _generate_unmatched_kb_answer(
+                message, medications, foods, result.unmatched_pairs
+            )
         else:
             answer_text = f"✅ Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra trong cơ sở dữ liệu."
 
@@ -261,6 +264,8 @@ def search_medical_guidelines(
     • "Chỉ số GI của gạo lứt là bao nhiêu?"
     • "Lợi ích của cá hồi đối với kiểm soát đường huyết?"
     • "Bị đái tháo đường type 2 cần kiêng những gì?"
+    • "Đang dùng Dapagliflozin cần lưu ý lượng nước uống thế nào?" (tác dụng phụ/lối sống khi dùng thuốc — không phải hỏi 1 món ăn cụ thể).
+    • "Tiêm Ozempic bị buồn nôn nên điều chỉnh ăn uống ra sao?"
 
     [TUYỆT ĐỐI KHÔNG DÙNG]:
     • Bệnh nhân hỏi xem thực đơn cụ thể đã tạo trong ứng dụng (dùng skill get_patient_meal_plan).

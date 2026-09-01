@@ -15,6 +15,7 @@ import {
   parseGlucoseMmol,
   getMetricClinicalStatus,
   calculateMetricDelta,
+  findBaselinePoint,
   type MetricClinicalStatus,
   type MetricDeltaCalculation,
 } from "@/lib/metrics-series";
@@ -85,9 +86,9 @@ export function HealthMetricsPanel() {
   }, [sortedHistory, profile]);
 
   const baselineWeight = useMemo(() => {
-    const pt = sortedHistory.find((p) => p.weight != null);
+    const pt = findBaselinePoint(sortedHistory, (p) => p.weight != null, activePlan);
     return pt?.weight ?? profile?.weight ?? null;
-  }, [sortedHistory, profile]);
+  }, [sortedHistory, profile, activePlan]);
 
   const latestBmi = useMemo(() => {
     const pt = [...sortedHistory].reverse().find((p) => p.bmi != null);
@@ -95,9 +96,9 @@ export function HealthMetricsPanel() {
   }, [sortedHistory, profile]);
 
   const baselineBmi = useMemo(() => {
-    const pt = sortedHistory.find((p) => p.bmi != null);
+    const pt = findBaselinePoint(sortedHistory, (p) => p.bmi != null, activePlan);
     return pt?.bmi ?? profile?.bmi ?? null;
-  }, [sortedHistory, profile]);
+  }, [sortedHistory, profile, activePlan]);
 
   const latestBP = useMemo(() => {
     const pt = [...sortedHistory]
@@ -130,8 +131,10 @@ export function HealthMetricsPanel() {
   }, [sortedHistory, profile]);
 
   const baselineGlucose = useMemo(() => {
-    const pt = sortedHistory.find(
-      (p) => p.glucose_fasting != null || Boolean(p.blood_glucose)
+    const pt = findBaselinePoint(
+      sortedHistory,
+      (p) => p.glucose_fasting != null || Boolean(p.blood_glucose),
+      activePlan
     );
     if (!pt) {
       if (profile?.blood_glucose) {
@@ -141,7 +144,7 @@ export function HealthMetricsPanel() {
     }
     if (pt.glucose_fasting != null) return pt.glucose_fasting;
     return parseGlucoseMmol(pt.blood_glucose);
-  }, [sortedHistory, profile]);
+  }, [sortedHistory, profile, activePlan]);
 
   // Overall Health Impact Summary
   const impactSummary = useMemo(() => {

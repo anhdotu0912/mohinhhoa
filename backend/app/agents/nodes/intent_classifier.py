@@ -174,7 +174,17 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
     has_explicit_drug = bool(
         re.search(r"tương tác|thuốc|metformin|gliclazide|glipizide|insulin|sitagliptin|atorvastatin|statin", message_lower)
     )
-    if not has_explicit_drug:
+    # A drug name alone isn't enough signal for interaction_check — "thuốc X + tác dụng
+    # phụ/liều/lối sống" (no concrete food/drink item) is a rag_qa question, not a
+    # drug-food pair lookup (see search_medical_guidelines vs check_drug_food_interaction
+    # docstrings).
+    has_lifestyle_signal = bool(
+        re.search(
+            r"tác dụng phụ|cần lưu ý|điều chỉnh|cài (?:đặt|liều)|buồn nôn|đầy bụng|lượng nước",
+            message_lower,
+        )
+    )
+    if not has_explicit_drug or has_lifestyle_signal:
         for pattern in _RAG_QA_PATTERNS:
             if re.search(pattern, message_lower):
                 return "rag_qa", []
@@ -183,6 +193,11 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
 
     for intent, patterns in _INTENT_PATTERNS.items():
         if intent == "refuse":
+            continue
+        # Lifestyle/side-effect questions about a drug ("cần lưu ý gì", "điều chỉnh
+        # ăn uống ra sao", "cài liều insulin thế nào") are rag_qa, not a drug-food
+        # pair lookup — even though a drug name is present.
+        if intent == "interaction_check" and has_lifestyle_signal:
             continue
         for pattern in patterns:
             m = re.search(pattern, message_lower)
@@ -277,10 +292,20 @@ def intent_classifier(state: AgentState) -> AgentState:
         return {**state, "intent": "unknown", "secondary_intents": []}
 
     # Tier 2: Check Emergency Triage first (0 tokens)
-    from app.agents.skills import emergency_triage_check
+    from app.agents.skills import detect_clinical_danger, emergency_triage_check
     if emergency_triage_check(message) is not None:
         logger.info("Tier 2 Fast-Path: Emergency triage detected (0 LLM tokens)")
         return {**state, "intent": "unknown", "secondary_intents": []}
+
+    # Tier 2: Clinical danger hidden in an otherwise normal nutrition question
+    # (hyperkalemia, GDM complications, severe underweight...) — must escalate to
+    # a doctor via `refuse`, not be answered directly by rag_qa/meal_plan.
+    danger = detect_clinical_danger(message)
+    if danger is not None:
+        logger.info(
+            "Tier 2 Fast-Path: Clinical danger detected (%s) — routing to refuse", danger["type"]
+        )
+        return {**state, "intent": "refuse", "secondary_intents": [], "clinical_danger": danger}
 
     # Tier 2: Rule-based fast-path for deterministic intents (0 tokens)
     kw_primary, kw_secondary = _detect_intents_by_keywords(message)
