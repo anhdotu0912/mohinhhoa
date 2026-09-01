@@ -841,7 +841,7 @@ export default function PatientOnboardingPage() {
               <button
                 type="button"
                 onClick={goNext}
-                className="flex-[2] bg-primary text-on-primary font-body-bold py-md px-lg rounded-xl hover:bg-primary-container transition-colors shadow-xs active:scale-[0.99] flex items-center justify-center gap-xs text-sm font-bold cursor-pointer"
+                className="flex-[2] bg-primary text-on-primary font-body-bold py-md px-lg rounded-xl hover:bg-primary/90 transition-colors shadow-xs active:scale-[0.99] flex items-center justify-center gap-xs text-sm font-bold cursor-pointer"
               >
                 Tiếp tục
                 <span className="material-symbols-outlined text-[18px]">
@@ -853,7 +853,7 @@ export default function PatientOnboardingPage() {
                 type="button"
                 onClick={() => void completeOnboarding()}
                 disabled={loading}
-                className="flex-[2] bg-primary text-on-primary font-body-bold py-md px-lg rounded-xl hover:bg-primary-container transition-colors shadow-xs active:scale-[0.99] flex items-center justify-center gap-xs text-sm font-bold cursor-pointer disabled:opacity-60"
+                className="flex-[2] bg-primary text-on-primary font-body-bold py-md px-lg rounded-xl hover:bg-primary/90 transition-colors shadow-xs active:scale-[0.99] flex items-center justify-center gap-xs text-sm font-bold cursor-pointer disabled:opacity-60"
               >
                 {loading ? "Đang lưu..." : "Hoàn tất hồ sơ"}
                 {!loading && (

@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-sm rounded-lg bg-primary text-on-primary font-semibold disabled:opacity-60"
+            className="w-full py-sm rounded-lg bg-primary hover:bg-primary/90 text-on-primary font-semibold transition-all cursor-pointer disabled:opacity-60"
           >
             {loading ? "Đang lưu…" : "Đặt lại mật khẩu"}
           </button>

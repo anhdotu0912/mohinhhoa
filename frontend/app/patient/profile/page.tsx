@@ -276,7 +276,7 @@ function ChangePasswordCard() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary-container transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary/90 transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
           >
             {submitting ? (
               <>
@@ -902,7 +902,7 @@ export default function PatientProfilePage() {
                 <button
                   type="button"
                   onClick={startEditing}
-                  className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary-container transition-all shadow-xs text-sm cursor-pointer active:scale-95"
+                  className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary/90 transition-all shadow-xs text-sm cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[20px]">edit</span>
                   Chỉnh sửa hồ sơ
@@ -921,7 +921,7 @@ export default function PatientProfilePage() {
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary-container transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-2.5 px-5 rounded-xl hover:bg-primary/90 transition-all shadow-xs text-sm cursor-pointer disabled:opacity-50"
                   >
                     {saving ? (
                       <>
@@ -2155,7 +2155,7 @@ export default function PatientProfilePage() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2 bg-primary hover:bg-primary-container text-on-primary font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-2 bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -2230,7 +2230,7 @@ export default function PatientProfilePage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAvatar}
-                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-xl shadow-xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {uploadingAvatar ? "Đang tải ảnh..." : "Chọn tệp ảnh"}
               </button>

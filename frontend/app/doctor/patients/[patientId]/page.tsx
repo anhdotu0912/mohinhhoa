@@ -1548,7 +1548,7 @@ export default function PatientDetailPage() {
                 type="button"
                 onClick={() => void handleSaveProfile()}
                 disabled={savingProfile}
-                className="bg-primary text-on-primary px-lg py-2 rounded-lg font-body-bold text-sm hover:bg-primary-container transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
+                className="bg-primary text-on-primary px-lg py-2 rounded-lg font-body-bold text-sm hover:bg-primary/90 transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
               >
                 <span
                   className={`material-symbols-outlined text-[18px] ${savingProfile ? "animate-spin" : ""

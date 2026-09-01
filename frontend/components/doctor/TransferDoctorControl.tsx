@@ -107,7 +107,7 @@ export function TransferDoctorControl({
               type="button"
               onClick={() => void submit()}
               disabled={!selected || sending || colleagues.length === 0}
-              className="h-8 px-3 rounded-lg bg-primary text-on-primary text-[11px] font-bold disabled:opacity-50 cursor-pointer"
+              className="h-8 px-3 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-[11px] font-bold transition-all disabled:opacity-50 cursor-pointer"
             >
               {sending ? "Đang gửi…" : "Gửi đề xuất"}
             </button>
