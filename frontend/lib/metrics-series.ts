@@ -446,3 +446,36 @@ export function calculateMetricDelta(
   };
 }
 
+/** ISO date đánh dấu "bắt đầu dùng" 1 plan: starts_on, fallback created_at. */
+export function getActivePlanBaselineIso(
+  activePlan?: { starts_on?: string | null; created_at?: string | null } | null
+): string | null {
+  if (!activePlan) return null;
+  return activePlan.starts_on ?? activePlan.created_at ?? null;
+}
+
+/**
+ * Bản ghi sớm nhất thoả `hasValue` trong `sortedAscHistory` (đã sort tăng dần theo
+ * recorded_at), ưu tiên tính TỪ ngày plan đang active bắt đầu. Nếu không có active
+ * plan, không parse được ngày, hoặc chưa có bản ghi nào kể từ mốc đó (bệnh nhân
+ * chưa đo gì từ khi đổi plan) → fallback về hành vi cũ: bản ghi sớm nhất toàn bộ
+ * lịch sử. Tránh baseline = null làm mất UI so sánh.
+ */
+export function findBaselinePoint<T extends { recorded_at: string }>(
+  sortedAscHistory: T[],
+  hasValue: (point: T) => boolean,
+  activePlan?: { starts_on?: string | null; created_at?: string | null } | null
+): T | null {
+  const sinceIso = getActivePlanBaselineIso(activePlan);
+  if (sinceIso) {
+    const sinceTime = new Date(sinceIso).getTime();
+    if (!Number.isNaN(sinceTime)) {
+      const withinPlan = sortedAscHistory.find(
+        (p) => hasValue(p) && new Date(p.recorded_at).getTime() >= sinceTime
+      );
+      if (withinPlan) return withinPlan;
+    }
+  }
+  return sortedAscHistory.find(hasValue) ?? null;
+}
+
