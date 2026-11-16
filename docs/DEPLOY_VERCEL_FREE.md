@@ -47,6 +47,10 @@ demo trên màn hình đăng nhập chỉ đúng nếu được chọn giống k
   phẩy. Nếu kiểm tra bằng một URL Preview, thêm đúng origin đó. Không dùng `*`.
 - Giữ Vercel Authentication khi dùng dữ liệu local. Frontend dùng proxy cùng
   origin và khóa server-to-server của backend; không cần mở API công khai.
+- Khi chuyển hồ sơ thật, đặt Vercel Authentication thành **All Deployments**
+  cho cả hai project. Standard Protection không bảo vệ đầy đủ domain production.
+  Người mở web cần dùng tài khoản Vercel được cấp quyền trước khi đăng nhập
+  tài khoản ứng dụng.
 - Deploy, kiểm tra `/health` trả database `ok` và provider `bm25` ready.
 
 `vercel_backend.py` trỏ đến cùng FastAPI app với bản local. Dependency ở
