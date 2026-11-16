@@ -70,7 +70,8 @@ out/
 .ai-log/archive/
 
 ui/
-static/
+/static/
+/backend/static/
 .reasonix/
 reasonix.toml
 
