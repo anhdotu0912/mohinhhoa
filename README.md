@@ -216,6 +216,7 @@ Khi import repo `anhdotu0912/mohinhhoa` trên Vercel:
 4. Đặt `NEXT_PUBLIC_API_BASE_URL` thành URL HTTPS của backend đã deploy, rồi Redeploy để áp dụng cấu hình mới. `localhost:8000` chỉ dùng khi chạy tại máy.
 
 Font Inter được đóng gói cùng frontend để build không cần tải Google Fonts.
+Trên Vercel, `next.config.mjs` dùng chế độ đóng gói mặc định của nền tảng; các bản build Docker vẫn dùng `standalone`. Không bật `output: "standalone"` trên Vercel với Next.js 16.3.0 vì bước hoàn tất build có thể lỗi thiếu `next-server.js.nft.json`.
 Nếu gặp trang Vercel `404 NOT_FOUND`, kiểm tra nhánh, Root Directory và domain đang trỏ đến deployment nào; lỗi này cũng có thể xuất hiện khi domain/deployment không còn tồn tại.
 
 GitHub Actions workflow `.github/workflows/deploy.yml` deploy frontend khi push `main`/`dev`. Cần secrets:
