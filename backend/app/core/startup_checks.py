@@ -41,7 +41,7 @@ def validate_security_settings() -> None:
             "No LLM API key configured for provider=%s — agents may fail or fall back unexpectedly.",
             settings.LLM_PROVIDER,
         )
-    if not _has_embedding_api_key(settings):
+    if settings.RAG_RETRIEVAL_MODE != "keyword" and not _has_embedding_api_key(settings):
         logger.warning(
             "GEMINI_API_KEY is empty while EMBEDDING_PROVIDER=gemini — "
             "RAG will fall back to local MiniLM; re-index after deploy if embeddings change."

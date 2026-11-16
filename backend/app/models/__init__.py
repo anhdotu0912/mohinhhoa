@@ -14,6 +14,7 @@ from app.models.password_reset import PasswordResetToken
 from app.models.patient_transfer import PatientTransfer
 from app.models.profile import Profile
 from app.models.user import User
+from app.models.user_avatar import UserAvatar
 
 __all__ = [
     "Alert",
@@ -37,4 +38,5 @@ __all__ = [
     "Profile",
     "Recipe",
     "User",
+    "UserAvatar",
 ]

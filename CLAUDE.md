@@ -55,6 +55,7 @@
 - Database: **PostgreSQL duy nhất** (`DATABASE_URL`, mặc định `docker-compose.yml` service `postgres`) — ADR-005 (update 2026-08-19: bỏ SQLite khỏi default/dev; SQLite in-memory chỉ còn dùng nội bộ trong pytest fixtures)
 - Auth: JWT, 2 role API (`patient`, `doctor`)
 - Deploy hiện tại: `docker-compose` local + `docker-compose.prod.yml` VPS (`deploy/bootstrap.sh`); frontend có thể deploy Vercel qua GitHub Actions
+- Vercel Hobby profile: backend FastAPI project ở gốc repo (`vercel_backend.py`, `pyproject.toml` nhẹ), PostgreSQL hosted/Neon, BM25 `keyword` thay embedding local, avatar trong database. Bootstrap schema qua CLI trước deploy; không tự seed demo trên request. Xem `docs/DEPLOY_VERCEL_FREE.md`.
 
 **Frontend**
 - Framework: Next.js 16 (App Router)

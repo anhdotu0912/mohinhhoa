@@ -1,7 +1,7 @@
 # API v1 Contract — VinNutri (FE ↔ BE)
 
-**Version:** 1.28 (2026-11-16 — bệnh nhân tự sửa thông tin tài khoản và hồ sơ)
-**Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
+**Version:** 1.29 (2026-11-17 — triển khai serverless, ảnh đại diện bền vững)
+**Base URL:** tất cả endpoint dưới đây (trừ Health và URL ảnh `/static/avatars/...`) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
 **Đánh dấu trạng thái:** endpoint không ghi gì = **as-built, đang hoạt động**. Endpoint có nhãn `[Planned]` = chưa tồn tại trong code, là thiết kế đề xuất cho spec liên quan.
@@ -67,6 +67,8 @@
 // Error 415 { "code": "INVALID_IMAGE", "detail": "File phải là ảnh (png/jpg/webp/gif)." }
 // Error 413 { "code": "IMAGE_TOO_LARGE", "detail": "Ảnh tối đa 2MB." }
 ```
+
+`GET /static/avatars/{filename}` (không có prefix `/api/v1`) trả bytes ảnh với MIME đã xác thực; không tìm thấy trả 404. Khi `AVATAR_STORAGE=database`, bytes ảnh lưu trong PostgreSQL để không mất khi function khởi động lại; URL upload không đổi. Chế độ `local` tiếp tục phục vụ file như trước.
 
 ### `POST /auth/forgot-password` (as-built 2026-08-18)
 **Role:** Không cần auth. **Quyết định 2026-08-18:** gửi **mật khẩu mới** qua SMTP tới email đã đăng ký (không in token ra log). Nếu email không tồn tại vẫn trả 200 cùng message — tránh lộ thông tin tồn tại email. Mật khẩu cũ chỉ bị thay khi gửi email thành công.
@@ -1089,9 +1091,11 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 ### `GET /health`
 **Role:** không cần auth. **Không** có prefix `/api/v1` (root-level).
 ```json
-// Response 200
-{ "status": "ok" }
+// Response 200 (dense mode uses provider "qdrant")
+{ "status": "ok", "database": { "status": "ok" }, "vector_store": { "provider": "bm25", "ready": true, "missing": [], "empty": [] } }
 ```
+
+`status` là `ok` hoặc `degraded`. `RAG_RETRIEVAL_MODE=keyword` kiểm tra corpus thực phẩm/hướng dẫn đi kèm, không mở Qdrant hay tải mô hình embedding. Backend serverless vẫn dùng PostgreSQL; cơ sở dữ liệu được khởi tạo bằng tác vụ quản trị trước deploy, không thay bằng SQLite hoặc tự tạo tài khoản demo khi có request.
 
 ### `GET /`
 **Role:** không cần auth. Root check.
@@ -1134,6 +1138,7 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
+- **Changelog 1.28 → 1.29 (2026-11-17):** thêm lưu avatar trong PostgreSQL cho serverless, giữ URL `/static/avatars/{filename}`; health báo đúng chế độ BM25/Qdrant. Entry point Vercel dùng dependency nhẹ, corpus sẵn có và không ghi file runtime; schema/tài khoản được khởi tạo qua CLI quản trị trước deploy. Không đổi payload đăng nhập/chat/thực đơn.
 - **Changelog 1.27 → 1.28 (2026-11-16):** bệnh nhân sửa `full_name`/`email` qua `POST /profile`, cùng transaction hồ sơ, kiểm tra định dạng/trùng email. Trang bác sĩ bỏ form sửa hồ sơ chung; bệnh nhân chỉnh tại `/patient/profile`. Không đổi response.
 - **Changelog 1.26 → 1.27 (2026-11-16):** `POST /chat` và `/chat/stream` nhận `session_id?: string | null` (tối đa 36 ký tự). Server kiểm tra chủ sở hữu, đọc tối đa 8 tin gần nhất để hiểu câu hỏi tiếp nối; session không tồn tại/không thuộc người gọi trả 404 trước khi mở SSE. Không tự ghi hồ sơ sức khỏe hay tạo thực đơn từ chat. Chế độ không LLM hỗ trợ tra cứu thực phẩm/công thức có nguồn, so sánh trên cùng cơ sở định lượng, gợi ý theo nguyên liệu/sở thích và hỏi lại khi mơ hồ; thêm intent `clarify` cho câu hỏi làm rõ không chứa kết luận y khoa, không hứa trả lời mọi chủ đề chưa có dữ liệu.
 

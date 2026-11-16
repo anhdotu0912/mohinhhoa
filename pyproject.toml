@@ -1,0 +1,23 @@
+[project]
+name = "vinnutri-vercel-api"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.139.2",
+  "pydantic==2.13.4",
+  "pydantic-settings==2.15.0",
+  "python-dotenv==1.2.2",
+  "langchain-openai==1.4.2",
+  "langgraph==1.2.10",
+  "python-jose[cryptography]==3.5.0",
+  "bcrypt>=4.1,<6",
+  "sqlalchemy==2.0.51",
+  "psycopg2-binary==2.9.12",
+  "rank-bm25==0.2.2",
+  "unidecode==1.4.0",
+  "httpx==0.28.1",
+  "python-multipart==0.0.32",
+]
+
+[tool.vercel]
+entrypoint = "vercel_backend:app"

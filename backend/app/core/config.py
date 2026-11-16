@@ -11,7 +11,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Load .env từ cwd, rồi project files. Project `.env` ghi đè User/Machine
 # Windows env để key trong repo (vd. DEEPSEEK_API_KEY) luôn thắng khi chạy local.
 # Pytest sets PYTEST_RUNNING=1 and hermetic env vars first — do not override those.
-_DOTENV_OVERRIDE = os.getenv("PYTEST_RUNNING") != "1"
+_DOTENV_OVERRIDE = not (
+    os.getenv("PYTEST_RUNNING") == "1"
+    or os.getenv("VERCEL")
+    or os.getenv("APP_ENV") == "production"
+)
 load_dotenv(override=_DOTENV_OVERRIDE)
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]  # backend/
@@ -42,6 +46,9 @@ class Settings(BaseSettings):
 
     # Database — PostgreSQL only (see ADR-005 update 2026-08-19)
     DATABASE_URL: str = "postgresql://p014:p014@localhost:5432/p014"
+    DATABASE_POOL_MODE: Literal["queue", "null"] = "queue"
+    INITIALIZE_DATABASE_ON_STARTUP: bool = True
+    AVATAR_STORAGE: Literal["local", "database"] = "local"
 
     # Vector Store — Qdrant only (see ADR-001 update 2026-08-19)
     QDRANT_PERSIST_DIR: str = "./qdrant_db"
@@ -58,6 +65,7 @@ class Settings(BaseSettings):
     # Optional — pytest / programmatic seed; prefer CLI `scripts.create_demo_accounts`.
     DEMO_PASSWORD: str = ""
     CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGIN_REGEX: str = ""
     FRONTEND_URL: str = "http://localhost:3000"
 
     # SMTP — chỉ cần USERNAME + PASSWORD (App Password). Host/port/TLS mặc định Gmail.

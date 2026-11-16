@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
@@ -39,6 +40,8 @@ else:
     # Postgres: pool_pre_ping để né connection bị drop bởi managed DB
     # (Railway/Supabase/Neon...), giúp khởi động lại an toàn sau idle.
     _engine_kwargs["pool_pre_ping"] = True
+    if settings.DATABASE_POOL_MODE == "null":
+        _engine_kwargs["poolclass"] = NullPool
 
 engine = create_engine(_database_url(), **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

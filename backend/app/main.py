@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     routes_alerts,
     routes_auth,
+    routes_avatars,
     routes_chat,
     routes_compliance,
     routes_doctor,
@@ -35,7 +37,6 @@ from app.db.session import engine
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 _REQUIRED_COLLECTIONS = ("food_items", "guidelines")
 
@@ -74,7 +75,29 @@ def _check_qdrant_readiness() -> dict[str, object]:
 
 
 def check_vector_store_readiness() -> dict[str, object]:
-    """Return Qdrant readiness."""
+    """Check the selected retrieval backend without loading an embedding model."""
+    if settings.RAG_RETRIEVAL_MODE == "keyword":
+        data_dir = Path(__file__).resolve().parents[1] / "data"
+        missing, empty = [], []
+        food_path = data_dir / "food_db_vn.json"
+        if not food_path.is_file():
+            missing.append("food_items")
+        else:
+            try:
+                foods = json.loads(food_path.read_text(encoding="utf-8"))
+                if not isinstance(foods, list) or not foods:
+                    empty.append("food_items")
+            except (OSError, ValueError):
+                empty.append("food_items")
+        guidelines = list((data_dir / "guidelines").glob("*.md"))
+        if not guidelines:
+            missing.append("guidelines")
+        elif not any(path.stat().st_size for path in guidelines):
+            empty.append("guidelines")
+        return {
+            "provider": "bm25", "ready": not missing and not empty,
+            "missing": missing, "empty": empty,
+        }
     try:
         return _check_qdrant_readiness()
     except Exception as exc:  # noqa: BLE001 — health probe only
@@ -108,7 +131,8 @@ def _warn_if_vector_store_empty() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_security_settings()
-    init_db()
+    if settings.INITIALIZE_DATABASE_ON_STARTUP:
+        init_db()
     _warn_if_vector_store_empty()
     yield
     from app.rag.qdrant import close_qdrant_client
@@ -117,12 +141,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VinNutri API", version="0.1.0", lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if settings.AVATAR_STORAGE == "database":
+    app.include_router(routes_avatars.router)
+else:
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
     allow_methods=["*"],
     allow_headers=["*"],
 )

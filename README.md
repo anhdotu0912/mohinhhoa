@@ -208,6 +208,8 @@ Script sẽ:
 
 ### Deploy frontend riêng (Vercel)
 
+Muốn đăng nhập và dùng đủ API online mà không có VPS: xem [Vercel Hobby + Neon Free](docs/DEPLOY_VERCEL_FREE.md). Repo có cấu hình backend FastAPI ở gốc và cấu hình frontend Next.js riêng trong `frontend/`.
+
 Khi import repo `anhdotu0912/mohinhhoa` trên Vercel:
 
 1. Chọn nhánh `feature/fe-patient-meal-plan-flow` (nhánh chứa mã nguồn hiện tại). Nếu dùng deployment production, đặt Production Branch thành nhánh này trong Project Settings.
