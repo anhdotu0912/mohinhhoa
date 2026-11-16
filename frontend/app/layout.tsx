@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { APP_NAME } from "@/lib/brand";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
+const inter = localFont({
+  src: "./fonts/InterVariable.woff2",
+  variable: "--font-inter",
+  weight: "100 900",
+  display: "swap",
+});
 
 const materialSymbols = localFont({
   src: "../node_modules/material-symbols/material-symbols-outlined.woff2",

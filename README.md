@@ -208,6 +208,16 @@ Script sẽ:
 
 ### Deploy frontend riêng (Vercel)
 
+Khi import repo `anhdotu0912/mohinhhoa` trên Vercel:
+
+1. Chọn nhánh `feature/fe-patient-meal-plan-flow` (nhánh chứa mã nguồn hiện tại). Nếu dùng deployment production, đặt Production Branch thành nhánh này trong Project Settings.
+2. Đặt **Root Directory** là `frontend`, **Framework Preset** là **Next.js**. Thư mục gốc repo chỉ có package phụ trợ, không phải ứng dụng web.
+3. Build bằng `npm run build`, cài dependencies bằng `npm ci`, Output Directory là `.next`. File `frontend/vercel.json` cung cấp các giá trị này.
+4. Đặt `NEXT_PUBLIC_API_BASE_URL` thành URL HTTPS của backend đã deploy, rồi Redeploy để áp dụng cấu hình mới. `localhost:8000` chỉ dùng khi chạy tại máy.
+
+Font Inter được đóng gói cùng frontend để build không cần tải Google Fonts.
+Nếu gặp trang Vercel `404 NOT_FOUND`, kiểm tra nhánh, Root Directory và domain đang trỏ đến deployment nào; lỗi này cũng có thể xuất hiện khi domain/deployment không còn tồn tại.
+
 GitHub Actions workflow `.github/workflows/deploy.yml` deploy frontend khi push `main`/`dev`. Cần secrets:
 
 - `VERCEL_TOKEN`
