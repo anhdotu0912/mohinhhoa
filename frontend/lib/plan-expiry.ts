@@ -72,7 +72,7 @@ export function getMonday(d: Date): Date {
 
 export function bucketFromDaysLeft(daysLeft: number | null): PlanExpiryBucket {
   if (daysLeft === null) return "none";
-  if (daysLeft <= 0) return "expired";
+  if (daysLeft < 0) return "expired";
   if (daysLeft <= EXPIRING_THRESHOLD_DAYS) return "expiring";
   return "ok";
 }
@@ -198,7 +198,7 @@ export function patientUsageLabel(status: PlanUsageStatus): string {
     case "upcoming":
       return "Sắp áp dụng";
     case "finished":
-      return "Đã dùng xong";
+      return "Hoàn thành";
     default:
       return "Chưa có thực đơn";
   }

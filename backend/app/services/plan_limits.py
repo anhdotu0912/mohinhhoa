@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import vn_today
 from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
@@ -17,6 +18,7 @@ from app.services.plan_apply import (
     find_upcoming_plan,
     reconcile_overlapping_applied_plans,
 )
+from app.services.plan_expiry import is_plan_historical
 
 UNASSIGNED_DRAFT = frozenset({"pending_review"})
 UNASSIGNED_APPROVED = frozenset({"approved", "edited"})
@@ -37,17 +39,18 @@ def _unassigned_query(db: Session, user_id: str, statuses: frozenset[str]):
 
 def assert_can_generate_meal_plan(db: Session, user_id: str) -> None:
     """At most one pending draft and one approved-but-unscheduled plan per patient."""
-    if _unassigned_query(db, user_id, UNASSIGNED_DRAFT).first() is not None:
+    today = vn_today()
+    if any(not is_plan_historical(row, today) for row in _unassigned_query(db, user_id, UNASSIGNED_DRAFT).all()):
         raise APIError(
             409,
             "PLAN_ALREADY_PENDING",
-            "Bệnh nhân đã có thực đơn chờ duyệt. Hãy duyệt hoặc xóa trước khi tạo mới.",
+            "Bạn đã có thực đơn chờ bác sĩ duyệt. Vui lòng chờ kết quả trước khi tạo mới.",
         )
-    if _unassigned_query(db, user_id, UNASSIGNED_APPROVED).first() is not None:
+    if any(not is_plan_historical(row, today) for row in _unassigned_query(db, user_id, UNASSIGNED_APPROVED).all()):
         raise APIError(
             409,
             "PLAN_UNASSIGNED_APPROVED",
-            "Đã có thực đơn đã duyệt chưa áp dụng. Hãy áp dụng hoặc xóa trước khi tạo mới.",
+            "Bạn đã có thực đơn được duyệt. Vui lòng chờ bác sĩ áp dụng trước khi tạo mới.",
         )
 
 

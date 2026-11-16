@@ -146,12 +146,14 @@ function cleanPortion(rawPortion?: string): string | null {
 export function MealItemRow({
   item,
   onChange,
+  readOnly = false,
 }: {
   item: FoodItem;
   onChange?: (next: FoodItem) => void;
+  readOnly?: boolean;
 }) {
   const [current, setCurrent] = useState(item);
-  const alternatives = safeAlternatives(current);
+  const alternatives = readOnly ? [] : safeAlternatives(current);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);

@@ -7,7 +7,7 @@ import type {
 import { ESCALATION_REASON_LABEL } from "@/lib/escalation";
 import {
   doctorChartHref,
-  doctorGenerateHref,
+  doctorMealPlansHref,
   doctorInboxHref,
   doctorReviewHref,
   type InboxJobType,
@@ -50,7 +50,7 @@ export const INBOX_TYPE_META: Record<
     iconWrap: "bg-sky-500/10 text-sky-700",
   },
   generate_request: {
-    label: "Yêu cầu tạo thực đơn",
+    label: "Yêu cầu hỗ trợ thực đơn",
     icon: "restaurant_menu",
     chipClass: "bg-emerald-50 text-emerald-800 border-emerald-200/70",
     iconWrap: "bg-primary/10 text-primary",
@@ -164,12 +164,12 @@ export function buildInboxJobs(
         patientDisease: patient.disease || [],
         patientAge: patient.age,
         patientGender: patient.gender,
-        title: "Bệnh nhân yêu cầu tạo thực đơn",
+        title: "Yêu cầu hỗ trợ thực đơn",
         subtitle: patient.meal_plan_request_note
           ? `“${patient.meal_plan_request_note}”`
           : "Chưa có ghi chú kèm theo",
-        href: doctorGenerateHref(patient.id),
-        cta: "Tạo thực đơn",
+        href: doctorMealPlansHref(patient.id),
+        cta: "Kiểm tra thực đơn",
         urgency: "normal",
         sortAt: patient.meal_plan_requested_at || patient.last_update || "",
       });
@@ -189,10 +189,10 @@ export function buildInboxJobs(
         patientGender: patient.gender,
         title: expired ? "Thực đơn đã hết hạn" : "Thực đơn sắp hết hạn",
         subtitle: expired
-          ? `Hết hạn ${patient.plan_end_date ?? "—"} — cần tạo thực đơn tiếp`
+          ? `Hết hạn ${patient.plan_end_date ?? "—"} — cần theo dõi kế hoạch tiếp theo`
           : `Còn ${patient.plan_days_left ?? "?"} ngày (đến ${patient.plan_end_date ?? "—"})`,
-        href: doctorGenerateHref(patient.id),
-        cta: "Tạo thực đơn mới",
+        href: doctorMealPlansHref(patient.id),
+        cta: "Xem và duyệt thực đơn",
         urgency: expired ? "urgent" : "soon",
         sortAt: patient.plan_end_date || patient.last_update || "",
       });

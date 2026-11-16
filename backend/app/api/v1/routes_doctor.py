@@ -1,4 +1,4 @@
-"""Doctor routes — patients list, generate-for-patient, meal-plan review."""
+"""Doctor routes — patients list and human review of patient-initiated AI plans."""
 
 from __future__ import annotations
 
@@ -59,12 +59,12 @@ from app.schemas.profile import PatientProfile
 from app.services import assignment as assignment_service
 from app.services import plan_expiry
 from app.services.avatar_service import save_user_avatar
-from app.services.compliance import ComplianceService
 from app.services.clinical_constraints import (
     apply_approved_proposals,
     confirm_doctor_override,
 )
-from app.services.meal_plan_service import _format_request_dt, generate_meal_plan, get_profile, meal_plan_from_row
+from app.services.compliance import ComplianceService
+from app.services.meal_plan_service import _format_request_dt, get_profile, meal_plan_from_row
 from app.services.notification import NotificationService
 from app.services.plan_apply import (
     apply_meal_plan,
@@ -819,9 +819,12 @@ def generate_plan_for_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("doctor")),
 ) -> MealPlanOutput:
-    patient = assignment_service.require_assigned_patient(db, user, patient_id)
-    req = payload or GenerateMealPlanRequest()
-    return generate_meal_plan(db, patient, notes=req.notes, priorities=req.priorities)
+    assignment_service.require_assigned_patient(db, user, patient_id)
+    raise APIError(
+        403,
+        "PATIENT_GENERATION_REQUIRED",
+        "Bệnh nhân khởi tạo thực đơn AI. Bác sĩ kiểm tra, chỉnh sửa và duyệt bản dự thảo.",
+    )
 
 
 @router.get("/meal-plans", response_model=list[MealPlanOutput])

@@ -120,6 +120,7 @@ class MealPlanOutput(BaseModel):
     citations: list[str] = Field(default_factory=list)
     status: str = "pending_review"
     adjustment_note: str | None = None
+    review_notes: str | None = None
     starts_on: str | None = None
     ends_on: str | None = None
     created_at: str | None = None
@@ -180,11 +181,17 @@ class InteractionCheckOutput(BaseModel):
 
 # --- Agent Graph I/O (contract §2) ---
 
+class ConversationTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=1200)
+
+
 class AgentRunInput(BaseModel):
     """Input to run_agent facade."""
     user_id: str
     message: str
     force_intent: str | None = None
+    history: list[ConversationTurn] = Field(default_factory=list, max_length=8)
 
 
 class MealPreviewMeal(BaseModel):

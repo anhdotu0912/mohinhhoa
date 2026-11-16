@@ -9,10 +9,13 @@ Provides `run_agent()` facade function for BE2 to call.
 from __future__ import annotations
 
 import logging
+import os
+import re
 from typing import Literal
 
 from langgraph.graph import END, StateGraph
 
+from app.agents.food_conversation import answer_food_conversation, resolve_food_followup
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import RAG_PROMPT_CHUNK_LIMIT, rag_qa_node
@@ -220,7 +223,7 @@ def interaction_check_node(state: AgentState) -> AgentState:
     from app.agents.skills import check_drug_food_interaction, get_lean_state_for_intent
 
     lean = get_lean_state_for_intent(state, "interaction_check")
-    medications = lean.get("medications") or ["metformin", "glipizide", "sitagliptin", "atorvastatin"]
+    medications = lean.get("medications") or []
     allergies = lean.get("allergies") or []
     message = lean.get("message", "")
     user_id = lean.get("user_id")
@@ -233,12 +236,14 @@ def interaction_check_node(state: AgentState) -> AgentState:
             allergies=allergies,
             user_id=user_id,
             db=db,
+            profile=state.get("profile") or {},
         )
         return {
             **state,
             "answer": res["answer"],
             "interactions": res["interactions"],
             "citations": res["citations"],
+            "rag_context": res.get("rag_context", []),
         }
     except Exception as e:
         logger.error("Interaction check failed: %s", e, exc_info=True)
@@ -364,6 +369,8 @@ def _generate_dynamic_unknown_answer(message: str, profile: dict) -> str:
     """Generate a concise, empathetic, safety-conscious fallback answer using LLM."""
     diseases = ", ".join(profile.get("disease", [])) if profile else ""
     medications = ", ".join(profile.get("medications", [])) if profile else ""
+    if not re.search(r"mệt|choáng|đói lả|run|vã mồ hôi|chóng mặt|ngất|đau ngực|khó thở", message.lower()):
+        return "Tôi hỗ trợ trò chuyện về đồ ăn, cách nấu và dinh dưỡng. Bạn muốn hỏi món hay nguyên liệu nào?"
 
     try:
         from app.core.llm import get_chat_llm
@@ -426,6 +433,13 @@ def unknown_node(state: AgentState) -> AgentState:
     }
 
 
+def clarification_node(state: AgentState) -> AgentState:
+    result = answer_food_conversation(state.get("message", ""), state.get("profile") or {}, state.get("history"))
+    return {**state, "intent": "clarify", "answer": result["answer"] if result and result.get("clarify") else
+            "Bạn muốn hỏi về món hoặc nguyên liệu nào? Bạn có thể hỏi cách nấu, so sánh món, khẩu phần hoặc nguyên liệu thay thế.",
+            "citations": [], "rag_context": []}
+
+
 def apply_guardrails(state: AgentState) -> AgentState:
     """Post-process node: citation checks, unsafe recommendation blocking, and food safety filtering."""
     intent = state.get("intent", "unknown")
@@ -470,6 +484,7 @@ def apply_guardrails(state: AgentState) -> AgentState:
 
 def route_intent(state: AgentState) -> Literal[
     "greeting",
+    "clarify",
     "rag_qa",
     "meal_plan",
     "interaction_check",
@@ -486,6 +501,7 @@ def route_intent(state: AgentState) -> Literal[
 
     if intent in (
         "greeting",
+        "clarify",
         "rag_qa",
         "meal_plan",
         "interaction_check",
@@ -510,6 +526,7 @@ def build_graph() -> StateGraph:
     graph.add_node("profile_loader", profile_loader)
     graph.add_node("intent_classifier", intent_classifier)
     graph.add_node("greeting", greeting_node)
+    graph.add_node("clarify", clarification_node)
     graph.add_node("rag_qa", rag_qa_node)
     graph.add_node("meal_plan", meal_plan_node)
     graph.add_node("interaction_check", interaction_check_node)
@@ -529,6 +546,7 @@ def build_graph() -> StateGraph:
         route_intent,
         {
             "greeting": "greeting",
+            "clarify": "clarify",
             "rag_qa": "rag_qa",
             "meal_plan": "meal_plan",
             "interaction_check": "interaction_check",
@@ -542,6 +560,7 @@ def build_graph() -> StateGraph:
     )
 
     graph.add_edge("greeting", "apply_guardrails")
+    graph.add_edge("clarify", "apply_guardrails")
     graph.add_edge("rag_qa", "apply_guardrails")
     graph.add_edge("meal_plan", "apply_guardrails")
     graph.add_edge("interaction_check", "apply_guardrails")
@@ -658,15 +677,14 @@ def build_agent_run_output(final_state: AgentState) -> AgentRunOutput:
     )
 
 
-import os
-
 def run_agent(input_data: AgentRunInput, db=None) -> AgentRunOutput:
     """Run the agent graph with Langfuse tracing, token and cost tracking."""
     compiled = get_compiled_graph()
 
     initial_state: AgentState = {
         "user_id": input_data.user_id,
-        "message": input_data.message,
+        "message": resolve_food_followup(input_data.message, [turn.model_dump() for turn in input_data.history]),
+        "history": [turn.model_dump() for turn in input_data.history],
         "force_intent": input_data.force_intent,
         "db": db,
         "profile": {},

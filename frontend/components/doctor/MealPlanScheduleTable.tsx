@@ -29,7 +29,7 @@ function occupancyLabel(occupancy: ScheduleOccupancy): string {
     case "upcoming":
       return "Đã lên lịch";
     case "past":
-      return "Đã qua";
+      return "Hoàn thành";
     default:
       return "Chưa có thực đơn";
   }
@@ -109,7 +109,7 @@ export function MealPlanScheduleTable({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showUnassigned, setShowUnassigned] = useState(false);
 
-  const generateHref = `/doctor/patients/${encodeURIComponent(patientId)}/generate`;
+  const reviewHref = `/doctor/patients/${encodeURIComponent(patientId)}/meals`;
   const chainAvailable = hasChainPlan(schedule);
 
   const showToast = (message: string) => {
@@ -201,7 +201,7 @@ export function MealPlanScheduleTable({
       {toastMessage && (
         <div
           role="status"
-          className="fixed top-20 right-6 z-[60] bg-emerald-800 text-white px-4 py-2.5 rounded-lg shadow-xl border border-emerald-600 flex items-center gap-2 font-body text-sm animate-in fade-in slide-in-from-top-2 duration-200"
+          className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-[60] bg-emerald-800 text-white px-4 py-2.5 rounded-lg shadow-xl border border-emerald-600 flex items-center gap-2 font-body text-sm animate-in fade-in slide-in-from-top-2 duration-200"
         >
           <span className="material-symbols-outlined text-[20px] text-emerald-300">
             check_circle
@@ -349,11 +349,11 @@ export function MealPlanScheduleTable({
                   )}
                   {slotAllowsAdd(slot, schedule.today) && !slot.plan && (
                     <Link
-                      href={generateHref}
+                      href={reviewHref}
                       className="px-2.5 py-1 rounded-lg bg-primary text-on-primary text-[11px] font-bold hover:bg-primary/90 transition-all flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                      Tạo AI
+                      Duyệt
                     </Link>
                   )}
                 </div>
@@ -483,14 +483,14 @@ export function MealPlanScheduleTable({
                     Chưa có thực đơn đã duyệt khác
                   </p>
                   <p className="text-xs mt-1 max-w-[36ch] mx-auto">
-                    Tạo thực đơn AI mới, duyệt xong rồi áp dụng từ hôm nay.
+                    Bệnh nhân tạo bản AI; bác sĩ kiểm tra, duyệt rồi chọn lịch áp dụng.
                   </p>
                   <Link
-                    href={generateHref}
+                    href={reviewHref}
                     className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs"
                   >
                     <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                    Tạo thực đơn AI mới
+                    Xem thực đơn chờ duyệt
                   </Link>
                 </div>
               ) : (
@@ -532,11 +532,11 @@ export function MealPlanScheduleTable({
             {assignableUnassigned.length > 0 && (
               <div className="px-6 py-3 border-t border-outline-variant/40 shrink-0 bg-surface-container-low/30">
                 <Link
-                  href={generateHref}
+                  href={reviewHref}
                   className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
                 >
                   <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  Hoặc tạo thực đơn AI mới
+                  Xem các bản dự thảo chờ duyệt
                 </Link>
               </div>
             )}
@@ -547,6 +547,6 @@ export function MealPlanScheduleTable({
   );
 }
 
-export function buildHistoryGenerateHref(patientId: string): string {
-  return `/doctor/patients/${encodeURIComponent(patientId)}/generate`;
+export function buildHistoryReviewHref(patientId: string): string {
+  return `/doctor/patients/${encodeURIComponent(patientId)}/meals`;
 }

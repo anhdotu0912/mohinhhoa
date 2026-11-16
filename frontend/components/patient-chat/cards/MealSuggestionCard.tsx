@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
 import type { Meal, MealPreviewOut } from "@/lib/types";
 import { usePatientPanel } from "../PatientPanelProvider";
 import {
@@ -53,7 +54,7 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
   if (!preview) {
     return (
       <MealPlanEmptyState
-        message="Bạn chưa có thực đơn được bác sĩ kích hoạt. Bạn có thể gửi yêu cầu để bác sĩ lập kế hoạch dinh dưỡng."
+        message="Bạn chưa có thực đơn đang áp dụng. Bạn có thể yêu cầu AI tạo bản dự thảo, sau đó bác sĩ kiểm tra và duyệt."
         showRequest
       />
     );
@@ -76,7 +77,7 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
               </span>
             </div>
             <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5 truncate">
-              Kế hoạch dinh dưỡng đã được bác sĩ phê duyệt
+              {approved ? "Kế hoạch dinh dưỡng đã được bác sĩ phê duyệt" : "Bản dự thảo AI · Chưa được áp dụng"}
             </p>
           </div>
         </div>
@@ -105,6 +106,7 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
 
       <ApprovedMealSlotList
         meals={meals}
+        readOnly={!approved}
         emptyLabel={
           isSingleSlot
             ? `Chưa có món cho ${slotMeta(meals[0].slot).label.toLowerCase()} hôm nay.`
@@ -160,14 +162,14 @@ export function MealSuggestionCard({ preview }: MealSuggestionCardProps) {
       )}
 
       <div className="pt-1">
-        <button
+        {approved ? <button
           type="button"
           onClick={() => openPanel("menu")}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#006857] hover:bg-[#005245] text-white rounded-xl text-xs font-bold transition-colors shadow-xs active:scale-95 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[17px]">restaurant_menu</span>
           <span>Xem chi tiết / Ghi nhận</span>
-        </button>
+        </button> : <Link href="/patient/meal-plan" className="text-xs font-bold text-teal-800 underline">Theo dõi kiểm duyệt thực đơn</Link>}
       </div>
     </div>
   );

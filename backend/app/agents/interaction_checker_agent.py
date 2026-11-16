@@ -243,7 +243,9 @@ def extract_foods_from_message(
         - is_specific_query: True if the user asks about specific food(s).
         - is_specific_query: False if it's a general inquiry (e.g., "Metformin kiêng gì?").
     """
-    message_lower = message.lower().strip()
+    from app.core.chat_text import normalize_chat_text, trim_meal_context
+
+    message_lower = normalize_chat_text(message)
     kb = load_interaction_kb()
     stop_words = _STOP_WORDS_FOOD | {m.lower().strip() for m in (medications or []) if m}
 
@@ -278,7 +280,7 @@ def extract_foods_from_message(
     for pat in patterns:
         matches = re.findall(pat, message_lower)
         for m in matches:
-            candidate = m.strip()
+            candidate = trim_meal_context(m.strip())
             words = candidate.split()
             filtered_words = [w for w in words if w not in stop_words]
             clean_candidate = " ".join(filtered_words).strip()

@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
+from app.core.llm import flush_langfuse
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
@@ -29,8 +30,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-from app.core.llm import flush_langfuse
-
 @router.post("", response_model=AgentRunOutput)
 def chat(
     payload: ChatRequest,
@@ -40,7 +39,8 @@ def chat(
     try:
         from app.agents.graph import run_agent
 
-        result = run_agent(AgentRunInput(user_id=user.id, message=payload.message), db=db)
+        history = chat_history_service.conversation_context(db, user.id, payload.session_id)
+        result = run_agent(AgentRunInput(user_id=user.id, message=payload.message, history=history), db=db)
         flush_langfuse()
         return result
     except APIError:
@@ -58,10 +58,12 @@ def chat_stream(
 ) -> StreamingResponse:
     from app.agents.streaming import stream_agent_events
 
+    history = chat_history_service.conversation_context(db, user.id, payload.session_id)
+
     def _sse():
         try:
             for event in stream_agent_events(
-                AgentRunInput(user_id=user.id, message=payload.message),
+                AgentRunInput(user_id=user.id, message=payload.message, history=history),
                 db=db,
             ):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"

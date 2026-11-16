@@ -9,6 +9,8 @@ Quyết định cũ (giữ local MiniLM) ưu tiên chi phí = 0 và không phụ
 Team quyết định đổi sang **Gemini Embedding**, cụ thể model **`gemini-embedding-2`** (model embedding đa phương thức mới nhất của Google Gemini API tại thời điểm quyết định, unify các model chuyên biệt cũ như `text-embedding-005`/`text-multilingual-embedding-002`, hỗ trợ tốt hơn 100 ngôn ngữ bao gồm tiếng Việt) — gọi qua **Gemini API** (`generativelanguage.googleapis.com`), không chạy local.
 
 ## Decision
+**Bổ sung vận hành local (2026-11-03):** `RAG_RETRIEVAL_MODE=keyword` cho máy ít RAM: truy xuất BM25 trực tiếp trên cùng corpus thực phẩm/guideline, không nạp PyTorch/SentenceTransformer cho truy vấn. Mặc định `dense` giữ luồng embedding hiện tại. Khi dense gặp `MemoryError` hoặc lỗi cấp phát Windows 1455/ENOMEM, chuyển sang BM25 trong tiến trình đó và không lặp lại việc nạp mô hình ở mỗi truy vấn. Giữ bộ lọc danh mục/dị ứng/nguồn và trích dẫn; khả năng tìm gần nghĩa thấp hơn dense. Không dùng vector giả, không đổi hoặc ghi đè index Qdrant, không cần re-index khi bật chế độ keyword.
+
 1. **Embedding provider mới: Gemini API, model `gemini-embedding-2`.**
    - Cấu hình mới cần thêm vào `backend/app/core/config.py`: `EMBEDDING_PROVIDER: str = "gemini"` (giá trị khác: `"local"` — giữ lại để làm fallback, xem rule 3), `GEMINI_API_KEY: str = ""`, `GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"`.
    - `backend/app/rag/embeddings.py` cần 1 custom Embedding Function (tương thích interface `chromadb.EmbeddingFunction`) gọi Gemini API (`embedContent`) thay cho `SentenceTransformerEmbeddingFunction` khi `EMBEDDING_PROVIDER=gemini`.

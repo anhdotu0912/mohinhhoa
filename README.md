@@ -45,6 +45,8 @@ Bệnh nhân mắc bệnh mãn tính (đái tháo đường Type 2 và các bệ
 
 ## Cấu trúc thư mục
 
+Luồng thực đơn hiện tại: bệnh nhân vào **Tạo thực đơn của tôi** (`/patient/meal-plan`), thêm ghi chú và bấm **Tạo thực đơn bằng AI**. AI tạo bản 7 ngày ở trạng thái **Chờ bác sĩ duyệt**. Bác sĩ kiểm tra/chỉnh sửa/duyệt trong **Hàng việc**, rồi áp dụng lịch. Bản chưa duyệt chỉ để xem trước; không dùng để ghi nhận bữa ăn. Bác sĩ không khởi tạo thực đơn mới.
+
 ```
 P-014/
 ├── backend/app/          # FastAPI + agents + RAG
@@ -237,6 +239,10 @@ GitHub Actions (`.github/workflows/ci.yml`) chạy cả backend và frontend tr�
 ---
 
 ## Troubleshooting
+
+### Chat báo thiếu bộ nhớ / Windows error 1455
+
+Máy ít RAM có thể không đủ bộ nhớ ảo để nạp mô hình embedding local. Đặt `RAG_RETRIEVAL_MODE=keyword` trong `.env`, rồi khởi động lại backend: chat sẽ dùng BM25 trên cùng tài liệu, giữ nguồn trích dẫn và không tải PyTorch/model cho truy vấn. Chế độ này tìm theo từ khóa, khả năng hiểu gần nghĩa thấp hơn dense. Khi đủ RAM hoặc có Gemini key hợp lệ, dùng lại `RAG_RETRIEVAL_MODE=dense`. Giao diện production (`docker compose up -d --no-deps frontend` sau khi build) nhẹ hơn `next dev`.
 
 ### Backend crash khi khởi động — không kết nối được Postgres
 

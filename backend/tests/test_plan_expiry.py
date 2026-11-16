@@ -224,7 +224,7 @@ def test_get_me_creates_plan_expired_notification(client):
     assert response.status_code == 200, response.text
 
     response = client.get("/api/v1/meal-plans/me", headers=patient_headers)
-    assert response.status_code == 200, response.text
+    assert response.status_code == 404, response.text  # Completed plans live in history.
 
     notifications = client.get("/api/v1/notifications", headers=patient_headers)
     assert notifications.status_code == 200, notifications.text

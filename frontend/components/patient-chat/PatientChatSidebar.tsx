@@ -71,6 +71,7 @@ export function PatientChatSidebar({
       .then((user) => {
         if (cancelled) return;
         setUserProfile({
+          email: user.email,
           displayName: user.full_name?.trim() || user.email,
           avatar: user.avatar ?? null,
           assignedDoctor: user.assigned_doctor ?? null,
@@ -335,6 +336,16 @@ export function PatientChatSidebar({
           </div>
           <span className="font-semibold">Cuộc trò chuyện mới</span>
         </button>
+
+        <Link
+          href="/patient/meal-plan"
+          onClick={() => { if (window.innerWidth < 768) setSidebarOpen(false); }}
+          aria-current={pathname === "/patient/meal-plan" ? "page" : undefined}
+          className="w-full rounded-xl bg-[#006857] px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-[#005245] flex items-center gap-2.5"
+        >
+          <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
+          <span>Tạo thực đơn của tôi</span>
+        </Link>
 
         {/* Quick Search */}
         {sessions.length > 5 && (

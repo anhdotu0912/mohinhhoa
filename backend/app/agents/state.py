@@ -22,6 +22,7 @@ class AgentState(TypedDict, total=False):
     user_id: str
     message: str
     force_intent: str | None
+    history: list[dict[str, str]]
 
     # Profile
     profile: dict  # PatientProfile as dict

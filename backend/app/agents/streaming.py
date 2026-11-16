@@ -7,9 +7,11 @@ import re
 import time
 from collections.abc import Iterator
 
+from app.agents.food_conversation import answer_food_conversation, resolve_food_followup
 from app.agents.graph import (
     apply_guardrails,
     build_agent_run_output,
+    clarification_node,
     doctor_note_node,
     food_log_node,
     greeting_node,
@@ -32,6 +34,7 @@ _STATUS_MESSAGES: dict[str, str] = {
     "profile_loader": "Đang tải hồ sơ bệnh nhân...",
     "intent_classifier": "Đang phân loại yêu cầu...",
     "greeting": "Đang gửi lời chào...",
+    "clarify": "Đang làm rõ câu hỏi...",
     "rag_qa": "Đang tìm tài liệu tham khảo...",
     "rag_qa_compose": "Đang soạn câu trả lời...",
     "meal_plan": "Đang đọc thực đơn từ hệ thống...",
@@ -47,6 +50,7 @@ _STATUS_MESSAGES: dict[str, str] = {
 
 _INTENT_NODE_HANDLERS = {
     "greeting": greeting_node,
+    "clarify": clarification_node,
     "meal_plan": meal_plan_node,
     "interaction_check": interaction_check_node,
     "food_log": food_log_node,
@@ -97,7 +101,8 @@ def _derive_correction_reason(flags: list[str]) -> str:
 def _build_initial_state(input_data: AgentRunInput, db) -> AgentState:
     return {
         "user_id": input_data.user_id,
-        "message": input_data.message,
+        "message": resolve_food_followup(input_data.message, [turn.model_dump() for turn in input_data.history]),
+        "history": [turn.model_dump() for turn in input_data.history],
         "force_intent": input_data.force_intent,
         "db": db,
         "profile": {},
@@ -157,13 +162,19 @@ def stream_agent_events(input_data: AgentRunInput, db=None) -> Iterator[dict]:
             profile = state.get("profile", {})
 
             yield _status_event("rag_qa")
-            rag_context, citations = retrieve_rag_context(message, profile)
-            state = {**state, "rag_context": rag_context, "citations": citations}
-
-            yield _status_event("rag_qa", _STATUS_MESSAGES["rag_qa_compose"])
-            for token in stream_answer_tokens(message, rag_context, profile):
-                full_answer += token
-                yield {"type": "token", "content": token}
+            conversational = answer_food_conversation(message, profile, state.get("history"), db=db)
+            if conversational is not None:
+                state = {**state, **conversational, "intent": "clarify" if conversational.get("clarify") else "rag_qa"}
+                for event in _yield_tokens_from_text(conversational["answer"]):
+                    full_answer += event["content"]
+                    yield event
+            else:
+                rag_context, citations = retrieve_rag_context(message, profile)
+                state = {**state, "rag_context": rag_context, "citations": citations}
+                yield _status_event("rag_qa", _STATUS_MESSAGES["rag_qa_compose"])
+                for token in stream_answer_tokens(message, rag_context, profile):
+                    full_answer += token
+                    yield {"type": "token", "content": token}
 
         elif intent in _INTENT_NODE_HANDLERS:
             yield _status_event(intent)
@@ -202,4 +213,14 @@ def stream_agent_events(input_data: AgentRunInput, db=None) -> Iterator[dict]:
 
     except Exception as exc:
         logger.exception("stream_agent_events failed for user %s", input_data.user_id)
-        yield {"type": "error", "message": str(exc)}
+        memory_error = isinstance(exc, MemoryError) or (
+            isinstance(exc, OSError) and (
+                getattr(exc, "winerror", None) == 1455
+                or getattr(exc, "errno", None) in (12, 1455)
+            )
+        )
+        message = (
+            "Máy đang thiếu bộ nhớ. Vui lòng đóng bớt ứng dụng và thử lại."
+            if memory_error else "Chưa xử lý được yêu cầu. Vui lòng thử lại sau."
+        )
+        yield {"type": "error", "message": message}

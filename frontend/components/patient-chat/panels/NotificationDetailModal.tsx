@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { EscalationOut, EscalationStatus, NotificationOut } from "@/lib/types";
 import { ApiError } from "@/lib/types";
 import { usePatientPanel } from "../PatientPanelProvider";
@@ -25,6 +26,8 @@ function notificationIcon(type: string): string {
     case "interaction_followup":
     case "plan_expiring":
       return "warning";
+    case "plan_expired":
+      return "task_alt";
     default:
       return "notifications";
   }
@@ -86,6 +89,7 @@ export function NotificationDetailModal({
   const assignedDoctor = useAuthStore((s) => s.assignedDoctor);
   const doctorLabel = assignedDoctor?.full_name?.trim() || "Bác sĩ phụ trách";
   const isPlanApproved = notification?.type === "plan_approved";
+  const isPlanRenewal = notification?.type === "plan_expired" || notification?.type === "plan_expiring";
   const isManualReminder = notification?.type === "manual_reminder";
   const escalationId =
     escalationIdProp ||
@@ -297,6 +301,10 @@ export function NotificationDetailModal({
               <span>Xem thực đơn tuần mới</span>
             </button>
           )}
+          {isPlanRenewal && <Link href="/patient/meal-plan" onClick={onClose} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#006857] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#005445]">
+            <span className="material-symbols-outlined text-[18px]">calendar_add_on</span>
+            {typeof notification?.payload?.action_label === "string" ? notification.payload.action_label : "Tạo thực đơn mới"}
+          </Link>}
         </div>
       </div>
     </div>

@@ -739,7 +739,7 @@ export const api = {
   chatStream,
 };
 
-async function* chatStream(message: string): AsyncGenerator<ChatStreamEvent> {
+async function* chatStream(message: string, sessionId?: string | null): AsyncGenerator<ChatStreamEvent> {
   const headers: Record<string, string> = {
     Accept: "text/event-stream",
     "Content-Type": "application/json",
@@ -752,7 +752,7 @@ async function* chatStream(message: string): AsyncGenerator<ChatStreamEvent> {
   const res = await fetch(`${API_BASE}/api/v1/chat/stream`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
   });
 
   if (!res.ok) {

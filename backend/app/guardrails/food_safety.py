@@ -28,7 +28,11 @@ def _match_word_in_text(term: str, text: str) -> bool:
     term_clean = term.strip().lower()
     if not term_clean:
         return False
-    pattern = rf"(?:^|[^\w\u00C0-\u1EF9]){re.escape(term_clean)}(?:$|[^\w\u00C0-\u1EF9])"
+    term_pattern = re.escape(term_clean)
+    if term_clean == "cá":
+        # These Vietnamese phrases refer to personalization/individuals, not fish.
+        term_pattern += r"(?!\s+(?:nhân|thể|biệt|tính)\b)"
+    pattern = rf"(?:^|[^\w\u00C0-\u1EF9]){term_pattern}(?:$|[^\w\u00C0-\u1EF9])"
     return bool(re.search(pattern, text.lower()))
 
 

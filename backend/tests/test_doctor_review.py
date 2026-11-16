@@ -7,7 +7,9 @@ edit (400 without edited_plan, success path), and role/ownership boundaries
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+
+from app.models.meal_plan import MealPlan
 
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
@@ -76,6 +78,43 @@ def test_doctor_reject_plan_before_approve_cancels_notifications(client):
 
     response = client.get(f"/api/v1/meal-plans/{plan_id}", headers=patient_headers)
     assert response.json()["status"] == "rejected"
+    assert response.json()["review_notes"] == "Cần giảm carb bữa tối"
+
+    retry = client.post("/api/v1/meal-plans/generate", headers=patient_headers)
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["id"] != plan_id
+    assert retry.json()["status"] == "pending_review"
+    assert retry.json()["review_notes"] is None
+
+
+def test_rejected_new_draft_visible_without_replacing_active_plan(client, db_session):
+    patient_headers = _login(client, PATIENT)
+    doctor_headers = _login(client, DOCTOR)
+    active = _generate_plan(client, patient_headers)
+    approved = client.post(
+        f"/api/v1/doctor/meal-plans/{active['id']}/review",
+        headers=doctor_headers,
+        json={"action": "approve"},
+    )
+    assert approved.status_code == 200, approved.text
+    _apply_plan(client, doctor_headers, active["id"])
+    # SQLite test timestamps have second precision; make creation order explicit.
+    row = db_session.get(MealPlan, active["id"])
+    row.created_at -= timedelta(minutes=1)
+    db_session.commit()
+
+    draft = _generate_plan(client, patient_headers)
+    rejected = client.post(
+        f"/api/v1/doctor/meal-plans/{draft['id']}/review",
+        headers=doctor_headers,
+        json={"action": "reject", "notes": "Cần đổi món trong bản mới"},
+    )
+    assert rejected.status_code == 200, rejected.text
+    schedule = client.get("/api/v1/meal-plans/schedule", headers=patient_headers).json()
+    assert schedule["active_plan"]["id"] == active["id"]
+    assert schedule["latest_plan"]["id"] == draft["id"]
+    assert schedule["latest_plan"]["status"] == "rejected"
+    assert schedule["latest_plan"]["review_notes"] == "Cần đổi món trong bản mới"
 
 
 def test_doctor_cannot_re_review_after_approve_and_apply(client):

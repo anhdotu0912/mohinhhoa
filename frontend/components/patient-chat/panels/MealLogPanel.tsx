@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { usePatientPanel } from "../PatientPanelProvider";
 import { api } from "@/lib/api";
 import {
@@ -14,6 +15,11 @@ import { MealItemRow } from "@/components/patient-chat/MealItemRow";
 import { WeeklyAdherenceChart } from "@/components/patient-chat/WeeklyAdherenceChart";
 import { mealsToDayTotals, sumMealNutrition } from "@/lib/meal-plan-display";
 import { NutrientChips } from "@/components/shared/NutrientChips";
+import { useVietnamToday } from "@/lib/use-vietnam-today";
+import { vietnamTodayIso } from "@/lib/meal-plan-calendar";
+import { parseFlexibleDate } from "@/lib/plan-expiry";
+import { mealPlanHistory } from "@/lib/meal-plan-workflow";
+import { WeeklyMealPlanCard } from "../cards/WeeklyMealPlanCard";
 
 
 
@@ -65,13 +71,15 @@ export function MealLogPanel() {
   const { closePanel } = usePatientPanel();
 
   const [mealPlan, setMealPlan] = useState<MealPlanOutput | null>(null);
+  const [historyPlans, setHistoryPlans] = useState<MealPlanOutput[]>([]);
   const [foodLogs, setFoodLogs] = useState<FoodLogEntry[]>([]);
   const [compliance, setCompliance] = useState<PatientComplianceOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Determine current day of week (0 = Mon ... 6 = Sun)
-  const now = useMemo(() => new Date(), []);
+  const vietnamToday = useVietnamToday();
+  const now = useMemo(() => parseFlexibleDate(vietnamToday)!, [vietnamToday]);
   const todayDayOfWeek = useMemo(() => (now.getDay() + 6) % 7, [now]);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(todayDayOfWeek);
 
@@ -91,12 +99,18 @@ export function MealLogPanel() {
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [plan, logs, complianceData] = await Promise.all([
-        api.getMyMealPlan().catch(() => null),
+      const [schedule, logs, complianceData] = await Promise.all([
+        api.getMyMealPlanSchedule(),
         api.listFoodLogs().catch(() => []),
         api.getMyCompliance(14).catch(() => null),
       ]);
-      setMealPlan(plan);
+      const plan = schedule.active_plan;
+      const today = vietnamTodayIso();
+      const isApplied = plan && ["approved", "edited"].includes(plan.status)
+        && plan.starts_on && plan.ends_on
+        && plan.starts_on <= today && today <= plan.ends_on;
+      setMealPlan(isApplied ? plan : null);
+      setHistoryPlans(mealPlanHistory(schedule));
       setFoodLogs(logs);
       setCompliance(complianceData);
     } catch (err) {
@@ -108,7 +122,7 @@ export function MealLogPanel() {
 
   useEffect(() => {
     void loadData();
-  }, [loadData]);
+  }, [loadData, vietnamToday]);
 
   const todayDateStr = useMemo(() => getLocalDateString(now), [now]);
 
@@ -227,7 +241,7 @@ export function MealLogPanel() {
               </span>
             </div>
             <div className="flex flex-col min-w-0">
-              <h2 className="font-bold text-base sm:text-xl text-slate-900 leading-tight truncate">Thực đơn &amp; Ghi nhận</h2>
+              <h2 className="font-bold text-base sm:text-xl text-slate-900 leading-tight truncate">Thực đơn &amp; Nhật ký</h2>
               <p className="text-[11px] sm:text-[13px] text-slate-500 font-medium mt-0.5 truncate">Kế hoạch dinh dưỡng cá nhân hóa</p>
             </div>
           </div>
@@ -292,6 +306,16 @@ export function MealLogPanel() {
               setCustomSlot(null);
             }}
           />
+          {!loading && historyPlans.length > 0 && <section aria-label="Nhật ký thực đơn" className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">Nhật ký thực đơn cũ</h3>
+            <p className="text-xs text-slate-500">Các bản cũ được giữ để xem lại. Bản chưa áp dụng không được tính là đã ăn theo thực đơn.</p>
+            {historyPlans.map((old) => <details key={old.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-xs font-bold text-slate-800">{old.starts_on && old.ends_on
+                ? `${old.starts_on} – ${old.ends_on} · Hoàn thành`
+                : `Bản ngày ${old.created_at?.slice(0, 10) ?? "chưa xác định"} · Đã lưu Nhật ký · Chưa áp dụng`}</summary>
+              <WeeklyMealPlanCard plan={old} historical />
+            </details>)}
+          </section>}
 
           {/* Meals for Selected Day Section */}
           <div className="space-y-3.5">
@@ -336,6 +360,7 @@ export function MealLogPanel() {
                   restaurant
                 </span>
                 <p>Chưa có thực đơn được kích hoạt cho {DAY_LABELS[selectedDayIndex]?.full}.</p>
+                <Link href="/patient/meal-plan" onClick={closePanel} className="inline-block mt-3 font-bold text-teal-800 underline">Tạo thực đơn AI / Theo dõi kiểm duyệt</Link>
               </div>
             )}
 

@@ -321,7 +321,9 @@ class MealPlanScheduleOut(BaseModel):
     today: str
     active_plan_id: str | None = None
     active_plan: MealPlanOutput | None = None
+    latest_plan: MealPlanOutput | None = None
     unassigned_plans: list[MealPlanOutput] = Field(default_factory=list)
+    history_plans: list[MealPlanOutput] = Field(default_factory=list)
     slots: list[MealPlanScheduleSlotOut] = Field(default_factory=list)
 
 

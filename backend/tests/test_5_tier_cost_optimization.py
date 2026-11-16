@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.agents.nodes.intent_classifier import intent_classifier
 from app.agents.nodes.profile_loader import profile_loader
 from app.agents.nodes.rag_tool import _generate_answer, stream_answer_tokens
@@ -11,7 +10,7 @@ from app.agents.state import AgentState
 from app.agents.streaming import stream_agent_events
 from app.core.cache import ProfileCache, profile_cache
 from app.schemas.meal_plan import AgentRunInput
-from app.services.semantic_cache import SemanticQACache, semantic_qa_cache
+from app.services.semantic_cache import semantic_qa_cache
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +82,11 @@ class TestTier2ZeroTokenRouting:
 # Tier 4: Semantic Q&A Cache Tests
 # ---------------------------------------------------------------------------
 class TestTier4SemanticQACache:
+    @pytest.fixture(autouse=True)
+    def _local_cache_vectors(self, monkeypatch):
+        # These are cache behavior tests, independent of downloading an embedding model.
+        monkeypatch.setattr("app.rag.embeddings.embed_query_texts", lambda queries: [[1.0, 0.0] for _ in queries])
+
     def setup_method(self):
         semantic_qa_cache.clear()
 
@@ -102,23 +106,21 @@ class TestTier4SemanticQACache:
         assert cached_cits == citations
 
     def test_rag_tool_generate_answer_hits_semantic_cache(self):
-        query = "Chỉ số đường huyết GI của gạo lứt là bao nhiêu?"
-        cached_answer = "Gạo lứt có chỉ số đường huyết GI trung bình khoảng 55-68, thấp hơn gạo trắng."
+        query = "Carbohydrate ảnh hưởng thế nào đến đường huyết?"
+        cached_answer = "Carbohydrate có ảnh hưởng đến đường huyết sau ăn; cần đối chiếu kế hoạch dinh dưỡng của bạn."
         semantic_qa_cache.put(query, cached_answer, ["ADA 2024"], disease=["diabetes_t2"])
 
         # Invoke _generate_answer — should return cached answer without calling LLM
         ans = _generate_answer(query, [{"text": "dummy", "source": "ADA 2024"}], {"disease": ["diabetes_t2"]})
         assert ans == cached_answer
 
-    def test_rag_tool_stream_answer_hits_semantic_cache(self):
+    def test_rag_tool_food_stream_does_not_reuse_similar_question_cache(self, monkeypatch):
         query = "Bị tiểu đường ăn yến mạch được không?"
-        cached_answer = "Yến mạch là thực phẩm tốt cho người tiểu đường nhờ giàu beta-glucan."
-        semantic_qa_cache.put(query, cached_answer, ["BYT"], disease=["diabetes_t2"])
-
-        # Stream tokens — should yield cached tokens
-        tokens = list(stream_answer_tokens(query, [{"text": "dummy", "source": "BYT"}], {"disease": ["diabetes_t2"]}))
+        monkeypatch.setattr(semantic_qa_cache, "get", lambda *args: pytest.fail("Food answers need their own retrieved evidence"))
+        tokens = list(stream_answer_tokens(query, [{"text": "Yến mạch cung cấp chất xơ.", "source": "BYT"}], {"disease": ["diabetes_t2"]}))
         streamed_text = "".join(tokens)
-        assert streamed_text == cached_answer
+        assert "yến mạch" in streamed_text.lower()
+        assert "chất xơ" in streamed_text
 
 
 # ---------------------------------------------------------------------------

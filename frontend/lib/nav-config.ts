@@ -9,13 +9,13 @@ export type NavItem = {
 
 export const NAV_BY_ROLE: Record<AppRole, NavItem[]> = {
   doctor: [
-    { id: "dashboard", label: "Dashboard", href: "/doctor", icon: "dashboard" },
+    { id: "dashboard", label: "Tổng quan", href: "/doctor", icon: "dashboard" },
     { id: "patients", label: "Bệnh nhân", href: "/doctor/patients", icon: "group" },
     { id: "inbox", label: "Hàng việc", href: "/doctor/inbox", icon: "inbox" },
   ],
   patient: [
     { id: "home", label: "Trang chủ", href: "/patient", icon: "dashboard" },
-    { id: "meals", label: "Thực đơn", href: "/patient", icon: "restaurant" },
+    { id: "meals", label: "Thực đơn AI", href: "/patient/meal-plan", icon: "restaurant" },
     {
       id: "notifications",
       label: "Thông báo",

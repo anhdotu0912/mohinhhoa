@@ -66,6 +66,20 @@ def _message_to_out(msg: ChatMessage) -> ChatMessageOut:
     return ChatMessageOut.model_validate(data)
 
 
+def conversation_context(db: Session, user_id: str, session_id: str | None) -> list[dict[str, str]]:
+    """Read a bounded, owned transcript; it is context, never medical evidence."""
+    if session_id is None:
+        return []
+    owned = db.query(ChatSession.id).filter(ChatSession.id == session_id, ChatSession.user_id == user_id).first()
+    if owned is None:
+        raise APIError(404, "SESSION_NOT_FOUND", "Không tìm thấy cuộc trò chuyện.")
+    rows = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.position.desc()).limit(8).all()
+    return [
+        {"role": "user" if row.sender == "user" else "assistant", "content": (row.text or "")[:1200]}
+        for row in reversed(rows) if row.sender in ("user", "ai")
+    ]
+
+
 def _message_in_to_payload(msg: ChatMessageIn) -> dict:
     return msg.model_dump(
         mode="json",

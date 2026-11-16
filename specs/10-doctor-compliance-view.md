@@ -25,6 +25,7 @@ Là **bác sĩ**, tôi muốn xem biểu đồ tuân thủ theo thời gian và 
 4. Nếu bác sĩ thấy tuân thủ thấp → bấm "Gửi nhắc nhở" → `POST /doctor/patients/{patient_id}/compliance/remind`.
 
 ## 5. Edge cases
+- **Tổng quan bác sĩ (2026-11-16):** dashboard ưu tiên hàng việc, tách theo dõi bệnh nhân khỏi các việc cần duyệt/phản hồi. Chỉ dùng dữ liệu API, không thay bằng dữ liệu demo khi trống/lỗi. Tuân thủ gộp theo ngày ISO thực tế, tuần lịch thứ Hai–Chủ nhật theo ngày Việt Nam; thiếu ghi nhận là `null`, không đổi thành 0. Trung bình tuần tính trên các cặp bệnh nhân–ngày có ghi nhận và nêu số bệnh nhân có dữ liệu. Ngày tương lai không tính; không gán ngưỡng “đạt/kém” hay các chỉ số kcal/muối từ tỷ lệ tuân thủ. Lỗi từng nguồn hiển thị rõ, không giả lập số 0. Các nút dẫn đến đúng hồ sơ, cuộc trao đổi và màn hình duyệt; dashboard không duyệt tự động hay giả lập dữ liệu.
 - Bệnh nhân chưa từng có `adherence_checkin` nào (chưa từng tương tác notification) → `daily_series` toàn bộ "không có dữ liệu" cho khoảng ngày yêu cầu, không phải lỗi.
 - Số lượng `Notification`/`Alert` tăng lớn (nhiều tháng lịch sử) → on-the-fly aggregation có thể chậm dần (xem điều kiện revisit ADR-008: >500 patient hoạt động đồng thời hoặc vài nghìn bản ghi/patient).
 - FE hiện hiển thị biểu đồ 14 ngày cố định qua default `days=14`; BE cho phép truyền `days` khác qua query param nếu cần, nhưng FE chưa có UI đổi khoảng ngày.

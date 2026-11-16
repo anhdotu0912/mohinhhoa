@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import type { AppRole } from "@/lib/nav-config";
-import { Sidebar } from "@/components/shared/Sidebar";
+import { DoctorNavigation } from "@/components/doctor/DoctorNavigation";
 import { MobileMenuContext } from "@/components/shared/MobileMenuContext";
 import { PatientChatShell } from "@/components/patient-chat/PatientChatShell";
 
@@ -49,12 +49,12 @@ export function AppShell({
     );
   }
 
-  // Branch for Doctor: Keep 100% identical layout and Sidebar
+  // Doctor pages share horizontal navigation; patient chat keeps its own shell.
   return (
     <MobileMenuContext.Provider value={value}>
-      <div className="bg-[#F7F8FA] text-on-surface flex font-body text-body min-h-screen">
-        <Sidebar role={role} />
-        <div className="md:ml-[240px] flex-1 flex flex-col w-full min-h-screen min-w-0">
+      <div className="min-h-screen bg-[#F7F8FA] font-body text-body text-on-surface [--doctor-nav-height:124px] md:[--doctor-nav-height:88px]">
+        <DoctorNavigation />
+        <div className="flex min-h-[calc(100dvh-var(--doctor-nav-height))] w-full min-w-0 flex-col">
           <div className="flex-1 w-full flex flex-col min-w-0">{children}</div>
         </div>
       </div>

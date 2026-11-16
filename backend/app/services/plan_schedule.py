@@ -7,6 +7,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import vn_today
 from app.models.meal_plan import MealPlan
 from app.schemas.meal_plan import MealPlanOutput
 from app.services import plan_expiry
@@ -136,7 +137,7 @@ def build_meal_plan_schedule(
     today: date | None = None,
 ) -> dict:
     """Build week slots: current, next, optional queued upcoming, trailing empty."""
-    today = today or date.today()
+    today = today or vn_today()
     duration = DEFAULT_DURATION
     applied = _applied_plans(db, user_id)
     active = find_active_plan(db, user_id, today)
@@ -256,14 +257,31 @@ def build_meal_plan_schedule(
         .order_by(MealPlan.created_at.desc())
         .all()
     )
-    unassigned_plans = [meal_plan_from_row(row).model_dump() for row in unassigned_rows]
+    unassigned_plans = [
+        meal_plan_from_row(row).model_dump() for row in unassigned_rows
+        if not plan_expiry.is_plan_historical(row, today)
+    ]
+
+    all_rows = (
+        db.query(MealPlan)
+        .filter(MealPlan.user_id == user_id)
+        .order_by(MealPlan.created_at.desc())
+        .all()
+    )
+    latest = all_rows[0] if all_rows else None
+    history_plans = [
+        meal_plan_from_row(row).model_dump() for row in all_rows
+        if plan_expiry.is_plan_historical(row, today)
+    ]
 
     return {
         "patient_id": user_id,
         "today": today.isoformat(),
         "active_plan_id": active_plan_id,
         "active_plan": active_plan.model_dump() if active_plan else None,
+        "latest_plan": meal_plan_from_row(latest).model_dump() if latest else None,
         "unassigned_plans": unassigned_plans,
+        "history_plans": history_plans,
         "slots": slots,
     }
 

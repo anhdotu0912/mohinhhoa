@@ -8,7 +8,9 @@ from __future__ import annotations
 import logging
 import re
 
+from app.agents.food_conversation import food_topic
 from app.agents.state import AgentState
+from app.core.chat_text import normalize_chat_text
 from app.guardrails.rules import REFUSE_REGEX_PATTERNS
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Valid intents per contract §2
 VALID_INTENTS = {
     "greeting",
+    "clarify",
     "meal_plan",
     "interaction_check",
     "food_log",
@@ -28,6 +31,7 @@ VALID_INTENTS = {
 }
 
 _RAG_QA_PATTERNS = [
+    r"(?:ăn|uống)\s+gì\s+(?:tốt|có lợi|phù hợp|để|khi bị|cho người)",
     r"(?:những|các|danh sách|top|nhóm|hoa quả ngọt|trái cây ngọt)\s+(?:loại\s+)?(?:rau|củ|quả|trái cây|hoa quả|thực phẩm|thức ăn|đồ ăn|món ăn|đồ uống|hạt|thịt|cá|chất béo)",
     r"(?:loại|thực phẩm|rau|trái cây|hoa quả|thịt|cá|chất béo)\s+nào\s+(?:nên|không nên|không được|tốt|xấu|hạn chế|kiêng|tránh)",
     r"(?:bao nhiêu|chỉ số)\s+(?:calo|kcal|gi|đường huyết|carb|carbohydrate|protein|đạm|chất béo|natri|muối)",
@@ -139,9 +143,30 @@ def _classify_by_keywords(message: str) -> str:
     return primary
 
 
+def _normalize_question(message: str) -> str:
+    """Normalize common Vietnamese chat spelling without altering the stored message."""
+    return normalize_chat_text(message)
+
+
+def _is_daily_meal_lookup(message: str) -> bool:
+    """Recognize explicit day/meal lookups independently of LLM availability."""
+    text = _normalize_question(message)
+    meal_time = r"(?:hôm nay|(?:bữa\s+)?(?:sáng|trưa|tối)\s+nay)"
+    question = r"(?<!đã )(?<!vừa )(?<!lỡ )(?:ăn (?:món )?gì|có món gì)\b"
+    return bool(
+        re.search(
+            rf"\b{meal_time}\s+(?:(?:tôi|mình|em)\s+)?"
+            rf"(?:(?:nên|sẽ|cần)\s+)?{question}",
+            text,
+        )
+        or re.search(rf"{question}\s+(?:vào\s+)?{meal_time}\b", text)
+        or re.search(rf"\bthực đơn\s+(?:(?:của tôi|của mình)\s+)?{meal_time}\b", text)
+    )
+
+
 def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
     """Detect primary and secondary intents using keyword patterns with positional disambiguation."""
-    message_lower = message.lower().strip()
+    message_lower = _normalize_question(message)
 
     # Priority 1: Refuse guardrails (unsafe medication requests must ALWAYS be refused first)
     for pat in REFUSE_REGEX_PATTERNS:
@@ -162,8 +187,14 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
                 break
         return primary, secondary
 
-    # Check if asking meal advice for next slot ("trưa nay nên ăn gì", "sáng nay nên ăn gì")
-    if re.search(r"(?:trưa nay|sáng nay|tối nay|hôm nay)\s+nên\s+ăn\s+gì", message_lower):
+    # Explicit meal lookups use the patient's plan, including colloquial "ăn j".
+    topic = food_topic(message_lower)
+    if topic and not re.search(r"thuốc|metformin|insulin|warfarin|đã ăn|vừa ăn|thực đơn", message_lower):
+        if topic == "followup":
+            return "clarify", []
+        return "rag_qa", []
+
+    if _is_daily_meal_lookup(message_lower):
         primary = "meal_plan"
         secondary = []
         if re.search(r"lỡ ăn|đã ăn", message_lower):
@@ -189,6 +220,16 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
             if re.search(pattern, message_lower):
                 return "rag_qa", []
 
+    # A meal time is context for the food question, not a request to read a plan.
+    if re.search(r"được không|có sao không|an toàn không", message_lower) and not re.search(
+        r"lập thực đơn|tạo thực đơn|ghi nhận", message_lower
+    ):
+        from app.agents.interaction_checker_agent import extract_foods_from_message
+
+        foods, specific = extract_foods_from_message(message_lower)
+        if specific and foods:
+            return "interaction_check", []
+
     matched_positions: list[tuple[int, str]] = []
 
     for intent, patterns in _INTENT_PATTERNS.items():
@@ -206,7 +247,11 @@ def _detect_intents_by_keywords(message: str) -> tuple[str, list[str]]:
                 break
 
     if not matched_positions:
-        return "rag_qa", []
+        if re.search(r"mệt|choáng|đói lả|run|vã mồ hôi|chóng mặt|ngất|đau ngực|khó thở", message_lower):
+            return "unknown", []
+        if re.search(r"\b(?:ăn|uống|món|nấu|bếp|rau|củ|quả|thịt|cá|thuốc|bệnh|đạm|calo|vitamin)\b|dinh dưỡng|thực phẩm|đường huyết|tiểu đường|khoáng chất", message_lower):
+            return "rag_qa", []
+        return "clarify", []
 
     # Sort matches by appearance in text to determine primary vs secondary clause
     matched_positions.sort(key=lambda x: x[0])
@@ -309,7 +354,14 @@ def intent_classifier(state: AgentState) -> AgentState:
 
     # Tier 2: Rule-based fast-path for deterministic intents (0 tokens)
     kw_primary, kw_secondary = _detect_intents_by_keywords(message)
-    if kw_primary in ("greeting", "refuse", "weekly_compliance", "doctor_note", "food_log"):
+    if kw_primary in ("greeting", "clarify", "refuse", "weekly_compliance", "doctor_note", "food_log") or (
+        kw_primary == "meal_plan" and _is_daily_meal_lookup(message)
+    ) or (
+        kw_primary == "interaction_check"
+        and re.search(r"được không|có sao không|an toàn không", normalize_chat_text(message))
+    ) or (
+        kw_primary == "rag_qa" and food_topic(message)
+    ):
         logger.info("Tier 2 Fast-Path: Intent '%s' routed without LLM (0 tokens)", kw_primary)
         return {**state, "intent": kw_primary, "secondary_intents": kw_secondary}
 

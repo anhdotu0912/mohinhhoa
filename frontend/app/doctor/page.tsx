@@ -1,1006 +1,210 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TopBar } from "@/components/shared/TopBar";
-import { doctorPatientToUi } from "@/lib/mock-data";
-import { api, assetUrl } from "@/lib/api";
+import { ArrowRight, ArrowUpRight, CalendarDays, ChevronRight, ClipboardCheck, Clock3, Inbox, MessageSquare, RefreshCw, Users } from "lucide-react";
+import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { isProduction } from "@/lib/env";
-import { mealPlanToUiItem } from "@/lib/meal-plan-mappers";
-import type { MealPlanItem } from "@/lib/plans-store";
-import {
-  ApiError,
-  type ComplianceDayPoint,
-  type DoctorPatientSummary,
-  type PatientComplianceOut,
-} from "@/lib/types";
-import { doctorReviewHref } from "@/lib/doctor-routes";
+import { buildInboxJobs, type InboxJob } from "@/lib/doctor-inbox";
+import { doctorChartHref, doctorInboxHref } from "@/lib/doctor-routes";
+import { complianceWeek, shortDashboardDate } from "@/lib/doctor-dashboard";
+import { useVietnamToday } from "@/lib/use-vietnam-today";
+import { userInitials } from "@/lib/avatar";
+import type { ClaimQueueItem, DoctorPatientSummary, EscalationListItem, MealPlanOutput, PatientComplianceOut } from "@/lib/types";
 
-interface DayCompliance {
-  day: string;
-  date: string;
-  rate: number;
-  meals: string;
-  calories: string;
-  salt: string;
+type DashboardData = {
+  patients: DoctorPatientSummary[] | null;
+  plans: MealPlanOutput[] | null;
+  claims: ClaimQueueItem[] | null;
+  escalations: EscalationListItem[] | null;
+  errors: string[];
+  updatedAt: Date | null;
+};
+type TaskFilter = "all" | "plans" | "messages" | "other";
+const subscribe = () => () => {};
+const panelClass = "min-w-0 rounded-xl border border-slate-200/80 bg-white";
+const emptyData: DashboardData = { patients: null, plans: null, claims: null, escalations: null, errors: [], updatedAt: null };
+const taskLabels: Record<InboxJob["type"], string> = {
+  plan_review: "Duyệt thực đơn", constraints: "Xác nhận ràng buộc", generate_request: "Hỗ trợ thực đơn",
+  plan_expiry: "Theo dõi chu kỳ", patient_claim: "Tiếp nhận bệnh nhân", chat_escalation: "Trả lời bệnh nhân",
+};
+const isMealTask = (job: InboxJob) => ["plan_review", "plan_expiry", "generate_request"].includes(job.type);
+
+function Avatar({ name }: { name: string }) {
+  return <span translate="no" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[12px] font-semibold text-slate-600">{userInitials(name)}</span>;
 }
 
-// Fallback chỉ dùng khi chưa có dữ liệu tuân thủ thật ở môi trường dev/demo.
-const THIS_WEEK_DATA: DayCompliance[] = [
-  { day: "T2", date: "07/10", rate: 60, meals: "2/3 bữa", calories: "85%", salt: "70%" },
-  { day: "T3", date: "08/10", rate: 75, meals: "3/3 bữa", calories: "90%", salt: "80%" },
-  { day: "T4", date: "09/10", rate: 50, meals: "1/3 bữa", calories: "60%", salt: "55%" },
-  { day: "T5", date: "10/10", rate: 90, meals: "3/3 bữa", calories: "98%", salt: "92%" },
-  { day: "T6", date: "11/10", rate: 85, meals: "3/3 bữa", calories: "92%", salt: "88%" },
-  { day: "T7", date: "12/10", rate: 65, meals: "2/3 bữa", calories: "75%", salt: "70%" },
-  { day: "CN", date: "13/10", rate: 80, meals: "3/3 bữa", calories: "88%", salt: "85%" },
-];
-
-const LAST_WEEK_DATA: DayCompliance[] = [
-  { day: "T2", date: "30/09", rate: 70, meals: "2/3 bữa", calories: "88%", salt: "75%" },
-  { day: "T3", date: "01/10", rate: 80, meals: "3/3 bữa", calories: "90%", salt: "85%" },
-  { day: "T4", date: "02/10", rate: 85, meals: "3/3 bữa", calories: "95%", salt: "90%" },
-  { day: "T5", date: "03/10", rate: 60, meals: "2/3 bữa", calories: "80%", salt: "65%" },
-  { day: "T6", date: "04/10", rate: 75, meals: "3/3 bữa", calories: "85%", salt: "80%" },
-  { day: "T7", date: "05/10", rate: 90, meals: "3/3 bữa", calories: "96%", salt: "94%" },
-  { day: "CN", date: "06/10", rate: 70, meals: "2/3 bữa", calories: "82%", salt: "72%" },
-];
-
-/** Lấy chữ cái đầu của tên (vd "Nguyễn Văn A" → "NA") cho avatar dự phòng. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "BN";
-  const first = parts[0][0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
-  return (first + last).toUpperCase();
-}
-
-/** Thứ trong tuần suy từ ngày ISO thật (không gán cứng theo thứ tự mảng). */
-function weekdayLabel(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return "";
-  return ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()];
-}
-
-function formatDateLabel(iso: string): string {
-  const [, mm, dd] = iso.split("-");
-  return mm && dd ? `${dd}/${mm}` : iso;
-}
-
-function averageRate(data: DayCompliance[]): number | null {
-  if (data.length === 0) return null;
-  return Math.round(data.reduce((acc, cur) => acc + cur.rate, 0) / data.length);
+function EmptyBlock({ children, loading = false }: { children: React.ReactNode; loading?: boolean }) {
+  return <div className="flex min-h-[150px] flex-col items-center justify-center gap-2 px-6 py-8 text-center text-sm text-slate-500">{loading ? <RefreshCw size={19} className="animate-spin text-slate-400" /> : <Inbox size={20} className="text-slate-400" />}<span>{children}</span></div>;
 }
 
 export default function DoctorDashboardPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
-  const [hydrated, setHydrated] = useState(false);
-  const [plans, setPlans] = useState<MealPlanItem[]>([]);
-  const [patientSummaries, setPatientSummaries] = useState<DoctorPatientSummary[]>(
-    []
-  );
-  const [expiryTab, setExpiryTab] = useState<"expiring" | "expired">("expiring");
-  const [demoBusy, setDemoBusy] = useState(false);
-  const [timeframe, setTimeframe] = useState<"this_week" | "last_week">("this_week");
-  const [hoveredDay, setHoveredDay] = useState<DayCompliance | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [thisWeekChart, setThisWeekChart] = useState<DayCompliance[]>([]);
-  const [lastWeekChart, setLastWeekChart] = useState<DayCompliance[]>([]);
+  const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
+  const today = useVietnamToday();
+  const [data, setData] = useState<DashboardData>(emptyData);
+  const [loading, setLoading] = useState(true);
+  const [complianceLoading, setComplianceLoading] = useState(true);
+  const [compliance, setCompliance] = useState<PatientComplianceOut[]>([]);
+  const [complianceFailures, setComplianceFailures] = useState(0);
+  const [filter, setFilter] = useState<TaskFilter>("all");
+  const [previousWeek, setPreviousWeek] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const requestRef = useRef(0);
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  const loadPlans = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!token || role !== "doctor") return;
-    try {
-      const [planRows, patientRows] = await Promise.all([
-        api.listDoctorMealPlans("all"),
-        api.listDoctorPatients().catch(() => [] as DoctorPatientSummary[]),
-      ]);
-      const patientMap = new Map(patientRows.map((p) => [p.id, p]));
-      const items = planRows.map((row) => {
-        const p = patientMap.get(row.user_id);
-        return mealPlanToUiItem(row, {
-          patientName: p?.name || "Bệnh nhân",
-          patientCode: p?.id || row.user_id,
-          condition: p?.condition_label || "—",
-        });
-      });
-      setPlans(items);
-      setPatientSummaries(patientRows);
-
-      const samplePatients = patientRows.slice(0, 10);
-      if (samplePatients.length > 0) {
-        const complianceRows = await Promise.all(
-          samplePatients.map((p) =>
-            api.getPatientCompliance(p.id, 14).catch(() => null)
-          )
-        );
-        const valid = complianceRows.filter(
-          (r): r is PatientComplianceOut => r != null
-        );
-        if (valid.length > 0) {
-          const maxLen = Math.max(...valid.map((r) => r.daily_series.length));
-          const aggregated: DayCompliance[] = [];
-          for (let i = 0; i < maxLen; i += 1) {
-            const points = valid
-              .map((r) => r.daily_series[i])
-              .filter(
-                (p): p is ComplianceDayPoint => Boolean(p) && p.adherence_pct != null
-              );
-            const rate =
-              points.length > 0
-                ? Math.round(
-                    points.reduce((sum, p) => sum + (p.adherence_pct ?? 0), 0) /
-                      points.length
-                  )
-                : 0;
-            const dateIso = valid.find((r) => r.daily_series[i])?.daily_series[i]?.date ?? "";
-            aggregated.push({
-              day: weekdayLabel(dateIso),
-              date: formatDateLabel(dateIso),
-              rate,
-              meals: "—",
-              calories: `${rate}%`,
-              salt: `${rate}%`,
-            });
-          }
-          const last7 = aggregated.slice(-7);
-          const olderPart = aggregated.slice(0, Math.max(aggregated.length - 7, 0));
-          setThisWeekChart(last7);
-          setLastWeekChart(olderPart.slice(-7));
-        } else {
-          setThisWeekChart([]);
-          setLastWeekChart([]);
-        }
-      } else {
-        setThisWeekChart([]);
-        setLastWeekChart([]);
+    const request = ++requestRef.current;
+    setLoading(true);
+    setComplianceLoading(true);
+    setSelectedDate(null);
+    const [patientsResult, plansResult, claimsResult, messagesResult] = await Promise.allSettled([
+      api.listDoctorPatients(), api.listDoctorMealPlans("all"), api.listClaimQueue(), api.listDoctorEscalations("open"),
+    ]);
+    if (request !== requestRef.current) return;
+    const patients = patientsResult.status === "fulfilled" ? patientsResult.value : null;
+    const errors = [
+      patientsResult.status === "rejected" ? "danh sách bệnh nhân" : null,
+      plansResult.status === "rejected" ? "thực đơn" : null,
+      claimsResult.status === "rejected" ? "yêu cầu tiếp nhận" : null,
+      messagesResult.status === "rejected" ? "tin nhắn" : null,
+    ].filter((value): value is string => value != null);
+    setData({ patients, plans: plansResult.status === "fulfilled" ? plansResult.value : null,
+      claims: claimsResult.status === "fulfilled" ? claimsResult.value : null,
+      escalations: messagesResult.status === "fulfilled" ? messagesResult.value : null,
+      errors, updatedAt: new Date() });
+    setLoading(false);
+    // Read every assigned patient, with bounded concurrency; do not silently sample ten.
+    const rows: PatientComplianceOut[] = [];
+    let failures = 0;
+    for (let i = 0; i < (patients?.length ?? 0); i += 6) {
+      const batch = await Promise.allSettled(patients!.slice(i, i + 6).map((p) => api.getPatientCompliance(p.id, 14)));
+      if (request !== requestRef.current) return;
+      for (const result of batch) {
+        if (result.status === "fulfilled") rows.push(result.value);
+        else failures++;
       }
-    } catch {
-      setPlans([]);
-      setPatientSummaries([]);
-      setThisWeekChart([]);
-      setLastWeekChart([]);
     }
+    if (request !== requestRef.current) return;
+    setCompliance(rows);
+    setComplianceFailures(failures);
+    setComplianceLoading(false);
   }, [token, role]);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!token || role !== "doctor") {
-      router.replace("/login");
-      return;
-    }
-    void loadPlans();
-  }, [hydrated, token, role, router, loadPlans]);
+    if (!token || role !== "doctor") { router.replace("/login"); return; }
+    void load();
+    return () => { requestRef.current += 1; };
+  }, [hydrated, token, role, load, router, today]);
 
-  const pendingPlans = plans.filter((p) => p.status === "pending");
-  // Chỉ hiển thị 5 thực đơn chờ duyệt mới nhất trên dashboard
-  const visiblePendingPlans = pendingPlans.slice(0, 5);
-
-  // Cảnh báo hạn thực đơn: sắp ăn xong (expiring) / đã ăn xong (expired)
-  const expiringPatients = patientSummaries.filter(
-    (p) => p.plan_expiry === "expiring"
-  );
-  const expiredPatients = patientSummaries.filter(
-    (p) => p.plan_expiry === "expired"
-  );
-  const expiryList = expiryTab === "expiring" ? expiringPatients : expiredPatients;
-
-  // Bệnh nhân cần chú ý: status "Cần chú ý" hoặc "Cảnh báo", ưu tiên nhiều cảnh báo nhất
-  const attentionSummaries = patientSummaries.filter(
-    (p) => p.status_key === "attention" || p.status_key === "warning"
-  );
-  const attentionPatients = [...attentionSummaries]
-    .sort((a, b) => (b.alert_count ?? 0) - (a.alert_count ?? 0))
-    .slice(0, 5)
-    .map(doctorPatientToUi);
-
-  const mealPlanRequestPatients = patientSummaries
-    .filter((p) => p.meal_plan_request_status === "pending")
-    .slice(0, 5);
-
-  // Demo: giả lập thực đơn sắp/đã hết hạn (backend chặn ở production)
-  const handleDemoExpiry = async (mode: "expiring" | "expired") => {
-    if (demoBusy) return;
-    setDemoBusy(true);
-    try {
-      await api.demoPlanExpiry(mode);
-      showToast(
-        mode === "expiring"
-          ? "Đã giả lập: các thực đơn đã duyệt còn 1 ngày (sắp ăn xong)."
-          : "Đã giả lập: các thực đơn đã duyệt hết hạn."
-      );
-      await loadPlans();
-    } catch (err) {
-      showToast(
-        err instanceof ApiError ? err.message : "Không giả lập được hạn thực đơn."
-      );
-    } finally {
-      setDemoBusy(false);
-    }
-  };
-  const realChartData = timeframe === "this_week" ? thisWeekChart : lastWeekChart;
-  // Dev/demo: fallback dữ liệu mẫu khi chưa có compliance thật; production luôn hiện empty state.
-  const chartData =
-    realChartData.length > 0
-      ? realChartData
-      : !isProduction
-        ? timeframe === "this_week"
-          ? THIS_WEEK_DATA
-          : LAST_WEEK_DATA
-        : [];
-  const hasChartData = chartData.length > 0;
-  const avgCompliance = hasChartData ? averageRate(chartData) : null;
-  const thisWeekAvg = averageRate(thisWeekChart);
-  const lastWeekAvg = averageRate(lastWeekChart);
-  const trendDelta =
-    timeframe === "this_week" && thisWeekAvg !== null && lastWeekAvg !== null
-      ? thisWeekAvg - lastWeekAvg
-      : null;
-
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
-  };
-
-  const handleQuickApprove = async (planId: string, planTitle: string) => {
-    try {
-      await api.reviewMealPlan(planId, { action: "approve" });
-      showToast(`Đã duyệt nhanh thực đơn: ${planTitle}`);
-      await loadPlans();
-    } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Không duyệt được thực đơn.");
-    }
-  };
+  const patients = data.patients ?? [];
+  const pendingPlans = data.plans?.filter((p) => ["pending", "pending_review"].includes(String(p.status))) ?? [];
+  const unanswered = data.escalations?.filter((item) => item.status === "waiting_doctor") ?? [];
+  const jobs = useMemo(() => buildInboxJobs(data.patients ?? [], data.plans ?? [], data.claims ?? [], data.escalations?.filter((item) => item.status === "waiting_doctor") ?? []), [data]);
+  const visibleJobs = jobs.filter((job) => filter === "all" || (filter === "plans" ? isMealTask(job) : filter === "messages" ? job.type === "chat_escalation" : !isMealTask(job) && job.type !== "chat_escalation"));
+  const attention = patients.filter((p) => ["attention", "warning"].includes(p.status_key))
+    .sort((a, b) => Number(b.status_key === "warning") - Number(a.status_key === "warning") || b.alert_count - a.alert_count);
+  const week = useMemo(() => complianceWeek(compliance, today, previousWeek), [compliance, today, previousWeek]);
+  const selectedDay = week.days.find((d) => d.date === selectedDate);
+  const activeCount = patients.filter((p) => Boolean(p.active_plan_id)).length;
+  const ending = patients.filter((p) => p.plan_expiry === "expiring");
+  const ended = patients.filter((p) => p.plan_expiry === "expired" || p.plan_usage === "finished");
+  const busy = loading || complianceLoading;
+  const firstLoad = !data.updatedAt;
+  const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(`${today}T12:00:00Z`));
+  const count = (value: number, available: boolean) => firstLoad || !available ? "—" : value;
+  const filters: { id: TaskFilter; label: string; count: number }[] = [
+    { id: "all", label: "Tất cả", count: jobs.length },
+    { id: "plans", label: "Thực đơn", count: jobs.filter(isMealTask).length },
+    { id: "messages", label: "Tin nhắn", count: unanswered.length },
+    { id: "other", label: "Khác", count: jobs.filter((job) => !isMealTask(job) && job.type !== "chat_escalation").length },
+  ];
 
   return (
     <>
-      <TopBar title="Dashboard Tổng quan" />
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
-          <span className="material-symbols-outlined text-[20px]">
-            check_circle
-          </span>
-          <span>{toastMessage}</span>
+      <main className="mx-auto w-full max-w-[1480px] flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="mb-2 flex items-center gap-1.5 text-xs text-slate-500"><CalendarDays size={14} strokeWidth={1.6} /><span className="first-letter:uppercase">{todayLabel}</span></div>
+            <h1 className="text-[25px] font-semibold tracking-tight text-slate-900">Tổng quan điều trị</h1>
+            <p className="mt-1 text-[14px] text-slate-500">Theo dõi bệnh nhân và các công việc đang chờ xử lý.</p>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button onClick={() => void load()} disabled={busy} type="button" aria-label="Làm mới tổng quan" className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"><RefreshCw size={14} className={busy ? "animate-spin" : ""} />Làm mới</button>
+            <Link href="/doctor/inbox" className="flex h-9 items-center gap-2 rounded-lg bg-[#0f766e] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#115e59]">Mở hàng việc<ArrowUpRight size={15} /></Link>
+          </div>
         </div>
-      )}
 
-      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-8 flex-1">
-        {/* Summary Cards (3 columns) */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Card 1 */}
-          <Link
-            href="/doctor/patients"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
-          >
-            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
-              <span
-                className="material-symbols-outlined text-[24px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                group
-              </span>
-            </div>
-            <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
-                Tổng bệnh nhân
-              </p>
-              <p className="font-h1 text-h1 text-on-surface text-2xl font-bold group-hover:text-primary transition-colors tabular-nums">
-                {patientSummaries.length}
-              </p>
-            </div>
-          </Link>
+        {data.errors.length > 0 && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><span>Chưa tải được {data.errors.join(", ")}. Một số thông tin chưa đầy đủ.</span><button disabled={busy} onClick={() => void load()} className="font-semibold underline">Thử lại</button></div>}
 
-          {/* Card 2 */}
-          <Link
-            href="/doctor/inbox?type=plan_review"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
-          >
-            <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors shrink-0">
-              <span
-                className="material-symbols-outlined text-[24px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                pending_actions
-              </span>
-            </div>
-            <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
-                Cần duyệt kế hoạch
-              </p>
-              <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
-                {pendingPlans.length}
-              </p>
-            </div>
-          </Link>
-
-          {/* Card 3 */}
-          <Link
-            href="/doctor/patients?status=attention"
-            className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/40 group cursor-pointer"
-          >
-            <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0">
-              <span
-                className="material-symbols-outlined text-[24px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                warning
-              </span>
-            </div>
-            <div>
-              <p className="font-caption text-caption text-on-surface-variant mb-1 font-medium text-xs">
-                Cảnh báo lâm sàng
-              </p>
-              <div className="flex items-center gap-2">
-                <p className="font-h1 text-h1 text-on-surface text-2xl font-bold tabular-nums">
-                  {attentionSummaries.length}
-                </p>
-                {attentionSummaries.length > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
-                    Cần chú ý
-                  </span>
-                )}
-              </div>
-            </div>
-          </Link>
+        <section aria-label="Chỉ số tổng quan" className={`${panelClass} grid grid-cols-2 overflow-hidden lg:grid-cols-4`}>
+          {[
+            { label: "Bệnh nhân đang quản lý", value: count(patients.length, data.patients != null), note: "Danh sách đã tiếp nhận", icon: Users, href: "/doctor/patients" },
+            { label: "Thực đơn chờ duyệt", value: count(pendingPlans.length, data.plans != null), note: "Cần bác sĩ kiểm tra", icon: ClipboardCheck, href: doctorInboxHref("plan_review") },
+            { label: "Tin nhắn chờ trả lời", value: count(unanswered.length, data.escalations != null), note: "Từ cuộc trao đổi với bệnh nhân", icon: MessageSquare, href: doctorInboxHref("chat_escalation") },
+            { label: "Bệnh nhân cần theo dõi", value: count(attention.length, data.patients != null), note: "Theo trạng thái hồ sơ", icon: Clock3, href: "/doctor/patients" },
+          ].map((item, i) => <Link key={item.label} href={item.href} className={`group min-w-0 px-4 py-5 transition-colors hover:bg-slate-50 sm:px-5 ${i % 2 ? "border-l border-slate-100" : ""} ${i > 1 ? "border-t border-slate-100 lg:border-t-0" : ""} ${i === 2 ? "lg:border-l" : ""}`}>
+            <div className="flex items-center justify-between gap-2"><p className="min-h-[36px] text-[13px] font-medium text-slate-500 sm:min-h-0">{item.label}</p><item.icon size={16} strokeWidth={1.7} className="hidden shrink-0 text-slate-400 sm:block" /></div>
+            <p className="mt-3 text-[30px] font-semibold leading-none tracking-tight text-slate-900 tabular-nums">{item.value}</p><p className="mt-2 hidden text-[12px] leading-relaxed text-slate-400 sm:block">{item.note}</p>
+          </Link>)}
         </section>
 
-        {mealPlanRequestPatients.length > 0 && (
-          <section className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
-            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex flex-wrap justify-between items-center gap-3">
-              <div>
-                <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">
-                    restaurant_menu
-                  </span>
-                  Yêu cầu tạo thực đơn
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Bệnh nhân đã gửi yêu cầu — bấm để vào trang tạo thực đơn AI
-                </p>
-              </div>
-              <Link
-                href="/doctor/inbox?type=generate_request"
-                className="text-primary font-body-bold hover:underline text-xs cursor-pointer flex items-center gap-0.5 font-semibold"
-              >
-                <span>Xem hàng việc</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </Link>
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
+          <section className={panelClass} aria-labelledby="dashboard-tasks-heading">
+            <div className="flex items-center justify-between gap-3 px-5 py-4"><div><h2 id="dashboard-tasks-heading" className="text-[16px] font-semibold text-slate-900">Việc cần xử lý</h2><p className="mt-1 text-xs text-slate-500">Kiểm tra, phản hồi và theo dõi kế hoạch điều trị.</p></div><span className="flex h-7 min-w-7 items-center justify-center rounded-md bg-slate-100 px-2 text-xs font-semibold text-slate-600">{firstLoad || data.errors.length ? "—" : jobs.length}</span></div>
+            <div className="flex justify-between gap-2 overflow-x-auto border-b border-slate-100 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Loại công việc">
+              {filters.map((item) => <button type="button" key={item.id} role="tab" aria-selected={filter === item.id} aria-controls="dashboard-task-list" id={`task-tab-${item.id}`} onClick={() => setFilter(item.id)} className={`flex shrink-0 items-center gap-1.5 border-b-2 py-3 text-xs font-medium transition-colors ${filter === item.id ? "border-[#0f766e] text-[#0f766e]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{item.label}<span className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${filter === item.id ? "bg-teal-50" : "bg-slate-50 text-slate-400"}`}>{firstLoad || data.errors.length ? "—" : item.count}</span></button>)}
             </div>
-            <ul className="divide-y divide-outline-variant/30">
-              {mealPlanRequestPatients.map((p) => (
-                <li
-                  key={p.id}
-                  className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low/30"
-                >
-                  <div className="min-w-0">
-                    <p className="font-body-bold text-sm text-on-surface font-bold">{p.name}</p>
-                    {p.meal_plan_request_note ? (
-                      <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
-                        “{p.meal_plan_request_note}”
-                      </p>
-                    ) : (
-                      <p className="text-xs text-on-surface-variant mt-1">
-                        Chưa có ghi chú kèm theo
-                      </p>
-                    )}
-                  </div>
-                  <Link
-                    href={`/doctor/patients/${p.id}/generate`}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                    Tạo thực đơn AI
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div id="dashboard-task-list" role="tabpanel" aria-labelledby={`task-tab-${filter}`}>
+              {firstLoad ? <EmptyBlock loading>Đang tải công việc…</EmptyBlock> : visibleJobs.length === 0 ? <EmptyBlock>{data.errors.length ? "Chưa đủ dữ liệu để hiển thị công việc." : filter === "all" ? "Hiện không có công việc đang chờ xử lý." : "Không có công việc trong nhóm này."}</EmptyBlock> : <ul className="divide-y divide-slate-100">
+                {visibleJobs.slice(0, 5).map((job) => <li key={job.id}><Link href={job.href || doctorInboxHref(job.type)} className="group flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/80"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${job.type === "chat_escalation" ? "bg-slate-100 text-slate-500" : "bg-teal-50 text-teal-700"}`}>{job.type === "chat_escalation" ? <MessageSquare size={17} strokeWidth={1.7} /> : job.type === "patient_claim" ? <Users size={17} strokeWidth={1.7} /> : <ClipboardCheck size={17} strokeWidth={1.7} />}</span><div className="min-w-0 flex-1"><p className="truncate text-[14px] font-semibold text-slate-800">{taskLabels[job.type]}<span className="ml-2 font-normal text-slate-500">· {job.patientName}</span></p><p className="mt-1 truncate text-xs text-slate-500">{job.type === "chat_escalation" ? job.title : job.type === "plan_review" ? job.title : job.subtitle}</p></div><span className="hidden shrink-0 text-[12px] text-slate-400 sm:block">{job.type === "chat_escalation" ? "Chờ phản hồi" : "Chờ xử lý"}</span><ChevronRight size={16} className="shrink-0 text-slate-300 group-hover:text-teal-700" /></Link></li>)}
+              </ul>}
+            </div>
+            <Link href={filter === "messages" ? doctorInboxHref("chat_escalation") : "/doctor/inbox"} className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs font-medium text-[#0f766e] hover:bg-teal-50/40"><span>Xem hàng việc đầy đủ</span><ArrowRight size={15} /></Link>
           </section>
-        )}
 
-        {/* Main Section (1:1 ratio) */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Col - Bệnh nhân cần chú ý */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden flex flex-col">
-            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
-              <div>
-                <h3 className="font-h2 text-h2 text-on-surface font-bold text-base flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-600 text-[20px]">
-                    error_outline
-                  </span>
-                  Danh sách bệnh nhân cần chú ý
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Các bệnh nhân có chỉ số bất thường hoặc cảnh báo gần đây
-                </p>
-              </div>
-              <Link
-                href="/doctor/patients"
-                className="text-primary font-body-bold hover:underline text-xs cursor-pointer flex items-center gap-0.5 font-semibold"
-              >
-                <span>Xem tất cả</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </Link>
-            </div>
-            <div className="flex-1 overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[550px]">
-                <thead>
-                  <tr className="bg-surface-container-low/50 border-b border-outline-variant/40">
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
-                      Bệnh nhân
-                    </th>
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold">
-                      Chỉ số biến động
-                    </th>
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
-                      Trạng thái
-                    </th>
-                    <th className="px-5 py-3 font-label text-label text-on-surface-variant uppercase tracking-wider text-[11px] font-semibold text-center whitespace-nowrap">
-                      Hành động
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/30 font-body text-body">
-                  {attentionPatients.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-8 text-center text-on-surface-variant">
-                        <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
-                          check_circle
-                        </span>
-                        <p className="font-body-bold text-sm font-bold">
-                          Không có bệnh nhân nào cần chú ý
-                        </p>
-                        <p className="text-xs text-on-surface-variant mt-0.5">
-                          Mọi bệnh nhân hiện đều ở trạng thái ổn định.
-                        </p>
-                      </td>
-                    </tr>
-                  ) : (
-                    attentionPatients.map((patient) => {
-                      const avatar =
-                        patient.avatar && !patient.avatar.startsWith("https://api.dicebear.com")
-                          ? assetUrl(patient.avatar)
-                          : "";
-                      return (
-                        <tr key={patient.id} className="hover:bg-surface-container-low/40 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-9 h-9 shrink-0">
-                                <div className="absolute inset-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label text-xs font-bold ring-2 ring-primary/20">
-                                  <span translate="no" className="notranslate">{initials(patient.name)}</span>
-                                </div>
-                                {avatar && (
-                                  <img
-                                    src={avatar}
-                                    alt={patient.name}
-                                    className="absolute inset-0 w-9 h-9 rounded-full object-cover ring-2 ring-outline-variant/40"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div>
-                                <span className="font-body-bold text-on-surface block text-sm font-bold">
-                                  {patient.name}
-                                </span>
-                                <span className="text-xs text-on-surface-variant font-mono">
-                                  {patient.id}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5 text-on-surface-variant text-xs font-medium">
-                            {patient.bloodSugar ? `Đường huyết (${patient.bloodSugar})` : patient.condition}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span
-                              className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap ${patient.statusColor}`}
-                            >
-                              {patient.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <Link
-                              href={`/doctor/patients/${patient.id}`}
-                              className="inline-flex items-center justify-center gap-1 h-8 px-3 bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-body-bold rounded-lg hover:bg-primary hover:text-white transition-all text-xs cursor-pointer active:scale-95 shadow-2xs font-semibold whitespace-nowrap"
-                            >
-                              <span>Chi tiết</span>
-                              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Right Col - Biểu đồ tuân thủ dinh dưỡng */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle p-5 flex flex-col justify-between">
-            <div>
-              {/* Header & Controls */}
-              <div className="border-b border-outline-variant/40 pb-3 mb-4 flex items-start justify-between">
-                <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-bold flex items-center gap-2 text-base">
-                    <span className="material-symbols-outlined text-primary text-[22px]">
-                      monitoring
-                    </span>
-                    Tuân thủ dinh dưỡng
-                  </h3>
-                  <p className="font-caption text-caption text-on-surface-variant mt-0.5 text-xs">
-                    Tỷ lệ tuân thủ thực đơn trung bình của bệnh nhân
-                  </p>
-                </div>
-                {/* Timeframe Selector */}
-                <div className="flex bg-surface-container-low rounded-lg p-1 border border-outline-variant/40">
-                  <button
-                    onClick={() => {
-                      setTimeframe("this_week");
-                      setHoveredDay(null);
-                    }}
-                    className={`px-3 py-1 text-xs rounded-md transition-all font-semibold cursor-pointer ${
-                      timeframe === "this_week"
-                        ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
-                        : "text-on-surface-variant hover:text-on-surface"
-                    }`}
-                  >
-                    Tuần này
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTimeframe("last_week");
-                      setHoveredDay(null);
-                    }}
-                    className={`px-3 py-1 text-xs rounded-md transition-all font-semibold cursor-pointer ${
-                      timeframe === "last_week"
-                        ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
-                        : "text-on-surface-variant hover:text-on-surface"
-                    }`}
-                  >
-                    Tuần trước
-                  </button>
-                </div>
-              </div>
-
-              {/* Stat Summary Box */}
-              <div className="mb-4 p-3.5 bg-surface-container-low border border-outline-variant/60 rounded-lg flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-on-surface-variant font-semibold block">Trung bình tuần</span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-2xl font-bold text-on-surface tabular-nums">
-                      {avgCompliance !== null ? `${avgCompliance}%` : "—"}
-                    </span>
-                    {trendDelta !== null && (
-                      <span
-                        className={`text-xs font-bold flex items-center tabular-nums ${
-                          trendDelta >= 0 ? "text-emerald-700" : "text-rose-700"
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {trendDelta >= 0 ? "trending_up" : "trending_down"}
-                        </span>
-                        {trendDelta >= 0 ? "+" : ""}
-                        {trendDelta}%
-                      </span>
-                    )}
+          <section className={panelClass} aria-labelledby="dashboard-compliance-heading">
+            <div className="px-5 pt-4"><div className="flex items-center justify-between gap-2"><h2 id="dashboard-compliance-heading" className="text-[16px] font-semibold text-slate-900">Tuân thủ dinh dưỡng</h2><span className="text-[11px] text-slate-400">Theo ghi nhận</span></div><div className="mt-4 flex items-center justify-between gap-2"><div className="inline-flex rounded-lg bg-slate-100 p-0.5">{[false, true].map((previous) => <button key={String(previous)} type="button" aria-pressed={previousWeek === previous} onClick={() => { setPreviousWeek(previous); setSelectedDate(null); }} className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${previousWeek === previous ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{previous ? "Tuần trước" : "Tuần này"}</button>)}</div><span className="text-[12px] tabular-nums text-slate-400">{shortDashboardDate(week.start)} – {shortDashboardDate(week.end)}</span></div></div>
+            <div className="px-5 pb-4 pt-4">
+              <div className="flex items-end justify-between gap-3"><div className="flex items-baseline gap-1"><span className="text-[32px] font-semibold leading-none tracking-tight text-slate-900 tabular-nums">{complianceLoading || week.average == null ? "—" : week.average}</span>{!complianceLoading && week.average != null && <span className="text-sm text-slate-400">%</span>}</div><span className="text-right text-[12px] text-slate-500">{complianceLoading ? "Đang tổng hợp…" : data.patients == null ? "Chưa tải được bệnh nhân" : `${week.patients}/${patients.length} bệnh nhân có ghi nhận`}</span></div>
+              {complianceLoading ? <EmptyBlock loading>Đang tải ghi nhận tuân thủ…</EmptyBlock> : week.average == null ? <div className="mt-5 flex h-[150px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-5 text-center"><Inbox size={23} strokeWidth={1.4} className="mb-2 text-slate-300" /><p className="text-xs font-medium text-slate-600">{complianceFailures || data.patients == null ? "Chưa tải được dữ liệu tuân thủ" : "Chưa có ghi nhận trong tuần"}</p><p className="mt-1 text-[12px] leading-relaxed text-slate-400">{complianceFailures || data.patients == null ? "Làm mới để thử tải lại." : "Tỷ lệ sẽ xuất hiện khi bệnh nhân ghi nhận bữa ăn hoặc check-in."}</p></div> : <>
+                <div className="relative mt-7 pl-7" aria-label="Biểu đồ tuân thủ theo ngày">
+                  <div aria-hidden="true" className="pointer-events-none absolute bottom-[38px] left-0 right-0 top-0 flex flex-col justify-between text-[10px] text-slate-400">{[100, 50, 0].map((tick) => <div key={tick} className="flex items-center gap-2"><span className="w-5 text-right tabular-nums">{tick}</span><span className="flex-1 border-t border-slate-100" /></div>)}</div>
+                  <div className="relative grid grid-cols-7 gap-2">
+                    {week.days.map((day) => <div key={day.date} className="min-w-0 text-center"><button type="button" disabled={day.future} onMouseEnter={() => setSelectedDate(day.date)} onFocus={() => setSelectedDate(day.date)} onMouseLeave={() => setSelectedDate(null)} onBlur={() => setSelectedDate(null)} onClick={() => setSelectedDate(day.date)} aria-label={`${day.label} ${shortDashboardDate(day.date)}: ${day.future ? "Chưa đến ngày" : day.rate == null ? "Chưa có ghi nhận" : `${day.rate}%, ${day.patients} bệnh nhân`}`} className="relative flex h-[120px] w-full flex-col items-center justify-end rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/30 disabled:cursor-default">
+                      {day.rate != null ? <div style={{ height: `${Math.max(day.rate, 2)}%` }} className={`relative w-full max-w-7 rounded-t-[3px] ${day.date === selectedDate ? "bg-teal-600" : "bg-[#83b7ac]"}`}><span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-600 tabular-nums">{day.rate}%</span></div> : <span className={`mb-0.5 h-1 w-4 rounded-full ${day.future ? "bg-slate-100" : "bg-slate-300"}`} />}
+                    </button><p className={`mt-2 text-[11px] ${day.future ? "text-slate-300" : "text-slate-500"}`}>{day.label}</p><p className="mt-0.5 text-[10px] text-slate-400">{shortDashboardDate(day.date)}</p></div>)}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60">
-                    <span className="w-3 border-b-2 border-dashed border-primary inline-block"></span>
-                    Chỉ tiêu: 80%
-                  </span>
-                  <span
-                    className={`px-3 py-1 rounded-md text-xs font-bold border ${
-                      avgCompliance === null
-                        ? "bg-surface-container-lowest text-on-surface-variant border-outline-variant/60"
-                        : avgCompliance >= 75
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200/70"
-                          : "bg-amber-50 text-amber-800 border-amber-200/70"
-                    }`}
-                  >
-                    {avgCompliance === null
-                      ? "Chưa có dữ liệu"
-                      : avgCompliance >= 75
-                        ? "Đạt mục tiêu"
-                        : "Cần theo dõi"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Interactive Bar Chart */}
-              <div className="relative pt-6 pb-2 min-h-[220px] flex flex-col justify-end">
-                {!hasChartData ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-on-surface-variant py-8">
-                    <span className="material-symbols-outlined text-[36px] text-outline/40 mb-1">
-                      bar_chart
-                    </span>
-                    <p className="text-sm font-bold">Chưa có dữ liệu tuân thủ</p>
-                    <p className="text-xs mt-0.5 text-center max-w-[220px]">
-                      Cần bệnh nhân ghi nhận Food Log để hiển thị biểu đồ.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Benchmark Target Line (80%) */}
-                    <div
-                      className="absolute left-0 right-0 border-b-2 border-dashed border-primary/50 z-0 pointer-events-none"
-                      style={{ bottom: "calc(26px + 120px * 0.8)" }}
-                    ></div>
-
-                    {/* Y-axis grid line 50% */}
-                    <div
-                      className="absolute left-0 right-0 border-b border-outline-variant/40 z-0 pointer-events-none"
-                      style={{ bottom: "calc(26px + 120px * 0.5)" }}
-                    ></div>
-
-                    {/* Bars Container */}
-                    <div className="w-full flex items-end justify-between px-2 z-10 gap-2">
-                      {chartData.map((item) => {
-                        const isHigh = item.rate >= 80;
-                        const isMedium = item.rate >= 60 && item.rate < 80;
-
-                        let barBg = "bg-rose-400/80 hover:bg-rose-500";
-                        let textBg = "text-rose-700";
-                        if (isHigh) {
-                          barBg = "bg-primary hover:bg-primary/90";
-                          textBg = "text-primary";
-                        } else if (isMedium) {
-                          barBg = "bg-amber-400/90 hover:bg-amber-500";
-                          textBg = "text-amber-700";
-                        }
-
-                        return (
-                          <div
-                            key={`${item.day}-${item.date}`}
-                            className="flex-1 flex flex-col items-center group relative cursor-pointer select-none"
-                            onMouseEnter={() => setHoveredDay(item)}
-                            onMouseLeave={() => setHoveredDay(null)}
-                          >
-                            {/* Hover Tooltip Popup */}
-                            {hoveredDay?.date === item.date && (
-                              <div className="absolute bottom-full mb-2 z-30 w-44 bg-surface-container-lowest text-on-surface text-xs p-3 rounded-lg shadow-xl border border-outline-variant/60 backdrop-blur-md animate-fadeIn pointer-events-none">
-                                <div className="flex justify-between items-center border-b border-outline-variant/40 pb-1 mb-1 font-bold">
-                                  <span>Thứ ({item.day}) - {item.date}</span>
-                                  <span className={item.rate >= 80 ? "text-primary" : "text-amber-700"}>
-                                    {item.rate}%
-                                  </span>
-                                </div>
-                                <div className="space-y-0.5 text-[11px] text-on-surface-variant">
-                                  <p>Bữa ăn: <strong className="text-on-surface">{item.meals}</strong></p>
-                                  <p>Calo đạt: <strong className="text-on-surface">{item.calories}</strong></p>
-                                  <p>Muối đạt: <strong className="text-on-surface">{item.salt}</strong></p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Value Text Above Bar */}
-                            <span className={`text-[10px] font-bold mb-1 tabular-nums ${textBg}`}>
-                              {item.rate}%
-                            </span>
-
-                            {/* Bar Track */}
-                            <div className="w-full h-[120px] flex items-end justify-center">
-                              <div
-                                className={`w-full max-w-[28px] rounded-t-md transition-all duration-200 ${barBg} ${
-                                  hoveredDay?.date === item.date ? "ring-2 ring-primary/30 shadow-xs" : ""
-                                }`}
-                                style={{ height: `${item.rate}%` }}
-                              ></div>
-                            </div>
-
-                            {/* X-axis Day Label */}
-                            <span className="mt-1.5 text-xs font-semibold text-on-surface-variant">
-                              {item.day}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
+                <p className="mt-3 min-h-4 text-center text-[11px] text-slate-500">{selectedDay ? `${shortDashboardDate(selectedDay.date)} · ${selectedDay.future ? "Chưa đến ngày" : selectedDay.rate == null ? "Chưa có ghi nhận" : `${selectedDay.rate}% · ${selectedDay.patients} bệnh nhân`}` : "Trung bình theo ngày · Dấu gạch: chưa có ghi nhận"}</p>
+              </>}
+              {complianceFailures > 0 && <p role="status" className="mt-3 text-[12px] text-amber-700">Chưa tải được ghi nhận của {complianceFailures} bệnh nhân.</p>}
             </div>
+            <p className="border-t border-slate-100 px-5 py-3 text-[11px] leading-relaxed text-slate-400">Ngày chưa ghi nhận không tính vào trung bình.</p>
+          </section>
+        </div>
 
-            {/* Legend & Link */}
-            <div className="pt-3 border-t border-outline-variant/40 mt-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-variant mb-3 font-medium">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
-                  Đạt (≥80%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                  TB (60-79%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
-                  Kém (&lt;60%)
-                </span>
-                <span className="flex items-center gap-1.5 text-primary font-semibold">
-                  <span className="w-3.5 border-b-2 border-dashed border-primary inline-block"></span>
-                  Chỉ tiêu (80%)
-                </span>
-              </div>
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
+          <section className={panelClass} aria-labelledby="dashboard-patients-heading">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-4"><div><h2 id="dashboard-patients-heading" className="text-[16px] font-semibold text-slate-900">Bệnh nhân cần theo dõi</h2><p className="mt-1 text-xs text-slate-500">Xem hồ sơ và các chỉ số ghi nhận gần nhất.</p></div><Link href="/doctor/patients" aria-label="Xem tất cả bệnh nhân" className="flex shrink-0 items-center gap-1 text-xs font-medium text-teal-700">Tất cả<ArrowUpRight size={14} /></Link></div>
+            {firstLoad ? <EmptyBlock loading>Đang tải bệnh nhân…</EmptyBlock> : !data.patients ? <EmptyBlock>Chưa tải được danh sách bệnh nhân.</EmptyBlock> : attention.length === 0 ? <EmptyBlock>Chưa có hồ sơ được đánh dấu cần theo dõi.</EmptyBlock> : <>
+              <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1.5fr)_0.65fr_1fr_0.9fr_18px] gap-3 bg-slate-50/60 px-5 py-2.5 text-[11px] font-medium text-slate-400 sm:grid"><span>Bệnh nhân</span><span>BMI</span><span>Đường huyết</span><span>Trạng thái</span><span /></div>
+              <ul className="divide-y divide-slate-100">{attention.slice(0, 5).map((p) => <li key={p.id}><Link href={doctorChartHref(p.id)} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/80 sm:grid-cols-[minmax(0,1.5fr)_0.65fr_1fr_0.9fr_18px]"><div className="flex min-w-0 items-center gap-2.5"><Avatar name={p.name} /><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-slate-800">{p.name}</p><p className="mt-0.5 truncate text-[11px] text-slate-400">{p.condition_label || "Chưa có thông tin bệnh lý"}</p><p className="mt-1 text-[11px] text-slate-500 sm:hidden">BMI {p.bmi?.toFixed(1) ?? "—"} · {p.blood_glucose || "Chưa có đường huyết"}</p></div></div><span className="hidden text-xs text-slate-600 tabular-nums sm:block">{p.bmi?.toFixed(1) ?? "—"}</span><span className="hidden text-[12px] text-slate-600 tabular-nums sm:block">{p.blood_glucose || "—"}</span><span className={`w-fit whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium ${p.status_key === "warning" ? "bg-rose-50 text-rose-700" : "bg-amber-50/70 text-amber-800"}`}>{p.status_key === "warning" ? "Có cảnh báo" : "Cần theo dõi"}</span><ChevronRight size={15} className="hidden text-slate-300 sm:block" /></Link></li>)}</ul>
+            </>}
+          </section>
 
-              <Link
-                href="/doctor/patients"
-                className="w-full py-2 bg-surface-container-low hover:bg-surface-container border border-outline-variant/60 text-on-surface font-body-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 font-semibold"
-              >
-                <span>Mở hồ sơ bệnh nhân để xem tuân thủ</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Bottom Section - Kế hoạch chờ duyệt mới nhất */}
-        <section>
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
-            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
-              <div>
-                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
-                  <span className="material-symbols-outlined text-amber-600 text-[20px]">
-                    assignment
-                  </span>
-                  Kế hoạch chờ duyệt mới nhất
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Các thực đơn được AI khởi tạo cần bác sĩ đánh giá và xác nhận
-                </p>
-              </div>
-
-              <Link
-                href="/doctor/inbox?type=plan_review"
-                className="text-primary text-xs font-bold hover:underline flex items-center gap-0.5"
-              >
-                <span>Xem tất cả ({pendingPlans.length})</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </Link>
-            </div>
-
-            <div className="p-5 space-y-3">
-              {pendingPlans.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
-                    check_circle
-                  </span>
-                  <p className="font-body-bold text-sm font-bold">Hiện không có kế hoạch nào chờ duyệt</p>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Tất cả các thực đơn đã được xem xét hoặc phê duyệt.
-                  </p>
-                </div>
-              ) : (
-                visiblePendingPlans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-sm shrink-0">
-                        <span translate="no" className="notranslate">{plan.patientName.charAt(0)}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-body-bold text-on-surface font-bold text-sm">
-                            {plan.patientName}
-                          </p>
-                          <span className="font-mono text-xs text-on-surface-variant">
-                            ({plan.patientCode})
-                          </span>
-                        </div>
-                        <p className="text-xs font-semibold text-primary mt-0.5 line-clamp-1">
-                          {plan.planTitle}
-                        </p>
-                        <div className="flex items-center gap-3 font-caption text-on-surface-variant mt-1 text-xs">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">
-                              restaurant_menu
-                            </span>{" "}
-                            {plan.condition}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">
-                              calendar_today
-                            </span>{" "}
-                            {plan.createdAt}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-outline-variant/30">
-                      <Link
-                        href={doctorReviewHref(plan.patientId, plan.id)}
-                        className="h-8 px-3.5 bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant font-body-bold rounded-lg hover:bg-surface-container-low hover:text-primary transition-all text-xs flex items-center gap-1 cursor-pointer font-semibold"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">visibility</span>
-                        <span>Xem trước</span>
-                      </Link>
-
-                      <button
-                        onClick={() =>
-                          handleQuickApprove(plan.id, plan.planTitle)
-                        }
-                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">check</span>
-                        <span>Duyệt nhanh</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Cảnh báo thực đơn hết hạn */}
-        <section>
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-subtle overflow-hidden">
-            <div className="p-5 border-b border-outline-variant/40 bg-surface-container-low/30 flex justify-between items-center">
-              <div>
-                <h3 className="font-h2 text-h2 text-on-surface flex items-center gap-2 font-bold text-base">
-                  <span className="material-symbols-outlined text-amber-600 text-[20px]">
-                    event_busy
-                  </span>
-                  Cảnh báo thực đơn hết hạn
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Bệnh nhân sắp ăn xong / đã ăn xong thực đơn — cần tạo thực đơn tiếp
-                </p>
-              </div>
-
-              {!isProduction && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => void handleDemoExpiry("expiring")}
-                    disabled={demoBusy}
-                    className="px-3 py-1.5 border border-outline-variant/60 rounded-lg text-xs font-semibold text-on-surface-variant hover:border-amber-400 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
-                    title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">schedule</span>
-                    Giả lập: sắp hết hạn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDemoExpiry("expired")}
-                    disabled={demoBusy}
-                    className="px-3 py-1.5 border border-outline-variant/60 rounded-lg text-xs font-semibold text-on-surface-variant hover:border-red-400 hover:text-red-700 transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1"
-                    title="Chỉ khả dụng môi trường demo (backend chặn ở production)"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">event_busy</span>
-                    Giả lập: đã hết hạn
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-3 px-5 border-b border-outline-variant/30 pt-2">
-              <button
-                type="button"
-                onClick={() => setExpiryTab("expiring")}
-                className={`font-label text-label pb-2.5 pt-1 px-3 border-b-2 transition-all cursor-pointer text-xs ${
-                  expiryTab === "expiring"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface font-medium"
-                }`}
-              >
-                Sắp ăn xong ({expiringPatients.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setExpiryTab("expired")}
-                className={`font-label text-label pb-2.5 pt-1 px-3 border-b-2 transition-all cursor-pointer text-xs ${
-                  expiryTab === "expired"
-                    ? "border-primary text-primary font-bold"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface font-medium"
-                }`}
-              >
-                Đã ăn xong ({expiredPatients.length})
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3">
-              {expiryList.length === 0 ? (
-                <div className="p-8 text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[36px] text-emerald-500 mb-1">
-                    {expiryTab === "expiring" ? "upcoming" : "check_circle"}
-                  </span>
-                  <p className="font-body-bold text-sm font-bold">
-                    {expiryTab === "expiring"
-                      ? "Không có bệnh nhân nào sắp ăn xong thực đơn"
-                      : "Không có bệnh nhân nào hết hạn thực đơn"}
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    {expiryTab === "expiring"
-                      ? "Các thực đơn đã duyệt đều còn nhiều ngày sử dụng."
-                      : "Tất cả bệnh nhân đều còn thực đơn đang sử dụng."}
-                  </p>
-                </div>
-              ) : (
-                expiryList.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-outline-variant/50 rounded-lg bg-surface-container-lowest hover:bg-surface-container-low/30 hover:border-primary/40 transition-all gap-4 shadow-2xs"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative w-10 h-10 rounded-full bg-primary/10 text-primary ring-2 ring-primary/20 flex items-center justify-center font-bold text-xs shrink-0">
-                        <span translate="no" className="notranslate">{initials(p.name)}</span>
-                        {p.avatar &&
-                          !p.avatar.startsWith("https://api.dicebear.com") && (
-                          <img
-                            src={assetUrl(p.avatar)}
-                            alt={p.name}
-                            className="absolute inset-0 w-10 h-10 rounded-full object-cover ring-2 ring-outline-variant/40"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-body-bold text-on-surface font-bold text-sm">
-                            {p.name}
-                          </p>
-                          <span className="font-mono text-xs text-on-surface-variant">
-                            ({p.id})
-                          </span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant mt-0.5">
-                          {p.condition_label}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-                      {p.plan_expiry === "expiring" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                          Còn {p.plan_days_left ?? "?"} ngày (đến {p.plan_end_date ?? "—"})
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                          <span className="material-symbols-outlined text-[14px]">
-                            event_busy
-                          </span>
-                          Hết hạn {p.plan_end_date ?? "—"}
-                        </span>
-                      )}
-
-                      <Link
-                        href={`/doctor/patients/${encodeURIComponent(p.id)}/generate`}
-                        className="h-8 px-3.5 bg-primary text-on-primary font-body-bold rounded-lg hover:bg-primary/90 transition-all text-xs shadow-2xs flex items-center gap-1 cursor-pointer font-semibold active:scale-95 whitespace-nowrap"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">
-                          auto_awesome
-                        </span>
-                        <span>Tạo thực đơn mới</span>
-                      </Link>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
+          <section className={panelClass} aria-labelledby="dashboard-cycle-heading">
+            <div className="px-5 pb-2 pt-4"><h2 id="dashboard-cycle-heading" className="text-[16px] font-semibold text-slate-900">Chu kỳ thực đơn</h2><p className="mt-1 text-xs text-slate-500">Theo lịch áp dụng của bệnh nhân.</p></div>
+            <dl className="space-y-3.5 px-5 py-4 text-xs">{[{ label: "Đang áp dụng", value: activeCount, dot: "bg-teal-600" }, { label: "Sắp kết thúc", value: ending.length, dot: "bg-amber-400" }, { label: "Đã kết thúc", value: ended.length, dot: "bg-slate-300" }].map((item) => <div key={item.label} className="flex items-center justify-between"><dt className="flex items-center gap-2 text-slate-500"><span className={`h-1.5 w-1.5 rounded-full ${item.dot}`} />{item.label}</dt><dd className="font-semibold text-slate-800 tabular-nums">{count(item.value, data.patients != null)}<span className="ml-1.5 font-normal text-slate-400">bệnh nhân</span></dd></div>)}</dl>
+            {(ending.length > 0 || ended.length > 0) && <div className="border-t border-slate-100 px-5 py-3"><p className="mb-2 text-[11px] font-medium text-slate-400">Cần theo dõi chu kỳ tiếp theo</p>{[...ended, ...ending].slice(0, 3).map((p) => <Link key={p.id} href={doctorChartHref(p.id, "meals")} className="flex items-center justify-between gap-2 py-1.5 text-xs"><span className="truncate text-slate-700">{p.name}</span><span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400">{p.plan_expiry === "expiring" ? `Còn ${p.plan_days_left ?? "—"} ngày` : "Đã kết thúc"}<ChevronRight size={13} /></span></Link>)}</div>}
+            <Link href={doctorInboxHref("plan_expiry")} className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs font-medium text-teal-700 hover:bg-teal-50/40">Theo dõi lịch thực đơn<ArrowRight size={15} /></Link>
+          </section>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400"><span>Số liệu từ hồ sơ và ghi nhận của bệnh nhân.</span><span role="status">{busy ? "Đang cập nhật dữ liệu…" : data.updatedAt ? `Cập nhật lúc ${data.updatedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })}` : "Đang kết nối…"}</span></div>
       </main>
     </>
   );

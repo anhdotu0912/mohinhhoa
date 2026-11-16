@@ -6,11 +6,14 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import vn_today
 from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
 from app.models.notification import Notification
+from app.models.user import User
 from app.schemas.meal_plan import MealPlanOutput
+from app.services import plan_expiry
 
 SLOT_TIMES: dict[str, tuple[int, int]] = {
     "breakfast": (7, 30),
@@ -113,7 +116,7 @@ class NotificationService:
         return cancelled
 
     def ensure_plan_expiry_notification(
-        self, plan_row: MealPlan, bucket: str
+        self, plan_row: MealPlan, bucket: str, *, today: date | None = None
     ) -> Notification | None:
         """Tạo plan_expiring/plan_expired một lần (idempotent) cho patient."""
         if bucket not in ("expiring", "expired"):
@@ -131,16 +134,42 @@ class NotificationService:
             row.related_ids.get("meal_plan_id") == plan_row.id for row in rows
         ):
             return None
+        today = today or vn_today()
+        successors = (
+            self.db.query(MealPlan)
+            .filter(
+                MealPlan.user_id == plan_row.user_id,
+                MealPlan.id != plan_row.id,
+                MealPlan.status.in_(["pending_review", "approved", "edited"]),
+                (MealPlan.ends_on.is_(None)) | (MealPlan.ends_on >= today),
+            )
+            .order_by(MealPlan.created_at.desc())
+            .all()
+        )
+        successor = next((row for row in successors if not plan_expiry.is_plan_historical(row, today)), None)
+        action_label = "Tạo thực đơn mới"
+        next_step = (
+            "Hãy mở Tạo thực đơn của tôi để tạo bản dự thảo mới; "
+            "bác sĩ sẽ kiểm tra và duyệt trước khi áp dụng."
+        )
+        if successor is not None:
+            action_label = "Theo dõi thực đơn kế tiếp"
+            if successor.status == "pending_review":
+                next_step = "Bạn đã có bản mới đang chờ bác sĩ duyệt. Hãy theo dõi kết quả kiểm duyệt."
+            elif successor.starts_on is None:
+                next_step = "Bản thực đơn kế tiếp đã được duyệt và đang chờ bác sĩ áp dụng lịch."
+            else:
+                next_step = "Bạn đã có thực đơn kế tiếp được lên lịch. Hãy kiểm tra lịch áp dụng."
         title = (
-            "Thực đơn sắp hết hạn"
+            "Thực đơn sắp hoàn thành"
             if bucket == "expiring"
-            else "Thực đơn đã hết hạn"
+            else "Đã hoàn thành thực đơn 7 ngày"
         )
-        body = (
-            "Thực đơn 7 ngày của bạn sắp kết thúc. Hãy liên hệ chuyên gia dinh dưỡng để được tạo thực đơn mới."
-            if bucket == "expiring"
-            else "Thực đơn 7 ngày của bạn đã hết hạn. Hãy liên hệ chuyên gia dinh dưỡng hoặc tạo thực đơn mới."
-        )
+        body = ("Chu kỳ thực đơn 7 ngày của bạn sắp kết thúc. " if bucket == "expiring"
+                else "Chu kỳ thực đơn 7 ngày của bạn đã hoàn thành. ") + next_step
+        if plan_row.starts_on is None and bucket == "expired":
+            title = "Bạn chưa tạo thực đơn cho chu kỳ mới"
+            body = "Bản thực đơn cũ chưa được áp dụng đã được lưu vào Nhật ký. " + next_step
         return self._add(
             user_id=plan_row.user_id,
             type=notif_type,
@@ -149,7 +178,50 @@ class NotificationService:
             scheduled_at=datetime.now(),
             status="sent",
             related_ids={"meal_plan_id": plan_row.id},
+            payload={"action_url": "/patient/meal-plan", "action_label": action_label},
         )
+
+    def sync_plan_expiry_notifications(
+        self, user_id: str, *, today: date | None = None
+    ) -> list[Notification]:
+        """Reconcile current/most recently completed cycles on any patient read path."""
+        today = today or vn_today()
+        # /notifications, /me and /schedule may arrive together. Serialize per patient
+        # so the existing (plan, type) idempotency check also holds across requests.
+        self.db.query(User).filter(User.id == user_id).with_for_update().first()
+        applied = (
+            self.db.query(MealPlan)
+            .filter(
+                MealPlan.user_id == user_id,
+                MealPlan.status.in_(plan_expiry.EXPIRY_ELIGIBLE_STATUSES),
+                MealPlan.starts_on.isnot(None),
+                MealPlan.ends_on.isnot(None),
+                MealPlan.starts_on <= today,
+            )
+            .order_by(MealPlan.ends_on.desc(), MealPlan.created_at.desc())
+            .all()
+        )
+        current = next((row for row in applied if row.ends_on >= today), None)
+        unapplied = self.db.query(MealPlan).filter(
+            MealPlan.user_id == user_id,
+            MealPlan.status.in_(["pending_review", "approved", "edited"]),
+            MealPlan.starts_on.is_(None), MealPlan.ends_on.is_(None),
+        ).all()
+        historical = [row for row in applied + unapplied if plan_expiry.is_plan_historical(row, today)]
+        completed = max(historical, key=plan_expiry.history_end_date) if historical else None
+        created: list[Notification] = []
+        for row in (current, completed):
+            if row is None:
+                continue
+            bucket = "expired" if row is completed else plan_expiry.bucket(
+                row.reviewed_at, row.created_at, len(row.days or []), today=today,
+                starts_on=row.starts_on, ends_on=row.ends_on,
+            )
+            notification = self.ensure_plan_expiry_notification(row, bucket, today=today)
+            if notification is not None:
+                created.append(notification)
+        self.db.flush()
+        return created
 
     def on_alert_created(self, alert: Alert) -> Notification | None:
         if alert.severity not in FOLLOWUP_SEVERITIES:

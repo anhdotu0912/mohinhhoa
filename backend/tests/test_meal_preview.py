@@ -111,7 +111,7 @@ class TestChatMealPlanReadonly:
         output = run_agent(
             AgentRunInput(
                 user_id="demo_patient_1",
-                message="Hôm nay ăn gì?",
+                message="Cho tôi xem thực đơn",
                 force_intent="meal_plan",
             ),
             db=db_session,

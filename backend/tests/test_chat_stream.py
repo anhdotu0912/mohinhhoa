@@ -141,8 +141,8 @@ class TestChatStreamHTTP:
         assert "done" in types
 
         done = next(e for e in events if e["type"] == "done")
-        assert done["data"]["meal_preview"] is not None
-        assert len(done["data"]["meal_preview"]["meals"]) >= 1
+        assert done["data"]["meal_preview"] is None
+        assert "đang chờ bác sĩ duyệt" in done["data"]["message"]
         assert done["data"]["intent"] == "meal_plan"
 
     @patch("app.agents.streaming.time.sleep")

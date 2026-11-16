@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.datetime_vn import vn_today
 from app.core.errors import APIError
 from app.models.alert import Alert
 from app.models.meal_plan import MealPlan
@@ -108,6 +109,7 @@ def meal_plan_from_row(row: MealPlan) -> MealPlanOutput:
         citations=row.citations or [],
         status=row.status,
         adjustment_note=row.adjustment_note,
+        review_notes=row.review_notes,
         starts_on=row.starts_on.isoformat() if row.starts_on else None,
         ends_on=row.ends_on.isoformat() if row.ends_on else None,
         created_at=row.created_at.isoformat() if row.created_at else None,
@@ -265,22 +267,24 @@ def generate_meal_plan(
 def resolve_patient_plan_row(
     db: Session, user_id: str, today: date | None = None
 ) -> MealPlan | None:
-    """Resolve plan for patient view: active → upcoming → latest."""
+    """Resolve the current cycle only; historical plans belong in the journal."""
     from app.services.plan_apply import find_active_plan, find_upcoming_plan
+    from app.services.plan_expiry import is_plan_historical
 
-    today = today or date.today()
+    today = today or vn_today()
     active = find_active_plan(db, user_id, today)
     if active is not None:
         return active
     upcoming = find_upcoming_plan(db, user_id, today)
     if upcoming is not None:
         return upcoming
-    return (
+    candidates = (
         db.query(MealPlan)
         .filter(MealPlan.user_id == user_id)
         .order_by(MealPlan.created_at.desc())
-        .first()
+        .all()
     )
+    return next((row for row in candidates if not is_plan_historical(row, today)), None)
 
 
 def parse_meal_slots(message: str) -> list[str]:
@@ -402,14 +406,16 @@ def format_meal_preview_message(
     """Human-readable summary for chat bubble."""
     if preview is None:
         return (
-            "Bạn chưa có thực đơn trong hệ thống. "
-            "Vui lòng liên hệ bác sĩ để được lập thực đơn, hoặc mở mục Thực đơn trên ứng dụng."
+            "Bạn chưa có thực đơn cho chu kỳ hiện tại. Các bản cũ được lưu trong Nhật ký. "
+            "Mở mục Tạo thực đơn của tôi để yêu cầu AI tạo bản dự thảo 7 ngày. "
+            "Bác sĩ sẽ kiểm tra và duyệt trước khi thực đơn được áp dụng."
         )
 
     prefix = ""
     if message_requests_plan_creation(message):
         prefix = (
-            "Thực đơn được bác sĩ lập và quản lý — chat không tự tạo thực đơn mới. "
+            "Bạn có thể yêu cầu AI tạo bản mới tại mục Tạo thực đơn của tôi; "
+            "bác sĩ sẽ kiểm tra và duyệt. Chat chỉ xem thực đơn có sẵn. "
             "Dưới đây là thực đơn hiện có của bạn:\n\n"
         )
 

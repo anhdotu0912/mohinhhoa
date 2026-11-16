@@ -3,13 +3,35 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+from app.core.datetime_vn import vn_calendar_date, vn_today
+
+if TYPE_CHECKING:
+    from app.models.meal_plan import MealPlan
 
 EXPIRING_THRESHOLD_DAYS = 2
 
 PlanExpiryBucket = Literal["expiring", "expired", "ok", "none"]
 
 EXPIRY_ELIGIBLE_STATUSES = frozenset({"approved", "edited"})
+
+
+def history_end_date(row: MealPlan) -> date | None:
+    """An unapplied draft belongs to its creation cycle, never to an invented applied week."""
+    if row.ends_on is not None:
+        return row.ends_on
+    if row.starts_on is not None:
+        return None
+    created = row.created_at or row.reviewed_at
+    if created is None:
+        return None
+    return vn_calendar_date(created) + timedelta(days=duration_days(len(row.days or [])) - 1)
+
+
+def is_plan_historical(row: MealPlan, today: date | None = None) -> bool:
+    end = history_end_date(row)
+    return end is not None and end < (today or vn_today())
 
 
 def duration_days(days_count: int | None) -> int:
@@ -57,7 +79,7 @@ def days_left(
     )
     if end is None:
         return None
-    return (end - (today or date.today())).days
+    return (end - (today or vn_today())).days
 
 
 def bucket(
@@ -80,7 +102,7 @@ def bucket(
     )
     if left is None:
         return "none"
-    if left <= 0:
+    if left < 0:
         return "expired"
     if left <= EXPIRING_THRESHOLD_DAYS:
         return "expiring"
@@ -93,7 +115,7 @@ def plan_usage_for_row(
     ends_on: date | None,
     today: date | None = None,
 ) -> Literal["none", "pending", "active", "upcoming", "finished"]:
-    today = today or date.today()
+    today = today or vn_today()
     if status not in EXPIRY_ELIGIBLE_STATUSES:
         return "none" if status == "rejected" else "pending"
     if starts_on is None or ends_on is None:

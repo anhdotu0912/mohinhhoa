@@ -1,16 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePatientPanel } from "../PatientPanelProvider";
 import { api } from "@/lib/api";
 import type { Meal, MealPlanOutput } from "@/lib/types";
 import {
-  DAY_LABELS,
   findDayPlan,
   isApprovedPlan,
   replaceDayMeals,
   resolveDayNutrition,
-  todayDayIndex,
 } from "@/lib/meal-plan-display";
 import {
   ApprovedMealSlotList,
@@ -18,15 +17,19 @@ import {
   MealPlanLoadingState,
 } from "./ApprovedMealSlotList";
 import { NutrientChips } from "@/components/shared/NutrientChips";
+import { mealPlanCalendarDays } from "@/lib/meal-plan-calendar";
+import { parseFlexibleDate, planUsageFromPlan } from "@/lib/plan-expiry";
+import { useVietnamToday } from "@/lib/use-vietnam-today";
 
 interface WeeklyMealPlanCardProps {
   plan?: MealPlanOutput | null;
+  historical?: boolean;
 }
 
-export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) {
+export function WeeklyMealPlanCard({ plan: planProp, historical = false }: WeeklyMealPlanCardProps) {
   const { openPanel } = usePatientPanel();
-  const todayIndex = useMemo(() => todayDayIndex(), []);
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(todayIndex);
+  const today = useVietnamToday();
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [fetchedPlan, setFetchedPlan] = useState<MealPlanOutput | null | undefined>(
     planProp === undefined ? undefined : planProp
   );
@@ -61,12 +64,21 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
   }, [sourcePlan]);
 
   const plan = workingPlan ?? sourcePlan;
+  const calendarDays = useMemo(() => mealPlanCalendarDays(plan), [plan]);
+  const todayIndex = calendarDays.findIndex((day) => day.date === today);
+  const usage = plan ? planUsageFromPlan(plan, { today: parseFlexibleDate(today)! }) : "none";
+  const completed = usage === "finished";
+  const active = !historical && usage === "active";
+  const upcoming = usage === "upcoming";
+  useEffect(() => {
+    setSelectedDayIndex(Math.max(0, todayIndex));
+  }, [plan?.id, todayIndex]);
   const loading = sourcePlan === undefined;
   const selectedDay = findDayPlan(plan, selectedDayIndex);
-  const selectedLabel = DAY_LABELS[selectedDayIndex];
+  const selectedLabel = calendarDays[selectedDayIndex];
   const nutrition = resolveDayNutrition(selectedDay);
   const meals = selectedDay?.meals ?? [];
-  const isToday = selectedDayIndex === todayIndex;
+  const isToday = active && selectedDayIndex === todayIndex;
 
   const [showNutrients, setShowNutrients] = useState(false);
 
@@ -76,7 +88,7 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
   };
 
   const weekRange =
-    plan?.starts_on && plan?.ends_on ? `${plan.starts_on} – ${plan.ends_on}` : "Thứ 2 – Chủ nhật";
+    plan?.starts_on && plan?.ends_on ? `${plan.starts_on} – ${plan.ends_on}` : "Chu kỳ 7 ngày · Chưa áp dụng";
 
   if (loading) {
     return <MealPlanLoadingState label="Đang tải thực đơn tuần..." />;
@@ -85,7 +97,7 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
   if (!plan) {
     return (
       <MealPlanEmptyState
-        message="Bạn chưa có thực đơn tuần nào. Bạn có thể gửi yêu cầu để bác sĩ lập kế hoạch dinh dưỡng 7 ngày."
+        message="Bạn chưa có thực đơn tuần nào. Hãy yêu cầu AI tạo bản dự thảo 7 ngày để bác sĩ kiểm tra và duyệt."
         showRequest
       />
     );
@@ -101,20 +113,28 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <h2 className="text-sm sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                Thực đơn tuần này
+                {completed ? "Thực đơn đã hoàn thành" : historical ? "Thực đơn lưu trong Nhật ký" : active ? "Thực đơn đang áp dụng" : upcoming ? "Thực đơn sắp áp dụng" : "Thực đơn 7 ngày"}
               </h2>
               <span className="text-[11px] sm:text-xs text-slate-500 font-medium">
                 ({weekRange})
               </span>
             </div>
             <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5 truncate">
-              Kế hoạch dinh dưỡng cá nhân hóa được bác sĩ phê duyệt
+              {completed ? "Chu kỳ đã kết thúc · Chỉ xem lại lịch sử" : historical ? "Bản cũ chưa được áp dụng · Chỉ xem lại" : isApprovedPlan(plan) ? "Kế hoạch dinh dưỡng đã được bác sĩ kiểm tra" : "Bản dự thảo AI · Chỉ xem trước, chưa áp dụng"}
             </p>
           </div>
         </div>
 
         <div className="self-start sm:self-auto">
-          {isApprovedPlan(plan) ? (
+          {completed ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              <span className="material-symbols-outlined text-[15px]">task_alt</span> Hoàn thành
+            </span>
+          ) : historical ? (
+            <span className="inline-flex shrink-0 whitespace-nowrap rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">Đã lưu Nhật ký</span>
+          ) : upcoming ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">Đã xếp lịch</span>
+          ) : isApprovedPlan(plan) ? (
             <div className="inline-flex items-center gap-1 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-emerald-50 text-[#006857] border border-emerald-200/90 rounded-full text-[11px] sm:text-xs font-bold shadow-2xs shrink-0">
               <span className="material-symbols-outlined text-[14px] sm:text-[15px]">verified</span>
               <span>Bác sĩ đã duyệt</span>
@@ -137,9 +157,9 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-0.5 -mx-0.5 px-0.5">
-          {DAY_LABELS.map((day) => {
+          {calendarDays.map((day) => {
             const isSelected = selectedDayIndex === day.index;
-            const isCurrentDay = todayIndex === day.index;
+            const isCurrentDay = active && todayIndex === day.index;
 
             return (
               <button
@@ -153,7 +173,7 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
                 }`}
               >
                 <span className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-80">{day.short}</span>
-                <span className="text-[11px] sm:text-xs font-extrabold mt-0.5">{day.full.replace("Thứ ", "T")}</span>
+                <span className="text-[11px] sm:text-xs font-extrabold mt-0.5">{day.date ? day.date.slice(5).split("-").reverse().join("/") : day.full}</span>
                 {isCurrentDay && (
                   <span
                     className={`w-1.5 h-1.5 rounded-full mt-0.5 sm:mt-1 ${
@@ -190,6 +210,7 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
         meals={meals}
         emptyLabel={`Chưa có thực đơn được kích hoạt cho ${selectedLabel?.full}.`}
         onMealsChange={handleMealsChange}
+        readOnly={!active}
       />
 
       {meals.length > 0 && (
@@ -229,14 +250,14 @@ export function WeeklyMealPlanCard({ plan: planProp }: WeeklyMealPlanCardProps) 
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-        <button
+        {active ? <button
           type="button"
           onClick={() => openPanel("menu")}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#006857] hover:bg-[#005245] text-white rounded-xl text-xs font-bold transition-colors shadow-xs active:scale-95 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[17px]">edit_note</span>
           <span>Xem chi tiết / Ghi nhận</span>
-        </button>
+        </button> : historical ? <span className="text-xs font-semibold text-slate-500">Chỉ xem lại</span> : <Link href="/patient/meal-plan" className="text-xs font-bold text-teal-800 underline">{completed ? "Quản lý thực đơn mới" : "Theo dõi kiểm duyệt thực đơn"}</Link>}
         <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-500">
           <span className="material-symbols-outlined text-[14px] sm:text-[15px] text-[#006857]">check_circle</span>
           <span>Thực đơn 7 ngày cá nhân hóa</span>

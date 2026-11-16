@@ -22,6 +22,7 @@ export type AuthState = {
     assignedDoctor?: AssignedDoctor | null;
   }) => void;
   setUserProfile: (profile: {
+    email?: string;
     displayName?: string | null;
     avatar?: string | null;
     assignedDoctor?: AssignedDoctor | null;
@@ -52,9 +53,10 @@ export const useAuthStore = create<AuthState>()(
           assignedDoctor:
             assignedDoctor !== undefined ? assignedDoctor : get().assignedDoctor,
         }),
-      setUserProfile: ({ displayName, avatar, assignedDoctor }) =>
+      setUserProfile: ({ displayName, avatar, assignedDoctor, email }) =>
         set((state) => ({
           displayName: displayName !== undefined ? displayName : state.displayName,
+          email: email !== undefined ? email : state.email,
           avatar: avatar !== undefined ? avatar : state.avatar,
           assignedDoctor:
             assignedDoctor !== undefined ? assignedDoctor : state.assignedDoctor,

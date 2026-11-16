@@ -18,7 +18,6 @@ from app.schemas.meal_plan import (
     MealPlanRequestOut,
     RequestAdjustmentRequest,
 )
-from app.services import plan_expiry
 from app.services.meal_plan_service import (
     generate_meal_plan,
     get_meal_plan_request,
@@ -47,26 +46,11 @@ def get_my_latest_plan(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> MealPlanOutput:
+    if NotificationService(db).sync_plan_expiry_notifications(user.id):
+        db.commit()
     row = resolve_patient_plan_row(db, user.id)
     if row is None:
         raise APIError(404, "NO_MEAL_PLAN", "Bạn chưa có thực đơn nào.")
-
-    if (
-        row.status in plan_expiry.EXPIRY_ELIGIBLE_STATUSES
-        and row.starts_on is not None
-    ):
-        expiry_bucket = plan_expiry.bucket(
-            row.reviewed_at,
-            row.created_at,
-            len(row.days or []),
-            starts_on=row.starts_on,
-            ends_on=row.ends_on,
-        )
-        notification = NotificationService(db).ensure_plan_expiry_notification(
-            row, expiry_bucket
-        )
-        if notification is not None:
-            db.commit()
 
     return meal_plan_from_row(row)
 
@@ -76,6 +60,8 @@ def get_my_meal_plan_schedule(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> MealPlanScheduleOut:
+    if NotificationService(db).sync_plan_expiry_notifications(user.id):
+        db.commit()
     data = build_meal_plan_schedule(db, user.id)
     return MealPlanScheduleOut(**data)
 

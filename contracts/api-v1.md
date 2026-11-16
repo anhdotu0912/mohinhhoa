@@ -1,6 +1,6 @@
 # API v1 Contract — VinNutri (FE ↔ BE)
 
-**Version:** 1.22 (2026-08-31 — `citation_chunks[]` trên AgentRunOutput / ChatMessage: đoạn RAG đã dùng để gen câu trả lời. Xem changelog ở mục Versioning cuối file)
+**Version:** 1.28 (2026-11-16 — bệnh nhân tự sửa thông tin tài khoản và hồ sơ)
 **Base URL:** tất cả endpoint dưới đây (trừ mục Health) có prefix `/api/v1`.
 **Nguồn sự thật:** `backend/app/api/v1/*.py`, `backend/app/main.py` (danh sách router thật được mount).
 **Luật bắt buộc:** sửa contract này trước, code sau. Field/schema nhắc ở đây phải khớp `contracts/agent-io-schema.md`.
@@ -119,6 +119,8 @@ Cần `SMTP_USERNAME` + `SMTP_PASSWORD` (App Password). Host Gmail mặc định
 ```
 **Field bệnh nhân ghi ngay:** `disease`, `medications`, `allergies`, chỉ số cơ thể (`bmi`/`weight`/`height`/`age`/`gender`), liên hệ, `preferences`.
 
+`POST /profile` nhận thêm `full_name?: string | null` (tối đa 255 ký tự) và `email?: string` (email hợp lệ, tối đa 255 ký tự). Chỉ cập nhật tài khoản của bệnh nhân đang đăng nhập; bỏ qua trường không gửi, `full_name=null`/rỗng xóa tên, email không được rỗng/null. Email chuẩn hóa trim/lowercase, trùng tài khoản khác trả `409 EMAIL_EXISTS`. Lưu tài khoản và hồ sơ trong cùng transaction; lỗi không lưu dở một phần. Response vẫn `PatientProfile`; tên/email mới đọc qua `GET /auth/me`. Token theo user id tiếp tục dùng được. `/patient/profile` là nơi chỉnh thông tin cá nhân; trang chi tiết bác sĩ chỉ hiển thị thông tin này, không có form chỉnh sửa hồ sơ chung. API bác sĩ cũ còn giữ để tương thích luồng khởi tạo bệnh nhân hiện có; không sử dụng ở trang chi tiết.
+
 **Field lâm sàng — đề xuất, không có hiệu lực tới khi bác sĩ duyệt (2026-08-29):** `target_kcal`, `restrictions`, `treatment_goals`. Nếu request khác giá trị hiệu lực đang lưu, BE ghi vào `proposed_target_kcal` / `proposed_restrictions` / `proposed_treatment_goals` và set `constraints_status="pending_doctor_review"`. Response `target_kcal`/`restrictions`/`treatment_goals` **vẫn là giá trị đã duyệt**; `proposed_*` phản ánh đề xuất. `meal_planner_agent` chỉ đọc cột hiệu lực.
 
 ### `GET /profile/me`
@@ -171,6 +173,10 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 
 ## 4. Meal Plans
 
+**Luồng sản phẩm (2026-11-03):** bệnh nhân tạo bản dự thảo bằng AI từ `/patient/meal-plan` → `pending_review` → bác sĩ xem/chỉnh sửa/duyệt trong hàng việc → bác sĩ áp dụng kế hoạch đã duyệt. Bệnh nhân xem trước bản dự thảo có nhãn rõ ràng; không ghi nhận tuân thủ hay áp dụng bản chưa duyệt. Chat chỉ đọc thực đơn và dẫn tới trang tạo, không âm thầm tạo bản mới.
+
+`MealPlanOutput.review_notes` optional (`string | null`, mặc định `null`) trả ghi chú bác sĩ từ review đã lưu, để bệnh nhân đọc lý do từ chối. Không dùng `adjustment_note` của bệnh nhân thay cho phản hồi bác sĩ. Đồng bộ agent I/O v1.15.
+
 ### `POST /meal-plans/generate`
 **Role:** `patient`. Luôn sinh 7 ngày, `status` khởi tạo `"pending_review"`. **Không** materialize `meal_reminder`/`adherence_checkin` tại thời điểm này — các nhắc nhở chỉ được tạo khi doctor `apply` (xem §9).
 ```json
@@ -184,7 +190,7 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 ```
 
 ### `GET /meal-plans/me`
-**Role:** `patient`. Trả plan mới nhất (`ORDER BY created_at DESC LIMIT 1`). Side-effect (lazy, idempotent): nếu plan mới nhất có `status` ∈ `{approved, edited}` và `plan_expiry.bucket()` trả `"expiring"` hoặc `"expired"`, BE tạo **một lần** `Notification(type="plan_expiring"|"plan_expired", status="sent")` gắn `related_ids.meal_plan_id` nếu chưa tồn tại bản ghi cùng type cho plan đó.
+**Role:** `patient`. Ưu tiên plan đang áp dụng → sắp áp dụng → bản hiện tại chưa quá chu kỳ. Không trả bản đã vào `history_plans`; nếu chỉ có lịch sử thì `404 NO_MEAL_PLAN`. Đồng bộ nhắc vòng đời lịch như `GET /notifications`, độc lập với bản được chọn trả về.
 ```json
 // Response 200 → MealPlanOutput
 // Error 404
@@ -193,6 +199,12 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 
 ### `GET /meal-plans/schedule`
 **Role:** `patient`. Lịch tuần thực đơn của chính mình — cùng schema với `GET /doctor/patients/{patient_id}/meal-plan-schedule` (ADR-012); `patient_id` trong response = `user_id` của patient đang đăng nhập.
+
+`latest_plan: MealPlanOutput | null` (optional, mặc định `null`) là bản được tạo gần nhất, kể cả khi bị từ chối. Dùng theo dõi kết quả duyệt bản AI mới trong khi `active_plan` vẫn là thực đơn đang áp dụng; không thay thế `active_plan` bằng bản chưa duyệt.
+
+`history_plans: MealPlanOutput[]` (optional, mặc định `[]`) chứa lịch đã kết thúc và bản chưa áp dụng đã quá chu kỳ 7 ngày kể từ ngày tạo tại Việt Nam (`created_at`, fallback `reviewed_at`). Các bản này được giữ nguyên nội dung/trạng thái kiểm duyệt để xem trong **Nhật ký**, không nằm trong `unassigned_plans` và không chặn `POST /meal-plans/generate`. Không tự gán ngày áp dụng cho bản chưa từng được áp dụng. Bản chờ duyệt/chờ áp dụng còn trong chu kỳ vẫn chặn tạo trùng. Trang **Tạo thực đơn** chỉ hiển thị bản hiện tại; không lấy `latest_plan` trong lịch sử làm fallback. Khi chưa có bản hiện tại, hiển thị “Bạn chưa tạo thực đơn cho chu kỳ mới” cùng hành động tạo mới và lối mở Nhật ký.
+
+**Kết thúc chu kỳ:** lịch 7 ngày tính theo `starts_on…ends_on`, bao gồm trọn ngày cuối tại Việt Nam (UTC+7). Từ 00:00 ngày kế tiếp, plan cũ nằm trong slot `occupancy="past"`, giao diện ghi **Hoàn thành**, chỉ xem lại; không tự gia hạn, không đổi trạng thái kiểm duyệt `approved|edited`, không xóa lịch sử. Endpoint này cũng đồng bộ thông báo kết thúc chu kỳ.
 ```json
 // Response 200 → MealPlanScheduleOut (xem § GET /doctor/patients/{patient_id}/meal-plan-schedule)
 ```
@@ -206,16 +218,16 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 ```
 
 ### `POST /doctor/patients/{patient_id}/meal-plans/generate`
-**Role:** `doctor`. Doctor sinh plan hộ 1 patient cụ thể — cùng pipeline với `POST /meal-plans/generate`.
+**Role:** `doctor`. **Ngừng hỗ trợ khởi tạo từ phía bác sĩ (2026-11-03).** Sau khi kiểm tra bệnh nhân thuộc quyền quản lý, trả `403 PATIENT_GENERATION_REQUIRED`. Bác sĩ xem, chỉnh sửa và duyệt bản AI do bệnh nhân khởi tạo; endpoint được giữ để client cũ nhận thông báo rõ ràng.
 ```json
 // Request (optional body, giống GenerateMealPlanRequest)
 { "notes": "", "priorities": [] }
-// Response 200 → MealPlanOutput
+// Error 403 { "code": "PATIENT_GENERATION_REQUIRED", "detail": "Bệnh nhân khởi tạo thực đơn AI. Bác sĩ kiểm tra, chỉnh sửa và duyệt bản dự thảo." }
 // Error 404 { "code": "PATIENT_NOT_FOUND", "detail": "Không tìm thấy bệnh nhân." }
 ```
 
 ### `POST /meal-plans/request` (as-built 2026-08-24)
-**Role:** `patient`. Bệnh nhân yêu cầu bác sĩ tạo thực đơn — **không** tự gọi AI generate. Lưu cờ trên `profiles` (`meal_plan_request_status`), **không** tạo bản ghi `notifications`.
+**Role:** `patient`. **Legacy:** lưu yêu cầu cũ trên `profiles`, không tự sinh thực đơn. Giao diện mới gọi `POST /meal-plans/generate` để bệnh nhân khởi tạo bản AI trực tiếp; không gửi thêm yêu cầu cho bác sĩ tạo.
 ```json
 // Request (optional body)
 { "note": "Tôi mới hoàn tất hồ sơ, mong bác sĩ lập thực đơn tuần này." }
@@ -229,7 +241,7 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 ```
 - Cho phép khi chưa có plan đã apply (`plan_usage=none`) hoặc plan đã hết hạn (`finished`). Chặn khi đã có plan `pending_review`.
 - Gửi lại khi `status=pending`: idempotent `200`, giữ `note`/`requested_at` cũ.
-- Khi doctor `POST /doctor/patients/{id}/meal-plans/generate` → BE tự reset `meal_plan_request_status` về `"none"`.
+- Khi patient `POST /meal-plans/generate` thành công → BE tự reset cờ yêu cầu legacy `meal_plan_request_status` về `"none"`.
 
 ### `GET /meal-plans/request`
 **Role:** `patient`. Trạng thái yêu cầu hiện tại của chính mình.
@@ -247,7 +259,7 @@ Patient **đề xuất** `restrictions`/`target_kcal`/`treatment_goals` qua `POS
 // Error 400 { "code": "PLAN_NOT_APPROVED", "detail": "Chỉ yêu cầu điều chỉnh trên thực đơn đã được duyệt." } — khi plan đang pending_review/rejected/edited
 ```
 
-**Ghi chú `/chat` intent `meal_plan` (read-only):** chat **không** sinh/persist thực đơn mới. Chỉ đọc plan có sẵn trong DB và trả `meal_preview` + `meal_plan_id` của plan đang xem. Sinh plan qua `POST /meal-plans/generate` hoặc `POST /doctor/.../meal-plans/generate`.
+**Ghi chú `/chat` intent `meal_plan` (read-only):** chat **không** sinh/persist thực đơn mới. Chỉ đọc plan có sẵn trong DB và trả `meal_preview` + `meal_plan_id` của plan đang xem. Bệnh nhân tạo plan qua `POST /meal-plans/generate` tại `/patient/meal-plan`.
 
 ---
 
@@ -286,7 +298,7 @@ GET /alerts?patient_id=user_uuid (doctor)
 ### `GET /notifications`
 **Role:** `patient` **chỉ** (doctor hiện chưa gọi được endpoint này — gap, xem §9 Doctor Compliance).
 
-**Plan expiry notifications (lazy):** `plan_expiring` / `plan_expired` được materialize idempotent khi patient gọi `GET /meal-plans/me` và plan đang có hiệu lực (`status` ∈ `{approved, edited}`) với bucket tương ứng — không dùng cron; gọi lại nhiều lần không tạo trùng lặp cho cùng `meal_plan_id` + type.
+**Plan lifecycle notifications (lazy):** `GET /notifications`, `GET /meal-plans/me` và `GET /meal-plans/schedule` đồng bộ `plan_expiring` cho lịch đang áp dụng và `plan_expired` cho lịch vừa hoàn thành gần nhất; không phụ thuộc vào việc có bản dự thảo mới hay đã mở `/me`. Chỉ xét plan `approved|edited` đã có `starts_on` và `ends_on`; ngày cuối vẫn là `expiring`, chỉ `expired` khi `today > ends_on` theo ngày Việt Nam. Mỗi `meal_plan_id` + type chỉ tạo một lần, kể cả đã đọc/bỏ qua. `plan_expired` có tiêu đề “Đã hoàn thành thực đơn 7 ngày”; khi chưa chuẩn bị bản kế tiếp, nội dung nhắc tạo mới và `payload` có `{action_url:"/patient/meal-plan", action_label:"Tạo thực đơn mới"}`. Nếu đã có bản mới đang chờ duyệt/chờ áp dụng hoặc lịch tiếp nối, hướng dẫn theo dõi bản đó thay vì tạo trùng. Giao diện tự cập nhật khi qua ngày và khi quay lại cửa sổ; không gửi email/push ngoài ứng dụng.
 ```
 GET /notifications?status=pending&type=meal_reminder
 ```
@@ -716,17 +728,19 @@ Query optional `days` (default `7`, min `1`, max `90`). `patient_id` trong respo
 **Role:** `patient` **hoặc** `doctor` (cả 2 role được phép gọi, khác với hầu hết endpoint patient-only khác).
 ```json
 // Request
-{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
+{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?", "session_id": null }
 // Response 200 → AgentRunOutput (xem contracts/agent-io-schema.md §5.2, gồm secondary_intents[], citation_chunks[], weekly_compliance / doctor_note)
 // Error 503 { "code": "AGENT_ERROR", "detail": "Lỗi xử lý agent: ..." }
 ```
 **Multi-intent (as-built):** `intent_classifier` phát hiện ý định phụ trong câu hỏi ghép (ví dụ vừa hỏi lập thực đơn vừa hỏi tương tác thuốc) qua keyword pattern — trả về qua `secondary_intents[]`, không xử lý song song đầy đủ, chỉ để `message` gợi ý người dùng hỏi lại riêng ý định phụ đó.
 
+`session_id` là tùy chọn (1–36 ký tự hoặc null). Khi có, server đọc tối đa 8 tin đã lưu của phiên thuộc người gọi, mỗi tin tối đa 1200 ký tự. Phiên thiếu/sai chủ sở hữu trả `404 SESSION_NOT_FOUND`; không nhận lịch sử do client tự truyền vào request. Ngữ cảnh chỉ giúp hiểu chủ thể/sở thích, không thay nguồn chứng cứ. HTTP vẫn không expose `force_intent`.
+
 ### `POST /chat/stream`
 **Role:** `patient` **hoặc** `doctor`.
 ```json
 // Request
-{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?" }
+{ "message": "Tôi bị tiểu đường, hôm nay nên ăn gì?", "session_id": null }
 ```
 **Response 200:** `text/event-stream` (Server-Sent Events)
 
@@ -760,7 +774,7 @@ data: {"type": "done", "data": { ...AgentRunOutput }}
 
 ### Chat Sessions (persist lịch sử UI — as-built 2026-08-23)
 
-Lưu session + transcript hiển thị trên sidebar patient chat. **Không** đưa transcript vào `run_agent` — mỗi lượt `/chat` vẫn stateless.
+Lưu session + transcript hiển thị trên sidebar patient chat. `/chat` và `/chat/stream` có thể đọc ngữ cảnh giới hạn từ phiên thuộc người gọi qua `session_id`; không dùng lịch sử thay nguồn y khoa. Kiểm tra quyền trước khi mở SSE. FE chờ lưu các lượt trước trước khi gửi câu hỏi tiếp nối.
 
 **Role:** `patient` only (doctor `403`).
 
@@ -1120,7 +1134,17 @@ Theo `adrs/013-patient-metrics-time-series.md`, `specs/12-patient-metrics-tracki
 
 ## Versioning
 
-- Version hiện tại: **1.23**.
+- **Changelog 1.27 → 1.28 (2026-11-16):** bệnh nhân sửa `full_name`/`email` qua `POST /profile`, cùng transaction hồ sơ, kiểm tra định dạng/trùng email. Trang bác sĩ bỏ form sửa hồ sơ chung; bệnh nhân chỉnh tại `/patient/profile`. Không đổi response.
+- **Changelog 1.26 → 1.27 (2026-11-16):** `POST /chat` và `/chat/stream` nhận `session_id?: string | null` (tối đa 36 ký tự). Server kiểm tra chủ sở hữu, đọc tối đa 8 tin gần nhất để hiểu câu hỏi tiếp nối; session không tồn tại/không thuộc người gọi trả 404 trước khi mở SSE. Không tự ghi hồ sơ sức khỏe hay tạo thực đơn từ chat. Chế độ không LLM hỗ trợ tra cứu thực phẩm/công thức có nguồn, so sánh trên cùng cơ sở định lượng, gợi ý theo nguyên liệu/sở thích và hỏi lại khi mơ hồ; thêm intent `clarify` cho câu hỏi làm rõ không chứa kết luận y khoa, không hứa trả lời mọi chủ đề chưa có dữ liệu.
+
+- **Changelog 1.24 → 1.25 (2026-11-16):** `MealPlanScheduleOut.history_plans[]` mặc định `[]`; tách lịch sử khỏi `unassigned_plans`. Bản chưa áp dụng quá chu kỳ tạo được lưu vào Nhật ký, không khóa tạo mới. `/meal-plans/me` trả `404 NO_MEAL_PLAN` nếu chỉ còn lịch sử; dùng schedule để xem lịch sử.
+
+- **Vận hành local (2026-11-03):** RAG có chế độ BM25 `RAG_RETRIEVAL_MODE=keyword` và fallback khi thiếu bộ nhớ; không đổi schema chat/citations. Sự kiện SSE `error.message` dùng thông báo tiếng Việt cho người dùng, không trả nguyên lỗi hệ điều hành hoặc đường dẫn nội bộ.
+
+- **Changelog 1.23 → 1.24 (2026-11-03):** giao diện bệnh nhân khởi tạo AI qua `/meal-plans/generate`, xem trước bản `pending_review` và theo dõi duyệt. Doctor chỉ kiểm tra/chỉnh sửa/duyệt/áp dụng; endpoint tạo cũ của doctor trả `403 PATIENT_GENERATION_REQUIRED` (thay đổi quyền khởi tạo có chủ đích). Các URL tạo cũ chuyển về hàng việc/danh sách duyệt.
+
+- Version hiện tại: **1.28**.
+- **Changelog 1.25 → 1.26 (2026-11-16):** Chat/SSE `interaction_check` có thể trả `citation_chunks` cho kiến thức dinh dưỡng của đúng món hỏi, sau kiểm tra dị ứng/tương tác; không dùng câu trả lời cache của món khác, không gắn tài liệu tiền sản/điều trị không liên quan. Đồng bộ agent I/O 1.16, giữ nguyên schema.
 - **Changelog 1.22 → 1.23 (2026-08-31):** `POST /metrics` / chat `metrics_delta_advice` — `MetricsDeltaAdviceOut` thêm `field_deltas[]` (mọi field đo được kèm `before`/`after`/`changed`, kể cả delta nhỏ dưới ngưỡng) để FE render bảng so sánh chỉ số trong chat. Không breaking — field mới optional default `[]`. Đồng bộ `contracts/agent-io-schema.md` v1.14, `specs/12`.
 - **Changelog 1.21 → 1.22 (2026-08-31):** `AgentRunOutput.citation_chunks[]` và `ChatMessageOut.citation_chunks[]` — đoạn RAG (`text`) đã dùng để gen câu chat. `citations[]` vẫn là id nguồn. Đồng bộ `contracts/agent-io-schema.md` v1.13. Không breaking.
 - **Changelog 1.20 → 1.21 (2026-08-31):** Chat escalation HITL — `POST/GET /chat/escalations`, `POST .../messages`; `GET/POST /doctor/escalations` + `.../resolve`. Notification type mới `escalation_sent` | `escalation_reply` (`related_ids.escalation_id`). `AgentRunOutput.unmatched_pairs[]` optional. `ChatMessageOut` thêm `unmatched_pairs[]`, `escalation_id`. Không breaking.

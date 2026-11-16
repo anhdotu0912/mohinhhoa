@@ -1,6 +1,8 @@
 # Spec: Bệnh nhân Xem Thực đơn
 
 ## Status
+**Cập nhật 2026-11-03:** `/patient/meal-plan` cho bệnh nhân tạo AI và xem trước bản dự thảo. Bản chưa duyệt luôn gắn nhãn “Chờ bác sĩ duyệt”, không có hành động ghi nhận bữa ăn. Bản đã duyệt mới được dùng sau khi bác sĩ áp dụng lịch; bản bị từ chối hiển thị lý do và cho bệnh nhân yêu cầu AI tạo lại.
+
 Done (Must/Should Have) — xem chi tiết, xem món thay thế (`swaps[]`/`alternatives[]`), và yêu cầu điều chỉnh plan (§3 rule 6) đều as-built. Danh sách đi chợ và gợi ý khu vực bán vẫn Planned (Could Have, xem §6).
 
 ## 1. Mục tiêu (Why)
@@ -24,6 +26,8 @@ Là **bệnh nhân**, tôi muốn xem chi tiết thực đơn 7 ngày của mìn
 4. Patient xem `swaps[]` ở cấp ngày để hiểu món nào đã bị AI đổi và lý do.
 
 ## 5. Edge cases
+- Trang Tạo thực đơn chỉ hiển thị bản của chu kỳ hiện tại. Khi chỉ còn lịch cũ, hiện “Bạn chưa tạo thực đơn cho chu kỳ mới” và cho tạo ngay. Lịch đã kết thúc hoặc bản chưa áp dụng đã quá 7 ngày từ ngày tạo chỉ xem tại **Thực đơn & Nhật ký** qua `history_plans`; không giả định đã áp dụng/đã ăn, không xóa nội dung hay kết quả duyệt.
+- Lịch đã áp dụng kết thúc sau trọn `ends_on` theo ngày Việt Nam: từ ngày kế tiếp hiển thị **Hoàn thành**, chỉ xem lại, không gắn nhãn “Hôm nay” và không cho đổi món/ghi nhận vào chu kỳ cũ. Giao diện cập nhật khi qua ngày hoặc quay lại tab. Giữ lịch cũ khi tạo bản mới; hiển thị nhắc và lối tắt tạo mới nếu chưa có bản kế tiếp chờ duyệt/chờ áp dụng hoặc đã xếp lịch. Nhãn ngày trong chu kỳ theo `starts_on + day_index - 1`, không mặc định ngày 1 luôn là Thứ 2.
 - Patient chưa từng generate plan nào → `GET /meal-plans/me` trả `404 NO_MEAL_PLAN`.
 - Plan đang ở trạng thái `rejected` — patient vẫn xem được nội dung (API không chặn xem plan `rejected`), FE cần tự hiển thị rõ trạng thái để tránh patient hiểu nhầm đây là thực đơn nên theo.
 - Patient gọi `request-adjustment` trên plan đang `pending_review`/`rejected`/`edited` (chưa/không phải `approved`) → `400 PLAN_NOT_APPROVED` (chỉ cho phép yêu cầu điều chỉnh trên plan đã duyệt, vì plan chưa duyệt vốn đã đang chờ bác sĩ xem, không cần thêm hành động này).

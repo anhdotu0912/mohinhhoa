@@ -35,6 +35,8 @@ def list_notifications(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles("patient")),
 ) -> list[Notification]:
+    if NotificationService(db).sync_plan_expiry_notifications(user.id):
+        db.commit()
     query = db.query(Notification).filter(Notification.user_id == user.id)
     if status:
         query = query.filter(Notification.status == status)

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterator
 
 from app.agents.state import AgentState
+from app.core.chat_text import normalize_chat_text, trim_meal_context
 from app.rag.retriever import retrieve_foods, retrieve_guidelines
 
 logger = logging.getLogger(__name__)
@@ -72,20 +74,42 @@ def _build_rag_context(
     disease_expanded = _disease_search_keywords(diseases)
     combined_query = f"{message} {disease_expanded}".strip()
 
-    guideline_chunks = retrieve_guidelines(combined_query, top_k=top_k_guidelines)
-    food_chunks = retrieve_foods(message, top_k=top_k_foods)
+    food_name = _detect_food_in_question(message)
+    guideline_chunks = retrieve_guidelines(
+        food_name or combined_query, top_k=max(6, top_k_guidelines) if food_name else top_k_guidelines
+    )
+    food_chunks = retrieve_foods(food_name or message, top_k=max(3, top_k_foods) if food_name else top_k_foods)
+    pregnancy_context = any("gestational" in disease.lower() or "thai" in disease.lower() for disease in diseases)
+    pregnancy_context = pregnancy_context or bool(re.search(r"mang thai|thai kỳ|thai phụ|tiền sản", normalize_chat_text(message)))
+    if not pregnancy_context:
+        guideline_chunks = [c for c in guideline_chunks if not re.search(r"gdm|1470|gestational", c.source.lower())]
+    if food_name:
+        phrase = re.compile(rf"(?<!\w){re.escape(food_name.lower())}(?!\w)")
+        guideline_chunks = [c for c in guideline_chunks if phrase.search(c.text.lower())][:top_k_guidelines]
+        food_chunks = [c for c in food_chunks if phrase.search(c.text.lower())][:top_k_foods]
+    else:
+        relevant_texts = set(_filter_relevant_chunks(message, [c.text for c in guideline_chunks]))
+        guideline_chunks = [c for c in guideline_chunks if c.text in relevant_texts]
 
     rag_context = []
     citations = []
 
     for chunk in guideline_chunks:
+        text = chunk.text
+        if food_name:
+            matching_lines = [line.strip() for line in text.splitlines() if phrase.search(line.lower())]
+            matching_lines = [line for line in matching_lines if not re.search(r"bữa.*\(\d{1,2}h", line.lower())]
+            text = "\n".join(matching_lines)
+            if not text:
+                continue
+        source = chunk.source if chunk.source.endswith(".md") else f"{chunk.source}.md"
         rag_context.append({
             "chunk_id": chunk.chunk_id,
-            "text": chunk.text,
-            "source": chunk.source,
+            "text": text,
+            "source": source,
             "score": chunk.score,
         })
-        source_citation = f"{chunk.source}"
+        source_citation = source
         if source_citation not in citations:
             citations.append(source_citation)
 
@@ -130,7 +154,7 @@ TÀI LIỆU Y KHOA THAM KHẢO:
 CÂU HỎI CỦA BỆNH NHÂN: {message}
 
 QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ):
-1. ĐI THẲNG VÀO TRỌNG TÂM: Trả lời chính xác, súc tích câu hỏi của người dùng (độ dài phù hợp khoảng 200–350 từ).
+1. ĐI THẲNG VÀO TRỌNG TÂM: Trả lời chính xác, súc tích câu hỏi của người dùng. Câu hỏi một món ăn/bữa phụ chỉ cần 3–5 câu, không diễn giải phác đồ, tiền sản hay bệnh khác.
 2. TUYỆT ĐỐI KHÔNG SUY DIỄN LAN MAN: KHÔNG tự động giải thích tác dụng phụ của thuốc, phác đồ điều trị, hoặc tiền sử dị ứng không liên quan nếu người dùng chỉ hỏi kiến thức dinh dưỡng/thực phẩm chung.
 3. CẤU TRÚC TRÌNH BÀY KHOA HỌC:
    - 🎯 **Kết luận trực diện:** Phân loại rõ ràng (NÊN ĂN / CẦN HẠN CHẾ hoặc Có/Không).
@@ -143,19 +167,21 @@ QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ):
 def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> str:
     """Generate RAG answer with Tier 4 Semantic Caching, Prompt KV-Cache & Max Tokens constraints."""
     diseases_list = profile.get("disease", [])
+    if not rag_context:
+        return _template_answer(message, "")
 
     # Tier 4: Check Semantic Cache first (0 tokens, <50ms)
     try:
         from app.services.semantic_cache import semantic_qa_cache
 
-        cached = semantic_qa_cache.get(message, diseases_list)
+        cached = None if _detect_food_in_question(message) else semantic_qa_cache.get(message, diseases_list)
         if cached is not None:
             cached_answer, _ = cached
             return cached_answer
     except Exception as e:
         logger.debug("Semantic cache check failed: %s", e)
 
-    context_texts = [c["text"] for c in rag_context[:2]]
+    context_texts = [c["text"] for c in rag_context[:RAG_PROMPT_CHUNK_LIMIT]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
@@ -169,13 +195,19 @@ def _generate_answer(message: str, rag_context: list[dict], profile: dict) -> st
         prompt = _build_rag_prompt(message, rag_context, profile)
         response = llm.invoke(prompt)
         answer = response.content
+        food_name = _detect_food_in_question(message)
+        if food_name and (food_name.lower() not in str(answer).lower() or re.search(
+            r"tiền sản|chẩn đoán thai|quản lý.*mang thai", str(answer).lower()
+        )):
+            return _template_answer(message, context_str)
 
         # Tier 4: Store generated answer into Semantic Cache
         try:
             from app.services.semantic_cache import semantic_qa_cache
 
             citations = [c["source"] for c in rag_context]
-            semantic_qa_cache.put(message, answer, citations, diseases_list)
+            if not _detect_food_in_question(message):
+                semantic_qa_cache.put(message, answer, citations, diseases_list)
         except Exception:
             pass
 
@@ -193,12 +225,17 @@ def stream_answer_tokens(
 ) -> Iterator[str]:
     """Stream RAG answer tokens from Semantic Cache or LLM, yielding tokens efficiently."""
     diseases_list = profile.get("disease", [])
+    if _detect_food_in_question(message) or not rag_context:
+        # Validate a food answer before exposing tokens; do not flash an unrelated
+        # treatment paragraph in the UI and correct it only after streaming.
+        yield _generate_answer(message, rag_context, profile)
+        return
 
     # Tier 4: Check Semantic Cache first
     try:
         from app.services.semantic_cache import semantic_qa_cache
 
-        cached = semantic_qa_cache.get(message, diseases_list)
+        cached = None if _detect_food_in_question(message) else semantic_qa_cache.get(message, diseases_list)
         if cached is not None:
             cached_answer, _ = cached
             import re
@@ -209,7 +246,7 @@ def stream_answer_tokens(
     except Exception as e:
         logger.debug("Semantic cache stream check failed: %s", e)
 
-    context_texts = [c["text"] for c in rag_context[:2]]
+    context_texts = [c["text"] for c in rag_context[:RAG_PROMPT_CHUNK_LIMIT]]
     context_str = "\n---\n".join(context_texts) if context_texts else "Không tìm thấy thông tin liên quan."
 
     try:
@@ -236,7 +273,8 @@ def stream_answer_tokens(
                 from app.services.semantic_cache import semantic_qa_cache
 
                 citations = [c["source"] for c in rag_context]
-                semantic_qa_cache.put(message, full_ans, citations, diseases_list)
+                if not _detect_food_in_question(message):
+                    semantic_qa_cache.put(message, full_ans, citations, diseases_list)
             except Exception:
                 pass
 
@@ -250,7 +288,7 @@ def _detect_food_in_question(message: str) -> str | None:
     """Detect if user asks about a specific food item. Return food name or None."""
     import re as _re
 
-    message_clean = message.lower().strip().rstrip("?")
+    message_clean = normalize_chat_text(message).rstrip("?")
     patterns = [
         # "tôi ăn cá hồi được không" / "ăn cá hồi có sao không"
         r"(?:tôi|em|mình|bệnh nhân)?\s*(?:có thể|có nên|có được|có|nên)?\s*(?:ăn|uống|dùng)\s+(.+?)\s+(?:được không|được|không\s*ạ|có sao không|có tốt không|an toàn không|chứ|nhé|nha|hả|thì sao)",
@@ -267,11 +305,13 @@ def _detect_food_in_question(message: str) -> str | None:
     for p in patterns:
         m = _re.search(p, message_clean)
         if m:
-            food = m.group(1).strip()
+            food = trim_meal_context(m.group(1).strip())
             # Remove leading/trailing noise words
             food = _re.sub(r"^(được|có thể|có nên|nên|có)\s+", "", food)
             food = _re.sub(r"\s+(được|không|có|ạ|nhé|nha)$", "", food)
-            if food and len(food) >= 2 and food not in _stop:
+            if food and len(food) >= 2 and food not in _stop and not _re.search(
+                r"\b(?:gì|nào|bao nhiêu|thế nào|ra sao)\b", food
+            ):
                 return food
     return None
 
@@ -295,7 +335,7 @@ def _filter_relevant_chunks(message: str, context_sections: list[str]) -> list[s
     keywords = {w for w in words if len(w) >= 2 and w not in _stops}
 
     if not keywords:
-        return context_sections[:2]
+        return []
 
     scored: list[tuple[int, str]] = []
     for section in context_sections:
@@ -307,7 +347,7 @@ def _filter_relevant_chunks(message: str, context_sections: list[str]) -> list[s
 
     # Keep only chunks with at least 1 keyword overlap, max 2 chunks
     relevant = [s for score, s in scored if score > 0]
-    return relevant[:2] if relevant else context_sections[:1]
+    return relevant[:RAG_PROMPT_CHUNK_LIMIT]
 
 
 def _template_answer(message: str, context: str) -> str:
@@ -349,26 +389,27 @@ def _template_answer(message: str, context: str) -> str:
                 if food_lower in line.lower():
                     food_sentences.append(line.strip())
 
+        if any("rau không chứa tinh bột" in line.lower() for line in food_sentences):
+            meal_context = " cho bữa phụ" if "bữa phụ" in normalize_chat_text(message) else " trong bữa ăn"
+            return (
+                f"**Về dinh dưỡng, bạn có thể cân nhắc {food_name}{meal_context}.** "
+                f"Tài liệu hiện có xếp **{food_name}** vào nhóm rau không chứa tinh bột.\n\n"
+                "Đây là gợi ý chung, chưa phải khẩu phần cá nhân hóa. "
+                "Nếu bạn có thực đơn đã được bác sĩ duyệt, hãy đối chiếu khẩu phần bữa ăn trong kế hoạch đó."
+            )
         if food_sentences:
             # Extract context about this food
-            context_summary = "\n".join(f"• {s}" for s in food_sentences[:4])
+            context_summary = "\n".join(f"• {s[:350]}" for s in food_sentences[:2])
             return (
                 f"Theo tài liệu hướng dẫn dinh dưỡng y khoa, "
                 f"**{food_name}** được đề cập trong các khuyến nghị sau:\n\n"
                 f"{context_summary}\n\n"
-                f"👉 Bạn có thể tham khảo thông tin trên để điều chỉnh chế độ ăn phù hợp.\n\n"
-                f"⚠️ *Lưu ý: Để được tư vấn cá thể hóa, "
-                f"bạn nên tham khảo ý kiến bác sĩ điều trị hoặc chuyên gia dinh dưỡng.*"
+                "Tài liệu này chưa đủ để xác định khẩu phần riêng cho bạn; hãy đối chiếu với thực đơn đã được bác sĩ duyệt."
             )
         else:
             return (
-                f"Tôi tìm được một số thông tin liên quan nhưng không có dữ liệu cụ thể "
-                f"về **{food_name}** trong tài liệu y khoa hiện có.\n\n"
-                f"👉 Nhìn chung, người bệnh đái tháo đường type 2 nên ưu tiên thực phẩm "
-                f"có chỉ số đường huyết (GI) thấp, giàu chất xơ, protein nạc, và hạn chế "
-                f"tinh bột tinh luyện, đường, đồ chiên rán.\n\n"
-                f"⚠️ *Vui lòng hỏi bác sĩ hoặc chuyên gia dinh dưỡng để được tư vấn "
-                f"cụ thể về {food_name} phù hợp với tình trạng sức khỏe của bạn.*"
+                f"Tôi chưa tìm thấy nguồn phù hợp về **{food_name}** để xác nhận món này có phù hợp với bạn hay không. "
+                "Bạn có thể cho biết rõ tên món hoặc hỏi bác sĩ phụ trách."
             )
 
     # --- GENERAL QUESTION ANSWER ---
@@ -386,7 +427,11 @@ def _template_answer(message: str, context: str) -> str:
         if lines:
             cleaned_paragraphs.append("\n".join(lines[:8]))
 
-    summary = "\n\n".join(cleaned_paragraphs[:2]) if cleaned_paragraphs else context[:400]
+    if not cleaned_paragraphs:
+        from app.guardrails.source_check import NO_CITATION_MESSAGE
+
+        return NO_CITATION_MESSAGE
+    summary = "\n\n".join(cleaned_paragraphs[:2])
 
     return (
         f"Dựa trên tài liệu hướng dẫn dinh dưỡng y khoa (Bộ Y Tế / ADA), "
@@ -404,6 +449,11 @@ def rag_qa_node(state: AgentState) -> AgentState:
     lean_state = get_lean_state_for_intent(state, "rag_qa")
     message = lean_state.get("message", "")
     profile = lean_state.get("profile", {})
+    from app.agents.food_conversation import answer_food_conversation
+
+    conversational = answer_food_conversation(message, state.get("profile") or profile, state.get("history"), db=state.get("db"))
+    if conversational is not None:
+        return {**state, **conversational, "intent": "clarify" if conversational.get("clarify") else "rag_qa"}
 
     if not message:
         return {

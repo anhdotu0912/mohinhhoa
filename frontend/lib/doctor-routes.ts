@@ -46,9 +46,8 @@ export function doctorChartHref(
   return `/doctor/patients/${enc(patientId)}${spec.suffix}`;
 }
 
-export function doctorGenerateHref(patientId: string, query?: string): string {
-  const base = `/doctor/patients/${enc(patientId)}/generate`;
-  return query ? `${base}?${query}` : base;
+export function doctorMealPlansHref(patientId: string): string {
+  return doctorChartHref(patientId, "meals");
 }
 
 export function doctorReviewHref(patientId: string, planId: string): string {

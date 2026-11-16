@@ -10,6 +10,7 @@ Tests:
 
 from __future__ import annotations
 
+import pytest
 from app.agents.graph import apply_guardrails
 from app.agents.nodes.rag_tool import _build_rag_prompt
 from app.guardrails.food_safety import enforce_food_safety_guardrail
@@ -35,6 +36,35 @@ class TestTier1LeanGeneration:
 
 
 class TestTier2DeterministicFoodSafetyGuardrail:
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "Để được tư vấn chính xác và cá thể hóa, hãy hỏi bác sĩ điều trị.",
+            "Thực đơn được cá nhân hóa theo hồ sơ của bạn.",
+            "Cần xem xét các trường hợp cá biệt.",
+            "Sở thích và cá tính của mỗi người khác nhau.",
+        ],
+    )
+    def test_non_food_ca_phrases_do_not_trigger_seafood_allergy(self, answer):
+        updated, flags = enforce_food_safety_guardrail(
+            answer=answer, medications=[], allergies=["hải sản"]
+        )
+        assert updated == answer
+        assert flags == []
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "Bữa trưa có cá hấp.",
+            "Thực đơn cá nhân hóa: cá hồi hấp với rau.",
+        ],
+    )
+    def test_actual_fish_still_triggers_seafood_allergy(self, answer):
+        _, flags = enforce_food_safety_guardrail(
+            answer=answer, medications=[], allergies=["hải sản"]
+        )
+        assert "targeted_allergy_alert" in flags
+
     def test_clean_safe_answer_remains_untouched(self):
         """When answer mentions safe vegetables for a Metformin patient, no false-positive alert is added."""
         clean_answer = (

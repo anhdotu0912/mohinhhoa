@@ -180,11 +180,11 @@ export default function PatientMealPlansListPage() {
           </p>
         </div>
         <Link
-          href={`/doctor/patients/${encodeURIComponent(patient.id)}/generate`}
+          href="/doctor/inbox?type=plan_review"
           className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 self-start sm:self-auto"
         >
           <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-          <span>Tạo thực đơn AI mới</span>
+          <span>Xem thực đơn chờ duyệt</span>
         </Link>
       </div>
 
@@ -248,7 +248,7 @@ export default function PatientMealPlansListPage() {
             Không có thực đơn nào ở trạng thái này
           </p>
           <p className="text-xs mt-1 text-on-surface-variant">
-            Chuyển tab khác hoặc bấm “Tạo thực đơn AI mới” cho bệnh nhân {patient.name}.
+            Bản AI do bệnh nhân khởi tạo sẽ xuất hiện tại đây. Chuyển tab để xem các trạng thái khác của bệnh nhân {patient.name}.
           </p>
         </div>
       ) : (

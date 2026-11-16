@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { EscalationMessageOut, EscalationOut } from "@/lib/types";
 import { ESCALATION_REASON_LABEL } from "@/lib/escalation";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
@@ -122,6 +122,7 @@ export function EscalationThread({
   sending,
   error,
   onSend,
+  compact = false,
 }: {
   thread: EscalationOut;
   viewer?: "patient" | "doctor";
@@ -130,41 +131,89 @@ export function EscalationThread({
   composerDisabled?: boolean;
   sending?: boolean;
   error?: string | null;
-  onSend: (body: string) => void;
+  onSend: (body: string) => void | Promise<void>;
+  compact?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
+  const composerId = useId();
   const endRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const lastSender = thread.messages.at(-1)?.sender;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [thread.messages.length, thread.status]);
+    if (compact) {
+      const viewport = viewportRef.current;
+      if (viewport && (nearBottomRef.current || lastSender === viewer)) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    } else {
+      endRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [thread.messages.length, thread.status, compact, viewer, lastSender]);
 
   const resolved = thread.status === "resolved";
-  const canSend = !resolved && !composerDisabled && !sending;
+  const busy = Boolean(sending || submitting);
+  const canSend = !resolved && !composerDisabled && !busy;
   const otherLabel =
     counterpartName?.trim() || (viewer === "patient" ? "Bác sĩ phụ trách" : "Bệnh nhân");
   const composerPlaceholder =
     viewer === "patient" ? "Nhắn với bác sĩ…" : "Phản hồi bệnh nhân…";
   const waitingOnDoctor = thread.status === "waiting_doctor";
 
-  const submit = () => {
+  const submit = async () => {
     const text = draft.trim();
-    if (!text || !canSend) return;
-    onSend(text);
-    setDraft("");
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
+    if (!text || !canSend || submitLockRef.current) return;
+    submitLockRef.current = true;
+    setSubmitting(true);
+    const submittedDraft = draft;
+    try {
+      await onSend(text);
+      setDraft((current) => current === submittedDraft ? "" : current);
+      if (inputRef.current) inputRef.current.style.height = "auto";
+    } catch {
+      // The caller displays the request error; retain the draft for retry.
+    } finally {
+      submitLockRef.current = false;
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="flex flex-col min-h-0 flex-1 bg-[#f8fafc] selection:bg-emerald-100">
-      <div className="px-4 pt-3 shrink-0">
-        <ContextBrief thread={thread} />
-      </div>
+      {!compact ? (
+        <div className="px-4 pt-3 shrink-0">
+          <ContextBrief thread={thread} />
+        </div>
+      ) : null}
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar px-4 py-4">
+      <div
+        ref={viewportRef}
+        role="log"
+        aria-label="Tin nhắn trao đổi"
+        aria-live="polite"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar px-4 py-4"
+      >
+        {compact && thread.question_text ? (
+          <div className="flex justify-end mb-3">
+            <div className="max-w-[88%] rounded-xl rounded-tr-sm bg-[#006857] px-3.5 py-2.5 text-[13px] text-white whitespace-pre-wrap break-words">
+              <p className="mb-1 text-[10px] font-semibold text-emerald-100">Câu hỏi đã chuyển cho bác sĩ</p>
+              {thread.question_text}
+            </div>
+          </div>
+        ) : null}
+        {compact && !thread.messages.some((m) => m.sender === "doctor") && !resolved ? (
+          <p className="mb-3 text-center text-[11px] leading-relaxed text-slate-500">
+            Câu hỏi đã được gửi. Bạn có thể nhắn thêm trong lúc chờ bác sĩ phản hồi.
+          </p>
+        ) : null}
         {thread.messages.map((msg, i) => {
           const prev = i > 0 ? thread.messages[i - 1] : null;
           const next = i < thread.messages.length - 1 ? thread.messages[i + 1] : null;
@@ -235,19 +284,19 @@ export function EscalationThread({
           className="shrink-0 px-3 pb-3 pt-1"
           onSubmit={(e) => {
             e.preventDefault();
-            submit();
+            void submit();
           }}
         >
           {error ? (
-            <p className="text-[12px] text-rose-700 font-medium px-2 pb-2">{error}</p>
+            <p role="alert" className="text-[12px] text-rose-700 font-medium px-2 pb-2">{error}</p>
           ) : null}
           <div className="flex items-end gap-2">
             <div className="flex-1 min-w-0 bg-white rounded-lg flex items-end pl-3.5 pr-1.5 py-1.5 shadow-[0_10px_28px_rgba(0,104,87,0.10)] focus-within:ring-4 focus-within:ring-emerald-500/15 transition-shadow">
-              <label className="sr-only" htmlFor="escalation-composer">
+              <label className="sr-only" htmlFor={composerId}>
                 {composerPlaceholder}
               </label>
               <textarea
-                id="escalation-composer"
+                id={composerId}
                 ref={inputRef}
                 value={draft}
                 rows={1}
@@ -260,9 +309,9 @@ export function EscalationThread({
                   e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 96)}px`;
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
-                    submit();
+                    void submit();
                   }
                 }}
                 className="flex-1 max-h-24 bg-transparent border-none resize-none text-[14px] text-slate-900 placeholder:text-slate-400 py-2 outline-none disabled:opacity-50 leading-relaxed"
@@ -271,10 +320,11 @@ export function EscalationThread({
                 type="submit"
                 disabled={!canSend || !draft.trim()}
                 title="Gửi"
+                aria-label={viewer === "patient" ? "Gửi tin nhắn cho bác sĩ" : "Gửi phản hồi cho bệnh nhân"}
                 className="w-9 h-9 mb-0.5 rounded-md bg-[#006857] hover:bg-[#005445] text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed active:scale-95"
               >
-                <span className={`material-symbols-outlined text-[18px] ${sending ? "animate-spin" : ""}`}>
-                  {sending ? "progress_activity" : "send"}
+                <span className={`material-symbols-outlined text-[18px] ${busy ? "animate-spin" : ""}`}>
+                  {busy ? "progress_activity" : "send"}
                 </span>
               </button>
             </div>

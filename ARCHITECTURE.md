@@ -10,6 +10,18 @@ Hệ thống được thiết kế theo kiến trúc 3-Tier hiện đại: Front
 
 ## Architecture Diagram
 
+### Sơ đồ 3 tầng dùng khi thuyết trình
+
+![Kiến trúc 3 tầng VinNutri, kèm vị trí mã nguồn](presentation/vinnutri-kien-truc-3-tang.png)
+
+[Mở ảnh PNG](presentation/vinnutri-kien-truc-3-tang.png) · [Bản SVG phóng to không vỡ](presentation/vinnutri-kien-truc-3-tang.svg)
+
+Sơ đồ tổng quan đối chiếu mã nguồn: Next.js là tầng giao diện; FastAPI, services và AI là tầng xử lý nghiệp vụ; PostgreSQL và Qdrant là tầng dữ liệu. API tạo thực đơn gọi Meal Planner qua service; `/chat` chạy LangGraph, còn `/chat/stream` gọi trực tiếp các bước xử lý tương ứng. Qdrant mặc định lưu cục bộ qua thư viện Python. Các nhà cung cấp LLM/embedding được lược bỏ trong hình tổng quan này.
+
+Tạo lại ảnh bằng `python presentation/render_architecture.py` (cần Pillow và font Arial trên Windows).
+
+### Sơ đồ thành phần chi tiết
+
 ```mermaid
 graph TB
     subgraph Client["Frontend Layer (Next.js 16 App Router)"]

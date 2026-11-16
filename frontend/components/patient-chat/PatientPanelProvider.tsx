@@ -95,6 +95,15 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshNotificationsBadge();
+    const refresh = () => { if (document.visibilityState === "visible") void refreshNotificationsBadge(); };
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [refreshNotificationsBadge]);
 
   useEffect(() => {

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1480" viewBox="0 0 1920 1480">
+<title>VinNutri — Kiến trúc hệ thống 3 tầng</title>
+<desc>Next.js gọi FastAPI; service và AI xử lý nghiệp vụ; PostgreSQL và Qdrant cung cấp dữ liệu. Các hộp ghi đường dẫn mã nguồn để đối chiếu.</desc>
+<rect width="1920" height="1480" fill="#f6f8fc"/>
+<text x="70" y="40" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="49" font-weight="700" fill="#13243b">VinNutri | Kiến trúc hệ thống 3 tầng</text>
+<text x="73" y="104" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="28" font-weight="400" fill="#52627a">Sơ đồ tổng quan đối chiếu mã nguồn dự án P-014</text>
+<rect x="660" y="163" width="600" height="62" rx="31" fill="#e4eaf4" stroke="none" stroke-width="2"/>
+<text x="809.5" y="177" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#13243b">BỆNH NHÂN  /  BÁC SĨ</text>
+<rect x="60" y="260" width="1800" height="188" rx="20" fill="#e9f0ff" stroke="none" stroke-width="2"/>
+<rect x="85" y="282" width="48" height="48" rx="12" fill="#2563eb" stroke="none" stroke-width="2"/>
+<text x="101.25" y="289" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff">1</text>
+<text x="151" y="287" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#2563eb">TẦNG GIAO DIỆN</text>
+<text x="1815" y="291" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a"></text>
+<text x="898.0" y="292" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#2563eb">Next.js</text>
+<text x="603.25" y="345" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="30" font-weight="400" fill="#13243b">Nhập hồ sơ · Xem thực đơn · Chat · Bác sĩ phê duyệt</text>
+<text x="761.75" y="395" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="25" font-weight="400" fill="#52627a">frontend/app/   +   frontend/lib/api.ts</text>
+<rect x="998" y="467" width="570" height="43" rx="9" fill="#f6f8fc" stroke="none" stroke-width="2"/>
+<text x="1014" y="473" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="25" font-weight="400" fill="#52627a">HTTP API: gửi yêu cầu / nhận kết quả</text>
+<rect x="60" y="530" width="1800" height="474" rx="20" fill="#e6f4f2" stroke="none" stroke-width="2"/>
+<rect x="85" y="552" width="48" height="48" rx="12" fill="#087f8c" stroke="none" stroke-width="2"/>
+<text x="101.25" y="559" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff">2</text>
+<text x="151" y="557" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#087f8c">TẦNG XỬ LÝ NGHIỆP VỤ</text>
+<text x="1815" y="561" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a"></text>
+<rect x="690" y="604" width="540" height="116" rx="20" fill="#ffffff" stroke="#b1dcd6" stroke-width="2"/>
+<text x="816.75" y="618" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#087f8c">FastAPI — /api/v1</text>
+<text x="728.25" y="665" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="25" font-weight="400" fill="#13243b">Nhận yêu cầu · Kiểm tra dữ liệu và quyền</text>
+<rect x="102" y="794" width="816" height="177" rx="20" fill="#ffffff" stroke="#b1dcd6" stroke-width="2"/>
+<text x="321.25" y="811" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="33" font-weight="700" fill="#087f8c">Services + Meal Planner</text>
+<text x="259.2578125" y="861" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="27" font-weight="400" fill="#13243b">Hồ sơ · Tạo / duyệt thực đơn · Thông báo</text>
+<text x="215.0" y="913" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="23" font-weight="400" fill="#52627a">backend/app/services/  +  agents/meal_planner_agent.py</text>
+<rect x="1002" y="794" width="816" height="177" rx="20" fill="#ffffff" stroke="#b1dcd6" stroke-width="2"/>
+<text x="1240.25" y="811" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="33" font-weight="700" fill="#087f8c">AI: LangGraph + RAG</text>
+<text x="1118.25" y="861" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="26" font-weight="400" fill="#13243b">Nạp hồ sơ → Chọn chức năng → Kiểm tra an toàn</text>
+<text x="1143.0" y="913" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="23" font-weight="400" fill="#52627a">backend/app/agents/graph.py  +  rag/  +  guardrails/</text>
+<text x="85" y="982" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="16" font-weight="400" fill="#13243b"></text>
+<rect x="89" y="1027" width="386" height="39" rx="8" fill="#f6f8fc" stroke="none" stroke-width="2"/>
+<text x="105" y="1033" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a">Đọc / ghi dữ liệu nghiệp vụ</text>
+<rect x="1435" y="1027" width="380" height="39" rx="8" fill="#f6f8fc" stroke="none" stroke-width="2"/>
+<text x="1452" y="1033" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a">Tìm kiến thức liên quan</text>
+<rect x="60" y="1090" width="1800" height="257" rx="20" fill="#f0eafb" stroke="none" stroke-width="2"/>
+<rect x="85" y="1112" width="48" height="48" rx="12" fill="#7250b5" stroke="none" stroke-width="2"/>
+<text x="101.25" y="1119" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff">3</text>
+<text x="151" y="1117" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#7250b5">TẦNG DỮ LIỆU</text>
+<text x="1815" y="1121" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a"></text>
+<rect x="102" y="1172" width="816" height="146" rx="20" fill="#ffffff" stroke="#d5c6ee" stroke-width="2"/>
+<text x="411.5" y="1184" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#7250b5">PostgreSQL</text>
+<text x="275.00390625" y="1232" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="27" font-weight="400" fill="#13243b">Tài khoản · Hồ sơ · Thực đơn · Lịch sử</text>
+<text x="301.5" y="1277" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a">backend/app/models/  +  db/session.py</text>
+<rect x="1002" y="1172" width="816" height="146" rx="20" fill="#ffffff" stroke="#d5c6ee" stroke-width="2"/>
+<text x="1354.0" y="1184" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#7250b5">Qdrant</text>
+<text x="1140.01171875" y="1232" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="26" font-weight="400" fill="#13243b">Vector + nội dung + nguồn: tài liệu / thực phẩm</text>
+<text x="1186.26171875" y="1277" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="24" font-weight="400" fill="#52627a">backend/app/rag/qdrant.py  +  retriever.py</text>
+<text x="75" y="1371" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#13243b">Luồng chính: giao diện gửi yêu cầu → backend xử lý → đọc / ghi dữ liệu → trả kết quả về giao diện.</text>
+<text x="75" y="1414" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="23" font-weight="400" fill="#52627a">Đối chiếu triển khai: /chat chạy LangGraph; /chat/stream gọi các node trực tiếp; tạo thực đơn gọi Meal Planner qua service.</text>
+<text x="75" y="1447" dominant-baseline="text-before-edge" font-family="Arial, sans-serif" font-size="23" font-weight="400" fill="#52627a">Backend chia module, triển khai chung (Modular Monolith). Qdrant mặc định lưu cục bộ; sơ đồ lược bỏ nhà cung cấp LLM / embedding.</text>
+<polyline points="960,225 960,260" fill="none" stroke="#52627a" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="960,260 967.0,247.0 953.0,247.0" fill="#52627a"/>
+<polyline points="960,448 960,604" fill="none" stroke="#52627a" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="960,604 967.0,591.0 953.0,591.0" fill="#52627a"/>
+<polyline points="825,720 825,755 510,755 510,794" fill="none" stroke="#087f8c" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="510,794 517.0,781.0 503.0,781.0" fill="#087f8c"/>
+<polyline points="1095,720 1095,755 1410,755 1410,794" fill="none" stroke="#087f8c" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="1410,794 1417.0,781.0 1403.0,781.0" fill="#087f8c"/>
+<polyline points="510,971 510,1172" fill="none" stroke="#7250b5" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="510,1172 517.0,1159.0 503.0,1159.0" fill="#7250b5"/>
+<polyline points="1410,971 1410,1172" fill="none" stroke="#7250b5" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="1410,1172 1417.0,1159.0 1403.0,1159.0" fill="#7250b5"/>
+<polyline points="1240,971 1240,1040 710,1040 710,1172" fill="none" stroke="#7250b5" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="710,1172 717.0,1159.0 703.0,1159.0" fill="#7250b5"/>
+</svg>

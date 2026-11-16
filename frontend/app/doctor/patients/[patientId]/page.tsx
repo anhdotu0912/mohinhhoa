@@ -14,10 +14,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { statusColorFor, type Patient } from "@/lib/mock-data";
 import {
   ApiError,
-  type CatalogItem,
-  type CatalogOut,
   type DoctorPatientSummary,
-  type DoctorPatientUpdate,
   type MealPlanOutput,
 } from "@/lib/types";
 import { DEFAULT_PLAN_DAYS } from "@/lib/config";
@@ -25,7 +22,6 @@ import {
   isReviewedPlanStatus,
   patientUsageLabel,
 } from "@/lib/plan-expiry";
-import { DISEASE_OPTIONS } from "@/lib/profile-mappers";
 import { doctorChartHref, doctorReviewHref } from "@/lib/doctor-routes";
 
 interface PatientDetailData extends Omit<Patient, "medications" | "allergies"> {
@@ -137,32 +133,6 @@ export default function PatientDetailPage() {
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [newGoalInput, setNewGoalInput] = useState("");
   const [savingGoals, setSavingGoals] = useState(false);
-
-  // Edit hồ sơ chung (tên/avatar/liên hệ/chẩn đoán/thuốc/dị ứng)
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [catalog, setCatalog] = useState<CatalogOut | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [medSearch, setMedSearch] = useState("");
-  const [allergySearch, setAllergySearch] = useState("");
-  const [diagnosisSearch, setDiagnosisSearch] = useState("");
-  const [editForm, setEditForm] = useState({
-    fullName: "",
-    email: "",
-    avatarUrl: "",
-    age: "",
-    gender: "",
-    phone: "",
-    address: "",
-    bloodPressure: "",
-    bloodGlucose: "",
-    disease: [] as string[],
-    medications: [] as string[],
-    allergies: [] as string[],
-    preferencesText: "",
-    goalsText: "",
-  });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -307,182 +277,6 @@ export default function PatientDetailPage() {
     if (ok) showToast("Đã xóa mục tiêu");
   };
 
-  const openEditProfile = () => {
-    if (!summary) return;
-    setEditForm({
-      fullName: summary.name || "",
-      email: summary.email || "",
-      avatarUrl: summary.avatar?.startsWith("https://api.dicebear.com")
-        ? ""
-        : summary.avatar || "",
-      age: summary.age != null ? String(summary.age) : "",
-      gender: summary.gender || "",
-      phone: summary.phone || "",
-      address: summary.address || "",
-      bloodPressure: summary.blood_pressure || "",
-      bloodGlucose: summary.blood_glucose || "",
-      disease: [...(summary.disease || [])],
-      medications: [...(summary.medications || [])],
-      allergies: [...(summary.allergies || [])],
-      preferencesText: (summary.preferences || []).join("\n"),
-      goalsText: (summary.treatment_goals || []).join("\n"),
-    });
-    setEditError(null);
-    setMedSearch("");
-    setAllergySearch("");
-    setDiagnosisSearch("");
-    setIsEditProfileOpen(true);
-  };
-
-  useEffect(() => {
-    if (!isEditProfileOpen) return;
-    let cancelled = false;
-    api
-      .getCatalog()
-      .then((c) => {
-        if (!cancelled) setCatalog(c);
-      })
-      .catch(() => {
-        if (!cancelled) setCatalog(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isEditProfileOpen]);
-
-  const toggleListItem = (
-    key: "disease" | "medications" | "allergies",
-    value: string
-  ) => {
-    setEditForm((f) => ({
-      ...f,
-      [key]: f[key].includes(value)
-        ? f[key].filter((v) => v !== value)
-        : [...f[key], value],
-    }));
-  };
-
-  /** Hiển thị tối đa 5 mục trong catalog theo từ khóa tìm kiếm. */
-  const visibleCatalog = (
-    items: CatalogItem[],
-    query: string,
-    selected: string[]
-  ): CatalogItem[] => {
-    const q = query.trim().toLowerCase();
-    const pool = q
-      ? items.filter((i) => i.name.toLowerCase().includes(q))
-      : items;
-    return pool
-      .filter((i) => !selected.includes(i.name))
-      .slice(0, 5);
-  };
-
-  const visibleDiagnoses = (
-    query: string
-  ): { code: string; name: string }[] => {
-    const q = query.trim().toLowerCase();
-    const pool = q
-      ? diagnosisOptions.filter((d) => d.name.toLowerCase().includes(q))
-      : diagnosisOptions;
-    return pool
-      .filter((d) => !editForm.disease.includes(d.code))
-      .slice(0, 5);
-  };
-
-  const handleUploadAvatar = async (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setEditError("File phải là ảnh (png/jpg/webp/gif).");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setEditError("Ảnh tối đa 2MB.");
-      return;
-    }
-    setUploadingAvatar(true);
-    setEditError(null);
-    try {
-      const out = await api.uploadPatientAvatar(patientId, file);
-      setEditForm((f) => ({ ...f, avatarUrl: out.avatar }));
-    } catch (err) {
-      setEditError(
-        err instanceof ApiError ? err.message : "Upload ảnh thất bại."
-      );
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const diagnosisOptions = useMemo(() => {
-    const base: { code: string; name: string }[] = catalog
-      ? catalog.diagnoses.map((d) => ({ code: d.code, name: d.name }))
-      : DISEASE_OPTIONS.map((d) => ({ code: d.code, name: d.label }));
-    const merged = [...base];
-    for (const d of editForm.disease) {
-      if (!merged.some((o) => o.code === d)) merged.push({ code: d, name: d });
-    }
-    return merged;
-  }, [catalog, editForm.disease]);
-
-  const chipClass = (active: boolean) =>
-    `px-md py-xs rounded-md text-xs font-medium border transition-colors cursor-pointer ${active
-      ? "bg-primary text-on-primary border-primary"
-      : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:border-primary"
-    }`;
-
-  const handleSaveProfile = async () => {
-    const email = editForm.email.trim();
-    if (!email) {
-      setEditError("Email không được để trống.");
-      return;
-    }
-    const age =
-      editForm.age.trim() === "" ? null : parseInt(editForm.age.trim(), 10);
-    if (age != null && (Number.isNaN(age) || age < 0 || age > 130)) {
-      setEditError("Tuổi phải nằm trong khoảng 0–130.");
-      return;
-    }
-    const payload: DoctorPatientUpdate = {
-      full_name: editForm.fullName.trim() || null,
-      email,
-      avatar: editForm.avatarUrl.trim() || null,
-      age,
-      gender: editForm.gender.trim() || null,
-      phone: editForm.phone.trim() || null,
-      address: editForm.address.trim() || null,
-      blood_pressure: editForm.bloodPressure.trim() || null,
-      blood_glucose: editForm.bloodGlucose.trim() || null,
-      disease: editForm.disease,
-      medications: editForm.medications,
-      allergies: editForm.allergies,
-      preferences: editForm.preferencesText
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      treatment_goals: editForm.goalsText
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    };
-    setSavingProfile(true);
-    setEditError(null);
-    try {
-      const updated = await api.updateDoctorPatientProfile(patientId, payload);
-      setSummary(updated);
-      setGoals(updated.treatment_goals || []);
-      setIsEditProfileOpen(false);
-      showToast("Đã cập nhật hồ sơ bệnh nhân");
-    } catch (err) {
-      setEditError(
-        err instanceof ApiError
-          ? err.message
-          : "Không lưu được hồ sơ. Kiểm tra backend."
-      );
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
   if (!hydrated || !token || role !== "doctor") {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-on-surface-variant">
@@ -535,12 +329,6 @@ export default function PatientDetailPage() {
     patient.avatar && !patient.avatar.startsWith("https://api.dicebear.com")
       ? assetUrl(patient.avatar)
       : "";
-  const previewAvatarUrl = editForm.avatarUrl.trim();
-  const previewAvatarSrc =
-    previewAvatarUrl &&
-      !previewAvatarUrl.startsWith("https://api.dicebear.com")
-      ? assetUrl(previewAvatarUrl)
-      : "";
   const hasGenerateRequest = summary?.meal_plan_request_status === "pending";
 
   return (
@@ -548,7 +336,7 @@ export default function PatientDetailPage() {
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-background font-body">
         {/* Toast Notification */}
         {toastMessage && (
-          <div className="fixed top-20 right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
+          <div className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
             <span className="material-symbols-outlined text-[20px]">check_circle</span>
             <span className="font-body-bold font-bold">{toastMessage}</span>
           </div>
@@ -605,21 +393,13 @@ export default function PatientDetailPage() {
                 <span className="material-symbols-outlined text-[16px]">delete</span>
                 <span>Xóa bệnh nhân</span>
               </button>
-              <button
-                type="button"
-                onClick={openEditProfile}
-                className="bg-surface-container-lowest border border-outline-variant/60 text-on-surface px-4 py-2 rounded-lg text-xs font-bold hover:bg-surface-container-low transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
-                <span>Chỉnh sửa hồ sơ</span>
-              </button>
               {!hasGenerateRequest && (
                 <Link
-                  href={`/doctor/patients/${patientId}/generate`}
+                  href={`/doctor/patients/${patientId}/meals`}
                   className="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  <span>Tạo thực đơn AI</span>
+                  <span>Kiểm tra thực đơn</span>
                 </Link>
               )}
             </div>
@@ -630,7 +410,7 @@ export default function PatientDetailPage() {
               <div className="min-w-0">
                 <p className="text-sm font-bold text-primary flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[20px]">notifications_active</span>
-                  <span>Bệnh nhân đã gửi yêu cầu tạo thực đơn mới</span>
+                  <span>Bệnh nhân cần hỗ trợ kế hoạch dinh dưỡng</span>
                 </p>
                 {summary.meal_plan_request_note ? (
                   <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
@@ -638,16 +418,16 @@ export default function PatientDetailPage() {
                   </p>
                 ) : (
                   <p className="text-xs text-on-surface-variant mt-1">
-                    Bệnh nhân đang chờ bác sĩ kích hoạt thực đơn AI tuần tiếp theo.
+                    Bệnh nhân chủ động tạo bản AI. Bác sĩ kiểm tra và duyệt khi nhận bản dự thảo.
                   </p>
                 )}
               </div>
               <Link
-                href={`/doctor/patients/${patientId}/generate`}
+                href={`/doctor/patients/${patientId}/meals`}
                 className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all shrink-0 shadow-2xs active:scale-95"
               >
                 <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                <span>Tạo thực đơn AI ngay</span>
+                <span>Kiểm tra và duyệt thực đơn</span>
               </Link>
             </div>
           )}
@@ -1118,452 +898,6 @@ export default function PatientDetailPage() {
         </main>
       </div>
 
-      {/* Modal: Chỉnh sửa hồ sơ bệnh nhân */}
-      {isEditProfileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-md bg-black/40 backdrop-blur-xs">
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between pb-md border-b border-outline-variant mb-md shrink-0">
-              <div className="flex items-center gap-sm">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-[24px]">edit</span>
-                </div>
-                <div>
-                  <h3 className="font-h2 text-h2 text-on-surface font-bold text-base">
-                    Chỉnh sửa hồ sơ bệnh nhân
-                  </h3>
-                  <p className="font-caption text-caption text-on-surface-variant text-xs">
-                    Lưu qua API — danh sách bệnh nhân cập nhật ngay
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEditProfileOpen(false)}
-                className="text-on-surface-variant hover:text-primary p-1 rounded-lg hover:bg-surface-container-low transition-colors"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-xs space-y-md">
-              {/* Ảnh đại diện */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Ảnh đại diện
-                </h5>
-                <div className="flex items-center gap-md">
-                  <div className="relative w-16 h-16 shrink-0">
-                    <div className="absolute inset-0 rounded-full bg-primary/15 text-primary flex items-center justify-center font-label text-sm font-semibold">
-                      {initials(editForm.fullName.trim() || patient.name)}
-                    </div>
-                    {previewAvatarSrc && (
-                      <img
-                        src={previewAvatarSrc}
-                        alt="Avatar preview"
-                        className="absolute inset-0 w-16 h-16 rounded-full object-cover border border-outline-variant bg-surface-container"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-xs">
-                    <label className="flex items-center gap-xs cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif"
-                        className="hidden"
-                        onChange={(e) => void handleUploadAvatar(e.target.files?.[0])}
-                      />
-                      <span
-                        className={`inline-flex items-center gap-xs px-md py-2 rounded-lg border border-primary text-primary text-sm font-semibold hover:bg-primary hover:text-on-primary transition-colors ${uploadingAvatar ? "opacity-60 pointer-events-none" : ""
-                          }`}
-                      >
-                        <span
-                          className={`material-symbols-outlined text-[18px] ${uploadingAvatar ? "animate-spin" : ""
-                            }`}
-                        >
-                          {uploadingAvatar ? "progress_activity" : "upload"}
-                        </span>
-                        {uploadingAvatar ? "Đang tải lên..." : "Tải ảnh lên"}
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.avatarUrl}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, avatarUrl: e.target.value }))
-                      }
-                      placeholder="Hoặc dán URL ảnh (bỏ trống = avatar mặc định)"
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setEditForm((f) => ({ ...f, avatarUrl: "" }))}
-                      className="text-xs text-primary hover:underline cursor-pointer"
-                    >
-                      Dùng avatar mặc định
-                    </button>
-                  </div>
-                </div>
-              </section>
-              {/* Thông tin chung */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Thông tin chung
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Họ tên
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.fullName}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, fullName: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Email <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={editForm.email}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, email: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Tuổi
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={130}
-                      value={editForm.age}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, age: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Giới tính
-                    </label>
-                    <select
-                      value={editForm.gender}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, gender: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    >
-                      <option value="">—</option>
-                      <option value="Nam">Nam</option>
-                      <option value="Nữ">Nữ</option>
-                      <option value="Khác">Khác</option>
-                    </select>
-                  </div>
-                </div>
-              </section>
-              {/* Thông tin liên hệ */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Thông tin liên hệ
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Điện thoại
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.phone}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, phone: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Địa chỉ
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.address}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, address: e.target.value }))
-                      }
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Huyết áp
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.bloodPressure}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, bloodPressure: e.target.value }))
-                      }
-                      placeholder="VD: 130/80 mmHg"
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Đường huyết
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.bloodGlucose}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, bloodGlucose: e.target.value }))
-                      }
-                      placeholder="VD: 135 mg/dL"
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-                </div>
-              </section>
-
-
-              {/* Chẩn đoán */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Chẩn đoán hiện tại
-                </h5>
-                <input
-                  type="text"
-                  value={diagnosisSearch}
-                  onChange={(e) => setDiagnosisSearch(e.target.value)}
-                  placeholder="Tìm bệnh lý..."
-                  className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                />
-                <div className="flex flex-wrap gap-xs mt-sm">
-                  {editForm.disease.map((code) => {
-                    const label =
-                      diagnosisOptions.find((o) => o.code === code)?.name ?? code;
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => toggleListItem("disease", code)}
-                        className={`${chipClass(true)} border-dashed`}
-                        title="Bấm để bỏ chọn"
-                      >
-                        {label} ✕
-                      </button>
-                    );
-                  })}
-                  {visibleDiagnoses(diagnosisSearch).map((opt) => (
-                    <button
-                      key={opt.code}
-                      type="button"
-                      onClick={() => toggleListItem("disease", opt.code)}
-                      className={chipClass(false)}
-                    >
-                      {opt.name}
-                    </button>
-                  ))}
-                </div>
-                {diagnosisSearch.trim() &&
-                  visibleDiagnoses(diagnosisSearch).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
-                      Không tìm thấy bệnh lý phù hợp.
-                    </p>
-                  )}
-              </section>
-
-
-
-              {/* Thuốc đang dùng */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Thuốc đang dùng
-                </h5>
-                <input
-                  type="text"
-                  value={medSearch}
-                  onChange={(e) => setMedSearch(e.target.value)}
-                  placeholder="Tìm thuốc..."
-                  className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                />
-                <div className="flex flex-wrap gap-xs mt-sm">
-                  {editForm.medications.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => toggleListItem("medications", v)}
-                      className={`${chipClass(true)} border-dashed`}
-                      title="Bấm để bỏ chọn"
-                    >
-                      {v} ✕
-                    </button>
-                  ))}
-                  {visibleCatalog(
-                    catalog?.medicines ?? [],
-                    medSearch,
-                    editForm.medications
-                  ).map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => toggleListItem("medications", m.name)}
-                      className={chipClass(false)}
-                    >
-                      {m.name}
-                    </button>
-                  ))}
-                </div>
-                {medSearch.trim() &&
-                  visibleCatalog(
-                    catalog?.medicines ?? [],
-                    medSearch,
-                    editForm.medications
-                  ).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
-                      Không tìm thấy thuốc phù hợp.
-                    </p>
-                  )}
-              </section>
-
-              {/* Dị ứng */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Dị ứng & Phản ứng phụ
-                </h5>
-                <input
-                  type="text"
-                  value={allergySearch}
-                  onChange={(e) => setAllergySearch(e.target.value)}
-                  placeholder="Tìm dị ứng..."
-                  className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors"
-                />
-                <div className="flex flex-wrap gap-xs mt-sm">
-                  {editForm.allergies.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => toggleListItem("allergies", v)}
-                      className={`${chipClass(true)} border-dashed`}
-                      title="Bấm để bỏ chọn"
-                    >
-                      {v} ✕
-                    </button>
-                  ))}
-                  {visibleCatalog(
-                    catalog?.allergies ?? [],
-                    allergySearch,
-                    editForm.allergies
-                  ).map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => toggleListItem("allergies", a.name)}
-                      className={chipClass(false)}
-                    >
-                      {a.name}
-                    </button>
-                  ))}
-                </div>
-                {allergySearch.trim() &&
-                  visibleCatalog(
-                    catalog?.allergies ?? [],
-                    allergySearch,
-                    editForm.allergies
-                  ).length === 0 && (
-                    <p className="text-xs text-on-surface-variant italic mt-xs">
-                      Không tìm thấy dị ứng phù hợp.
-                    </p>
-                  )}
-              </section>
-
-              {/* Dinh dưỡng & Mục tiêu điều trị */}
-              <section>
-                <h5 className="font-label text-label text-on-surface font-semibold text-xs uppercase tracking-wider mb-sm">
-                  Dinh dưỡng & Mục tiêu điều trị
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Dinh dưỡng / Sở thích ăn uống (mỗi dòng 1 mục)
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={editForm.preferencesText}
-                      onChange={(e) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          preferencesText: e.target.value,
-                        }))
-                      }
-                      placeholder={"thích ăn cơm\nkhông ăn thịt bò"}
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors resize-y"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-label text-label text-on-surface-variant block mb-xs">
-                      Mục tiêu điều trị (mỗi dòng 1 mục tiêu)
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={editForm.goalsText}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, goalsText: e.target.value }))
-                      }
-                      placeholder={"Kiểm soát đường huyết (HbA1c < 7%).\nGiảm cân 2kg trong 1 tháng."}
-                      className="w-full px-md py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors resize-y"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {editError && (
-                <div className="rounded-lg border border-error/30 bg-error-container/20 px-md py-sm text-xs text-error font-medium">
-                  {editError}
-                </div>
-              )}
-            </div>
-
-            <div className="pt-md border-t border-outline-variant mt-md flex justify-end items-center gap-sm shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsEditProfileOpen(false)}
-                disabled={savingProfile}
-                className="px-md py-2 border border-outline-variant rounded-lg text-sm hover:bg-surface-container-low transition-colors disabled:opacity-60"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSaveProfile()}
-                disabled={savingProfile}
-                className="bg-primary text-on-primary px-lg py-2 rounded-lg font-body-bold text-sm hover:bg-primary/90 transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 font-semibold disabled:opacity-60"
-              >
-                <span
-                  className={`material-symbols-outlined text-[18px] ${savingProfile ? "animate-spin" : ""
-                    }`}
-                >
-                  {savingProfile ? "progress_activity" : "save"}
-                </span>
-                {savingProfile ? "Đang lưu..." : "Lưu lại"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DELETE PATIENT CONFIRMATION MODAL */}
       {isDeleteModalOpen && patient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn">
           <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 max-w-md w-full shadow-2xl animate-scaleUp">

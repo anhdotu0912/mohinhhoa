@@ -10,6 +10,7 @@ Hồ sơ bệnh nhân (bệnh lý, thuốc, dị ứng, mục tiêu dinh dưỡn
 Là **bệnh nhân**, tôi muốn khai báo bệnh lý, thuốc đang dùng, dị ứng, mục tiêu calo và sở thích ăn uống, để AI lập thực đơn phù hợp và an toàn với tình trạng của tôi.
 
 ## 3. Business rules
+0. **Quyền sở hữu thông tin cá nhân (2026-11-16):** bệnh nhân sửa ảnh, họ tên, email, tuổi/giới tính và liên hệ tại `/patient/profile`. `POST /profile` có thể lưu `full_name`/`email` của chính tài khoản cùng hồ sơ, kiểm tra email duy nhất trước khi commit. Bỏ field tài khoản giữ tên/email hiện có; lỗi không cập nhật một phần. FE đồng bộ tên/email mới vào tài khoản và thanh bên sau khi lưu. Trang chi tiết bác sĩ không còn nút/modal sửa hồ sơ chung; chỉ số, mục tiêu/ràng buộc và duyệt thực đơn vẫn có công cụ chuyên môn riêng.
 1. **1 user – 1 profile** (upsert theo `user_id`, không có nhiều hồ sơ/user) — `POST /profile` tạo mới nếu chưa có, ghi đè toàn bộ field nếu đã có (không phải patch từng field).
 2. Không có field nào bị Pydantic validate bắt buộc (mọi field default) — nhưng về nghiệp vụ: `disease/medications/allergies/bmi/target_kcal` **nên** được điền đầy đủ trước khi bấm "Lập thực đơn" để kết quả có ý nghĩa (business rule khuyến nghị ở FE, không phải validation cứng ở BE).
 3. **`allergies` = hard filter** — món ăn khớp bất kỳ allergy nào **bị loại tuyệt đối** khỏi thực đơn và khỏi danh sách món thay thế (`meal_planner_agent._is_allergic`, áp dụng cả khi lọc catalog gốc lẫn khi lọc `alternatives[]` sau khi sinh). Không có ngoại lệ, không có "cảnh báo nhưng vẫn cho chọn".

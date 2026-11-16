@@ -13,7 +13,7 @@ ARG NEXT_PUBLIC_APP_ENV=
 ENV NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
 FROM base AS runner
 WORKDIR /app

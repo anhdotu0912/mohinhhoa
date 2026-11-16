@@ -1,5 +1,6 @@
 """Pydantic schemas for Patient Profile — matches contract §1.1."""
 
+import re
 from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator
@@ -90,6 +91,8 @@ class ProfileUpsert(BaseModel):
     `ProfileClinicalProposal` and `specs/04`.
     """
 
+    full_name: str | None = Field(default=None, max_length=255)
+    email: str | None = Field(default=None, max_length=255)
     disease: list[str] = Field(default_factory=list)
     medications: list[str] = Field(default_factory=list)
     allergies: list[str] = Field(default_factory=list)
@@ -122,6 +125,16 @@ class ProfileUpsert(BaseModel):
     @classmethod
     def _goals(cls, value: list[str] | None) -> list[str] | None:
         return normalize_treatment_goals(value)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _email(cls, value: str | None) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Email không được để trống.")
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+            raise ValueError("Nhập địa chỉ email hợp lệ.")
+        return normalized
 
 
 class ProfileClinicalProposal(BaseModel):

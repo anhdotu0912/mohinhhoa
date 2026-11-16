@@ -64,6 +64,8 @@ export interface PatientProfile {
 }
 
 export interface ProfileUpsert {
+  full_name?: string | null;
+  email?: string;
   disease: string[];
   medications: string[];
   allergies: string[];
@@ -171,6 +173,7 @@ export interface MealPlanOutput {
   status: MealPlanStatus | string;
   trust_badge?: string | null;
   adjustment_note?: string | null;
+  review_notes?: string | null;
   starts_on?: string | null;
   ends_on?: string | null;
   created_at?: string | null;
@@ -398,7 +401,9 @@ export interface MealPlanScheduleOut {
   today: string;
   active_plan_id: string | null;
   active_plan: MealPlanOutput | null;
+  latest_plan?: MealPlanOutput | null;
   unassigned_plans: MealPlanOutput[];
+  history_plans?: MealPlanOutput[];
   slots: MealPlanScheduleSlot[];
 }
 

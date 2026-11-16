@@ -228,7 +228,7 @@ export default function PatientConstraintsTabPage() {
   return (
     <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
       {toast && (
-        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-xl border border-emerald-600 flex items-center gap-2 animate-in fade-in duration-200">
+        <div className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-50 bg-emerald-800 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-xl border border-emerald-600 flex items-center gap-2 animate-in fade-in duration-200">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">check_circle</span>
           <span>{toast}</span>
         </div>

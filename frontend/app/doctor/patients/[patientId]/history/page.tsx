@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
-import { MealPlanScheduleTable, buildHistoryGenerateHref } from "@/components/doctor/MealPlanScheduleTable";
+import { MealPlanScheduleTable, buildHistoryReviewHref } from "@/components/doctor/MealPlanScheduleTable";
 import { api, assetUrl } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { doctorPatientToUi, type Patient } from "@/lib/mock-data";
@@ -399,11 +399,11 @@ export default function DoctorPatientHistoryPage() {
               </Link>
             )}
             <Link
-              href={buildHistoryGenerateHref(patientId!)}
+              href={buildHistoryReviewHref(patientId!)}
               className="bg-primary hover:bg-primary/90 text-on-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-              Tạo thực đơn AI mới
+              Xem thực đơn chờ duyệt
             </Link>
           </div>
         </div>

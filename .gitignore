@@ -37,6 +37,7 @@ backend/app.db
 # Logs
 logs/
 *.log
+.codex/run-logs/
 
 # Scratch / one-off debug artifacts
 _tmp*

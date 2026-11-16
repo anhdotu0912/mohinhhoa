@@ -7,7 +7,7 @@ from datetime import datetime
 from app.core.datetime_vn import vn_today
 from app.models.food_log import FoodLog
 
-from tests.test_api import DOCTOR, PATIENT, _login
+from tests.test_api import PATIENT, _login
 
 
 def test_create_food_log_as_planned(client):
@@ -142,12 +142,10 @@ def test_list_food_logs_filters_by_vn_date_across_utc_midnight(client):
 
 
 def test_create_food_log_rejects_foreign_meal_plan(client):
-    doctor_headers = _login(client, DOCTOR)
     patient2_headers = _login(client, "demo_patient_2@example.com")
-    patient2_id = client.get("/api/v1/auth/me", headers=patient2_headers).json()["id"]
     gen = client.post(
-        f"/api/v1/doctor/patients/{patient2_id}/meal-plans/generate",
-        headers=doctor_headers,
+        "/api/v1/meal-plans/generate",
+        headers=patient2_headers,
     )
     assert gen.status_code == 200, gen.text
     foreign_plan_id = gen.json()["id"]

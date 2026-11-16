@@ -895,7 +895,7 @@ export default function PlanReviewDetailPage() {
   return (
     <>
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-lg shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
+        <div className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-50 bg-emerald-800 text-white px-md py-sm rounded-lg shadow-lg border border-emerald-600 flex items-center gap-xs font-body text-sm animate-slide-down">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">
             check_circle
           </span>
@@ -903,7 +903,7 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      <div className="sticky top-[8.5rem] z-10 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3">
+      <div className="sticky top-[calc(var(--doctor-nav-height,64px)+4.5rem)] z-10 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3">
         <div className="max-w-[1600px] w-full mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {status === "pending" && (

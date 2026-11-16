@@ -29,7 +29,7 @@ export function PatientCard({
   patient,
   onSelect,
   isSelected = false,
-  actionText = "Tạo thực đơn",
+  actionText = "Kiểm tra thực đơn",
   badgeColorClass,
 }: PatientCardProps) {
   const [avatarFailed, setAvatarFailed] = useState(false);

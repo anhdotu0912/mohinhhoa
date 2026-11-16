@@ -16,7 +16,7 @@ import {
   chartTabFromPath,
   doctorChartHref,
   doctorPatientsHref,
-  doctorGenerateHref,
+  doctorMealPlansHref,
   isGeneratePath,
   isPlanReviewPath,
 } from "@/lib/doctor-routes";
@@ -122,7 +122,7 @@ export function PatientChartShell({
       <TopBar
         title={
           compact
-            ? "Tạo thực đơn AI"
+            ? "Kiểm tra thực đơn"
             : reviewing
               ? "Duyệt thực đơn"
               : "Hồ sơ lâm sàng bệnh nhân"
@@ -130,7 +130,7 @@ export function PatientChartShell({
       />
 
       {/* Modern EHR 2-Tier Sticky Header Bar */}
-      <div className="bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/60 sticky top-16 z-20 shadow-xs">
+      <div className="bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/60 sticky top-[var(--doctor-nav-height,64px)] z-20 shadow-xs">
         <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 md:px-8 flex flex-col">
           {/* TIER 1: Patient Clinical Identity & Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -204,7 +204,7 @@ export function PatientChartShell({
               )}
             </div>
 
-            {/* Right Section: Plan Expiry Badge + Quick Action (Tạo thực đơn AI) */}
+            {/* Right Section: Plan Expiry Badge + Quick Action (Kiểm tra thực đơn) */}
             <div className="flex items-center gap-2.5 shrink-0">
               {patient?.plan_expiry && patient.plan_expiry !== "none" && (
                 <PlanExpiryBadge
@@ -222,12 +222,12 @@ export function PatientChartShell({
 
               {!hideChartNav && routeId && (
                 <Link
-                  href={doctorGenerateHref(routeId)}
+                  href={doctorMealPlansHref(routeId)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  <span className="hidden sm:inline">Tạo thực đơn AI</span>
-                  <span className="sm:hidden">Tạo AI</span>
+                  <span className="hidden sm:inline">Kiểm tra thực đơn</span>
+                  <span className="sm:hidden">Duyệt</span>
                 </Link>
               )}
             </div>

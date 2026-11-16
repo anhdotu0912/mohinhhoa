@@ -31,6 +31,15 @@ export type { Message };
 
 const SAMPLE_CHIPS = [
   {
+    id: "create_meal",
+    title: "Tạo thực đơn bằng AI",
+    subtitle: "AI tạo bản dự thảo · Bác sĩ duyệt",
+    icon: "auto_awesome",
+    colorClass: "bg-emerald-50 text-[#006857]",
+    prompt: "",
+    action: "create_meal_plan",
+  },
+  {
     id: "weekly_meal",
     title: "Thực đơn tuần này",
     subtitle: "Xem kế hoạch dinh dưỡng 7 ngày",
@@ -76,6 +85,8 @@ const SAMPLE_CHIPS = [
 const BOT_VIDEO_SRC = "/video/video_chatbot.mp4";
 
 function formatCitationLabel(raw: string): string {
+  if (raw.startsWith("food_catalog_vn#")) return "Bảng thành phần thực phẩm";
+  if (raw.startsWith("recipe_catalog_vn#")) return "Công thức món ăn";
   const kbPair = raw.match(/drug_food_interactions#(.+)$/i);
   if (kbPair?.[1]) {
     return `KB tương tác: ${kbPair[1].replace(/_/g, " ")}`;
@@ -439,7 +450,12 @@ export default function PatientChatHomePage() {
     };
 
     try {
-      for await (const event of api.chatStream(query)) {
+      // Wait for queued transcript saves so follow-up questions see prior turns.
+      // Exclude the current question and its streaming placeholder from context.
+      if (curSessionId && messages.length > 0) {
+        await saveActiveSessionMessages(messages, undefined, curSessionId);
+      }
+      for await (const event of api.chatStream(query, curSessionId)) {
         if (event.type === "status") {
           thinkingSteps = upsertThinkingStep(thinkingSteps, event.node, event.message);
           showIfCurrent((prev) =>
@@ -549,6 +565,10 @@ export default function PatientChatHomePage() {
   };
 
   const handleChipClick = (chip: (typeof SAMPLE_CHIPS)[0]) => {
+    if (chip.action === "create_meal_plan") {
+      router.push("/patient/meal-plan");
+      return;
+    }
     if (chip.action === "open_meal_panel") {
       openPanel("menu");
       return;

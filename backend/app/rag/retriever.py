@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -22,6 +21,28 @@ from app.rag.qdrant import get_qdrant_client
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+
+_dense_memory_failed = False
+
+
+def _keyword_mode() -> bool:
+    return settings.RAG_RETRIEVAL_MODE == "keyword" or _dense_memory_failed
+
+
+def _query_vectors(query: str) -> list[list[float]] | None:
+    """Stop retrying a model that cannot fit in this process's memory budget."""
+    global _dense_memory_failed
+    try:
+        return embed_query_texts([query])
+    except (MemoryError, OSError) as exc:
+        if not isinstance(exc, MemoryError) and not (
+            getattr(exc, "winerror", None) == 1455
+            or getattr(exc, "errno", None) in (12, 1455)
+        ):
+            raise
+        _dense_memory_failed = True
+        logger.warning("Embedding allocation failed; using BM25 for subsequent retrievals")
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +63,16 @@ def _get_qdrant_client():
     return get_qdrant_client()
 
 
+def _query_phrase_patterns(query: str):
+    """Keep the leading subject (e.g. 'chất xơ') ahead of background disease terms."""
+    import re
+    import unicodedata
+
+    text = unicodedata.normalize("NFC", query).lower().strip()
+    phrases = [text, " ".join(text.split()[:2])]
+    return [re.compile(rf"(?<!\w){re.escape(phrase)}(?!\w)") for phrase in phrases if phrase]
+
+
 def retrieve_foods(
     query: str,
     top_k: int = 10,
@@ -58,6 +89,11 @@ def retrieve_foods(
         exclude_tags: Exclude foods with these tags (e.g. ["allergen-shellfish"])
         client: Optional Qdrant client
     """
+    if _keyword_mode():
+        return _bm25_search(
+            query, "food_items", top_k,
+            category_filter=category_filter, exclude_tags=exclude_tags,
+        )
     try:
         from qdrant_client.models import FieldCondition, Filter, MatchValue
     except ImportError as exc:
@@ -67,7 +103,12 @@ def retrieve_foods(
     client = client or _get_qdrant_client()
     if client is None:
         return []
-    query_vectors = embed_query_texts([query])
+    query_vectors = _query_vectors(query)
+    if query_vectors is None:
+        return _bm25_search(
+            query, "food_items", top_k,
+            category_filter=category_filter, exclude_tags=exclude_tags,
+        )
     if not query_vectors:
         return []
 
@@ -128,6 +169,8 @@ def retrieve_guidelines(
         source_filter: Filter by guideline source (e.g. "ada_diabetes")
         client: Optional Qdrant client
     """
+    if _keyword_mode():
+        return _bm25_search(query, "guidelines", top_k, source_filter=source_filter)
     try:
         from qdrant_client.models import FieldCondition, Filter, MatchValue
     except ImportError as exc:
@@ -137,7 +180,9 @@ def retrieve_guidelines(
     client = client or _get_qdrant_client()
     if client is None:
         return []
-    query_vectors = embed_query_texts([query])
+    query_vectors = _query_vectors(query)
+    if query_vectors is None:
+        return _bm25_search(query, "guidelines", top_k, source_filter=source_filter)
     if not query_vectors:
         return []
 
@@ -193,6 +238,8 @@ def _retrieve_hybrid_uncached(
     collection_name: str = "food_items",
     client=None,
 ) -> list[RetrievedChunk]:
+    if _keyword_mode():
+        return _bm25_search(query, collection_name, top_k)
     # Dense retrieval
     if collection_name == "food_items":
         dense_results = retrieve_foods(query, top_k=top_k * 2, client=client)
@@ -204,7 +251,8 @@ def _retrieve_hybrid_uncached(
 
     # Reciprocal Rank Fusion
     fused = _reciprocal_rank_fusion(dense_results, bm25_results, k=60)
-
+    patterns = _query_phrase_patterns(query)
+    fused.sort(key=lambda chunk: tuple(bool(p.search(chunk.text.lower())) for p in patterns), reverse=True)
     return fused[:top_k]
 
 
@@ -227,10 +275,14 @@ def _bm25_search(
     query: str,
     collection_name: str,
     top_k: int = 20,
+    *,
+    category_filter: str | None = None,
+    exclude_tags: list[str] | None = None,
+    source_filter: str | None = None,
 ) -> list[RetrievedChunk]:
     """Simple BM25 keyword search over the raw data files."""
     try:
-        from rank_bm25 import BM25Okapi
+        from rank_bm25 import BM25L
         from unidecode import unidecode
     except ImportError:
         logger.debug("rank_bm25 or unidecode not installed, skipping BM25")
@@ -245,12 +297,24 @@ def _bm25_search(
         with open(food_db_path, encoding="utf-8") as f:
             foods = json.load(f)
         for food in foods:
+            if category_filter and food.get("category") != category_filter:
+                continue
+            if exclude_tags and any(tag in food.get("tags", []) for tag in exclude_tags):
+                continue
             aliases_str = ", ".join(food.get("aliases", []))
-            doc_text = f"{food['name']} {aliases_str} {food.get('category', '')} {' '.join(food.get('tags', []))}"
+            macros = food.get("macros", {})
+            doc_text = (
+                f"{food['name']} {aliases_str}. Phân loại: {food.get('category', '')}. "
+                f"Khẩu phần: {food.get('portion', '')}. Năng lượng: {food.get('kcal', 0)} kcal. "
+                f"Carb: {macros.get('carb_g', 0)}g, Protein: {macros.get('protein_g', 0)}g, "
+                f"Fat: {macros.get('fat_g', 0)}g, Sodium: {macros.get('sodium_mg', 0)}mg. "
+                f"Tags: {', '.join(food.get('tags', []))}."
+            )
             documents.append({
                 "id": food["id"],
                 "text": doc_text,
                 "source": "food_db_vn",
+                "metadata": food,
             })
     else:
         from app.rag.indexer import _chunk_markdown
@@ -258,6 +322,8 @@ def _bm25_search(
         if not guidelines_dir.exists():
             return []
         for md_file in sorted(guidelines_dir.glob("*.md")):
+            if source_filter and source_filter not in (md_file.stem, md_file.name):
+                continue
             text = md_file.read_text(encoding="utf-8")
             chunks = _chunk_markdown(text, md_file.stem)
             for c in chunks:
@@ -276,26 +342,35 @@ def _bm25_search(
         return normalized.split()
 
     corpus = [tokenize(doc["text"]) for doc in documents]
-    bm25 = BM25Okapi(corpus)
+    # Positive IDF also works when a source/category filter leaves one document.
+    bm25 = BM25L(corpus)
 
     query_tokens = tokenize(query)
     scores = bm25.get_scores(query_tokens)
 
-    # Sort by score
+    # Accent folding makes "cà" match "cá". Prefer the actual queried phrase
+    # before BM25 scores; otherwise prenatal/fish documents can outrank tomatoes.
+    patterns = _query_phrase_patterns(query)
     scored_docs = sorted(
         zip(documents, scores),
-        key=lambda x: x[1],
+        key=lambda x: (*[bool(p.search(x[0]["text"].lower())) for p in patterns], x[1]),
         reverse=True,
     )
 
     results = []
     for doc, score in scored_docs[:top_k]:
         if score > 0:
+            text = doc["text"]
+            match = next((match for pattern in patterns if (match := pattern.search(text.lower()))), None)
+            if match and match.end() > 450:
+                start = max(0, match.start() - 150)
+                text = text[start:start + max(500, len(query) + 250)]
             results.append(RetrievedChunk(
                 chunk_id=doc["id"],
-                text=doc["text"][:500],
+                text=text[:max(500, len(query) + 250)],
                 source=doc["source"],
                 score=float(score),
+                metadata=doc.get("metadata", {}),
             ))
 
     return results

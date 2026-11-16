@@ -89,7 +89,7 @@ export function slotTitle(slot: MealPlanScheduleSlot): string {
   if (slot.slot_key === "current") return "Đang áp dụng";
   if (slot.slot_key === "next") return "Xếp sẵn";
   if (slot.occupancy === "upcoming") return "Xếp sẵn";
-  if (slot.occupancy === "past") return "Đã qua";
+  if (slot.occupancy === "past") return "Hoàn thành";
   return "Chu kỳ trống";
 }
 

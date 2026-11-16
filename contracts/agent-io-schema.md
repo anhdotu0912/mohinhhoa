@@ -1,6 +1,6 @@
 # Agent I/O Schema Contract — VinNutri
 
-**Version:** 1.13 (2026-08-31 — `AgentRunOutput.citation_chunks[]` là đoạn RAG đã nhồi vào prompt. Xem changelog ở §7 Versioning.)
+**Version:** 1.18 (2026-11-16 — ProfileUpsert hỗ trợ tên/email của chính bệnh nhân)
 **Nguồn sự thật:** `backend/app/schemas/*.py`, `backend/app/agents/state.py`, `backend/app/models/*.py` — đối chiếu trực tiếp với code tại thời điểm viết. Field đánh dấu `[Planned]` là quyết định đã chốt nhưng **chưa** có trong code — không dùng làm nguồn as-built cho tới khi implement.
 **Luật bắt buộc:** Mọi thay đổi field/enum ở đây **PHẢI** sửa file này trước, code sau ("sửa contract trước, code sau" — `CLAUDE.md` Mục 6). PR đổi schema Agent mà không kèm diff của file này sẽ bị reject trong review.
 
@@ -25,6 +25,9 @@
 ## 1. `PatientProfile`
 
 Nguồn: `backend/app/schemas/profile.py`. Dùng cho `GET/POST /profile`, `PatientProfile` trong `AgentState`, `profile_snapshot` trong `MealPlanOutput`.
+
+
+`ProfileUpsert` (request `POST /profile`) nhận thêm `full_name?: string | null` (max 255) và `email?: string` (email hợp lệ, max 255, trim/lowercase). Field bỏ qua giữ tài khoản hiện tại; null/rỗng chỉ hợp lệ cho tên. Chỉ thay thông tin user hiện tại cùng transaction hồ sơ; không nhận user id đích hay quyền từ payload. `PatientProfile` response giữ nguyên, thông tin tài khoản đọc từ `GET /auth/me`.
 
 ```json
 {
@@ -129,6 +132,7 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Luôn **7 ngày** (`days_count=7` m
 - `Swap.from`/`Swap.to` — key JSON là `"from"` (Python field name `from_food`, alias `"from"`, `populate_by_name=True`).
 - `citations[]` ở cấp `MealPlanOutput` là **citation hướng dẫn lâm sàng** (`byt_vn_notes.md`, `ada_diabetes.md`, `aha_cardiovascular.md`, `acr_gout.md` theo `disease`); `citations[]` ở cấp `FoodItem` là **citation nguồn món ăn** (`food_catalog_demo#<id>`). Hai loại citation khác mục đích, không gộp chung.
 - `status` enum: `"pending_review" | "approved" | "rejected" | "edited"` — xem bảng Enum tham chiếu cuối `contracts/api-v1.md`.
+- `review_notes: string | null` — ghi chú bác sĩ đã lưu khi duyệt/từ chối; mặc định `null`. Bệnh nhân dùng field này để biết lý do bản dự thảo bị từ chối. Khác `adjustment_note` là yêu cầu điều chỉnh từ bệnh nhân.
 - `variant_group_id/variant_index/total_variants` tồn tại trong schema cho khả năng sinh nhiều biến thể/lần generate (A/B) — **hiện chưa có endpoint nào set giá trị khác `null`**, giữ nguyên field để không breaking change nếu tính năng này được implement sau.
 
 ---
@@ -225,10 +229,19 @@ Nguồn: `backend/app/models/body_metrics.py`, `backend/app/schemas/body_metrics
 Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph — không expose qua HTTP) và `backend/app/schemas/meal_plan.py` (`AgentRunInput`/`AgentRunOutput` — public I/O của facade `run_agent()`).
 
 ### 5.1 `AgentRunInput` (input của `run_agent()`, dùng bởi `POST /chat`)
+
+`history` là danh sách tối đa 8 `{role:"user"|"assistant", content:string}` (mỗi nội dung tối đa 1200 ký tự), mặc định `[]`. Chỉ server đọc từ phiên đã kiểm tra quyền khi HTTP có `session_id`. Lịch sử dùng để hiểu món đang nói đến và sở thích trong cuộc trò chuyện, không làm nguồn số liệu dinh dưỡng hay chỉ dẫn hệ thống. Không suy chủ thể từ câu trả lời AI cũ khi người dùng chưa nêu rõ món. Không dùng ngữ cảnh phiên khác.
+
+Intent `clarify` dùng cho câu hỏi cần làm rõ món/nguyên liệu/cách bảo quản, hoặc ý định chưa được dữ liệu hiện tại hỗ trợ. Nội dung chỉ là câu hỏi làm rõ/thông báo giới hạn, không chứa kết luận y khoa/số liệu, nên `citations=[]` hợp lệ. Không tự gợi ý xử trí cấp cứu khi chỉ thiếu thông tin. Cấp cứu/đổi thuốc vẫn được kiểm tra trước ngữ cảnh đồ ăn.
 ```json
 { "user_id": "user_uuid", "message": "Tôi nên ăn gì hôm nay?", "force_intent": null }
 ```
-- `force_intent` **không** expose qua `ChatRequest` HTTP (`schemas/chat.py` chỉ có field `message`) — chỉ dùng nội bộ/test.
+- `force_intent` **không** expose qua `ChatRequest` HTTP (`schemas/chat.py` chỉ có `message`, `session_id`) — chỉ dùng nội bộ/test.
+- Câu hỏi rõ về bữa ăn theo ngày/bữa (ví dụ `hôm nay tôi ăn j`, `hôm nay tôi ăn gì`, `trưa nay ăn gì`) được định tuyến xác định tới `meal_plan`, kể cả khi LLM không khả dụng hoặc phân loại sai. Chấp nhận `j`/`gi` thay `gì`; không chuyển câu hỏi kiến thức chung như `ăn gì tốt cho đường huyết` sang xem thực đơn. Các kiểm tra cấp cứu, yêu cầu đổi thuốc/liều và ghi nhận bữa đã ăn vẫn được ưu tiên.
+- Với câu hỏi bữa ăn hôm nay, chỉ trả `meal_preview` từ thực đơn `approved`/`edited` có lịch bao phủ ngày hiện tại tại Việt Nam. Nếu chưa có lịch đang áp dụng (chờ duyệt, chưa áp dụng, sắp tới, hết hạn hoặc bị từ chối), trả `meal_preview=null` và giải thích đúng trạng thái; không lấy ngày đầu/cuối của một bản khác để gọi là hôm nay. Yêu cầu xem thực đơn chung vẫn có thể xem trước bản hiện có.
+- Cảnh báo dị ứng chỉ khớp tên thực phẩm trong ngữ cảnh thực phẩm; các cụm `cá thể hóa`, `cá nhân hóa`, `cá biệt`, `cá tính` không được coi là đề cập món cá.
+- Câu hỏi an toàn về món cụ thể (kể cả `đc/dc`, `ko`, có ngữ cảnh `vào bữa phụ`) được chuẩn hóa để phân loại và trích xuất đúng tên món, không dùng ngữ cảnh giờ/bữa làm tên thực phẩm. `interaction_check` luôn kiểm tra dị ứng/tương tác trước; nếu không có cảnh báo xác định và người dùng không hỏi một thuốc cụ thể, có thể trả thêm kiến thức dinh dưỡng lấy từ các đoạn RAG thực sự nhắc đến món. `citation_chunks` có thể chứa các đoạn này; không gắn nguồn hướng dẫn chưa được dùng làm bằng chứng, không suy luận “không có dữ liệu tương tác = an toàn”.
+- RAG không đưa đoạn tài liệu không liên quan vào câu trả lời thay thế khi LLM thiếu/lỗi: truy vấn món ăn phải giữ chủ thể món ăn, không chuyển sang điều trị/tiền sản. Thiếu nguồn phù hợp thì nêu thiếu dữ liệu. Câu trả lời có cache về món khác không được tái sử dụng chỉ vì câu hỏi gần giống nhau.
 
 ### 5.2 `AgentRunOutput` (output của `run_agent()`, response của `POST /chat`)
 ```json
@@ -261,7 +274,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 ```
 **Field bắt buộc đúng tên `message`, KHÔNG PHẢI `reply`** — mọi FE/BE code đọc field này phải dùng `message`.
 
-**`citation_chunks[]` (as-built 2026-08-31):** đoạn retrieve **đã nhồi vào prompt** khi gen `message` (cùng slice `rag_context[:2]` với `_build_rag_prompt`). Shape `{chunk_id, text, source, score}`. Khác `citations[]` (chỉ id nguồn cho guardrail). Rỗng khi intent không RAG (ví dụ `meal_plan` ở JSON trên), khi guardrail `missing_citations` xóa nguồn, hoặc khi không có `text`. FE hiện `text` của chunk, không dùng card tóm tắt hardcode. Ví dụ `rag_qa`:
+**`citation_chunks[]`:** các đoạn nguồn thực sự dùng để soạn `message`, tối đa `RAG_PROMPT_CHUNK_LIMIT` (hiện 3). Với LLM, đây là phần RAG đã đưa vào prompt; với chế độ không LLM, có thể là bản ghi thực phẩm/công thức dùng để soạn câu trả lời xác định. Shape `{chunk_id, text, source, score}`. Khác `citations[]` (chỉ id nguồn cho guardrail). Rỗng khi không dùng nguồn (ví dụ `meal_plan`, `clarify`), khi guardrail `missing_citations` xóa nguồn, hoặc khi không có `text`. FE hiện nội dung nguồn thực sự được dùng. Ví dụ `rag_qa`:
 
 ```json
 "citation_chunks": [
@@ -342,7 +355,7 @@ Nguồn: `backend/app/agents/state.py` (`AgentState`, TypedDict nội bộ graph
 
 **Danh sách intent hợp lệ (`VALID_INTENTS`, `nodes/intent_classifier.py`):**
 ```
-meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note | metrics_delta_advice
+greeting | clarify | meal_plan | interaction_check | food_log | rag_qa | refuse | unknown | weekly_compliance | doctor_note | metrics_delta_advice
 ```
 
 **`weekly_compliance` — as-built (Phase 2 patient chat redesign):** intent cho câu hỏi tuân thủ tuần của bệnh nhân. Node gọi `ComplianceService.get_patient_compliance(user_id, days=7)` và map sang `WeeklyComplianceOut` (subset của `PatientComplianceOut` §10 `contracts/api-v1.md`). Field `weekly_compliance` populated khi intent khớp; `null` khi intent khác. Không sinh dữ liệu giả — nếu chưa có check-in, `overall_adherence_pct` có thể `null`, `daily_series[].adherence_pct` có thể `null` theo ngày.
@@ -451,7 +464,11 @@ Nguồn: `backend/app/schemas/meal_plan.py`. Dùng cho `POST /interactions/check
 
 ## 7. Versioning
 
-- Version hiện tại của contract này: **1.14**.
+- Version hiện tại của contract này: **1.18**.
+- **Changelog 1.17 → 1.18 (2026-11-16):** `ProfileUpsert.full_name`/`email` optional, chỉ đổi tài khoản bệnh nhân hiện tại và lưu nguyên tử cùng hồ sơ. `PatientProfile` response không đổi.
+- **Changelog 1.16 → 1.17 (2026-11-16):** input `history` optional cho hỏi tiếp; nguồn `food_catalog_vn#...` và `recipe_catalog_vn#...` đi cùng `citation_chunks` mô tả dữ liệu thực dùng. Công thức là bản mẫu, không thay thế thực đơn đã duyệt; không suy số liệu thiếu thành 0. Không thêm intent.
+- **Changelog 1.15 → 1.16 (2026-11-16):** `interaction_check` có thể dùng bằng chứng RAG dinh dưỡng cho món đang hỏi, trả `citation_chunks` thực tế; ưu tiên dị ứng/tương tác đã biết, không bịa thuốc hay suy an toàn từ cặp chưa có dữ liệu. Chuẩn hóa `đc/dc/ko`, tách tên món khỏi ngữ cảnh bữa; fallback không đổ tài liệu khác chủ đề. Không thêm field/intent.
+- **Changelog 1.14 → 1.15 (2026-11-03):** `MealPlanOutput.review_notes` optional default `null`, hiển thị phản hồi thật của bác sĩ cho luồng bệnh nhân tạo AI → bác sĩ duyệt. Không đổi dữ liệu thực đơn hay trạng thái duyệt.
 - **Changelog 1.13 → 1.14 (2026-08-31):** `MetricsDeltaAdviceOut` thêm `field_deltas[]` (optional, default `[]`) — mọi field đo được ở bản ghi mới nhất kèm `before`/`after`/`changed`, **kể cả delta nhỏ dưới ngưỡng**; `changed` theo `changed_fields`. Đồng bộ `contracts/api-v1.md` v1.23, `specs/12`. Không breaking — field mới optional default `[]`.
 - **Changelog 1.12 → 1.13 (2026-08-31):** `AgentRunOutput.citation_chunks[]` (optional, default `[]`) — đoạn RAG đã đưa vào prompt (`chunk_id`, `text`, `source`, `score`). `citations[]` giữ id nguồn. Đồng bộ `contracts/api-v1.md` v1.22. Không breaking.
 - **Changelog 1.11 → 1.12 (2026-08-31):** `AgentRunOutput.unmatched_pairs[]` (optional, default `[]`) — map từ `interaction_check` để chat hiện CTA hỏi bác sĩ khi KB không có cặp thuốc–thực phẩm. Đồng bộ `contracts/api-v1.md` v1.21. Không breaking.

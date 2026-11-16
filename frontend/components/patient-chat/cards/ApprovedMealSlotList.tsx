@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import type { FoodItem, Meal } from "@/lib/types";
-import { ApiError } from "@/lib/types";
-import { api } from "@/lib/api";
 import { slotMeta, sumMealNutrition } from "@/lib/meal-plan-display";
 import { MealItemRow } from "../MealItemRow";
 import { NutrientChips } from "@/components/shared/NutrientChips";
@@ -12,16 +11,19 @@ interface ApprovedMealSlotListProps {
   meals: Meal[];
   emptyLabel: string;
   onMealsChange?: (meals: Meal[]) => void;
+  readOnly?: boolean;
 }
 
 function ApprovedMealSlotCard({
   meal,
   mealIdx,
   onReplaceItem,
+  readOnly,
 }: {
   meal: Meal;
   mealIdx: number;
   onReplaceItem: (mealIdx: number, itemIdx: number, next: FoodItem) => void;
+  readOnly: boolean;
 }) {
   const [showSlotNutrients, setShowSlotNutrients] = useState(false);
   const meta = slotMeta(meal.slot);
@@ -58,6 +60,7 @@ function ApprovedMealSlotCard({
                 key={`${meal.slot}-${idx}`}
                 item={item}
                 onChange={(next) => onReplaceItem(mealIdx, idx, next)}
+                readOnly={readOnly}
               />
             ))
           ) : (
@@ -104,6 +107,7 @@ export function ApprovedMealSlotList({
   meals,
   emptyLabel,
   onMealsChange,
+  readOnly = false,
 }: ApprovedMealSlotListProps) {
   const [localMeals, setLocalMeals] = useState(meals);
 
@@ -142,6 +146,7 @@ export function ApprovedMealSlotList({
           meal={meal}
           mealIdx={mealIdx}
           onReplaceItem={replaceItem}
+          readOnly={readOnly}
         />
       ))}
     </div>
@@ -155,99 +160,17 @@ export function MealPlanEmptyState({
   message: string;
   showRequest?: boolean;
 }) {
-  const [requestStatus, setRequestStatus] = useState<"none" | "pending" | "loading">("loading");
-  const [note, setNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!showRequest) {
-      setRequestStatus("none");
-      return;
-    }
-    let cancelled = false;
-    async function load() {
-      try {
-        const data = await api.getMealPlanRequest();
-        if (cancelled) return;
-        setRequestStatus(data.status === "pending" ? "pending" : "none");
-      } catch {
-        if (!cancelled) setRequestStatus("none");
-      }
-    }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [showRequest]);
-
-  const handleRequest = async () => {
-    setSubmitting(true);
-    setError(null);
-    setFeedback(null);
-    try {
-      const data = await api.requestMealPlan(note.trim());
-      setRequestStatus(data.status === "pending" ? "pending" : "none");
-      setFeedback("Đã gửi yêu cầu. Bác sĩ sẽ tạo thực đơn cho bạn.");
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Không gửi được yêu cầu. Vui lòng thử lại."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col gap-3 mt-1">
       <p className="text-sm text-slate-700 leading-relaxed">{message}</p>
-
-      {showRequest && requestStatus === "loading" && (
-        <p className="text-xs text-slate-500">Đang kiểm tra trạng thái yêu cầu...</p>
-      )}
-
-      {showRequest && requestStatus === "pending" && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-          <span className="material-symbols-outlined text-[18px] shrink-0">hourglass_top</span>
-          <p className="font-medium leading-relaxed">
-            Bạn đã gửi yêu cầu tạo thực đơn. Bác sĩ sẽ xử lý trong thời gian sớm nhất.
-          </p>
-        </div>
-      )}
-
-      {showRequest && requestStatus === "none" && (
-        <div className="flex flex-col gap-2.5">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder="Ghi chú cho bác sĩ (tuỳ chọn)..."
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 resize-none"
-          />
-          <button
-            type="button"
-            onClick={() => void handleRequest()}
-            disabled={submitting}
-            className="inline-flex items-center justify-center gap-1.5 self-start px-4 py-2.5 bg-[#006857] hover:bg-[#005245] disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-colors shadow-xs active:scale-95 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[17px]">send</span>
-            {submitting ? "Đang gửi..." : "Yêu cầu tạo thực đơn"}
-          </button>
-        </div>
-      )}
-
-      {feedback && (
-        <p className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-          {feedback}
-        </p>
-      )}
-      {error && (
-        <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-          {error}
-        </p>
+      {showRequest && (
+        <>
+          <Link href="/patient/meal-plan" className="inline-flex items-center justify-center gap-1.5 self-start px-4 py-2.5 bg-[#006857] hover:bg-[#005245] text-white rounded-xl text-xs font-bold transition-colors">
+            <span className="material-symbols-outlined text-[17px]">auto_awesome</span>
+            Tạo thực đơn bằng AI
+          </Link>
+          <p className="text-xs text-slate-500">AI tạo bản dự thảo. Bác sĩ kiểm tra và duyệt trước khi áp dụng.</p>
+        </>
       )}
     </div>
   );

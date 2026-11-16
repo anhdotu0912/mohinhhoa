@@ -323,6 +323,8 @@ function ClinicalEffectiveValue({
 }
 
 type EditFormState = {
+  fullName: string;
+  email: string;
   age: string;
   gender: string;
   phone: string;
@@ -344,7 +346,8 @@ type EditFormState = {
 
 function profileToForm(
   profile: PatientProfile,
-  catalog: CatalogOut | null
+  catalog: CatalogOut | null,
+  user: UserMeResponse | null
 ): EditFormState {
   const medDisplay = (profile.medications ?? []).map((code) => {
     const fromCatalog = catalog?.medicines.find(
@@ -357,6 +360,8 @@ function profileToForm(
     profile.proposed_restrictions ?? profile.restrictions;
 
   return {
+    fullName: user?.full_name ?? "",
+    email: user?.email ?? "",
     age: profile.age != null ? String(profile.age) : "",
     gender: profile.gender ?? "",
     phone: profile.phone ?? "",
@@ -506,6 +511,7 @@ export default function PatientProfilePage() {
       setCatalog(catalogData);
 
       setUserProfile({
+        email: userData.email,
         avatar: userData.avatar ?? null,
         displayName: userData.full_name?.trim() || userData.email,
         assignedDoctor: userData.assigned_doctor ?? null,
@@ -604,7 +610,7 @@ export default function PatientProfilePage() {
 
   const startEditing = () => {
     if (!profile) return;
-    setForm(profileToForm(profile, catalog));
+    setForm(profileToForm(profile, catalog, user));
     setSaveNotice(null);
     setError(null);
     setMetricErrors({});
@@ -763,6 +769,9 @@ export default function PatientProfilePage() {
 
   const validateForm = (): string | null => {
     if (!form) return "Form không hợp lệ.";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) {
+      return "Nhập địa chỉ email hợp lệ.";
+    }
     const ageNum = Number(form.age);
     if (!form.age || !Number.isFinite(ageNum) || ageNum <= 0 || ageNum > 130) {
       return "Nhập tuổi hợp lệ (1–130).";
@@ -810,6 +819,8 @@ export default function PatientProfilePage() {
     };
 
     const payload: ProfileUpsert = {
+      full_name: form.fullName.trim() || null,
+      email: form.email.trim().toLowerCase(),
       disease: form.diseaseCodes,
       medications: normalizeMedications(form.medications),
       allergies: form.allergies,
@@ -834,15 +845,19 @@ export default function PatientProfilePage() {
     try {
       const updated = await api.upsertProfile(payload);
       setProfile(updated);
+      const updatedEmail = payload.email!;
+      const updatedName = payload.full_name ?? null;
+      setUser((current) => current ? { ...current, full_name: updatedName, email: updatedEmail } : current);
+      setUserProfile({ displayName: updatedName || updatedEmail, email: updatedEmail });
       setEditing(false);
       setForm(null);
       setMetricErrors({});
       if (updated.constraints_status === "pending_doctor_review") {
         setSaveNotice(
-          "Đã gửi đề xuất kcal/ràng buộc cho bác sĩ. Thực đơn vẫn dùng giá trị đã duyệt cho tới khi được xác nhận."
+          "Đã lưu thông tin tài khoản và hồ sơ. Đề xuất kcal/ràng buộc đã gửi cho bác sĩ; thực đơn vẫn dùng giá trị đã duyệt."
         );
       } else {
-        setSaveNotice("Đã lưu hồ sơ sức khỏe thành công.");
+        setSaveNotice("Đã lưu thông tin tài khoản và hồ sơ sức khỏe.");
       }
     } catch (err) {
       setError(
@@ -1148,15 +1163,43 @@ export default function PatientProfilePage() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-on-surface">
-                      Thông tin Liên hệ & Hành chính
+                      Thông tin tài khoản & liên hệ
                     </h3>
                     <p className="text-xs text-on-surface-variant">
-                      Số điện thoại và địa chỉ nhận hỗ trợ y tế.
+                      Bạn tự cập nhật thông tin cá nhân của mình tại đây.
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label htmlFor="patient-profile-full-name" className="text-xs font-bold text-on-surface-variant mb-1 block">Họ tên</label>
+                    {editing && form ? (
+                      <input
+                        id="patient-profile-full-name"
+                        autoComplete="name"
+                        maxLength={255}
+                        value={form.fullName}
+                        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    ) : <p className="text-sm font-semibold text-on-surface">{user?.full_name || "—"}</p>}
+                  </div>
+                  <div>
+                    <label htmlFor="patient-profile-email" className="text-xs font-bold text-on-surface-variant mb-1 block">Email đăng nhập</label>
+                    {editing && form ? (
+                      <input
+                        id="patient-profile-email"
+                        type="email"
+                        autoComplete="email"
+                        maxLength={255}
+                        required
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="w-full px-3.5 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    ) : <p className="text-sm font-semibold text-on-surface break-all">{user?.email ?? email}</p>}
+                  </div>
                   {/* Phone */}
                   <div>
                     <label className="text-xs font-bold text-on-surface-variant mb-1 block">

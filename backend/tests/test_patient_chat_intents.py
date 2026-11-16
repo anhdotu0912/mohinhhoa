@@ -42,6 +42,47 @@ def test_intent_classifier_doctor_note_extra():
     assert _classify_by_keywords("Lời nhắc bác sĩ gần đây") == "doctor_note"
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "hôm nay tôi ăn j",
+        "Hôm nay tôi nên ăn gi?",
+        "hôm nay mình ăn gì",
+        "trưa nay tôi ăn j?",
+        "Tôi nên ăn j hôm nay?",
+        "Thực đơn hôm nay của tôi",
+        "Cho tôi xem thực đơn bữa sáng nay",
+        "Hôm nay mình nên ăn món gi?",
+    ],
+)
+def test_daily_meal_questions_bypass_llm(message, monkeypatch):
+    from app.agents.nodes.intent_classifier import intent_classifier
+
+    def unexpected_llm(_message):
+        pytest.fail("A clear daily meal lookup must not depend on LLM classification")
+
+    monkeypatch.setattr(
+        "app.agents.nodes.intent_classifier._classify_by_llm", unexpected_llm
+    )
+    assert _classify_by_keywords(message) == "meal_plan"
+    assert intent_classifier({"message": message})["intent"] == "meal_plan"
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("Ăn gì tốt cho đường huyết?", "rag_qa"),
+        ("Hôm nay tôi đã ăn phở bò", "food_log"),
+        ("Hôm nay tôi ăn j, tăng liều thuốc giúp tôi", "refuse"),
+        ("Hôm nay tôi ăn cá hồi được không?", "interaction_check"),
+    ],
+)
+def test_daily_meal_routing_keeps_other_intents(message, expected):
+    from app.agents.nodes.intent_classifier import intent_classifier
+
+    assert intent_classifier({"message": message})["intent"] == expected
+
+
 def test_weekly_compliance_node_uses_service(db_session):
     from datetime import date
 

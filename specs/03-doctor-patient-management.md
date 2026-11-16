@@ -1,6 +1,10 @@
 # Spec: Bác sĩ Quản lý Danh sách & Thông tin Bệnh nhân
 
 ## Status
+**Danh bạ 2026-11-16:** thẻ thống kê và khung bảng co theo nội dung, không chia đều thẻ để lấp chiều ngang hay tự giãn cột bảng. Giữ chữ tên bệnh nhân 16px, padding ô gọn và đường phân cột mảnh; màn hình hẹp cuộn trong bảng.
+**Hàng việc 2026-11-16:** bố cục gọn, nội dung giới hạn chiều rộng và căn giữa; thống kê trên một dải, danh sách dùng các hàng căn cột (bệnh nhân, công việc, cập nhật, thao tác). Giữ tìm kiếm, lọc loại/ưu tiên, phân trang, tiếp nhận hồ sơ và trao đổi bác sĩ; không tự gửi tin hay tự duyệt khi thay bố cục. Mobile xếp lại hàng để không tràn ngang.
+**Điều hướng 2026-11-16:** khu vực bác sĩ dùng thanh điều hướng ngang bo tròn phía trên (Tổng quan, Bệnh nhân, Hàng việc), giữ trạng thái trang hiện tại, số việc và menu tài khoản/đăng xuất. Bỏ sidebar và lề trái cố định; mobile vẫn hiện ba mục ngang, không quay về menu dọc. Các thanh hồ sơ/duyệt bám dính nằm dưới chiều cao thanh điều hướng.
+**Cập nhật 2026-11-16:** giao diện chỉnh sửa hồ sơ cá nhân đã chuyển sang tài khoản bệnh nhân (`/patient/profile`); trang bác sĩ xem thông tin và dùng các công cụ chuyên môn riêng. Endpoint profile bác sĩ cũ giữ tương thích cho luồng khởi tạo bệnh nhân, không còn gắn form chỉnh sửa ở trang chi tiết.
 Done — CRUD danh sách/thông tin chung; phân công bác sĩ ↔ bệnh nhân 1–1 (claim + chuyển có xác nhận) as-built 2026-08-28. Phần ràng buộc lâm sàng (`target_kcal`/`restrictions`) tách sang `specs/04-clinical-constraints.md`.
 
 ## 1. Mục tiêu (Why)

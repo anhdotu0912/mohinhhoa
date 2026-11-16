@@ -88,8 +88,8 @@ def test_generate_clears_request_flag(client):
     )
 
     generated = client.post(
-        f"/api/v1/doctor/patients/{patient_id}/meal-plans/generate",
-        headers=doctor_headers,
+        "/api/v1/meal-plans/generate",
+        headers=patient_headers,
         json={"notes": "Theo yêu cầu bệnh nhân"},
     )
     assert generated.status_code == 200, generated.text

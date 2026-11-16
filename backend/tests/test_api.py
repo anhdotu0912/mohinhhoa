@@ -3,7 +3,7 @@ notifications, doctor review, chat)."""
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 
 def _login(client, email: str, password: str = "demo1234") -> dict:
@@ -331,7 +331,7 @@ def test_demo_simulate_blocked_in_production(client, monkeypatch):
     assert response.json() == []
 
 
-def test_doctor_patients_list_and_generate(client):
+def test_patient_generates_and_doctor_reviews(client):
     doctor_headers = _login(client, DOCTOR)
     response = client.get("/api/v1/doctor/patients", headers=doctor_headers)
     assert response.status_code == 200, response.text
@@ -348,6 +348,11 @@ def test_doctor_patients_list_and_generate(client):
         f"/api/v1/doctor/patients/{patient_id}/meal-plans/generate",
         headers=doctor_headers,
     )
+    assert response.status_code == 403, response.text
+    assert response.json()["code"] == "PATIENT_GENERATION_REQUIRED"
+    assert client.get("/api/v1/doctor/meal-plans", headers=doctor_headers).json() == []
+
+    response = client.post("/api/v1/meal-plans/generate", headers=_login(client, PATIENT))
     assert response.status_code == 200, response.text
     plan = response.json()
     assert plan["user_id"] == patient_id
@@ -356,6 +361,9 @@ def test_doctor_patients_list_and_generate(client):
     first_items = plan["days"][0]["meals"][0]["items"]
     assert first_items
     assert "alternatives" in first_items[0]
+
+    review_queue = client.get("/api/v1/doctor/meal-plans", headers=doctor_headers)
+    assert plan["id"] in [draft["id"] for draft in review_queue.json()]
 
 
 def test_doctor_role_guard(client):
@@ -612,16 +620,24 @@ def test_update_patient_metrics(client):
     assert response.status_code in (401, 403)
 
 
-def test_chat_thin_wrapper(client):
+def test_chat_thin_wrapper(client, db_session):
     headers = _login(client, PATIENT)
 
     gen = client.post("/api/v1/meal-plans/generate", headers=headers)
     assert gen.status_code == 200, gen.text
     existing_plan_id = gen.json()["id"]
 
+    from app.core.datetime_vn import vn_today
     from app.db.session import get_db
     from app.main import app
     from app.models.meal_plan import MealPlan
+
+    # A draft is not today's food schedule; use a reviewed, applied plan here.
+    applied = db_session.get(MealPlan, existing_plan_id)
+    applied.status = "approved"
+    applied.starts_on = vn_today()
+    applied.ends_on = applied.starts_on + timedelta(days=6)
+    db_session.commit()
 
     def _count_plans():
         override = app.dependency_overrides.get(get_db)

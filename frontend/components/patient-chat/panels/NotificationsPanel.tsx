@@ -5,10 +5,12 @@ import { usePatientPanel } from "../PatientPanelProvider";
 import { api } from "@/lib/api";
 import { ApiError, type NotificationOut } from "@/lib/types";
 import { NotificationDetailModal } from "./NotificationDetailModal";
+import { useVietnamToday } from "@/lib/use-vietnam-today";
 
 const PAGE_SIZE = 6;
 
 export function NotificationsPanel() {
+  const today = useVietnamToday();
   const {
     closePanel,
     notificationsView,
@@ -36,7 +38,7 @@ export function NotificationsPanel() {
 
   useEffect(() => {
     void loadData();
-  }, [loadData]);
+  }, [loadData, today]);
 
   const handleSelectNotification = async (notif: NotificationOut) => {
     openNotificationDetail(notif.id);

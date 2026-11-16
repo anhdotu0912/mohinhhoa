@@ -63,6 +63,8 @@ def get_patient_meal_plan(
             None,
         )
 
+    from app.agents.nodes.intent_classifier import _is_daily_meal_lookup
+    from app.core.datetime_vn import vn_today
     from app.services.meal_plan_service import (
         _collect_citations,
         build_meal_preview,
@@ -70,15 +72,36 @@ def get_patient_meal_plan(
         meal_plan_from_row,
         resolve_patient_plan_row,
     )
+    from app.services.plan_apply import find_active_plan
 
-    preview = build_meal_preview(db, user_id, message)
+    today = vn_today()
+    row = resolve_patient_plan_row(db, user_id, today)
+    if _is_daily_meal_lookup(message) and find_active_plan(db, user_id, today) is None:
+        answer = "Hôm nay bạn chưa có thực đơn đang áp dụng. "
+        if row is None:
+            answer += (
+                "Mở mục Tạo thực đơn của tôi để yêu cầu AI tạo bản dự thảo; "
+                "bác sĩ sẽ kiểm tra và duyệt trước khi áp dụng."
+            )
+        elif row.status == "pending_review":
+            answer += "Bản thực đơn hiện có đang chờ bác sĩ duyệt, chưa dùng làm kế hoạch ăn hôm nay."
+        elif row.status == "rejected":
+            answer += "Bản thực đơn gần nhất đã bị từ chối. Vui lòng liên hệ bác sĩ để điều chỉnh."
+        elif row.starts_on and row.starts_on > today:
+            answer += f"Thực đơn đã duyệt bắt đầu từ ngày {row.starts_on:%d/%m/%Y}."
+        elif row.ends_on and row.ends_on < today:
+            answer += "Lịch thực đơn trước đã kết thúc. Vui lòng yêu cầu thực đơn mới và chờ bác sĩ duyệt."
+        else:
+            answer += "Thực đơn đã được duyệt nhưng chưa được áp dụng vào lịch. Vui lòng nhờ bác sĩ áp dụng lịch thực đơn."
+        return None, answer, [], None
+
+    preview = build_meal_preview(db, user_id, message, today=today)
     answer = format_meal_preview_message(preview, message)
     citations: list[str] = []
     meal_plan_id: str | None = None
 
     if preview is not None:
         meal_plan_id = preview.meal_plan_id
-        row = resolve_patient_plan_row(db, user_id)
         if row is not None:
             citations = _collect_citations(meal_plan_from_row(row), preview.meals)
 
@@ -164,6 +187,7 @@ def check_drug_food_interaction(
     allergies: list[str] | None = None,
     user_id: str | None = None,
     db: Session | None = None,
+    profile: dict | None = None,
 ) -> dict[str, Any]:
     """[MỤC ĐÍCH]: Tra cứu an toàn và cảnh báo tương tác giữa thuốc đang điều trị với thực phẩm cụ thể hoặc kiểm tra dị ứng thực phẩm theo hồ sơ bệnh nhân.
 
@@ -203,6 +227,8 @@ def check_drug_food_interaction(
         interactions = result.interactions
 
     meds_str = ", ".join(m.capitalize() for m in medications)
+    nutrition_context: list[dict] = []
+    nutrition_sources: list[str] | None = None
 
     if allergy_warnings:
         from app.agents.graph import _generate_allergy_blocked_answer
@@ -227,10 +253,27 @@ def check_drug_food_interaction(
         answer_text = "\n\n".join(lines)
     else:
         if is_specific_query and foods:
-            from app.agents.graph import _generate_unmatched_kb_answer
-            answer_text = _generate_unmatched_kb_answer(
-                message, medications, foods, result.unmatched_pairs
-            )
+            import re
+
+            mentions_drug = bool(re.search(
+                r"thuốc|tương tác|metformin|insulin|warfarin|atorvastatin|gliclazide|glipizide",
+                message.lower(),
+            )) or any(m.lower() in message.lower() for m in medications if m)
+            if mentions_drug:
+                from app.agents.graph import _generate_unmatched_kb_answer
+                answer_text = _generate_unmatched_kb_answer(
+                    message, medications, foods, result.unmatched_pairs
+                )
+            else:
+                from app.agents.nodes.rag_tool import _generate_answer, retrieve_rag_context
+
+                nutrition_context, nutrition_sources = retrieve_rag_context(message, profile or {})
+                answer_text = _generate_answer(message, nutrition_context, profile or {})
+                if medications and result.unmatched_pairs:
+                    answer_text += (
+                        "\n\n**Về tương tác thuốc:** Cơ sở dữ liệu chưa đủ thông tin cho cặp thực phẩm–thuốc trong hồ sơ của bạn; "
+                        "kết quả này không xác nhận an toàn tuyệt đối khi dùng cùng thuốc."
+                    )
         else:
             answer_text = f"✅ Không tìm thấy tương tác nguy hiểm giữa các thuốc ({meds_str}) và thực phẩm được kiểm tra trong cơ sở dữ liệu."
 
@@ -239,7 +282,9 @@ def check_drug_food_interaction(
         kb_sources.extend(_flatten_citation_sources(getattr(item, "sources", None)))
     # Always attach clinical guidelines so the patient UI can show
     # "Tài liệu tham khảo" even when the queried pair is unmatched/safe.
-    all_sources = list(dict.fromkeys(kb_sources + _INTERACTION_GUIDELINE_CITATIONS))
+    all_sources = list(dict.fromkeys(kb_sources + (
+        nutrition_sources if nutrition_sources is not None else _INTERACTION_GUIDELINE_CITATIONS
+    )))
 
     return {
         "answer": answer_text,
@@ -247,6 +292,7 @@ def check_drug_food_interaction(
         "citations": all_sources,
         "has_allergy_warning": bool(allergy_warnings),
         "allergy_warnings": allergy_warnings,
+        "rag_context": nutrition_context,
     }
 
 
