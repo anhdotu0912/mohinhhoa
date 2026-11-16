@@ -45,8 +45,8 @@ demo trên màn hình đăng nhập chỉ đúng nếu được chọn giống k
   đặt secret trong `vercel.json`.
 - `CORS_ORIGINS`: các origin frontend được phép truy cập, phân tách bằng dấu
   phẩy. Nếu kiểm tra bằng một URL Preview, thêm đúng origin đó. Không dùng `*`.
-- Nếu Vercel Authentication chặn project backend, bỏ bảo vệ cho deployment API
-  cần công khai. Các endpoint bệnh nhân/bác sĩ vẫn kiểm tra JWT của ứng dụng.
+- Giữ Vercel Authentication khi dùng dữ liệu local. Frontend dùng proxy cùng
+  origin và khóa server-to-server của backend; không cần mở API công khai.
 - Deploy, kiểm tra `/health` trả database `ok` và provider `bm25` ready.
 
 `vercel_backend.py` trỏ đến cùng FastAPI app với bản local. Dependency ở
@@ -57,16 +57,21 @@ thoại tổng quát và không hứa trả lời những dữ liệu chưa có.
 
 ## 4. Nối frontend
 
-Project frontend giữ Root Directory `frontend` và Framework Next.js. Đặt:
+Project frontend giữ Root Directory `frontend` và Framework Next.js. Đặt các
+biến server sau (không dùng tiền tố `NEXT_PUBLIC_` cho khóa nội bộ):
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=https://TEN-PROJECT-BACKEND.vercel.app
+BACKEND_API_URL=https://TEN-PROJECT-BACKEND.vercel.app
+BACKEND_PROTECTION_BYPASS_SECRET=<khóa nội bộ của backend, chỉ lưu trong Secret>
+NEXT_PUBLIC_API_BASE_URL=
 ```
 
-Giá trị chỉ gồm origin, không thêm `/api/v1`. Áp dụng cho cả Preview/Production
-đang dùng rồi tạo deployment frontend mới từ commit mới nhất; biến này được
-đóng vào bundle lúc build. Thử đăng nhập, lưu hồ sơ, chat, tạo thực đơn và tải
-ảnh. Kiểm tra trên domain production sau khi promote deployment tương ứng.
+URL backend chỉ gồm origin, không thêm `/api/v1`. `NEXT_PUBLIC_API_BASE_URL`
+để trống để trình duyệt gọi `/api/v1/*` và `/static/avatars/*` ở cùng origin;
+server frontend chuyển tiếp tới backend bằng khóa nội bộ. Chỉ tạo khóa này
+khi chủ tài khoản cho phép; không công khai khóa hay bỏ bảo vệ Vercel để nối
+web. Áp dụng cho Preview/Production đang dùng rồi tạo deployment frontend mới.
+Thử đăng nhập, lưu hồ sơ, chat, tạo thực đơn và tải ảnh trên domain production.
 
 ## Tài liệu nhà cung cấp
 

@@ -215,7 +215,7 @@ Khi import repo `anhdotu0912/mohinhhoa` trên Vercel:
 1. Chọn nhánh `feature/fe-patient-meal-plan-flow` (nhánh chứa mã nguồn hiện tại). Nếu dùng deployment production, đặt Production Branch thành nhánh này trong Project Settings.
 2. Đặt **Root Directory** là `frontend`, **Framework Preset** là **Next.js**. Thư mục gốc repo chỉ có package phụ trợ, không phải ứng dụng web.
 3. Build bằng `npm run build`, cài dependencies bằng `npm ci`, Output Directory là `.next`. File `frontend/vercel.json` cung cấp các giá trị này.
-4. Đặt `NEXT_PUBLIC_API_BASE_URL` thành URL HTTPS của backend đã deploy, rồi Redeploy để áp dụng cấu hình mới. `localhost:8000` chỉ dùng khi chạy tại máy.
+4. Khi backend được bảo vệ, đặt `BACKEND_API_URL` thành URL HTTPS của backend và `BACKEND_PROTECTION_BYPASS_SECRET` thành khóa nội bộ (chỉ ở server, cần chủ tài khoản cho phép). Để `NEXT_PUBLIC_API_BASE_URL` trống để dùng proxy cùng origin, rồi tạo deployment mới. Xem hướng dẫn đầy đủ ở trên; `localhost:8000` chỉ dùng khi chạy tại máy.
 
 Font Inter được đóng gói cùng frontend để build không cần tải Google Fonts.
 Trên Vercel, `next.config.mjs` dùng chế độ đóng gói mặc định của nền tảng; các bản build Docker vẫn dùng `standalone`. Không bật `output: "standalone"` trên Vercel với Next.js 16.3.0 vì bước hoàn tất build có thể lỗi thiếu `next-server.js.nft.json`.
