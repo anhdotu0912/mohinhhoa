@@ -58,6 +58,7 @@ type RequestOptions = {
   body?: unknown;
   token?: string | null;
   auth?: boolean;
+  timeoutMs?: number;
 };
 
 function formatApiDetail(detail: unknown, fallback: string): string {
@@ -133,11 +134,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: options.method || "GET",
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: options.method || "GET",
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new ApiError(408, "REQUEST_TIMEOUT", "Máy chủ phản hồi quá lâu. Vui lòng thử đăng nhập lại.");
+    }
+    throw error;
+  }
 
   if (!res.ok) {
     let detail = res.statusText || "Request failed";
@@ -188,6 +198,7 @@ export const api = {
       method: "POST",
       body: { email, password },
       auth: false,
+      timeoutMs: 30_000,
     });
   },
 

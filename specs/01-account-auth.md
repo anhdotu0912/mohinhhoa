@@ -22,6 +22,8 @@ Mọi actor (bác sĩ, bệnh nhân) cần một danh tính xác thực để h�
 
 ## 4. Luồng chính (happy path)
 
+**Hiệu năng đăng nhập:** Sau khi `/auth/login` thành công, FE lưu phiên và chuyển ngay tới trang theo vai trò. Thông tin `/auth/me` do shell đích tải nền; lỗi hoặc chậm tải hồ sơ không chặn chuyển trang. Yêu cầu đăng nhập có giới hạn chờ 30 giây và hiển thị thông báo khi vượt 4 giây.
+
 **Patient tự đăng ký:**
 1. FE gọi `POST /auth/register` với `role="patient"`.
 2. FE gọi `POST /auth/login` → nhận `access_token`.

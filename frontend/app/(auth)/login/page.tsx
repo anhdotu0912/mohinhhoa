@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -63,10 +63,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [slowLogin, setSlowLogin] = useState(false);
   const [activeQuickFill, setActiveQuickFill] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setSlowLogin(true), 4000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const completeLogin = async (loginEmail: string, loginPassword: string) => {
     setError(null);
+    setSlowLogin(false);
     setLoading(true);
     try {
       const tokenRes = await api.login(loginEmail, loginPassword);
@@ -76,17 +84,14 @@ export default function LoginPage() {
         userId: tokenRes.user_id,
         email: loginEmail.trim().toLowerCase(),
       });
-      try {
-        const me = await api.getCurrentUser(tokenRes.access_token);
-        setUserProfile({
-          displayName: me.full_name?.trim() || me.email,
-          avatar: me.avatar ?? null,
-          assignedDoctor: me.assigned_doctor ?? null,
-        });
-      } catch {
-        /* Sidebar sẽ thử fetch lại sau */
-      }
-      router.push(homePathForRole(tokenRes.role));
+      // The destination shell loads /auth/me in the background. A slow profile
+      // request must not hold up a successfully authenticated session.
+      setUserProfile({
+        displayName: loginEmail.trim().toLowerCase(),
+        avatar: null,
+        assignedDoctor: null,
+      });
+      router.replace(homePathForRole(tokenRes.role));
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -180,6 +185,11 @@ export default function LoginPage() {
             >
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
+            {loading && slowLogin && (
+              <p role="status" className="text-xs text-on-surface-variant text-center">
+                Máy chủ đang phản hồi chậm, vui lòng chờ một chút…
+              </p>
+            )}
           </form>
 
           {/* Quick Demo Accounts Selection Box */}
