@@ -14,7 +14,7 @@ import {
 interface RecordMetricsFormPanelProps {
   onBack: () => void;
   onClose: () => void;
-  onSaved: (advice?: MetricsDeltaAdviceOut | null) => void;
+  onSaved: (advice?: MetricsDeltaAdviceOut | null, entry?: MetricsHistoryPoint) => void;
 }
 
 type FieldName =
@@ -75,7 +75,7 @@ function MetricStepperField({
   }, [hasValidNum, numVal, prevValue]);
 
   const handleStep = (direction: 1 | -1) => {
-    let current = hasValidNum ? numVal : prevValue ?? (min ?? 0);
+    const current = hasValidNum ? numVal : prevValue ?? (min ?? 0);
     let next = current + direction * step;
     if (min != null && next < min) next = min;
     if (max != null && next > max) next = max;
@@ -373,7 +373,7 @@ export function RecordMetricsFormPanel({
           : undefined,
         hba1c: hba1c.trim() ? parseFloat(hba1c.replace(",", ".")) : undefined,
       });
-      onSaved(result.delta_advice ?? null);
+      onSaved(result.delta_advice ?? null, result);
       onBack();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không thể lưu chỉ số.");

@@ -16,9 +16,8 @@ export function DoctorMiniChat({
   doctor: AssignedDoctor | null;
   initialThread?: EscalationOut | null;
 }) {
-  const { openEscalationThread, refreshNotificationsBadge } = usePatientPanel();
+  const { openEscalationThread, refreshNotificationsBadge, doctorChatExpanded: expanded, setDoctorChatExpanded: setExpanded, activePanel } = usePatientPanel();
   const [thread, setThread] = useState<EscalationOut | null>(initialThread ?? null);
-  const [expanded, setExpanded] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -27,9 +26,26 @@ export function DoctorMiniChat({
   const requestVersionRef = useRef(0);
   const lastDoctorMessageRef = useRef(initialThread?.messages.filter((m) => m.sender === "doctor").at(-1)?.id);
   const contentId = useId();
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const doctorName = doctor?.full_name?.trim() || "Bác sĩ phụ trách";
   const avatar = resolveUserAvatar(doctor?.avatar);
   const nextRequestVersion = useCallback(() => ++requestVersionRef.current, []);
+
+  const minimize = useCallback(() => {
+    setExpanded(false);
+    window.requestAnimationFrame(() => launcherRef.current?.focus());
+  }, [setExpanded]);
+
+  useEffect(() => {
+    if (!expanded || activePanel !== null) return;
+    sectionRef.current?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) minimize();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded, activePanel, minimize]);
 
   const loadThread = useCallback(async () => {
     if (sendingRef.current) return;
@@ -100,19 +116,32 @@ export function DoctorMiniChat({
   const statusText = !thread ? "Đang tải cuộc trao đổi…" : resolved ? "Trao đổi đã kết thúc" : replied ? "Bác sĩ đã phản hồi" : "Đang chờ bác sĩ phản hồi";
 
   return (
+    <div className="fixed bottom-[max(12px,env(safe-area-inset-bottom))] right-3 z-40 max-w-[calc(100vw-24px)] sm:bottom-5 sm:right-5">
+      <button
+        ref={launcherRef}
+        hidden={expanded}
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        className={`${expanded ? "hidden" : "flex"} max-w-full items-center gap-2.5 rounded-full border border-teal-200 bg-[#006857] py-3 pl-4 pr-5 text-left text-white shadow-lg transition-colors hover:bg-[#005445] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2`}
+      >
+        <span className="material-symbols-outlined text-[23px]" aria-hidden>chat</span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">Nhắn {doctorName}</span>
+          {replied && <span className="block text-[11px] text-teal-100">Bác sĩ đã phản hồi</span>}
+        </span>
+      </button>
     <section
+      ref={sectionRef}
+      tabIndex={-1}
+      hidden={!expanded}
+      role="region"
       aria-label={`Nhắn tin với ${doctorName}`}
-      className="mt-1 w-full max-w-lg overflow-hidden rounded-2xl border border-emerald-200/80 bg-white shadow-[0_8px_24px_rgba(25,28,28,0.06)]"
+      className={`${expanded ? "flex" : "hidden"} h-[min(480px,calc(100dvh-100px))] w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-emerald-200/80 bg-white shadow-[0_12px_40px_rgba(15,70,60,0.18)]`}
     >
-      <header className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-4">
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={contentId}
-          aria-label={`${expanded ? "Thu gọn" : "Mở"} chat với bác sĩ`}
-          onClick={() => setExpanded((value) => !value)}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-        >
+      <header className="flex shrink-0 items-center gap-2 border-b border-teal-100 bg-teal-50/60 px-3 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
           <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-200 bg-emerald-50 text-xs font-bold text-[#006857]" translate="no">
             {userInitials(doctorName)}
             {avatar ? (
@@ -125,10 +154,10 @@ export function DoctorMiniChat({
             <span className="block text-[10px] text-slate-500">Nhắn tin với bác sĩ điều trị</span>
             <span role="status" className={`mt-0.5 block text-[11px] font-medium ${replied ? "text-[#006857]" : "text-slate-500"}`}>{statusText}</span>
           </span>
-        </button>
+        </div>
         <button
           type="button"
-          onClick={() => openEscalationThread(escalationId)}
+          onClick={() => { setExpanded(false); openEscalationThread(escalationId); }}
           title="Mở cuộc trao đổi đầy đủ"
           aria-label="Mở cuộc trao đổi đầy đủ"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-[#006857] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
@@ -137,27 +166,28 @@ export function DoctorMiniChat({
         </button>
         <button
           type="button"
-          onClick={() => setExpanded((value) => !value)}
-          title={expanded ? "Thu gọn chat" : "Mở chat"}
-          aria-label={expanded ? "Thu gọn chat" : "Mở chat"}
+          onClick={minimize}
+          title="Thu gọn chat"
+          aria-label="Thu gọn chat"
           aria-expanded={expanded}
           aria-controls={contentId}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
         >
-          <span className="material-symbols-outlined text-[20px]">{expanded ? "remove" : "expand_more"}</span>
+          <span className="material-symbols-outlined text-[20px]">remove</span>
         </button>
       </header>
-      <div id={contentId} hidden={!expanded}>
+      <div id={contentId} className="flex min-h-0 flex-1 flex-col">
         {loadError ? (
           <div role="alert" className="flex items-center justify-between gap-2 bg-amber-50 px-4 py-2 text-[11px] text-amber-900">
             <span>{loadError}</span>
             <button type="button" className="shrink-0 font-bold underline" onClick={() => void loadThread()}>Thử lại</button>
           </div>
         ) : null}
-        <div className="flex h-[340px] max-h-[65dvh] flex-col sm:h-[370px]">
+        <div className="flex min-h-0 flex-1 flex-col">
           {thread ? (
             <EscalationThread
               compact
+              active={expanded && activePanel === null}
               thread={thread}
               viewer="patient"
               counterpartName={doctorName}
@@ -172,5 +202,6 @@ export function DoctorMiniChat({
         </div>
       </div>
     </section>
+    </div>
   );
 }

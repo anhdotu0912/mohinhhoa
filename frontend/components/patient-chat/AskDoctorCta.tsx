@@ -5,7 +5,6 @@ import { api } from "@/lib/api";
 import { ApiError, type AssignedDoctor, type EscalationOut } from "@/lib/types";
 import { ESCALATION_REASON_LABEL, getEscalationReason } from "@/lib/escalation";
 import { usePatientPanel } from "@/components/patient-chat/PatientPanelProvider";
-import { DoctorMiniChat } from "./DoctorMiniChat";
 import type { ChatMessage } from "@/lib/patient-chat-history-store";
 
 export function AskDoctorCta({
@@ -21,7 +20,7 @@ export function AskDoctorCta({
   assignedDoctor: AssignedDoctor | null;
   onEscalated: (messageId: string, escalationId: string) => void;
 }) {
-  const { refreshNotificationsBadge } = usePatientPanel();
+  const { refreshNotificationsBadge, openDoctorChat } = usePatientPanel();
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +31,15 @@ export function AskDoctorCta({
 
   if (escalationId) {
     return (
-      <DoctorMiniChat
-        key={escalationId}
-        escalationId={escalationId}
-        doctor={assignedDoctor}
-        initialThread={thread}
-      />
+      <button
+        type="button"
+        onClick={() => openDoctorChat({ escalationId, doctor: assignedDoctor, initialThread: thread })}
+        className="inline-flex w-fit items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-left text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+      >
+        <span className="material-symbols-outlined text-[20px]" aria-hidden>chat</span>
+        <span>Nhắn {assignedDoctor?.full_name?.trim() || "bác sĩ điều trị"}</span>
+        <span className="material-symbols-outlined text-[17px]" aria-hidden>north_east</span>
+      </button>
     );
   }
 
@@ -68,6 +70,7 @@ export function AskDoctorCta({
         guardrail_triggered: message.guardrailTriggered ?? false,
       });
       setThread(created);
+      openDoctorChat({ escalationId: created.id, doctor: assignedDoctor, initialThread: created });
       onEscalated(message.id, created.id);
       void refreshNotificationsBadge();
     } catch (err) {

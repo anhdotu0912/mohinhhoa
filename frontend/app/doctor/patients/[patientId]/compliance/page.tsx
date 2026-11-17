@@ -186,7 +186,7 @@ export default function PatientComplianceTabPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex items-center justify-center min-h-[400px] flex-1">
+      <main className="px-4 py-4 sm:px-6 text-sm text-on-surface-variant w-full max-w-[1240px] mx-auto flex items-center justify-center min-h-[400px] flex-1">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-[24px] animate-spin">
             progress_activity
@@ -202,24 +202,21 @@ export default function PatientComplianceTabPage() {
   const rate = complianceData?.overall_adherence_pct ?? null;
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
+    <main className="px-4 py-4 sm:px-6 w-full max-w-[1240px] mx-auto space-y-4 flex-1">
       {/* Top Header & Patient Context */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-on-surface font-black text-2xl tracking-tight flex items-center gap-2">
-            <span>Theo dõi Tuân thủ &amp; Chỉ số Bệnh nhân</span>
+          <h2 className="flex items-center gap-2 text-[26px] font-bold tracking-tight text-slate-900">
+            <span>Tuân thủ &amp; chỉ số</span>
           </h2>
-          <p className="text-on-surface-variant mt-1 text-xs font-medium">
-            Phân tích nhật ký dinh dưỡng 14 ngày kết hợp chuỗi thời gian các chỉ số sinh hiệu bệnh nhân tự ghi nhận
-          </p>
         </div>
 
         {/* Tab Switcher Controller */}
-        <div className="flex items-center gap-1.5 p-1 bg-surface-container-low border border-outline-variant/60 rounded-lg self-start md:self-auto shadow-2xs">
+        <div className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-lg border border-teal-100 bg-teal-50/60 p-1">
           <button
             type="button"
             onClick={() => setActiveTab("compliance")}
-            className={`px-4 py-2 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === "compliance"
                 ? "bg-primary text-on-primary shadow-2xs"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -231,14 +228,14 @@ export default function PatientComplianceTabPage() {
           <button
             type="button"
             onClick={() => setActiveTab("metrics")}
-            className={`px-4 py-2 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === "metrics"
                 ? "bg-primary text-on-primary shadow-2xs"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
           >
             <span className="material-symbols-outlined text-[16px]">monitoring</span>
-            <span>Chuỗi Chỉ số Sinh hiệu ({metricsHistory.length})</span>
+            <span>Chỉ số sinh hiệu ({metricsHistory.length})</span>
           </button>
         </div>
       </div>
@@ -263,24 +260,24 @@ export default function PatientComplianceTabPage() {
       {/* TAB 1: TUÂN THỦ DINH DƯỠNG & BỮA ĂN (14-day Compliance)   */}
       {/* ========================================================= */}
       {activeTab === "compliance" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
           {/* 3 Summary KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs text-center flex flex-col justify-center">
-              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+          <div className="flex flex-wrap items-stretch justify-center gap-2.5">
+            <div className="flex w-fit max-w-full flex-none flex-col justify-center rounded-xl border border-teal-200/70 bg-teal-50/60 px-4 py-3">
+              <p className="text-[12px] font-semibold text-slate-600">
                 Tỷ lệ tuân thủ 14 ngày
               </p>
-              <p className="text-3xl font-black text-primary mt-1.5 tabular-nums tracking-tight">
+              <p className="text-[27px] font-bold text-primary mt-1.5 tabular-nums tracking-tight">
                 {rate != null ? `${rate}%` : "—"}
               </p>
               <span className="text-[10px] text-on-surface-variant mt-1">Đạt mục tiêu thực đơn đề ra</span>
             </div>
 
-            <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs text-center flex flex-col justify-center">
-              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+            <div className="flex w-fit max-w-full flex-none flex-col justify-center rounded-xl border border-sky-200/70 bg-sky-50/50 px-4 py-3">
+              <p className="text-[12px] font-semibold text-slate-600">
                 Check-in đúng kế hoạch
               </p>
-              <p className="text-3xl font-black text-on-surface mt-1.5 tabular-nums tracking-tight">
+              <p className="text-[27px] font-bold text-on-surface mt-1.5 tabular-nums tracking-tight">
                 {complianceData?.checkins_as_planned ?? 0}{" "}
                 <span className="text-sm font-semibold text-on-surface-variant">
                   / {complianceData?.checkins_done ?? 0} bữa
@@ -289,8 +286,8 @@ export default function PatientComplianceTabPage() {
               <span className="text-[10px] text-on-surface-variant mt-1">Số bữa ăn đã ghi nhật ký</span>
             </div>
 
-            <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs text-center flex flex-col justify-center">
-              <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+            <div className="flex w-fit max-w-full flex-none flex-col justify-center rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3">
+              <p className="text-[12px] font-semibold text-slate-600">
                 Đánh giá lâm sàng
               </p>
               <div className="mt-2">
@@ -319,13 +316,13 @@ export default function PatientComplianceTabPage() {
           </div>
 
           {/* 14-Day Interactive Bar Chart */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-xs">
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-              <h3 className="text-sm font-bold text-on-surface flex items-center gap-2 uppercase tracking-wider">
+              <h3 className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-slate-800">
                 <span className="material-symbols-outlined text-primary text-[20px]">bar_chart</span>
                 <span>Biểu đồ tuân thủ 14 ngày gần nhất</span>
               </h3>
-              <div className="flex items-center gap-3 text-[11px] text-on-surface-variant">
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-on-surface-variant">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-sm bg-primary" />
                   <span>≥ 80% (Tốt)</span>
@@ -342,7 +339,7 @@ export default function PatientComplianceTabPage() {
             </div>
 
             {!hasChart ? (
-              <div className="h-[200px] flex flex-col items-center justify-center text-on-surface-variant">
+              <div className="mt-3 flex min-h-[130px] flex-col items-center justify-center rounded-lg border border-dashed border-teal-200 bg-teal-50/30 px-4 py-4 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[40px] text-outline/40 mb-1">
                   bar_chart
                 </span>
@@ -379,7 +376,7 @@ export default function PatientComplianceTabPage() {
                       <div className="w-full h-[120px] flex items-end justify-center">
                         {hasVal ? (
                           <div
-                            className={`w-full max-w-[24px] rounded-t-xl transition-all ${bar} ${
+                            className={`w-full max-w-[24px] rounded-t-md transition-all ${bar} ${
                               isHovered || isSelected ? "ring-4 ring-primary/20 scale-y-105" : "hover:opacity-90"
                             }`}
                             style={{ height: `${Math.max(value, 8)}%` }}
@@ -406,9 +403,9 @@ export default function PatientComplianceTabPage() {
           </div>
 
           {/* 2-Column Section: Events & Reminder */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Events Log (7 cols) */}
-            <div className="lg:col-span-7 bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="lg:col-span-7 min-w-0 rounded-xl border border-sky-100 bg-white p-4 shadow-xs space-y-3">
               <div>
                 <h3 className="text-xs font-bold text-on-surface mb-3 flex items-center justify-between uppercase tracking-wider">
                   <span className="flex items-center gap-1.5">
@@ -451,7 +448,7 @@ export default function PatientComplianceTabPage() {
             </div>
 
             {/* Quick Doctor Reminder Card (5 cols) */}
-            <div className="lg:col-span-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+            <div className="lg:col-span-5 min-w-0 rounded-xl border border-amber-100 bg-amber-50/30 p-4 shadow-xs space-y-3">
               <div>
                 <h3 className="text-xs font-bold text-on-surface mb-2 flex items-center gap-1.5 uppercase tracking-wider">
                   <span className="material-symbols-outlined text-primary text-[18px]">send</span>
@@ -463,7 +460,7 @@ export default function PatientComplianceTabPage() {
                 <textarea
                   value={remindMessage}
                   onChange={(e) => setRemindMessage(e.target.value)}
-                  rows={4}
+                  rows={3}
                   placeholder="Nhập nội dung nhắc nhở bệnh nhân..."
                   className="w-full px-3.5 py-2.5 bg-surface-container-low/40 border border-outline-variant/60 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none font-medium"
                 />
@@ -478,7 +475,7 @@ export default function PatientComplianceTabPage() {
                 type="button"
                 disabled={remindSending || !remindMessage.trim()}
                 onClick={() => void handleRemind()}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold rounded-lg disabled:opacity-60 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                className="w-fit max-w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold rounded-lg disabled:opacity-60 transition-all shadow-2xs active:scale-95 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">
                   {remindSending ? "progress_activity" : "send"}
@@ -494,11 +491,11 @@ export default function PatientComplianceTabPage() {
       {/* TAB 2: CHUỖI CHỈ SỐ SINH HIỆU & SỨC KHỎE (Recorded Metrics) */}
       {/* ========================================================= */}
       {activeTab === "metrics" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
           {/* 4 Vitals Summary Cards (Latest Measurements) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-wrap items-stretch justify-center gap-2.5">
             {/* Card 1: Weight / Height / BMI */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex w-fit min-w-[220px] max-w-full flex-col justify-between rounded-xl border border-teal-200/70 bg-teal-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -515,7 +512,7 @@ export default function PatientComplianceTabPage() {
                   </span>
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-outline-variant/40 flex items-center justify-between">
+              <div className="mt-2.5 pt-2.5 border-t border-outline-variant/40 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-mono font-bold text-on-surface">
                   BMI: {effectiveBmi != null ? effectiveBmi : "—"}
                 </span>
@@ -526,7 +523,7 @@ export default function PatientComplianceTabPage() {
             </div>
 
             {/* Card 2: Blood Pressure */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex w-fit min-w-[220px] max-w-full flex-col justify-between rounded-xl border border-rose-200/70 bg-rose-50/40 p-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -538,14 +535,14 @@ export default function PatientComplianceTabPage() {
                   {effectiveBP || "—"}
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-outline-variant/40 flex items-center justify-between text-xs text-on-surface-variant font-medium">
+              <div className="mt-2.5 pt-2.5 border-t border-outline-variant/40 flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-variant font-medium">
                 <span>Ngưỡng chuẩn:</span>
                 <span className="font-mono text-[11px] text-on-surface">&lt; 120/80 mmHg</span>
               </div>
             </div>
 
             {/* Card 3: Blood Glucose & HbA1c */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex w-fit min-w-[220px] max-w-full flex-col justify-between rounded-xl border border-amber-200/70 bg-amber-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -557,7 +554,7 @@ export default function PatientComplianceTabPage() {
                   {effectiveGlucose || "—"}
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-outline-variant/40 flex items-center justify-between text-xs text-on-surface-variant font-medium">
+              <div className="mt-2.5 pt-2.5 border-t border-outline-variant/40 flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-variant font-medium">
                 <span>HbA1c gần nhất:</span>
                 <span className="font-mono text-xs font-bold text-on-surface">
                   {effectiveHba1c != null ? `${effectiveHba1c}%` : "Chưa đo"}
@@ -566,7 +563,7 @@ export default function PatientComplianceTabPage() {
             </div>
 
             {/* Card 4: Waist Circumference */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex w-fit min-w-[220px] max-w-full flex-col justify-between rounded-xl border border-sky-200/70 bg-sky-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
@@ -578,7 +575,7 @@ export default function PatientComplianceTabPage() {
                   {effectiveWaist != null ? `${effectiveWaist} cm` : "—"}
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-outline-variant/40 flex items-center justify-between text-xs text-on-surface-variant font-medium">
+              <div className="mt-2.5 pt-2.5 border-t border-outline-variant/40 flex flex-wrap items-center justify-between gap-2 text-xs text-on-surface-variant font-medium">
                 <span>Cập nhật lúc:</span>
                 <span className="font-mono text-[10px] text-on-surface truncate">
                   {latestMetric?.recorded_at ? formatEventTime(latestMetric.recorded_at) : (patientSummary?.last_update || "—")}
@@ -588,15 +585,15 @@ export default function PatientComplianceTabPage() {
           </div>
 
           {/* Biểu đồ Đa chuỗi & Dự đoán Xu hướng 7 ngày */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-xs">
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
             <MetricsOverlayChart history={chartHistory} loading={loading} />
           </div>
 
           {/* Time-series Table of Recorded Metrics */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-6 shadow-xs space-y-4">
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-outline-variant/40">
               <div>
-                <h3 className="text-sm font-bold text-on-surface flex items-center gap-2 uppercase tracking-wider">
+                <h3 className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-slate-800">
                   <span className="material-symbols-outlined text-primary text-[20px]">table_chart</span>
                   <span>Lịch sử Chuỗi Thời gian Chỉ số Sinh hiệu</span>
                 </h3>
@@ -606,7 +603,7 @@ export default function PatientComplianceTabPage() {
               </div>
 
               {/* Source Filter Tabs */}
-              <div className="flex items-center gap-1 p-1 bg-surface-container-low border border-outline-variant/50 rounded-lg text-xs">
+              <div className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-lg border border-teal-100 bg-teal-50/60 p-1 text-xs">
                 <button
                   type="button"
                   onClick={() => setMetricsFilter("all")}
@@ -644,7 +641,7 @@ export default function PatientComplianceTabPage() {
             </div>
 
             {filteredMetrics.length === 0 ? (
-              <div className="py-12 text-center text-on-surface-variant space-y-2">
+              <div className="space-y-2 rounded-lg border border-dashed border-teal-100 bg-teal-50/30 px-4 py-6 text-center text-on-surface-variant">
                 <span className="material-symbols-outlined text-[40px] text-outline/40">
                   device_thermostat
                 </span>

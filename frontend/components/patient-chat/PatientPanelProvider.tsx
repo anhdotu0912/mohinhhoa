@@ -10,7 +10,13 @@ import React, {
 } from "react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import type { NotificationOut } from "@/lib/types";
+import type { AssignedDoctor, EscalationOut, NotificationOut } from "@/lib/types";
+
+export interface DoctorChatSelection {
+  escalationId: string;
+  doctor: AssignedDoctor | null;
+  initialThread?: EscalationOut | null;
+}
 
 export type PatientPanelKey = "menu" | "notifications" | "health" | null;
 export type HealthPanelView = "dock" | "record";
@@ -52,6 +58,10 @@ export interface PatientPanelState {
 }
 
 export interface PatientPanelContextValue extends PatientPanelState {
+  doctorChat: (DoctorChatSelection & { userId: string }) | null;
+  doctorChatExpanded: boolean;
+  openDoctorChat: (selection: DoctorChatSelection) => void;
+  setDoctorChatExpanded: (expanded: boolean) => void;
   openPanel: (key: Exclude<PatientPanelKey, null>) => void;
   closePanel: () => void;
   openNotificationDetail: (id: string) => void;
@@ -72,6 +82,19 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
   const [healthView, setHealthView] = useState<HealthPanelView>("dock");
   const [notificationsView, setNotificationsView] = useState<NotificationsPanelView>("list");
   const [hasUnseenBadge, setHasUnseenBadge] = useState(false);
+  const [doctorChat, setDoctorChat] = useState<(DoctorChatSelection & { userId: string }) | null>(null);
+  const [doctorChatExpanded, setDoctorChatExpanded] = useState(true);
+
+  useEffect(() => {
+    setDoctorChat(null);
+  }, [userId]);
+
+  const openDoctorChat = useCallback((selection: DoctorChatSelection) => {
+    if (!userId) return;
+    setDoctorChat({ ...selection, userId });
+    setDoctorChatExpanded(true);
+    setActivePanel(null);
+  }, [userId]);
 
   const refreshNotificationsBadge = useCallback(async () => {
     if (!userId) {
@@ -189,6 +212,10 @@ export function PatientPanelProvider({ children }: { children: ReactNode }) {
   }, [activePanel, closePanel]);
 
   const value: PatientPanelContextValue = {
+    doctorChat,
+    doctorChatExpanded,
+    openDoctorChat,
+    setDoctorChatExpanded,
     activePanel,
     healthView,
     notificationsView,

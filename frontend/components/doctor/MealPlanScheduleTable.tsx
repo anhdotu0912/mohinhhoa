@@ -197,7 +197,7 @@ export function MealPlanScheduleTable({
   };
 
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 mb-6 shadow-xs">
+    <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
       {toastMessage && (
         <div
           role="status"
@@ -210,7 +210,7 @@ export function MealPlanScheduleTable({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-teal-50/50 px-3 py-2.5">
         <div>
           <h3 className="font-h2 text-sm font-bold text-on-surface flex items-center gap-1.5">
             <span className="material-symbols-outlined text-primary text-[20px]">
@@ -248,7 +248,7 @@ export function MealPlanScheduleTable({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {displaySlots.map((slot, index) => {
           const isSelected = slot.starts_on === selectedStartsOn;
           const isActive = slot.occupancy === "active";
@@ -261,8 +261,12 @@ export function MealPlanScheduleTable({
               onClick={() => onSelectSlot?.(slot)}
               className={`rounded-xl p-4 border transition-all cursor-pointer flex flex-col justify-between ${
                 isSelected
-                  ? "bg-primary/[0.03] border-primary ring-2 ring-primary/25 shadow-xs"
-                  : "bg-surface-container-low/40 border-outline-variant/60 hover:border-primary/40 hover:bg-white"
+                  ? "border-teal-400 bg-teal-50/70 ring-2 ring-teal-600/15 shadow-xs"
+                  : isActive
+                    ? "border-emerald-200 bg-emerald-50/40 hover:border-emerald-400"
+                    : isUpcoming
+                      ? "border-sky-200 bg-sky-50/40 hover:border-sky-400"
+                      : "border-slate-200 bg-slate-50/60 hover:border-teal-300"
               }`}
             >
               <div>

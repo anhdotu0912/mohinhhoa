@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePatientPanel } from "../PatientPanelProvider";
 import { api } from "@/lib/api";
 import {
@@ -22,6 +22,7 @@ import {
 import { MetricsOverlayChart } from "@/components/patient/MetricsOverlayChart";
 import { MetricsImprovementSummary } from "./MetricsImprovementSummary";
 import { RecordMetricsFormPanel } from "./RecordMetricsFormPanel";
+import { mergeSavedMetric } from "@/lib/metrics-daily";
 
 type MainViewTab = "chart" | "comparison" | "nutrition" | "roadmap";
 
@@ -36,16 +37,19 @@ export function HealthMetricsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [deltaAdvice, setDeltaAdvice] = useState<MetricsDeltaAdviceOut | null>(null);
   const [activeTab, setActiveTab] = useState<MainViewTab>("chart");
+  const loadRequest = useRef(0);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
+    const request = ++loadRequest.current;
     setError(null);
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [metricsData, profileData, scheduleData] = await Promise.allSettled([
         api.getMetricsHistory(90),
         api.getProfile(),
         api.getMyMealPlanSchedule(),
       ]);
+      if (request !== loadRequest.current) return;
 
       if (metricsData.status === "fulfilled") {
         setHistory(metricsData.value);
@@ -61,9 +65,9 @@ export function HealthMetricsPanel() {
         setActivePlan(scheduleData.value.active_plan ?? null);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không tải được chỉ số sức khỏe.");
+      if (request === loadRequest.current) setError(err instanceof ApiError ? err.message : "Không tải được chỉ số sức khỏe.");
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current && !silent) setLoading(false);
     }
   }, []);
 
@@ -215,11 +219,16 @@ export function HealthMetricsPanel() {
 
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
-  const handleSaved = (advice?: MetricsDeltaAdviceOut | null) => {
+  const handleSaved = (advice?: MetricsDeltaAdviceOut | null, entry?: MetricsHistoryPoint) => {
+    if (entry) {
+      setHistory((previous) => mergeSavedMetric(previous, entry));
+      setLoading(false);
+    }
+    setActiveTab("chart");
     setDeltaAdvice(advice ?? null);
     setSaveSuccess("Đã lưu và cập nhật chỉ số sức khỏe hôm nay thành công!");
     setTimeout(() => setSaveSuccess(null), 6000);
-    void loadData();
+    void loadData(Boolean(entry));
   };
 
   return (
@@ -362,7 +371,7 @@ export function HealthMetricsPanel() {
                       }`}
                     >
                       <span className="material-symbols-outlined text-[16px]">show_chart</span>
-                      <span>Biểu đồ &amp; Dự đoán</span>
+                      <span>Biểu đồ theo ngày</span>
                     </button>
 
                     <button
@@ -406,7 +415,7 @@ export function HealthMetricsPanel() {
                   </div>
 
                   {/* Active Tab Content */}
-                  {activeTab === "chart" && <MetricsOverlayChart history={history} />}
+                  {activeTab === "chart" && <MetricsOverlayChart history={history} onRecord={goToRecordMetricsForm} />}
 
                   {activeTab !== "chart" && (
                     <MetricsImprovementSummary

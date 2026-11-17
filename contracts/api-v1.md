@@ -684,9 +684,10 @@ On-the-fly aggregation từ `adherence_checkin` (done) + `Alert` (severity ∈ `
   ]
 }
 ```
-- `overall_adherence_pct`: trung bình các ngày có `adherence_pct` không null; `null` nếu chưa có check-in `done`.
-- `checkins_done` / `checkins_as_planned`: đếm check-in `adherence_checkin` status `done` trong cửa sổ (`yes` = đúng kế hoạch).
-- Ngày không có check-in `done`: `adherence_pct: null` (không tính vào trung bình).
+- `overall_adherence_pct`: trung bình các ngày có `adherence_pct` không null; `null` khi chưa có food log hoặc check-in hợp lệ.
+- Theo implementation hiện có, ngày có food log được ưu tiên: sáng/trưa/tối mỗi bữa 30 điểm, bữa phụ 10; `as_planned` nhận đủ điểm, `custom` nhận một nửa, slot chưa ghi chưa đóng góp điểm. Ngày chưa có food log dùng check-in `yes=100`, `partial=50`, `no=0`.
+- `checkins_done` / `checkins_as_planned`: tổng food log và check-in `adherence_checkin` status `done` trong cửa sổ; đúng kế hoạch tương ứng `as_planned` / `yes`. Các counter này không phải số bữa dự kiến trong thực đơn.
+- Ngày không có cả hai nguồn: `adherence_pct: null`, không tính vào trung bình. Điểm từ nhật ký không xác nhận tình trạng sức khỏe; thiếu ghi nhận không chứng minh bệnh nhân đã ăn sai.
 
 ### `POST /doctor/patients/{patient_id}/compliance/remind`
 **Role:** `doctor`. Gửi nhắc nhở tuân thủ thủ công tới patient — tạo `Notification(type="manual_reminder", status="sent")`.

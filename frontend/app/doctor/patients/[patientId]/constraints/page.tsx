@@ -204,7 +204,7 @@ export default function PatientConstraintsTabPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
+      <main className="px-4 py-4 sm:px-6 text-sm text-on-surface-variant w-full max-w-[1240px] mx-auto flex-1">
         Đang tải ràng buộc lâm sàng…
       </main>
     );
@@ -212,7 +212,7 @@ export default function PatientConstraintsTabPage() {
 
   if (!patient) {
     return (
-      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto text-sm text-error flex-1">
+      <main className="px-4 py-4 sm:px-6 w-full max-w-[1240px] mx-auto text-sm text-error flex-1">
         {error || "Không tìm thấy bệnh nhân."}
       </main>
     );
@@ -226,7 +226,7 @@ export default function PatientConstraintsTabPage() {
   );
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
+    <main className="px-4 py-4 sm:px-6 w-full max-w-[1240px] mx-auto space-y-4 flex-1">
       {toast && (
         <div className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-50 bg-emerald-800 text-white px-4 py-2.5 rounded-lg text-sm font-medium shadow-xl border border-emerald-600 flex items-center gap-2 animate-in fade-in duration-200">
           <span className="material-symbols-outlined text-[20px] text-emerald-300">check_circle</span>
@@ -236,8 +236,8 @@ export default function PatientConstraintsTabPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-on-surface font-black text-2xl tracking-tight">
-            Ràng buộc Dinh dưỡng Lâm sàng
+          <h2 className="text-slate-900 text-[26px] font-bold tracking-tight">
+            Ràng buộc dinh dưỡng lâm sàng
           </h2>
           <p className="text-on-surface-variant mt-1 text-xs font-medium">
             {pending
@@ -266,7 +266,7 @@ export default function PatientConstraintsTabPage() {
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-[13px]">
               <thead>
                 <tr className="bg-amber-100/70 text-amber-900 uppercase tracking-wider text-[10px] font-bold">
                   <th className="px-4 py-2.5">Chỉ số</th>
@@ -365,11 +365,11 @@ export default function PatientConstraintsTabPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex min-w-0 flex-col justify-between space-y-3 rounded-xl border border-teal-200/70 bg-teal-50/50 p-4">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 <span className="material-symbols-outlined text-primary text-[18px]">local_fire_department</span>
                 <span>Năng lượng (Calo)</span>
               </label>
@@ -377,7 +377,7 @@ export default function PatientConstraintsTabPage() {
                 {form.targetKcal} kcal
               </span>
             </div>
-            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
+            <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">
               Hợp lệ {CLINICAL_LIMITS.target_kcal.min}–{CLINICAL_LIMITS.target_kcal.max} kcal. Khuyến nghị điều trị: 1500–2000 kcal/ngày.
             </p>
           </div>
@@ -389,10 +389,10 @@ export default function PatientConstraintsTabPage() {
           />
         </div>
 
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+        <div className="flex min-w-0 flex-col justify-between space-y-3 rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-4">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 <span className="material-symbols-outlined text-lime-700 text-[18px]">nutrition</span>
                 <span>Carb / bữa</span>
               </label>
@@ -400,7 +400,7 @@ export default function PatientConstraintsTabPage() {
                 {form.carbPerMeal} g
               </span>
             </div>
-            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
+            <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">
               Hợp lệ {CLINICAL_LIMITS.carb_per_meal.min}–{CLINICAL_LIMITS.carb_per_meal.max} g/bữa.
             </p>
           </div>
@@ -412,10 +412,10 @@ export default function PatientConstraintsTabPage() {
           />
         </div>
 
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+        <div className="flex min-w-0 flex-col justify-between space-y-3 rounded-xl border border-amber-200/70 bg-amber-50/50 p-4">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 <span className="material-symbols-outlined text-amber-600 text-[18px]">science</span>
                 <span>Muối / ngày</span>
               </label>
@@ -423,7 +423,7 @@ export default function PatientConstraintsTabPage() {
                 {form.salt} g
               </span>
             </div>
-            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
+            <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">
               Hợp lệ {CLINICAL_LIMITS.salt_daily_g.min}–{CLINICAL_LIMITS.salt_daily_g.max} g. Khuyến nghị tim mạch: ≤ 5.0g/ngày.
             </p>
           </div>
@@ -435,10 +435,10 @@ export default function PatientConstraintsTabPage() {
           />
         </div>
 
-        <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3 flex flex-col justify-between">
+        <div className="flex min-w-0 flex-col justify-between space-y-3 rounded-xl border border-sky-200/70 bg-sky-50/50 p-4">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 <span className="material-symbols-outlined text-sky-600 text-[18px]">icecream</span>
                 <span>Đường / ngày</span>
               </label>
@@ -446,7 +446,7 @@ export default function PatientConstraintsTabPage() {
                 {form.sugar} g
               </span>
             </div>
-            <p className="text-[11px] text-on-surface-variant font-medium min-h-[32px]">
+            <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">
               Hợp lệ {CLINICAL_LIMITS.sugar_daily_g.min}–{CLINICAL_LIMITS.sugar_daily_g.max} g. Khuyến nghị ĐTĐ: ≤ 25g/ngày.
             </p>
           </div>
@@ -459,9 +459,9 @@ export default function PatientConstraintsTabPage() {
         </div>
       </div>
 
-      <div className="p-5 bg-surface-container-lowest border border-outline-variant/60 rounded-xl shadow-xs space-y-3">
+      <div className="space-y-3 rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
         <div>
-          <label className="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+          <label className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
             <span className="material-symbols-outlined text-teal-700 text-[18px]">flag</span>
             <span>Mục tiêu điều trị</span>
           </label>
@@ -478,7 +478,7 @@ export default function PatientConstraintsTabPage() {
                 type="button"
                 disabled={saving}
                 onClick={() => toggleGoal(goal)}
-                className={`px-3 py-2 rounded-lg text-left text-[11px] font-semibold border transition-all cursor-pointer disabled:opacity-60 ${
+                className={`w-fit max-w-full px-2.5 py-1.5 rounded-md text-left text-xs font-semibold border transition-all cursor-pointer disabled:opacity-60 ${
                   isSelected
                     ? "bg-primary/10 border-primary text-primary"
                     : "bg-surface-container-low border-outline-variant text-on-surface-variant hover:border-primary/50"
@@ -497,13 +497,13 @@ export default function PatientConstraintsTabPage() {
                 type="button"
                 disabled={saving}
                 onClick={() => toggleGoal(goal)}
-                className="px-3 py-2 rounded-lg text-left text-[11px] font-semibold border bg-primary/10 border-primary text-primary cursor-pointer disabled:opacity-60"
+                className="w-fit max-w-full px-2.5 py-1.5 rounded-md text-left text-xs font-semibold border bg-primary/10 border-primary text-primary cursor-pointer disabled:opacity-60"
               >
                 ✓ {goal}
               </button>
             ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex max-w-lg gap-2">
           <input
             type="text"
             value={customGoalInput}
@@ -517,7 +517,7 @@ export default function PatientConstraintsTabPage() {
               }
             }}
             placeholder="Thêm mục tiêu khác..."
-            className="flex-1 px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:border-primary"
+            className="min-w-0 flex-1 px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:border-primary"
           />
           <button
             type="button"

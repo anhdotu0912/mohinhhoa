@@ -2,10 +2,10 @@
 
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { MetricsHistoryPoint } from "@/lib/types";
+import { buildMetricDays, emptyMetricValues as emptyValues, emptyMetricDisplay, formatMetricValue as formatValue, firstRecordedMetric, type MetricDay as DayPoint } from "@/lib/metrics-daily";
+import { useVietnamToday } from "@/lib/use-vietnam-today";
 import {
   METRIC_SERIES,
-  parseBpPair,
-  parseGlucoseMmol,
   type MetricSeriesDef,
   type MetricSeriesId,
 } from "@/lib/metrics-series";
@@ -24,124 +24,6 @@ const GOAL_LINE_DAYS = 7;
  *  number comes from a clinical guideline, not from extrapolating the
  *  patient's own noisy self-reported readings. */
 const SAFE_WEIGHT_LOSS_KG_PER_WEEK = 0.75;
-
-type DayPoint = {
-  key: string;
-  label: string;
-  isToday: boolean;
-  recordedAt?: string;
-  values: Record<MetricSeriesId, number | null>;
-  display: Record<MetricSeriesId, string | null>;
-};
-
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function localDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function readSeriesValue(point: MetricsHistoryPoint, id: MetricSeriesId): number | null {
-  const bp = parseBpPair(point.blood_pressure);
-  switch (id) {
-    case "weight":
-      return point.weight ?? null;
-    case "bmi":
-      return point.bmi ?? null;
-    case "waist":
-      return point.waist_cm ?? null;
-    case "systolic":
-      return point.systolic ?? bp.sys;
-    case "diastolic":
-      return point.diastolic ?? bp.dia;
-    case "glucose_fasting":
-      return point.glucose_fasting ?? parseGlucoseMmol(point.blood_glucose);
-    case "glucose_postprandial":
-      return point.glucose_postprandial ?? null;
-    case "hba1c":
-      return point.hba1c ?? null;
-    default:
-      return null;
-  }
-}
-
-function formatValue(id: MetricSeriesId, value: number | null, unit: string): string | null {
-  if (value == null) return null;
-  const text =
-    id === "weight" || id === "bmi" || id === "hba1c" || id.startsWith("glucose")
-      ? String(value)
-      : String(Math.round(value));
-  return unit ? `${text} ${unit}` : text;
-}
-
-function emptyValues(): Record<MetricSeriesId, number | null> {
-  return {
-    weight: null,
-    glucose_fasting: null,
-    glucose_postprandial: null,
-    systolic: null,
-    diastolic: null,
-    bmi: null,
-    waist: null,
-    hba1c: null,
-  };
-}
-
-function emptyDisplay(): Record<MetricSeriesId, string | null> {
-  return {
-    weight: null,
-    glucose_fasting: null,
-    glucose_postprandial: null,
-    systolic: null,
-    diastolic: null,
-    bmi: null,
-    waist: null,
-    hba1c: null,
-  };
-}
-
-function buildDays(history: MetricsHistoryPoint[]): DayPoint[] {
-  const today = startOfLocalDay(new Date());
-  const latestByDay = new Map<string, MetricsHistoryPoint>();
-  for (const point of history) {
-    const key = localDateKey(new Date(point.recorded_at));
-    const prev = latestByDay.get(key);
-    if (!prev || new Date(point.recorded_at) > new Date(prev.recorded_at)) {
-      latestByDay.set(key, point);
-    }
-  }
-
-  return Array.from({ length: HISTORY_DAYS }, (_, i) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (HISTORY_DAYS - 1 - i));
-    const key = localDateKey(date);
-    const isToday = i === HISTORY_DAYS - 1;
-    const point = latestByDay.get(key);
-    const values = emptyValues();
-    const display = emptyDisplay();
-    for (const series of METRIC_SERIES) {
-      const value = point ? readSeriesValue(point, series.id) : null;
-      values[series.id] = value;
-      display[series.id] = formatValue(series.id, value, series.unit);
-    }
-    return {
-      key,
-      label: isToday
-        ? "Hôm nay"
-        : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
-      isToday,
-      recordedAt: point?.recorded_at,
-      values,
-      display,
-    };
-  });
-}
 
 type LinearFit = { slope: number; rmse: number; firstIndex: number; lastIndex: number };
 
@@ -340,14 +222,17 @@ function InfoTooltip({ text }: { text: string }) {
 type Props = {
   history: MetricsHistoryPoint[];
   loading?: boolean;
+  onRecord?: () => void;
 };
 
-export function MetricsOverlayChart({ history, loading = false }: Props) {
+export function MetricsOverlayChart({ history, loading = false, onRecord }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [focused, setFocused] = useState<MetricSeriesId>("glucose_fasting");
+  const [selectedMetric, setFocused] = useState<MetricSeriesId | null>(null);
+  const today = useVietnamToday();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const historyDays = useMemo(() => buildDays(history), [history]);
+  const historyDays = useMemo(() => buildMetricDays(history, today), [history, today]);
+  const focused = selectedMetric ?? firstRecordedMetric(historyDays);
 
   const weightGoal = useMemo(
     () => (focused === "weight" ? computeWeightGoal(historyDays, HISTORY_DAYS + GOAL_LINE_DAYS) : null),
@@ -363,13 +248,12 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
         label: dayNum === 1 ? "Mục tiêu" : dayNum === GOAL_LINE_DAYS ? `+${GOAL_LINE_DAYS} ngày` : "",
         isToday: false,
         values: emptyValues(),
-        display: emptyDisplay(),
+        display: emptyMetricDisplay(),
       };
     });
     return [...historyDays, ...goalDays];
   }, [historyDays, weightGoal]);
 
-  const hasAny = historyDays.some((d) => METRIC_SERIES.some((s) => d.values[s.id] != null));
   const focusedSeries = METRIC_SERIES.find((s) => s.id === focused) ?? METRIC_SERIES[0];
   const visible = [focusedSeries];
 
@@ -407,22 +291,23 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
   const focusedPointCount = observedCount(historyDays, focused);
   const canShowTrend = focusedPointCount >= MIN_TREND_POINTS && focusedTrend != null;
   const targetMax = focusedSeries.targetMax ?? null;
-  const targetY = targetMax != null ? plotY(targetMax, focusedDomain) : null;
+  const targetY = targetMax != null && focusedPointCount > 0 ? plotY(targetMax, focusedDomain) : null;
 
   return (
     <section className="space-y-3.5">
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-1">
-            <h3 className="font-bold text-sm text-slate-900">Xu hướng 7 ngày qua</h3>
+            <h3 className="font-bold text-sm text-slate-900">Chỉ số theo từng ngày</h3>
             <InfoTooltip
               text={`Nét liền là các lần đã ghi trong 7 ngày qua · đường ngang là mục tiêu lâm sàng${
                 weightGoal ? " · nét chấm là đường mục tiêu tham khảo theo tốc độ an toàn ADA" : ""
               }`}
             />
           </div>
-          <p className="text-xs text-slate-500 font-medium">Chọn 1 chỉ số để theo dõi</p>
+          <p className="text-xs text-slate-500 font-medium">7 ngày gần nhất · Hiển thị ngay từ số đo đầu tiên</p>
         </div>
+        {onRecord && <button type="button" onClick={onRecord} className="inline-flex w-fit items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"><span className="material-symbols-outlined text-[16px]">add</span>Ghi nhận chỉ số</button>}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -457,13 +342,6 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
 
       {loading ? (
         <div className="h-40 rounded-xl bg-slate-50 border border-slate-200/80 animate-pulse" />
-      ) : !hasAny ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center">
-          <p className="text-sm font-semibold text-slate-800">Chưa có dữ liệu 7 ngày qua</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Bấm «Ghi nhận chỉ số mới» để bắt đầu theo dõi xu hướng.
-          </p>
-        </div>
       ) : (
         <div
           ref={wrapRef}
@@ -508,7 +386,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
               </defs>
 
               {/* Safe Target Zone Band — Clamped strictly within chart bounds */}
-              {focusedSeries.targetMax != null && (() => {
+              {focusedPointCount > 0 && focusedSeries.targetMax != null && (() => {
                 const chartTop = PAD.top;
                 const chartBottom = VIEW_H - PAD.bottom;
                 const rawTopY = plotY(focusedSeries.targetMax, focusedDomain);
@@ -581,7 +459,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                       if (value == null) return null;
                       const active = hoverIndex === i;
                       return (
-                        <circle
+                        <g key={`${series.id}-${day.key}`}><circle
                           key={`${series.id}-${day.key}`}
                           cx={plotX(i, days.length)}
                           cy={plotY(value, domain)}
@@ -589,7 +467,8 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                           fill={series.color}
                           stroke="#ffffff"
                           strokeWidth="1.75"
-                        />
+                          aria-label={`${series.label} ${day.key}: ${day.display[series.id]}`}
+                        />{focusedPointCount === 1 && <text x={plotX(i, days.length) - 8} y={Math.max(12, plotY(value, domain) - 10)} textAnchor="end" fill={series.color} fontSize="11" fontWeight="700">{day.display[series.id]}</text>}</g>
                       );
                     })}
                   </g>
@@ -653,6 +532,7 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
                 </span>
               </div>
             )}
+            {focusedPointCount === 0 && <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-10 text-center"><p className="rounded-lg bg-white/95 px-3 py-2 text-xs font-medium text-slate-600">Chưa có số đo {focusedSeries.label.toLowerCase()} trong khoảng này. Ghi một lần là điểm đầu tiên sẽ xuất hiện.</p></div>}
           </div>
 
           <div className="relative h-5 mt-0.5">
@@ -680,13 +560,13 @@ export function MetricsOverlayChart({ history, loading = false }: Props) {
           )}
 
           {!canShowTrend ? (
-            <div className="mt-2 p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200/70 flex items-center justify-between text-xs">
+            <div className="mt-2 p-2.5 rounded-lg bg-sky-50/70 border border-sky-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
                 <span className="material-symbols-outlined text-[16px] text-[#006857]">tips_and_updates</span>
                 <span>
                   {focusedPointCount === 0
-                    ? `Chưa có dữ liệu ${focusedSeries.label.toLowerCase()} trong 7 ngày qua.`
-                    : `Đã có dữ liệu ${focusedPointCount}/${MIN_TREND_POINTS} ngày trong tuần (mỗi ngày là 1 mốc). Ghi thêm các ngày tiếp theo để xem xu hướng.`}
+                    ? "Ngày chưa có số đo được để trống, không tính là 0. Không cần chờ đủ 7 ngày."
+                    : `Đã hiển thị số đo của ${focusedPointCount} ngày. Cần ít nhất ${MIN_TREND_POINTS} ngày có số đo để nhận xét chiều hướng; biểu đồ vẫn cập nhật mỗi lần lưu.`}
                 </span>
               </span>
               <span className="text-[11px] font-bold text-[#006857] shrink-0">

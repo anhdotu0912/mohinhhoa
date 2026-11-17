@@ -29,31 +29,25 @@ function ApprovedMealSlotCard({
   const meta = slotMeta(meal.slot);
   const items = meal.items ?? [];
   const nutrition = sumMealNutrition(meal);
+  const headerTone = ["morning", "breakfast"].includes(meal.slot) ? "bg-amber-50/70 text-amber-800" : ["evening", "dinner"].includes(meal.slot) ? "bg-sky-50/70 text-sky-800" : meal.slot === "snack" ? "bg-violet-50/60 text-violet-800" : "bg-teal-50/70 text-teal-800";
 
   return (
     <div
       key={`${meal.slot}-${mealIdx}`}
-      className="p-3 sm:p-4 border border-slate-200/90 rounded-2xl bg-white shadow-2xs hover:shadow-sm transition-shadow flex flex-col gap-3 sm:gap-3.5"
+      className="min-w-0 overflow-hidden rounded-xl border border-slate-200/80 bg-white"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5 sm:px-4 ${headerTone}`}>
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-50 text-[#006857] flex items-center justify-center border border-emerald-200/80 shrink-0">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center">
             <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{meta.icon}</span>
           </div>
-          <span className="text-xs sm:text-sm font-bold text-slate-900">{meta.label}</span>
-          {nutrition.kcal > 0 && (
-            <span className="text-[11px] sm:text-xs font-extrabold text-[#006857] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-md border border-emerald-200/80">
-              {nutrition.kcal} kcal
-            </span>
-          )}
+          <span className="text-[15px] font-bold text-slate-900">{meta.label}</span>
         </div>
-        <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-50 rounded-md border border-slate-200/60">
-          Kế hoạch thực đơn
-        </span>
+        {nutrition.kcal > 0 && <span className="text-[12px] font-semibold tabular-nums text-slate-600">{nutrition.kcal} kcal</span>}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+      <div className="px-3 sm:px-4">
+        <div className="min-w-0 divide-y divide-slate-100">
           {items.length > 0 ? (
             items.map((item, idx) => (
               <MealItemRow
@@ -71,13 +65,14 @@ function ApprovedMealSlotCard({
         </div>
 
         {/* Nút Xem thêm thành phần dinh dưỡng bữa */}
-        <div className="pt-0.5">
+        <div className="border-t border-slate-100 py-2">
           <button
             type="button"
             onClick={() => setShowSlotNutrients((v) => !v)}
+            aria-expanded={showSlotNutrients}
             className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#006857] py-0.5 px-1.5 rounded-md hover:bg-emerald-50/60 transition-colors cursor-pointer"
           >
-            <span>Thành phần bữa</span>
+            <span>Dinh dưỡng cả bữa</span>
             <span
               className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
                 showSlotNutrients ? "rotate-180 text-[#006857]" : "text-slate-400"
@@ -116,17 +111,12 @@ export function ApprovedMealSlotList({
   }, [meals]);
 
   const replaceItem = (mealIdx: number, itemIdx: number, next: FoodItem) => {
-    setLocalMeals((prev) => {
-      const updated = prev.map((meal, i) => {
-        if (i !== mealIdx) return meal;
-        return {
-          ...meal,
-          items: (meal.items ?? []).map((item, j) => (j === itemIdx ? next : item)),
-        };
-      });
-      onMealsChange?.(updated);
-      return updated;
+    const updated = localMeals.map((meal, i) => {
+      if (i !== mealIdx) return meal;
+      return { ...meal, items: (meal.items ?? []).map((item, j) => (j === itemIdx ? next : item)) };
     });
+    setLocalMeals(updated);
+    onMealsChange?.(updated);
   };
 
   if (!localMeals.length) {
@@ -139,7 +129,7 @@ export function ApprovedMealSlotList({
   }
 
   return (
-    <div className="space-y-3.5">
+    <div className="min-w-0 space-y-3">
       {localMeals.map((meal, mealIdx) => (
         <ApprovedMealSlotCard
           key={`${meal.slot}-${mealIdx}`}

@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -13,6 +12,14 @@ import { ApiError, type DoctorPatientSummary } from "@/lib/types";
 import { asRouteId } from "@/lib/route-params";
 import { doctorReviewHref } from "@/lib/doctor-routes";
 import { NotificationBadge } from "@/components/shared/NotificationBadge";
+
+const PLAN_STATUS: Record<MealPlanItem["status"], { label: string; color: string }> = {
+  pending: { label: "Chờ duyệt", color: "border-amber-200 bg-amber-50 text-amber-800" },
+  approved: { label: "Đã duyệt", color: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  edited: { label: "Đã chỉnh sửa", color: "border-sky-200 bg-sky-50 text-sky-800" },
+  rejected: { label: "Đã từ chối", color: "border-rose-200 bg-rose-50 text-rose-800" },
+  unselected: { label: "Chưa chọn", color: "border-slate-200 bg-slate-50 text-slate-600" },
+};
 
 function resolvePatientAvatar(raw: string | null | undefined): string {
   if (
@@ -152,7 +159,7 @@ export default function PatientMealPlansListPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-4 text-sm text-on-surface-variant sm:px-6">
         Đang tải thực đơn của bệnh nhân…
       </main>
     );
@@ -160,7 +167,7 @@ export default function PatientMealPlansListPage() {
 
   if (loadError || !patient) {
     return (
-      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-4 sm:px-6">
         <p className="text-sm text-error mb-3">
           {loadError || "Không tìm thấy bệnh nhân."}
         </p>
@@ -169,19 +176,16 @@ export default function PatientMealPlansListPage() {
   }
 
   return (
-    <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <main className="mx-auto w-full max-w-[1240px] flex-1 space-y-4 px-4 py-4 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-on-surface font-black text-2xl tracking-tight">
-            Quản lý Thực đơn &amp; Biến thể AI
+          <h2 className="text-[26px] font-bold tracking-tight text-slate-900">
+            Quản lý thực đơn
           </h2>
-          <p className="text-on-surface-variant mt-1 text-xs font-medium">
-            Xem lại các phương án thực đơn đã sinh, so sánh chỉ số dinh dưỡng và duyệt kế hoạch cho bệnh nhân
-          </p>
         </div>
         <Link
           href="/doctor/inbox?type=plan_review"
-          className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs active:scale-95 self-start sm:self-auto"
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-on-primary transition-colors hover:bg-teal-800"
         >
           <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
           <span>Xem thực đơn chờ duyệt</span>
@@ -189,8 +193,10 @@ export default function PatientMealPlansListPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 pb-1 overflow-x-auto scrollbar-none">
+      <div className="flex justify-center"><div role="group" aria-label="Lọc thực đơn theo trạng thái" className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-lg border border-teal-100 bg-teal-50/60 p-1">
         <button
+          type="button"
+          aria-pressed={activeTab === "pending"}
           onClick={() => setActiveTab("pending")}
           className={`relative px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "pending"
@@ -207,6 +213,8 @@ export default function PatientMealPlansListPage() {
           )}
         </button>
         <button
+          type="button"
+          aria-pressed={activeTab === "approved"}
           onClick={() => setActiveTab("approved")}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "approved"
@@ -217,6 +225,8 @@ export default function PatientMealPlansListPage() {
           Đã duyệt ({approvedCount})
         </button>
         <button
+          type="button"
+          aria-pressed={activeTab === "rejected"}
           onClick={() => setActiveTab("rejected")}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "rejected"
@@ -227,21 +237,24 @@ export default function PatientMealPlansListPage() {
           Đã từ chối ({rejectedCount})
         </button>
         <button
+          type="button"
+          aria-pressed={activeTab === "all"}
           onClick={() => setActiveTab("all")}
           className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeTab === "all"
-              ? "bg-surface-container-highest text-on-surface shadow-2xs font-black"
+              ? "bg-teal-700 text-white shadow-2xs"
               : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
           }`}
         >
           Tất cả ({allPatientPlans.length})
         </button>
       </div>
+      </div>
 
       {/* Meal Plans Section */}
       {filteredPlans.length === 0 ? (
-        <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-16 text-center text-on-surface-variant shadow-xs">
-          <span className="material-symbols-outlined text-[48px] text-outline/40 mb-2">
+        <div className="mx-auto w-full max-w-[640px] rounded-xl border border-dashed border-teal-200 bg-white px-4 py-6 text-center text-on-surface-variant">
+          <span className="material-symbols-outlined mb-2 text-[32px] text-teal-400">
             menu_book
           </span>
           <p className="text-on-surface text-sm font-bold">
@@ -252,7 +265,7 @@ export default function PatientMealPlansListPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="mx-auto w-full max-w-[960px] space-y-4">
           {/* Display Grouped Variant Batches */}
           {groupsList.map((group) => {
             const isExpanded = expandedGroups[group.groupId] !== false; // Default true (expanded)
@@ -261,12 +274,12 @@ export default function PatientMealPlansListPage() {
             return (
               <div
                 key={group.groupId}
-                className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 space-y-4 shadow-xs"
+                className="space-y-3 rounded-xl border border-teal-100 bg-white p-4 shadow-xs"
               >
                   {/* Group Header Banner with Dropdown Toggle */}
                   <div
                     onClick={() => toggleGroupExpand(group.groupId)}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-xs pb-sm border-b border-outline-variant/60 cursor-pointer select-none hover:opacity-90 transition-opacity"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-teal-50/50 px-3 py-2.5 cursor-pointer select-none hover:opacity-90 transition-opacity"
                   >
                     <div className="flex items-center gap-xs flex-wrap">
                       <span className="relative inline-flex items-center justify-center">
@@ -283,8 +296,8 @@ export default function PatientMealPlansListPage() {
                       <h3 className="font-h2 text-h2 font-bold text-on-surface text-sm sm:text-base">
                         Đợt sinh thực đơn: {group.plans.length} phương án thay thế
                       </h3>
-                      <span className="bg-primary/10 text-primary font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold">
-                        {group.groupId}
+                      <span title={group.groupId} className="w-fit rounded-md border border-teal-100 bg-white px-2 py-0.5 font-mono text-[11px] font-medium text-teal-700">
+                        …{group.groupId.slice(-8)}
                       </span>
                       {hasPendingInGroup && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
@@ -294,7 +307,7 @@ export default function PatientMealPlansListPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-md text-xs text-on-surface-variant font-caption">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant font-caption">
                       <span>Thời gian: {group.createdAt}</span>
                       <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded-md font-semibold border border-emerald-200">
                         Độ dài: {group.duration}
@@ -343,8 +356,8 @@ export default function PatientMealPlansListPage() {
                               <span className="px-2 py-0.5 rounded-md bg-emerald-700 text-white font-bold text-[11px] shadow-2xs">
                                 Phương án {plan.variantIndex || 1}/{plan.totalVariants || 1}
                               </span>
-                              <span className="font-mono text-xs font-semibold text-on-surface-variant">
-                                {plan.id}
+                              <span title={plan.id} className="font-mono text-[11px] font-medium text-slate-500">
+                                Mã: …{plan.id.slice(-8)}
                               </span>
                               <span className="text-xs text-on-surface-variant">
                                 • {plan.daysCount || 7} ngày
@@ -381,7 +394,7 @@ export default function PatientMealPlansListPage() {
                           </div>
 
                           {/* Right Side: Status Badge & Action */}
-                          <div className="flex items-center gap-md shrink-0 w-full md:w-auto justify-between md:justify-end pt-sm md:pt-0 border-t md:border-t-0 border-outline-variant">
+                          <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 md:grid md:w-[260px] md:grid-cols-[minmax(0,1fr)_132px] md:border-t-0 md:pt-0">
                             <div>
                               {plan.status === "pending" && (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -419,7 +432,7 @@ export default function PatientMealPlansListPage() {
                               onClick={() =>
                                 router.push(doctorReviewHref(patient.id, plan.id))
                               }
-                              className={`px-md py-1.5 rounded-lg font-body-bold text-xs font-semibold transition-all shadow-xs flex items-center gap-xs cursor-pointer active:scale-95 ${
+                              className={`flex w-[132px] items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                                 plan.status === "approved" || plan.status === "edited"
                                   ? "bg-emerald-700 text-white hover:bg-emerald-800"
                                   : "bg-primary text-on-primary hover:bg-primary/90"
@@ -441,47 +454,49 @@ export default function PatientMealPlansListPage() {
 
             {/* Display Standalone Plans if any */}
             {standalonePlans.length > 0 && (
-              <div className="space-y-sm pt-md">
-                <h3 className="font-h2 text-h2 font-bold text-on-surface text-sm">
+              <div className="space-y-3">
+                <h3 className="flex w-fit items-center gap-2 rounded-lg bg-teal-50 px-3 py-2 text-[14px] font-semibold text-teal-800">
+                  <span className="material-symbols-outlined text-[18px]">menu_book</span>
                   Thực đơn của bệnh nhân
                 </h3>
                 {standalonePlans.map((plan) => (
                   <div
                     key={plan.id}
-                    className={`relative bg-surface-container-lowest border rounded-xl p-md shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-md ${
+                    className={`flex flex-col items-start justify-between gap-3 rounded-xl border p-4 shadow-xs md:flex-row md:items-center ${
                       plan.status === "pending"
-                        ? "border-amber-300/80 bg-amber-50/15"
-                        : "border-outline-variant"
+                        ? "border-amber-200 bg-amber-50/30"
+                        : plan.status === "approved" || plan.status === "edited"
+                          ? "border-teal-200 bg-teal-50/30"
+                          : plan.status === "rejected"
+                            ? "border-rose-200 bg-rose-50/30"
+                            : "border-slate-200 bg-white"
                     }`}
                   >
-                    {/* Facebook-style red notification dot on top right of pending standalone card */}
-                    {plan.status === "pending" && (
-                      <NotificationBadge
-                        dot
-                        className="bottom-auto top-2.5 right-2.5 w-3 h-3 ring-2 ring-white shadow-xs"
-                      />
-                    )}
-
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs font-bold text-primary mb-1">
-                        {plan.id}
-                      </p>
-                      <h4 className="font-h2 text-h2 font-semibold text-on-surface text-sm mb-xs">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <h4 className="text-[15px] font-semibold text-slate-900">
                         {plan.planTitle}
                       </h4>
-                      <p className="text-xs text-on-surface-variant">
-                        {plan.daysCount || 7} ngày • Calo: {plan.calories} • Muối: {plan.salt}
-                      </p>
+                      <span title={plan.id} className="w-fit rounded-md border border-slate-200/70 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-500">Mã: …{plan.id.slice(-8)}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-slate-600">
+                        <span className="rounded-md border border-teal-100 bg-white px-2 py-1">{plan.daysCount || 7} ngày</span>
+                        <span className="rounded-md border border-sky-100 bg-sky-50/60 px-2 py-1">Calo: {plan.calories}</span>
+                        <span className="rounded-md border border-amber-100 bg-amber-50/60 px-2 py-1">Muối: {plan.salt}</span>
+                      </div>
                     </div>
-
+                    <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-2 md:grid md:w-[260px] md:grid-cols-[minmax(0,1fr)_132px]">
+                    <span className={`inline-flex w-fit items-center rounded-md border px-2 py-1 text-[11px] font-semibold ${PLAN_STATUS[plan.status].color}`}>{PLAN_STATUS[plan.status].label}</span>
                     <button
+                      type="button"
                       onClick={() =>
                         router.push(doctorReviewHref(patient.id, plan.id))
                       }
-                      className="px-md py-1.5 bg-primary text-on-primary rounded-lg text-xs font-semibold"
+                      className="flex w-[132px] items-center justify-center gap-1.5 rounded-lg bg-primary px-2 py-2 text-xs font-semibold text-on-primary transition-colors hover:bg-teal-800"
                     >
-                      Xem chi tiết →
+                      Xem chi tiết<span className="material-symbols-outlined text-[15px]">arrow_forward</span>
                     </button>
+                    </div>
                   </div>
                 ))}
               </div>

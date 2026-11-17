@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -56,13 +55,6 @@ function getDayMealByIndex(
     null
   );
 }
-
-const MEAL_ROWS: { slot: "breakfast" | "lunch" | "dinner" | "snack"; label: string; icon: string }[] = [
-  { slot: "breakfast", label: "Sáng", icon: "wb_twilight" },
-  { slot: "lunch", label: "Trưa", icon: "wb_sunny" },
-  { slot: "dinner", label: "Tối", icon: "bedtime" },
-  { slot: "snack", label: "Phụ", icon: "cookie" },
-];
 
 const WEEKDAY_FULL = [
   "Chủ nhật",
@@ -339,7 +331,7 @@ export default function DoctorPatientHistoryPage() {
 
   if (loading) {
     return (
-      <main className="p-4 sm:p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
+      <main className="px-4 py-4 sm:px-6 text-sm text-on-surface-variant w-full max-w-[1240px] mx-auto flex-1">
         Đang tải lịch sử thực đơn…
       </main>
     );
@@ -347,7 +339,7 @@ export default function DoctorPatientHistoryPage() {
 
   if (loadError || !patient || !summary) {
     return (
-      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
+      <main className="px-4 py-4 sm:px-6 w-full max-w-[1240px] mx-auto flex-1">
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-rose-800 text-sm">
           {loadError || "Không tìm thấy bệnh nhân."}
         </div>
@@ -367,9 +359,10 @@ export default function DoctorPatientHistoryPage() {
   const currentWeekDayMeta = weekDays[selectedDayIdx - 1];
 
   return (
-      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
+      <main className="px-4 py-4 sm:px-6 w-full max-w-[1240px] mx-auto space-y-4 flex-1">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="mr-1 text-[26px] font-bold tracking-tight text-slate-900">Lịch sử thực đơn</h2>
             {selectedEntry && (
               <span
                 className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold border ${
@@ -424,11 +417,11 @@ export default function DoctorPatientHistoryPage() {
 
         {/* Weekly Content & View Controller */}
         {selectedSlot && (
-          <div id="meal-week-grid" className="space-y-6">
+          <div id="meal-week-grid" className="space-y-4">
             {/* Unified Weekly Toolbar & KPI Summary */}
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs">
+            <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
               {/* Controls row */}
-              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-4 border-b border-outline-variant/50">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-3 border-b border-outline-variant/50">
                 {/* Week selector buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
@@ -490,9 +483,9 @@ export default function DoctorPatientHistoryPage() {
               </div>
 
               {/* 4 KPI Metric Chips */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4">
-                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
+              <div className="flex flex-wrap items-stretch justify-center gap-2.5 pt-3">
+                <div className="flex w-fit max-w-full items-center gap-2.5 rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">check_circle</span>
                   </div>
                   <div>
@@ -505,8 +498,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
+                <div className="flex w-fit max-w-full items-center gap-2.5 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">grain</span>
                   </div>
                   <div>
@@ -524,8 +517,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
+                <div className="flex w-fit max-w-full items-center gap-2.5 rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/10 text-sky-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">local_fire_department</span>
                   </div>
                   <div>
@@ -538,8 +531,8 @@ export default function DoctorPatientHistoryPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-surface-container-low/40">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-800 flex items-center justify-center shrink-0">
+                <div className="flex w-fit max-w-full items-center gap-2.5 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/10 text-purple-800 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[20px]">event</span>
                   </div>
                   <div>
@@ -554,7 +547,7 @@ export default function DoctorPatientHistoryPage() {
 
             {/* Main Menu Display Area */}
             {!weekInPlan ? (
-              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-10 text-center text-on-surface-variant shadow-xs">
+              <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl px-4 py-6 text-center text-on-surface-variant shadow-xs">
                 <span className="material-symbols-outlined text-[48px] text-outline mb-2">
                   calendar_today
                 </span>
@@ -565,19 +558,18 @@ export default function DoctorPatientHistoryPage() {
               </div>
             ) : viewMode === "grid" ? (
               /* Mode 1: 7-Column Day Cards (Weekly Kanban Layout) */
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
                 {weekDays.map((day) => {
                   const dayMeal = selectedEntry ? getDayMealByIndex(selectedEntry.plan, day.dayIndex) : null;
                   const adherence = adherenceByDate.get(day.isoDate);
                   const dayKcal = dayMeal?.totalCalories ?? 0;
-                  const daySalt = dayMeal?.totalSalt ?? 0;
 
                   return (
                     <div
                       key={day.isoDate}
-                      className={`rounded-xl p-3.5 flex flex-col justify-between transition-all group relative overflow-hidden ${
+                      className={`rounded-xl p-3 flex flex-col justify-between transition-all group relative overflow-hidden ${
                         day.isToday
-                          ? "bg-gradient-to-b from-primary/[0.08] via-emerald-50/30 to-white border-2 border-primary shadow-lg ring-4 ring-primary/15"
+                          ? "border-2 border-teal-400 bg-teal-50/50 shadow-xs ring-2 ring-teal-600/15"
                           : "bg-white border border-outline-variant/60 shadow-xs hover:border-primary/40 hover:shadow-md"
                       }`}
                     >
@@ -771,10 +763,10 @@ export default function DoctorPatientHistoryPage() {
 
                 {/* Day Overview Summary */}
                 {currentDayData ? (
-                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-outline-variant/40 mb-5">
+                  <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-teal-100 mb-3">
                       <div>
-                        <h4 className="font-h2 text-base font-bold text-on-surface flex items-center gap-2">
+                        <h4 className="font-h2 text-base font-bold text-on-surface flex flex-wrap items-center gap-2">
                           <span>
                             {currentWeekDayMeta?.fullDayName} ({currentWeekDayMeta?.shortDate})
                             {currentWeekDayMeta?.isToday && (
@@ -924,7 +916,7 @@ export default function DoctorPatientHistoryPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-8 text-center text-on-surface-variant">
+                  <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 text-center text-on-surface-variant">
                     <p className="text-xs italic">Không có dữ liệu chi tiết cho ngày được chọn.</p>
                   </div>
                 )}

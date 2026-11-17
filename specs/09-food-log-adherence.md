@@ -26,9 +26,10 @@ Là **bệnh nhân**, tôi muốn ghi nhận nhanh mỗi bữa ăn là "đã ăn
 3. FE gọi `POST /food-log`.
 4. BE persist `FoodLog`; nếu `custom` + khớp KB tương tác → tạo `Alert` liên kết (`alert_ids[]`).
 5. Patient xem lại lịch sử log qua `GET /food-log` (filter theo `date`/`meal_plan_id`).
-6. Dữ liệu log tổng hợp làm input cho `specs/13-ai-chat-assistant.md` (intent `food_log` đọc 3 log gần nhất) và gián tiếp cho `specs/10-doctor-compliance-view.md` (nguồn tuân thủ chính hiện tại vẫn là `Notification(type="adherence_checkin")`, không trực tiếp qua `FoodLog` — xem ADR-008).
+6. Dữ liệu log làm input cho `specs/13-ai-chat-assistant.md` (intent `food_log` đọc 3 log gần nhất). `ComplianceService` hiện đã tổng hợp trực tiếp FoodLog: ngày có log ưu tiên điểm từ các bữa; ngày chưa có log mới dùng `adherence_checkin` (xem contract API §10).
 
 ## 5. Edge cases
+- **Nhận biết tuân thủ ở trang bệnh nhân:** hiển thị tiến độ ghi nhận hôm nay theo các bữa của lịch đang áp dụng, phân biệt `as_planned` (đã ăn theo thực đơn), `custom` (đã ăn khác + ghi chú), chưa ghi và chưa đến ngày. Chỉ ghi nhận bữa hôm nay; ánh xạ `day_index` theo ngày bắt đầu áp dụng, không theo thứ trong tuần. Không dùng log khác ngày/lịch để đánh dấu bữa hiện tại. Khi chưa có thực đơn áp dụng hoặc tải nhật ký lỗi, nêu rõ thay vì kết luận không tuân thủ. Biểu đồ giải thích điểm từ ghi nhận, không gọi mốc hiển thị 85% là chuẩn y khoa.
 - Intent `food_log` trong `/chat` map tới `food_log_node` — đọc 3 `FoodLog` gần nhất từ DB theo `user_id` và tóm tắt tuân thủ (fallback message cố định khi không có log nào), xem `specs/13`.
 - `POST /food-log` với `type="custom"` và `note` rỗng → `422` validation error (`note_required_for_custom`).
 - `GET /food-log?date=YYYY-MM-DD` lọc theo **ngày dương lịch Asia/Ho_Chi_Minh** của `logged_at` (cửa sổ UTC tương ứng, ví dụ 17:10 UTC ngày 23 = 00:10 VN ngày 24). `date.fromisoformat` không hợp lệ → bỏ qua filter ngày, không lỗi.

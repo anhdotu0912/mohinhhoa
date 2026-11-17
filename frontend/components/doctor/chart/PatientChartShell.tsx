@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { TopBar } from "@/components/shared/TopBar";
 import { PlanExpiryBadge } from "@/components/doctor/PlanExpiryBadge";
 import { TransferDoctorControl } from "@/components/doctor/TransferDoctorControl";
 import { api, assetUrl } from "@/lib/api";
@@ -119,23 +118,24 @@ export function PatientChartShell({
 
   return (
     <>
-      <TopBar
-        title={
-          compact
+      <div className="mx-auto w-full max-w-[1240px] px-4 pb-2 pt-3 sm:px-6">
+        <p className="inline-flex w-fit items-center gap-1.5 rounded-md bg-teal-50 px-2 py-1 text-[11px] font-medium text-teal-700">
+          <span className="material-symbols-outlined text-[14px]">clinical_notes</span>
+          {compact
             ? "Kiểm tra thực đơn"
             : reviewing
               ? "Duyệt thực đơn"
-              : "Hồ sơ lâm sàng bệnh nhân"
-        }
-      />
+              : "Hồ sơ lâm sàng bệnh nhân"}
+        </p>
+      </div>
 
       {/* Modern EHR 2-Tier Sticky Header Bar */}
-      <div className="bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant/60 sticky top-[var(--doctor-nav-height,64px)] z-20 shadow-xs">
-        <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 md:px-8 flex flex-col">
+      <div className="sticky top-[var(--doctor-nav-height,64px)] z-20 mx-auto w-full max-w-[1240px] px-4 sm:px-6">
+        <div className="flex w-full flex-col rounded-xl border border-teal-100 bg-white/95 px-3 shadow-[0_2px_8px_rgba(15,23,42,0.025)] backdrop-blur-md sm:px-4">
           {/* TIER 1: Patient Clinical Identity & Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 py-3">
             {/* Left Section: Back link + Avatar + Patient Info */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="flex w-full min-w-0 flex-none items-center gap-3 md:w-auto md:flex-1">
               <Link
                 href={backHref}
                 className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-all shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-outline-variant/60 hover:bg-surface-container-low hover:border-primary/40 shadow-2xs cursor-pointer active:scale-95"
@@ -205,7 +205,7 @@ export function PatientChartShell({
             </div>
 
             {/* Right Section: Plan Expiry Badge + Quick Action (Kiểm tra thực đơn) */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
               {patient?.plan_expiry && patient.plan_expiry !== "none" && (
                 <PlanExpiryBadge
                   expiry={{
@@ -234,11 +234,11 @@ export function PatientChartShell({
           </div>
 
           {!hideChartNav && routeId && (
-            <div className="pb-3">
+            <div className="flex justify-center border-t border-teal-100/70 py-2.5">
               <div
                 role="tablist"
                 aria-label="Phần hồ sơ bệnh nhân"
-                className="flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto p-1 rounded-xl bg-surface-container-low border border-outline-variant/50 custom-scrollbar"
+                className="flex w-fit max-w-full min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg border border-teal-100 bg-teal-50/60 p-1 custom-scrollbar"
               >
                 {CHART_TABS.map((tab) => {
                   const selected = activeTab === tab.id;
@@ -262,7 +262,7 @@ export function PatientChartShell({
                             : undefined
                       }
                       href={doctorChartHref(routeId, tab.id)}
-                      className={`relative flex flex-1 min-w-[9rem] items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
+                      className={`relative flex w-fit flex-none items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                         selected
                           ? "bg-primary text-on-primary font-bold shadow-[0_1px_2px_rgba(18,28,42,0.18)]"
                           : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest/80"

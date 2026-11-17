@@ -12,10 +12,12 @@ import { PatientChatSidebar } from "./PatientChatSidebar";
 import { usePatientChatHistoryStore } from "@/lib/patient-chat-history-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { APP_NAME } from "@/lib/brand";
+import { DoctorMiniChat } from "./DoctorMiniChat";
 
 function ShellInner({ children }: { children: ReactNode }) {
-  const { activePanel, openPanel, closePanel, hasUnseenBadge } = usePatientPanel();
+  const { activePanel, openPanel, closePanel, hasUnseenBadge, doctorChat } = usePatientPanel();
   const token = useAuthStore((s) => s.token);
+  const userId = useAuthStore((s) => s.userId);
   const toggleSidebar = usePatientChatHistoryStore((s) => s.toggleSidebar);
   const isSidebarOpen = usePatientChatHistoryStore((s) => s.isSidebarOpen);
   const hydrateSessions = usePatientChatHistoryStore((s) => s.hydrateSessions);
@@ -212,6 +214,16 @@ function ShellInner({ children }: { children: ReactNode }) {
       </div>
 
       {/* Side Panels Overlay */}
+      {token && doctorChat && doctorChat.userId === userId && (
+        <div hidden={activePanel !== null}>
+          <DoctorMiniChat
+            key={`${userId}:${doctorChat.escalationId}`}
+            escalationId={doctorChat.escalationId}
+            doctor={doctorChat.doctor}
+            initialThread={doctorChat.initialThread}
+          />
+        </div>
+      )}
       {activePanel === "menu" && <MealLogPanel />}
       {activePanel === "notifications" && <NotificationsPanel />}
       {activePanel === "health" && <HealthMetricsPanel />}

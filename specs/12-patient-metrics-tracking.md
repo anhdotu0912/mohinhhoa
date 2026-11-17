@@ -38,6 +38,7 @@ Cân nặng/chiều cao/BMI là input quan trọng để tính `target_kcal` ph�
 2. Chỉ hiển thị được **giá trị mới nhất** trên profile — biểu đồ xu hướng dùng dữ liệu thật từ `GET /metrics/history`.
 
 ## 5. Edge cases
+- **Biểu đồ theo ngày:** 7 ngày là cửa sổ xem, không phải điều kiện có đủ 7 bản ghi. Hiển thị khung ngày ngay cả khi chưa đo; 1 lần ghi đã tạo điểm quan sát, 2 ngày có dữ liệu đã có thể nối đường. Ngày thiếu không tự điền 0. Gom theo ngày Việt Nam, lấy số đo không rỗng mới nhất của từng chỉ số trong ngày để bản ghi riêng lẻ sau đó không làm mất chỉ số đã ghi trước. Cập nhật biểu đồ từ response lưu thành công rồi làm mới nền. Nhận xét xu hướng là phần riêng, không chặn hiển thị dữ liệu ít ngày. Chỉ số sức khỏe dùng số đo, không suy ra tự động từ ghi nhận bữa ăn.
 - Patient tự nhập BMI mâu thuẫn với weight/height đã nhập → hệ thống chấp nhận, không cảnh báo (rule 2, cố ý không validate chéo ở endpoint patient).
 - Doctor cập nhật metrics nhưng chỉ gửi 1 trong 2 field (`weight` hoặc `height`) → theo rule 5, BE trả `400 METRICS_INCOMPLETE`, không cố suy ra từ giá trị cũ trong `profiles`.
 

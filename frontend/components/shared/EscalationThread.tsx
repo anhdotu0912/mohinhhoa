@@ -123,6 +123,7 @@ export function EscalationThread({
   error,
   onSend,
   compact = false,
+  active = true,
 }: {
   thread: EscalationOut;
   viewer?: "patient" | "doctor";
@@ -133,6 +134,7 @@ export function EscalationThread({
   error?: string | null;
   onSend: (body: string) => void | Promise<void>;
   compact?: boolean;
+  active?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -145,6 +147,7 @@ export function EscalationThread({
   const lastSender = thread.messages.at(-1)?.sender;
 
   useEffect(() => {
+    if (!active) return;
     if (compact) {
       const viewport = viewportRef.current;
       if (viewport && (nearBottomRef.current || lastSender === viewer)) {
@@ -153,7 +156,7 @@ export function EscalationThread({
     } else {
       endRef.current?.scrollIntoView({ block: "nearest" });
     }
-  }, [thread.messages.length, thread.status, compact, viewer, lastSender]);
+  }, [thread.messages.length, thread.status, compact, viewer, lastSender, active]);
 
   const resolved = thread.status === "resolved";
   const busy = Boolean(sending || submitting);

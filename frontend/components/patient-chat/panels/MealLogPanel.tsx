@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePatientPanel } from "../PatientPanelProvider";
 import { api } from "@/lib/api";
@@ -13,6 +13,8 @@ import {
 } from "@/lib/types";
 import { MealItemRow } from "@/components/patient-chat/MealItemRow";
 import { WeeklyAdherenceChart } from "@/components/patient-chat/WeeklyAdherenceChart";
+import { DailyMealProgress } from "@/components/patient-chat/DailyMealProgress";
+import { foodLogSlot as toFoodLogSlot, latestMealLog, patientMealDay } from "@/lib/patient-meal-progress";
 import { mealsToDayTotals, sumMealNutrition } from "@/lib/meal-plan-display";
 import { NutrientChips } from "@/components/shared/NutrientChips";
 import { useVietnamToday } from "@/lib/use-vietnam-today";
@@ -33,30 +35,6 @@ const SLOT_META: Record<string, { label: string; icon: string }> = {
   snack: { label: "Bữa phụ", icon: "cookie" },
 };
 
-function getLocalDateString(d: Date = new Date()): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/** Parse API datetime. Naive ISO (no Z/offset) is UTC — backend stores UTC. */
-function parseLoggedAt(value: string): Date {
-  if (!value) return new Date(NaN);
-  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
-    return new Date(value);
-  }
-  return new Date(`${value}Z`);
-}
-
-function toFoodLogSlot(slot: string): "morning" | "noon" | "evening" | "snack" | null {
-  if (slot === "breakfast" || slot === "morning") return "morning";
-  if (slot === "lunch" || slot === "noon") return "noon";
-  if (slot === "dinner" || slot === "evening") return "evening";
-  if (slot === "snack") return "snack";
-  return null;
-}
-
 const DAY_LABELS = [
   { short: "T2", full: "Thứ 2", index: 0, dayIndex: 1 },
   { short: "T3", full: "Thứ 3", index: 1, dayIndex: 2 },
@@ -76,6 +54,9 @@ export function MealLogPanel() {
   const [compliance, setCompliance] = useState<PatientComplianceOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [foodLogsError, setFoodLogsError] = useState<string | null>(null);
+  const [complianceError, setComplianceError] = useState<string | null>(null);
+  const mealsSectionRef = useRef<HTMLDivElement>(null);
 
   // Determine current day of week (0 = Mon ... 6 = Sun)
   const vietnamToday = useVietnamToday();
@@ -99,11 +80,13 @@ export function MealLogPanel() {
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [schedule, logs, complianceData] = await Promise.all([
+      const [scheduleResult, logsResult, complianceResult] = await Promise.allSettled([
         api.getMyMealPlanSchedule(),
-        api.listFoodLogs().catch(() => []),
-        api.getMyCompliance(14).catch(() => null),
+        api.listFoodLogs(),
+        api.getMyCompliance(14),
       ]);
+      if (scheduleResult.status === "rejected") throw scheduleResult.reason;
+      const schedule = scheduleResult.value;
       const plan = schedule.active_plan;
       const today = vietnamTodayIso();
       const isApplied = plan && ["approved", "edited"].includes(plan.status)
@@ -111,10 +94,14 @@ export function MealLogPanel() {
         && plan.starts_on <= today && today <= plan.ends_on;
       setMealPlan(isApplied ? plan : null);
       setHistoryPlans(mealPlanHistory(schedule));
-      setFoodLogs(logs);
-      setCompliance(complianceData);
+      setFoodLogs(logsResult.status === "fulfilled" ? logsResult.value : []);
+      setFoodLogsError(logsResult.status === "rejected" ? "Chưa tải được nhật ký bữa ăn. Chưa thể xác định bữa nào đã ghi." : null);
+      setCompliance(complianceResult.status === "fulfilled" ? complianceResult.value : null);
+      setComplianceError(complianceResult.status === "rejected" ? "Chưa tải được điểm ghi nhận. Vui lòng tải lại." : null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không tải được thực đơn.");
+      setFoodLogsError("Chưa tải được lịch áp dụng. Vui lòng tải lại trước khi ghi nhận bữa ăn.");
+      setComplianceError("Chưa tải được dữ liệu để hiển thị điểm ghi nhận.");
     } finally {
       setLoading(false);
     }
@@ -124,36 +111,23 @@ export function MealLogPanel() {
     void loadData();
   }, [loadData, vietnamToday]);
 
-  const todayDateStr = useMemo(() => getLocalDateString(now), [now]);
+  const todayDateStr = vietnamToday;
+  const selectedDateStr = useMemo(() => {
+    const date = new Date(`${vietnamToday}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + selectedDayIndex - todayDayOfWeek);
+    return date.toISOString().slice(0, 10);
+  }, [vietnamToday, selectedDayIndex, todayDayOfWeek]);
 
   // Selected Day Plan (plan.days have day_index 1..7)
   const activeDayPlan = useMemo(() => {
-    if (!mealPlan?.days || mealPlan.days.length === 0) return null;
-    const targetDayIndex = selectedDayIndex + 1;
-    return (
-      mealPlan.days.find((d) => d.day_index === targetDayIndex) ||
-      mealPlan.days[selectedDayIndex % mealPlan.days.length] ||
-      null
-    );
-  }, [mealPlan, selectedDayIndex]);
+    return patientMealDay(mealPlan, selectedDateStr);
+  }, [mealPlan, selectedDateStr]);
 
   const isToday = selectedDayIndex === todayDayOfWeek;
 
-  // Determine logged status for each slot today
-  const isSlotLogged = useCallback(
-    (slotKey: string) => {
-      const target = toFoodLogSlot(slotKey);
-      if (!target) return false;
-      return foodLogs.some((log) => {
-        const logDate = log.logged_at ? getLocalDateString(parseLoggedAt(log.logged_at)) : "";
-        return logDate === todayDateStr && log.slot === target;
-      });
-    },
-    [foodLogs, todayDateStr]
-  );
-
   const replaceDayItem = (slotKey: string, itemIdx: number, next: FoodItem) => {
-    const targetDayIndex = selectedDayIndex + 1;
+    const targetDayIndex = activeDayPlan?.day_index;
+    if (!targetDayIndex) return;
     setMealPlan((prev) => {
       if (!prev) return prev;
       return {
@@ -175,7 +149,7 @@ export function MealLogPanel() {
 
   const handleLogPlanned = async (slotKey: string) => {
     const slot = toFoodLogSlot(slotKey);
-    if (!mealPlan || !activeDayPlan || !slot) return;
+    if (!mealPlan || !activeDayPlan || !slot || !isToday || savingSlot || foodLogsError) return;
     setSavingSlot(slotKey);
     try {
       const created = await api.createFoodLog({
@@ -195,7 +169,7 @@ export function MealLogPanel() {
 
   const handleLogCustom = async (slotKey: string) => {
     const slot = toFoodLogSlot(slotKey);
-    if (!mealPlan || !activeDayPlan || !slot || !customNote.trim()) return;
+    if (!mealPlan || !activeDayPlan || !slot || !isToday || savingSlot || foodLogsError || !customNote.trim()) return;
     setSavingSlot(slotKey);
     try {
       const created = await api.createFoodLog({
@@ -296,29 +270,31 @@ export function MealLogPanel() {
 
         {/* Scrollable Content Body */}
         <div className="p-3.5 sm:p-5 md:p-7 flex-1 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-5">
+          <DailyMealProgress
+            plan={mealPlan} logs={foodLogs} today={todayDateStr} loading={loading}
+            error={error || foodLogsError}
+            onRetry={() => { setLoading(true); void loadData(); }}
+            onNavigate={closePanel}
+            onRecord={() => {
+              setSelectedDayIndex(todayDayOfWeek);
+              setCustomSlot(null);
+              mealsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
           <WeeklyAdherenceChart
             series={compliance?.daily_series ?? []}
             todayDateStr={todayDateStr}
             selectedDayIndex={selectedDayIndex}
             loading={loading}
+            errorMessage={complianceError}
+            onRetry={() => { setLoading(true); void loadData(); }}
             onSelectDay={(index) => {
               setSelectedDayIndex(index);
               setCustomSlot(null);
             }}
           />
-          {!loading && historyPlans.length > 0 && <section aria-label="Nhật ký thực đơn" className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">Nhật ký thực đơn cũ</h3>
-            <p className="text-xs text-slate-500">Các bản cũ được giữ để xem lại. Bản chưa áp dụng không được tính là đã ăn theo thực đơn.</p>
-            {historyPlans.map((old) => <details key={old.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <summary className="cursor-pointer text-xs font-bold text-slate-800">{old.starts_on && old.ends_on
-                ? `${old.starts_on} – ${old.ends_on} · Hoàn thành`
-                : `Bản ngày ${old.created_at?.slice(0, 10) ?? "chưa xác định"} · Đã lưu Nhật ký · Chưa áp dụng`}</summary>
-              <WeeklyMealPlanCard plan={old} historical />
-            </details>)}
-          </section>}
-
           {/* Meals for Selected Day Section */}
-          <div className="space-y-3.5">
+          <div ref={mealsSectionRef} className="scroll-mt-3 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5 sm:gap-2">
                 <span>Thực đơn {DAY_LABELS[selectedDayIndex]?.full}</span>
@@ -373,7 +349,8 @@ export function MealLogPanel() {
 
                 const foodLogSlot = toFoodLogSlot(slotKey);
                 const canLogSlot = foodLogSlot !== null;
-                const isLogged = isToday && canLogSlot ? isSlotLogged(slotKey) : false;
+                const slotLog = mealPlan && !foodLogsError ? latestMealLog(foodLogs, mealPlan.id, selectedDateStr, slotKey) : null;
+                const isLogged = slotLog !== null;
                 const isSaving = savingSlot === slotKey;
                 const isCustomOpen = customSlot === slotKey;
 
@@ -403,24 +380,24 @@ export function MealLogPanel() {
                       {/* Action / Logging Buttons */}
                       <div className="shrink-0">
                         {isLogged ? (
-                          <div className="flex items-center gap-1 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-emerald-50 text-emerald-800 rounded-full text-[10px] sm:text-xs font-bold border border-emerald-200 shadow-2xs">
-                            <span className="material-symbols-outlined text-[13px] sm:text-[15px] text-[#006857]">check_circle</span>
-                            <span>Đã ghi nhận</span>
+                          <div className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-semibold ${slotLog.type === "as_planned" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                            <span className="material-symbols-outlined text-[15px]">{slotLog.type === "as_planned" ? "check_circle" : "edit_note"}</span>
+                            <span>{slotLog.type === "as_planned" ? "Đã ăn theo thực đơn" : "Đã ăn khác"}</span>
                           </div>
-                        ) : isToday && canLogSlot ? (
+                        ) : isToday && canLogSlot && !foodLogsError ? (
                           <div className="flex items-center gap-1 sm:gap-1.5">
                             <button
                               type="button"
-                              disabled={isSaving}
+                              disabled={savingSlot !== null}
                               onClick={() => void handleLogPlanned(slotKey)}
                               className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-[#006857] hover:bg-[#005245] text-white rounded-lg text-[11px] sm:text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
                             >
                               <span className="material-symbols-outlined text-[13px] sm:text-[14px]">done</span>
-                              <span>{isSaving ? "Đang lưu..." : "Ăn đúng"}</span>
+                              <span>{isSaving ? "Đang lưu..." : "Đã ăn theo thực đơn"}</span>
                             </button>
                             <button
                               type="button"
-                              disabled={isSaving}
+                              disabled={savingSlot !== null}
                               onClick={() => {
                                 setCustomSlot(isCustomOpen ? null : slotKey);
                                 setCustomNote("");
@@ -428,16 +405,18 @@ export function MealLogPanel() {
                               className="px-2.5 py-1 sm:px-3 sm:py-1.5 border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-[11px] sm:text-xs font-semibold hover:bg-slate-50 transition-colors active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1"
                             >
                               <span className="material-symbols-outlined text-[13px] sm:text-[14px]">edit_note</span>
-                              <span>Ăn khác</span>
+                              <span>Đã ăn khác</span>
                             </button>
                           </div>
                         ) : (
                           <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-50 rounded-md sm:rounded-lg border border-slate-200/60">
-                            Kế hoạch thực đơn
+                            {foodLogsError ? "Chưa tải được ghi nhận" : selectedDateStr > todayDateStr ? "Chưa đến ngày" : "Chưa ghi nhận"}
                           </span>
                         )}
                       </div>
                     </div>
+
+                    {slotLog?.type === "custom" && slotLog.note && <p className="mb-2 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-xs text-amber-900">Bạn đã ăn: {slotLog.note}</p>}
 
                     {/* Dishes List */}
                     <div className="flex flex-col gap-2">
@@ -526,6 +505,17 @@ export function MealLogPanel() {
                 );
               })}
           </div>
+          {!loading && historyPlans.length > 0 && <section aria-label="Nhật ký thực đơn" className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">Nhật ký thực đơn cũ</h3>
+            <p className="text-xs text-slate-500">Các bản cũ được giữ để xem lại. Bản chưa áp dụng không được tính là đã ăn theo thực đơn.</p>
+            {historyPlans.map((old) => <details key={old.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-xs font-bold text-slate-800">{old.starts_on && old.ends_on
+                ? `${old.starts_on} – ${old.ends_on} · Hoàn thành`
+                : `Bản ngày ${old.created_at?.slice(0, 10) ?? "chưa xác định"} · Đã lưu Nhật ký · Chưa áp dụng`}</summary>
+              <WeeklyMealPlanCard plan={old} historical />
+            </details>)}
+          </section>}
+
         </div>
       </div>
     </div>

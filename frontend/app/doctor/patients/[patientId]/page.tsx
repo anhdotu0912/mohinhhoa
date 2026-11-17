@@ -333,7 +333,7 @@ export default function PatientDetailPage() {
 
   return (
     <>
-      <div className="flex flex-col min-h-[calc(100vh-64px)] bg-background font-body">
+      <div className="flex min-w-0 flex-col bg-background font-body">
         {/* Toast Notification */}
         {toastMessage && (
           <div className="fixed top-[calc(var(--doctor-nav-height,64px)+1rem)] right-6 z-50 bg-primary text-on-primary px-md py-sm rounded-xl shadow-xl border border-primary-fixed/30 flex items-center gap-xs font-body text-sm animate-slide-down">
@@ -342,7 +342,7 @@ export default function PatientDetailPage() {
           </div>
         )}
 
-        <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 flex-1">
+        <main className="mx-auto w-full max-w-[1240px] flex-1 space-y-4 px-4 py-4 sm:px-6">
           {summary?.constraints_status === "pending_doctor_review" && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
               <div className="flex items-start gap-2.5 min-w-0">
@@ -381,30 +381,6 @@ export default function PatientDetailPage() {
             </div>
           )}
 
-          {/* Top Quick Actions Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-
-            <div className="flex items-center flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteModalOpen(true)}
-                className="bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                <span>Xóa bệnh nhân</span>
-              </button>
-              {!hasGenerateRequest && (
-                <Link
-                  href={`/doctor/patients/${patientId}/meals`}
-                  className="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold hover:bg-primary/90 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  <span>Kiểm tra thực đơn</span>
-                </Link>
-              )}
-            </div>
-          </div>
-
           {hasGenerateRequest && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs animate-in fade-in duration-200">
               <div className="min-w-0">
@@ -432,16 +408,17 @@ export default function PatientDetailPage() {
             </div>
           )}
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left Column: Patient Profile & Demographics (32%) */}
-            <div className="w-full lg:w-[32%] flex flex-col gap-6">
+          <div className="grid items-start gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+            {/* Patient identity and contact information */}
+            <div className="min-w-0 space-y-4">
               {/* Profile Card */}
-              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 p-6 flex flex-col items-center text-center shadow-xs">
-                <div className="relative mb-4">
-                  <div className="relative w-24 h-24 rounded-full ring-4 ring-primary/20 p-1 bg-white shadow-md overflow-hidden">
+              <div className="rounded-xl border border-teal-200/70 bg-teal-50/40 p-4">
+                <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <div className="relative h-14 w-14 overflow-hidden rounded-full bg-white p-1 ring-2 ring-teal-200">
                     <div
                       translate="no"
-                      className="absolute inset-1 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-bold"
+                      className="absolute inset-1 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xl font-bold"
                     >
                       {initials(patient.name)}
                     </div>
@@ -456,17 +433,20 @@ export default function PatientDetailPage() {
                       />
                     )}
                   </div>
-                  <span className="absolute bottom-0 right-0 z-20 w-4 h-4 bg-emerald-500 ring-2 ring-white rounded-full"></span>
+                  <span className="absolute bottom-0 right-0 z-20 h-3 w-3 bg-emerald-500 ring-2 ring-white rounded-full"></span>
                 </div>
-                <h3 className="text-on-surface mb-1 font-black text-xl tracking-tight">
-                  {patient.name}
-                </h3>
-                <p className="text-on-surface-variant mb-4 text-xs font-semibold">
-                  {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender === "male" ? "Nam" : patient.gender === "female" ? "Nữ" : patient.gender}
-                </p>
+                  <div className="min-w-0">
+                    <h3 className="text-on-surface font-bold text-[18px] tracking-tight break-words">
+                      {patient.name}
+                    </h3>
+                    <p className="mt-1 text-on-surface-variant text-xs font-medium">
+                      {patient.age > 0 ? `${patient.age} tuổi` : "—"} • {patient.gender === "male" ? "Nam" : patient.gender === "female" ? "Nữ" : patient.gender}
+                    </p>
+                  </div>
+                </div>
 
-                <div className="w-full text-left pt-4 border-t border-outline-variant/40">
-                  <p className="text-on-surface-variant mb-2 uppercase tracking-wider text-[10px] font-bold">
+                <div className="mt-3 w-full border-t border-teal-100 pt-3 text-left">
+                  <p className="mb-2 text-[11px] font-semibold text-teal-800">
                     Chẩn đoán &amp; Bệnh lý
                   </p>
                   <div className="flex flex-wrap gap-1.5 justify-start">
@@ -478,7 +458,7 @@ export default function PatientDetailPage() {
                       patient.diagnoses.map((diag, index) => (
                         <span
                           key={index}
-                          className="bg-primary/10 text-primary px-3 py-1 rounded-md font-caption text-caption border border-primary/20 text-xs font-semibold"
+                          className="w-fit max-w-full rounded-md border border-teal-200/70 bg-white px-2 py-1 text-xs font-semibold text-teal-800"
                         >
                           {diag}
                         </span>
@@ -489,10 +469,10 @@ export default function PatientDetailPage() {
               </div>
 
               {/* Contact & Extra Info Card */}
-              <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 p-5 shadow-xs">
-                <h4 className="text-on-surface mb-3.5 pb-2.5 border-b border-outline-variant/40 font-bold flex items-center justify-between text-xs uppercase tracking-wider">
+              <div className="bg-white rounded-xl border border-sky-100 p-4 shadow-xs">
+                <h4 className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-sky-50 px-2.5 py-2 text-[13px] font-semibold text-sky-900">
                   <span>Thông tin liên hệ &amp; Hồ sơ</span>
-                  <span className="material-symbols-outlined text-primary text-[18px]">
+                  <span className="material-symbols-outlined text-sky-700 text-[18px]">
                     badge
                   </span>
                 </h4>
@@ -527,11 +507,17 @@ export default function PatientDetailPage() {
                     <span className="font-medium text-on-surface">{patient.address || "—"}</span>
                   </li>
                 </ul>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <button type="button" onClick={() => setIsDeleteModalOpen(true)} className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-100">
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    Xóa bệnh nhân
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Right Column: Stacked Cards (68%) */}
-            <div className="w-full lg:w-[68%] flex flex-col gap-6">
+            {/* Clinical details */}
+            <div className="min-w-0 space-y-4">
               {/* Card 1: Body Vitals (Chỉ số cơ thể) */}
               <PatientMetricsCard
                 patientId={patientId}
@@ -547,12 +533,12 @@ export default function PatientDetailPage() {
               />
 
               {/* Card 2: Medications & Allergies */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Left Sub-card: Thuốc đang dùng */}
                 <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
-                  <div className="p-4 border-b border-outline-variant/40 bg-surface-container-low/40">
-                    <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-                      <span className="material-symbols-outlined text-primary text-[18px]">
+                  <div className="border-b border-sky-100 bg-sky-50/50 px-4 py-3">
+                    <h4 className="flex items-center gap-2 text-[13px] font-semibold text-sky-900">
+                      <span className="material-symbols-outlined text-sky-700 text-[18px]">
                         medication
                       </span>
                       <span>Thuốc điều trị đang dùng</span>
@@ -570,7 +556,7 @@ export default function PatientDetailPage() {
                             ? patient.medications
                             : patient.medications.slice(0, MAX_LIST_ITEMS)
                           ).map((med, idx) => (
-                            <li key={idx} className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-container-low/30 border border-outline-variant/30">
+                            <li key={idx} className="flex w-fit max-w-full items-start gap-2.5 rounded-lg border border-sky-100 bg-sky-50/30 px-3 py-2">
                               <span className="material-symbols-outlined text-primary text-[16px] mt-0.5">
                                 pill
                               </span>
@@ -606,15 +592,15 @@ export default function PatientDetailPage() {
 
                 {/* Right Sub-card: Dị ứng */}
                 <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
-                  <div className="p-4 border-b border-outline-variant/40 bg-surface-container-low/40">
-                    <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                  <div className="border-b border-rose-100 bg-rose-50/50 px-4 py-3">
+                    <h4 className="flex items-center gap-2 text-[13px] font-semibold text-rose-900">
                       <span className="material-symbols-outlined text-rose-600 text-[18px]">
                         warning
                       </span>
                       <span>Dị ứng &amp; Phản ứng phụ</span>
                     </h4>
                   </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="flex flex-1 flex-col gap-3 p-4">
                     {patient.allergies.severe.length === 0 &&
                       patient.allergies.mild.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
@@ -622,12 +608,12 @@ export default function PatientDetailPage() {
                       </p>
                     ) : (
                       <>
-                        <ul className="list-disc list-inside space-y-1 text-on-surface-variant text-xs mb-2 font-medium">
+                        {patient.allergies.mild.length > 0 && <ul className="list-disc list-inside space-y-1 text-on-surface-variant text-xs font-medium">
                           {patient.allergies.mild.map((item, idx) => (
                             <li key={idx}>{item}</li>
                           ))}
-                        </ul>
-                        <div className="pt-2.5 border-t border-outline-variant/30">
+                        </ul>}
+                        <div className={patient.allergies.mild.length ? "border-t border-rose-100 pt-2.5" : ""}>
                           <p className="text-rose-900 mb-1.5 text-[10px] uppercase tracking-wider font-black">
                             Cần tránh tuyệt đối:
                           </p>
@@ -668,8 +654,8 @@ export default function PatientDetailPage() {
 
               {/* Card 3: Treatment Goals */}
               <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
-                  <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/50 px-4 py-3">
+                  <h4 className="flex items-center gap-2 text-[13px] font-semibold text-amber-900">
                     <span className="material-symbols-outlined text-primary text-[18px]">
                       flag
                     </span>
@@ -688,7 +674,7 @@ export default function PatientDetailPage() {
                 </div>
 
                 <div className="p-4 flex-1 space-y-4">
-                  <div className="bg-surface-container-low/30 border border-outline-variant/40 rounded-lg p-4 min-h-[100px]">
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/30 p-3">
                     {goals.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
                         Chưa thiết lập mục tiêu điều trị cụ thể.
@@ -771,8 +757,8 @@ export default function PatientDetailPage() {
 
               {/* Card 4: Lịch sử thực đơn (Tóm tắt) */}
               <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
-                  <h4 className="text-on-surface flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-100 bg-teal-50/40 px-4 py-3">
+                  <h4 className="flex items-center gap-2 text-[13px] font-semibold text-teal-900">
                     <span className="material-symbols-outlined text-primary text-[18px]">
                       history
                     </span>

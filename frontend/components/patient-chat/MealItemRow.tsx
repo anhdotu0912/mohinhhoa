@@ -205,40 +205,32 @@ export function MealItemRow({
   return (
     <div
       ref={wrapRef}
-      className="flex flex-col gap-1.5 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
+      className="min-w-0 py-2.5 text-xs"
     >
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap sm:flex-nowrap flex-1">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#006857]" />
-          <span className="font-bold text-slate-800 truncate" title={current.name}>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
+        <div className="min-w-0">
+          <p className="break-words text-[14px] font-semibold leading-relaxed text-slate-900" title={current.name}>
             {current.name}
-          </span>
+          </p>
           {portionText && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white text-slate-600 text-[11px] font-medium border border-slate-200/80 shrink-0 shadow-2xs">
-              {portionText}
-            </span>
-          )}
-          {current.kcal > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 text-[#006857] text-[10.5px] font-bold border border-emerald-200/70 shrink-0">
-              {current.kcal} kcal
-            </span>
+            <p className="mt-0.5 break-words text-[12px] leading-relaxed text-slate-500">Khẩu phần: <span className="font-medium text-slate-700">{portionText}</span></p>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+        <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+          {current.kcal > 0 && <span className="whitespace-nowrap text-[12px] font-medium tabular-nums text-slate-500">{current.kcal} kcal</span>}
           <button
             type="button"
-            onClick={() => setShowNutrients((v) => !v)}
-            aria-label={showNutrients ? "Ẩn thành phần dinh dưỡng" : "Xem thành phần dinh dưỡng"}
+            onClick={() => { setShowNutrients((v) => !v); setOpen(false); }}
+            aria-expanded={showNutrients}
+            aria-controls={showNutrients ? `${panelId}-nutrition` : undefined}
+            aria-label={`${showNutrients ? "Ẩn" : "Xem"} chi tiết ${current.name}`}
             title={showNutrients ? "Ẩn thành phần dinh dưỡng" : "Xem thành phần dinh dưỡng"}
-            className={`flex h-6 w-6 sm:h-6.5 sm:w-6.5 shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-              showNutrients
-                ? "border-emerald-300 bg-emerald-50 text-[#006857] shadow-2xs"
-                : "border-slate-200 bg-white text-slate-500 hover:text-[#006857] hover:border-emerald-200 hover:bg-emerald-50/50"
-            }`}
+            className="inline-flex items-center gap-0.5 rounded px-0.5 py-0.5 text-[11px] font-medium text-slate-500 transition-colors hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
           >
+            <span>{showNutrients ? "Thu gọn" : "Chi tiết"}</span>
             <span
-              className={`material-symbols-outlined text-[17px] sm:text-[18px] transition-transform duration-200 ${
+              className={`material-symbols-outlined text-[15px] transition-transform duration-200 ${
                 showNutrients ? "rotate-180 text-[#006857]" : ""
               }`}
             >
@@ -246,34 +238,11 @@ export function MealItemRow({
             </span>
           </button>
 
-          {alternatives.length > 0 && (
-            <button
-              ref={btnRef}
-              type="button"
-              title={`${alternatives.length} lựa chọn thay thế`}
-              aria-label={`${alternatives.length} lựa chọn thay thế`}
-              aria-expanded={open}
-              aria-controls={open ? panelId : undefined}
-              onClick={() => setOpen((value) => !value)}
-              className={`relative flex h-6 w-6 sm:h-6.5 sm:w-6.5 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-                open
-                  ? "border-teal-300 bg-teal-50 text-teal-800"
-                  : "border-slate-200 bg-white text-[#006857] hover:border-teal-300 hover:bg-teal-50"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[15px]" aria-hidden>
-                swap_horiz
-              </span>
-              <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#006857] px-0.5 text-[8.5px] font-extrabold leading-none text-white">
-                {alternatives.length}
-              </span>
-            </button>
-          )}
         </div>
       </div>
 
       {showNutrients && (
-        <div className="pt-1 border-t border-slate-200/50 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div id={`${panelId}-nutrition`} className="mt-2 space-y-2.5 rounded-lg border border-slate-100 bg-slate-50/70 p-3">
           <NutrientChips
             values={toNutrientValues({
               kcal: current.kcal,
@@ -287,6 +256,27 @@ export function MealItemRow({
             compact
             className="w-full"
           />
+          {alternatives.length > 0 && (
+            <button
+              ref={btnRef}
+              type="button"
+              title={`${alternatives.length} lựa chọn thay thế`}
+              aria-label={`${alternatives.length} lựa chọn thay thế`}
+              aria-expanded={open}
+              aria-controls={open ? panelId : undefined}
+              onClick={() => setOpen((value) => !value)}
+              className={`inline-flex w-fit items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
+                open
+                  ? "border-teal-300 bg-teal-50 text-teal-800"
+                  : "border-slate-200 bg-white text-[#006857] hover:border-teal-300 hover:bg-teal-50"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]" aria-hidden>
+                swap_horiz
+              </span>
+              <span>Đổi món · {alternatives.length} lựa chọn</span>
+            </button>
+          )}
         </div>
       )}
 

@@ -77,7 +77,7 @@ export function PatientMetricsCard({
   return (
     <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-xs overflow-hidden">
       {/* Header: title + updatedAt + actions */}
-      <div className="px-5 py-3.5 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-100/70 bg-teal-50/40 px-4 py-3">
         <h4 className="text-on-surface flex items-center gap-2 font-bold text-sm">
           <span className="material-symbols-outlined text-primary text-[20px]">
             monitor_weight
@@ -86,7 +86,7 @@ export function PatientMetricsCard({
         </h4>
 
         {isEditing ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {error ? (
               <span className="text-xs text-rose-600 font-medium max-w-[220px] truncate">
                 {error}
@@ -121,14 +121,14 @@ export function PatientMetricsCard({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-on-surface-variant text-xs font-medium">
               Cập nhật: {metrics.updated_at || "—"}
             </span>
             <button
               type="button"
               onClick={startEdit}
-              className="text-primary hover:text-primary/80 transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer"
+              className="flex w-fit items-center gap-1 rounded-md border border-teal-200/70 bg-white px-2 py-1 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-50 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">
                 edit_note
@@ -140,9 +140,9 @@ export function PatientMetricsCard({
       </div>
 
       {/* Body: 4 clinical metric cells */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant/40">
+      <div className="grid grid-cols-2 gap-2.5 p-3 lg:grid-cols-4">
         {/* Cân nặng */}
-        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+        <div className="flex min-w-0 flex-col items-center justify-center rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-3 text-center">
           <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Cân nặng
           </p>
@@ -170,7 +170,7 @@ export function PatientMetricsCard({
         </div>
 
         {/* Chiều cao */}
-        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+        <div className="flex min-w-0 flex-col items-center justify-center rounded-lg border border-violet-100 bg-violet-50/40 px-3 py-3 text-center">
           <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Chiều cao
           </p>
@@ -198,7 +198,7 @@ export function PatientMetricsCard({
         </div>
 
         {/* BMI */}
-        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+        <div className="flex min-w-0 flex-col items-center justify-center rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-3 text-center">
           <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Chỉ số BMI
           </p>
@@ -215,7 +215,7 @@ export function PatientMetricsCard({
         </div>
 
         {/* Huyết áp / Đường huyết */}
-        <div className="p-5 flex flex-col items-center justify-center text-center bg-surface-container-lowest/50 hover:bg-surface-container-low/20 transition-colors">
+        <div className="flex min-w-0 flex-col items-center justify-center rounded-lg border border-rose-100 bg-rose-50/40 px-3 py-3 text-center">
           <p className="text-on-surface-variant mb-1.5 uppercase tracking-wider text-[10px] font-bold">
             Huyết áp &amp; Đường huyết
           </p>

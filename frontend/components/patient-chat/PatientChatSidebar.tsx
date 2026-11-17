@@ -36,6 +36,7 @@ export function PatientChatSidebar({
   const initials = userInitials(displayName || email || "BN");
 
   const sessions = usePatientChatHistoryStore((s) => s.sessions);
+  const historyLoading = usePatientChatHistoryStore((s) => s.isLoading);
   const activeSessionId = usePatientChatHistoryStore((s) => s.activeSessionId);
   const isSidebarOpen = usePatientChatHistoryStore((s) => s.isSidebarOpen);
   const toggleSidebar = usePatientChatHistoryStore((s) => s.toggleSidebar);
@@ -49,6 +50,7 @@ export function PatientChatSidebar({
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState("");
+  const [historyExpanded, setHistoryExpanded] = useState(true);
 
   // Context Menu State
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function PatientChatSidebar({
 
   // Close context menu on outside click or escape
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    const handleOutsideClick = () => {
       if (menuSessionId) {
         setMenuSessionId(null);
       }
@@ -249,14 +251,18 @@ export function PatientChatSidebar({
             return (
               <div
                 key={s.id}
-                onClick={() => handleSelectSession(s.id)}
                 className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-medium transition-all duration-150 cursor-pointer ${
                   isActive
                     ? "bg-emerald-50/90 text-[#006857] font-semibold shadow-2xs border border-emerald-500/20"
                     : "text-slate-700 hover:bg-slate-200/60 hover:text-slate-900"
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                <button
+                  type="button"
+                  onClick={() => handleSelectSession(s.id)}
+                  aria-current={isActive ? "true" : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md pr-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                >
                   <span
                     className={`material-symbols-outlined text-[17px] shrink-0 transition-colors ${
                       isActive ? "text-[#006857]" : "text-slate-400 group-hover:text-slate-600"
@@ -264,15 +270,15 @@ export function PatientChatSidebar({
                   >
                     {s.pinned ? "push_pin" : "chat_bubble"}
                   </span>
-                  <span className="truncate leading-tight">{s.title || "Cuộc trò chuyện"}</span>
-                </div>
+                  <span title={s.title || "Cuộc trò chuyện"} className="truncate leading-tight">{s.title || "Cuộc trò chuyện"}</span>
+                </button>
 
                 {/* 3-dot context menu trigger */}
                 <button
                   type="button"
                   onClick={(e) => handleOpenContextMenu(e, s)}
                   className={`p-1 rounded-md hover:bg-slate-300/60 text-slate-400 hover:text-slate-700 transition-all shrink-0 ${
-                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
                   }`}
                   title="Tùy chọn"
                 >
@@ -286,7 +292,7 @@ export function PatientChatSidebar({
     );
   };
 
-  const sidebarContent = (
+  const sidebarContent = (surface: "desktop" | "mobile") => (
     <div className="w-[260px] h-full flex flex-col bg-[#f0f4f9]/90 backdrop-blur-xl border-r border-slate-200/80 select-none">
       {/* Top Header: Hamburger, Brand, Clear All & New Chat Button */}
       <div className="p-3 pb-2.5 flex flex-col gap-2.5 border-b border-slate-200/60">
@@ -347,22 +353,39 @@ export function PatientChatSidebar({
           <span>Tạo thực đơn của tôi</span>
         </Link>
 
-        {/* Quick Search */}
-        {sessions.length > 5 && (
+        <button
+          type="button"
+          aria-expanded={historyExpanded}
+          aria-controls={`patient-chat-history-${surface}`}
+          onClick={() => {
+            setHistoryExpanded((expanded) => !expanded);
+            setMenuSessionId(null);
+          }}
+          className="flex w-full items-center gap-2.5 rounded-xl border border-emerald-200/70 bg-white/80 px-3.5 py-2.5 text-left text-[13px] font-semibold text-[#006857] transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+        >
+          <span className="material-symbols-outlined shrink-0 text-[20px]">history</span>
+          <span className="min-w-0 flex-1">Lịch sử trò chuyện</span>
+          <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">{sessions.length}</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">{historyExpanded ? "expand_less" : "expand_more"}</span>
+        </button>
+
+        {historyExpanded && (
           <div className="relative mt-0.5">
             <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2">
               search
             </span>
             <input
-              type="text"
+              type="search"
+              aria-label="Tìm cuộc trò chuyện đã lưu"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm đoạn chat..."
-              className="w-full bg-white/70 focus:bg-white border border-slate-200/80 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-emerald-500 transition-colors"
+              placeholder="Tìm tên cuộc trò chuyện…"
+              className="w-full bg-white/70 focus:bg-white border border-slate-200/80 rounded-lg pl-8 pr-8 py-2 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-emerald-500 transition-colors [&::-webkit-search-cancel-button]:appearance-none"
             />
             {searchQuery && (
               <button
                 type="button"
+                aria-label="Xóa từ khóa tìm kiếm"
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
@@ -374,19 +397,21 @@ export function PatientChatSidebar({
       </div>
 
       {/* Scrollable Sessions List */}
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2 py-3">
-        {filteredSessions.length === 0 ? (
+      <section id={`patient-chat-history-${surface}`} aria-label="Các cuộc trò chuyện đã lưu" aria-busy={historyLoading} hidden={!historyExpanded} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2 py-3">
+        {historyLoading && sessions.length === 0 ? (
+          <p role="status" className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-slate-500"><span className="material-symbols-outlined animate-spin text-[18px] text-emerald-600">progress_activity</span>Đang tải lịch sử…</p>
+        ) : filteredSessions.length === 0 ? (
           <div className="text-center py-8 px-4 text-slate-400 flex flex-col items-center gap-2">
             <span className="material-symbols-outlined text-[28px] text-slate-300">
               forum
             </span>
-            <p className="text-xs font-medium">Chưa có cuộc trò chuyện nào</p>
+            <p className="text-xs font-medium">{searchQuery.trim() ? "Không tìm thấy cuộc trò chuyện" : "Chưa có cuộc trò chuyện đã lưu"}</p>
             <button
               type="button"
-              onClick={handleStartNewChat}
+              onClick={searchQuery.trim() ? () => setSearchQuery("") : handleStartNewChat}
               className="text-xs text-[#006857] font-semibold hover:underline mt-1 cursor-pointer"
             >
-              Bắt đầu ngay
+              {searchQuery.trim() ? "Xóa tìm kiếm" : "Bắt đầu trò chuyện"}
             </button>
           </div>
         ) : (
@@ -398,10 +423,10 @@ export function PatientChatSidebar({
             {renderGroup("Trước đó", grouped.older)}
           </>
         )}
-      </div>
+      </section>
 
       {/* Bottom User Account Section */}
-      <div className="p-2.5 border-t border-slate-200/70 bg-[#f0f4f9] flex flex-col gap-1.5">
+      <div className="mt-auto p-2.5 border-t border-slate-200/70 bg-[#f0f4f9] flex flex-col gap-1.5">
         {/* Clickable Profile Card -> Directly opens /patient/profile */}
         <Link
           href="/patient/profile"
@@ -467,7 +492,7 @@ export function PatientChatSidebar({
           isSidebarOpen ? "w-[260px] opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
-        {sidebarContent}
+        {sidebarContent("desktop")}
       </aside>
 
       {/* Mobile Drawer with Backdrop */}
@@ -478,7 +503,7 @@ export function PatientChatSidebar({
             onClick={() => setSidebarOpen(false)}
           />
           <div className="relative z-10 h-full shadow-2xl animate-in slide-in-from-left duration-250">
-            {sidebarContent}
+            {sidebarContent("mobile")}
           </div>
         </div>
       )}
@@ -599,7 +624,7 @@ export function PatientChatSidebar({
               Xóa toàn bộ lịch sử trò chuyện?
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Tất cả các phiên tư vấn dinh dưỡng đã lưu sẽ bị xóa hoàn toàn khỏi trình duyệt của bạn.
+              Các cuộc trò chuyện đã lưu của tài khoản này sẽ bị xóa vĩnh viễn khỏi hệ thống.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 mt-5">

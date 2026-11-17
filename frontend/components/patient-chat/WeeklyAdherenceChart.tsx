@@ -54,6 +54,8 @@ interface WeeklyAdherenceChartProps {
   onSelectDay: (index: number) => void;
   loading?: boolean;
   targetPct?: number;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 }
 
 export interface TooltipProps {
@@ -106,9 +108,9 @@ export function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
   } else if (!row.hasData) {
     status = { text: "Chưa ghi nhận", className: "text-slate-300" };
   } else if ((row.pct ?? 0) >= targetPct) {
-    status = { text: "Đạt chuẩn", className: "text-emerald-400" };
+    status = { text: "Từ mốc hiển thị", className: "text-emerald-400" };
   } else {
-    status = { text: "Cần lưu ý", className: "text-amber-400" };
+    status = { text: "Dưới mốc hiển thị", className: "text-amber-400" };
   }
 
   const pctClass = row.hasData
@@ -129,7 +131,7 @@ export function ChartTooltip({ active, payload, targetPct }: TooltipProps) {
         </span>
       </div>
       <div className="flex items-center justify-between gap-4 pt-0.5 text-[11px]">
-        <span className="text-slate-400">Đánh giá</span>
+        <span className="text-slate-400">Ghi nhận</span>
         <span className={`font-semibold ${status.className}`}>{status.text}</span>
       </div>
     </div>
@@ -232,6 +234,8 @@ export function WeeklyAdherenceChart({
   onSelectDay,
   loading = false,
   targetPct = TARGET_PCT,
+  errorMessage = null,
+  onRetry,
 }: WeeklyAdherenceChartProps) {
   const mounted = React.useSyncExternalStore(emptySubscribe, () => true, () => false);
 
@@ -254,12 +258,13 @@ export function WeeklyAdherenceChart({
     return Math.round(scored.reduce((sum, pct) => sum + pct, 0) / scored.length);
   }, [chartData]);
 
-  const badge =
-    weekPct == null
+  const badge = errorMessage
+    ? { label: "Chưa tải được", className: "text-amber-800 bg-amber-50 border-amber-200" }
+    : weekPct == null
       ? { label: "Chưa có dữ liệu", className: "text-slate-600 bg-slate-100 border-slate-200" }
       : weekPct >= targetPct
-        ? { label: `${weekPct}% đạt chuẩn`, className: "text-[#006857] bg-emerald-50 border-emerald-200" }
-        : { label: `${weekPct}% cần lưu ý`, className: "text-amber-800 bg-amber-50 border-amber-200" };
+        ? { label: `${weekPct}% điểm ghi nhận`, className: "text-[#006857] bg-emerald-50 border-emerald-200" }
+        : { label: `${weekPct}% điểm ghi nhận`, className: "text-amber-800 bg-amber-50 border-amber-200" };
 
   const loggedCount = chartData.filter((row) => row.hasData).length;
 
@@ -271,7 +276,7 @@ export function WeeklyAdherenceChart({
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="weekly-adherence-heading" className="text-sm font-bold text-slate-900">
-            Tuân thủ tuần này
+            Điểm ghi nhận tuần này
           </h3>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
             {weekRange}
@@ -286,12 +291,12 @@ export function WeeklyAdherenceChart({
       </header>
       <p className="sr-only">
         {weekPct == null
-          ? "Chưa có dữ liệu tuân thủ tuần này."
-          : `Trung bình tuân thủ tuần này ${weekPct} phần trăm, dựa trên ${loggedCount} ngày đã ghi nhận.`}
+          ? "Chưa có ghi nhận để tính điểm tuần này."
+          : `Điểm ghi nhận trung bình tuần này ${weekPct} phần trăm, dựa trên ${loggedCount} ngày đã ghi nhận.`}
       </p>
 
       <div className="h-44 w-full">
-        {loading || !mounted ? (
+        {errorMessage ? <div role="alert" className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-center text-xs text-amber-800"><p>{errorMessage}</p>{onRetry && <button type="button" onClick={onRetry} className="font-semibold underline">Tải lại điểm ghi nhận</button>}</div> : loading || !mounted ? (
           <div
             className="h-full w-full rounded-lg bg-white/70 border border-slate-200/70 animate-pulse"
             aria-hidden
@@ -372,11 +377,11 @@ export function WeeklyAdherenceChart({
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[11px] text-slate-600 pt-0.5">
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-[#006857]" />
-          Đạt chuẩn (≥{targetPct}%)
+          Điểm ≥{targetPct}%
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-amber-600" />
-          Cần lưu ý
+          Điểm &lt;{targetPct}%
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-slate-300" />
@@ -384,9 +389,17 @@ export function WeeklyAdherenceChart({
         </span>
         <span className="inline-flex items-center gap-1.5 ml-auto text-slate-500">
           <span className="w-3 border-t border-dashed border-emerald-600" />
-          Vùng mục tiêu
+          Mốc hiển thị
         </span>
       </div>
+      <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+        <summary className="cursor-pointer font-semibold text-teal-800">Cách ghi nhận và tính điểm</summary>
+        <div className="mt-2 space-y-2 leading-relaxed">
+          <p>Sáng, trưa, tối: mỗi bữa tối đa 30 điểm; bữa phụ 10 điểm. “Ăn theo thực đơn” nhận đủ điểm, “Ăn khác” nhận một nửa. Bữa chưa ghi chưa được cộng điểm.</p>
+          <p>Ngày chưa có nhật ký bữa ăn dùng check-in nếu có: đúng kế hoạch 100, một phần 50, không theo kế hoạch 0 điểm. Trung bình tuần chỉ tính các ngày có ghi nhận.</p>
+          <p>Mốc {targetPct}% dùng để phân màu trong ứng dụng. Điểm thấp có thể do chưa ghi đủ bữa; bữa chưa ghi chưa cho biết bạn đã ăn đúng hay sai.</p>
+        </div>
+      </details>
     </section>
   );
 }
