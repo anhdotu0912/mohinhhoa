@@ -4,22 +4,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { EscalationMessageOut, EscalationOut } from "@/lib/types";
 import { ESCALATION_REASON_LABEL } from "@/lib/escalation";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
-
-function formatClock(iso: string): string {
-  try {
-    const d = new Date(iso);
-    const now = new Date();
-    const sameDay =
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate();
-    const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-    if (sameDay) return time;
-    return `${d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} · ${time}`;
-  } catch {
-    return iso;
-  }
-}
+import { escalationContext } from "@/lib/escalation-display";
+import { messageTimeIso, vietnamMessageClock, vietnamMessageDateTime } from "@/lib/message-time";
+import { useCurrentTime } from "@/lib/use-current-time";
 
 function CounterpartAvatar({
   name,
@@ -145,6 +132,7 @@ export function EscalationThread({
   const nearBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastSender = thread.messages.at(-1)?.sender;
+  const now = useCurrentTime();
 
   useEffect(() => {
     if (!active) return;
@@ -166,6 +154,7 @@ export function EscalationThread({
   const composerPlaceholder =
     viewer === "patient" ? "Nhắn với bác sĩ…" : "Phản hồi bệnh nhân…";
   const waitingOnDoctor = thread.status === "waiting_doctor";
+  const questionAlreadyInThread = thread.messages.some((message) => message.kind === "context" && escalationContext(message.body).question === thread.question_text.trim());
 
   const submit = async () => {
     const text = draft.trim();
@@ -204,15 +193,18 @@ export function EscalationThread({
         }}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar px-4 py-4"
       >
-        {compact && thread.question_text ? (
-          <div className="flex justify-end mb-3">
-            <div className="max-w-[88%] rounded-xl rounded-tr-sm bg-[#006857] px-3.5 py-2.5 text-[13px] text-white whitespace-pre-wrap break-words">
-              <p className="mb-1 text-[10px] font-semibold text-emerald-100">Câu hỏi đã chuyển cho bác sĩ</p>
+        {thread.question_text && !questionAlreadyInThread ? (
+          <div className={`mb-3 flex ${viewer === "patient" ? "justify-end" : "justify-start"}`}>
+            <div className="max-w-[90%]">
+            <div className={`whitespace-pre-wrap break-words rounded-xl px-3.5 py-2.5 text-sm ${viewer === "patient" ? "rounded-tr-sm bg-[#006857] text-white" : "rounded-tl-sm border border-slate-200 bg-white text-slate-800"}`}>
+              <p className={`mb-1 text-[11px] font-semibold ${viewer === "patient" ? "text-emerald-100" : "text-teal-700"}`}>Câu hỏi chuyển từ trợ lý AI</p>
               {thread.question_text}
+            </div>
+            <time dateTime={messageTimeIso(thread.created_at)} title={`${vietnamMessageDateTime(thread.created_at)} (giờ Việt Nam)`} className={`mt-1 block text-[11px] tabular-nums text-slate-500 ${viewer === "patient" ? "text-right" : ""}`}>{vietnamMessageClock(thread.created_at, now)}</time>
             </div>
           </div>
         ) : null}
-        {compact && !thread.messages.some((m) => m.sender === "doctor") && !resolved ? (
+        {compact && viewer === "patient" && !thread.messages.some((m) => m.sender === "doctor") && !resolved ? (
           <p className="mb-3 text-center text-[11px] leading-relaxed text-slate-500">
             Câu hỏi đã được gửi. Bạn có thể nhắn thêm trong lúc chờ bác sĩ phản hồi.
           </p>
@@ -226,11 +218,17 @@ export function EscalationThread({
             viewer === "doctor" ? msg.sender === "doctor" : msg.sender === "patient";
 
           if (msg.kind === "context") {
+            const context = escalationContext(msg.body);
             return (
-              <div key={msg.id} className={`${i === 0 ? "" : "mt-4"} flex justify-center`}>
-                <p className="text-[11px] font-medium text-slate-500 bg-white rounded-md px-3 py-1 max-w-[92%] text-center leading-relaxed">
-                  Đã chuyển thêm câu hỏi từ chat
-                </p>
+              <div key={msg.id} className={`${i === 0 ? "" : "mt-4"} flex ${fromSelf ? "justify-end" : "justify-start"}`}>
+                <div className="max-w-[90%] min-w-0">
+                  <div className={`rounded-xl px-3.5 py-2.5 text-sm ${fromSelf ? "rounded-tr-sm bg-[#006857] text-white" : "rounded-tl-sm border border-slate-200 bg-white text-slate-800"}`}>
+                    <p className={`mb-1 text-[11px] font-semibold ${fromSelf ? "text-emerald-100" : "text-teal-700"}`}>Câu hỏi chuyển từ trợ lý AI</p>
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">{context.question || msg.body}</p>
+                  </div>
+                  {context.answer && <details className="mt-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600"><summary className="cursor-pointer font-medium">Xem câu trả lời AI đã chuyển kèm</summary><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed">{context.answer}</p></details>}
+                  <time dateTime={messageTimeIso(msg.created_at)} title={`${vietnamMessageDateTime(msg.created_at)} (giờ Việt Nam)`} className="mt-1 block text-[11px] tabular-nums text-slate-500">{vietnamMessageClock(msg.created_at, now)}</time>
+                </div>
               </div>
             );
           }
@@ -260,13 +258,15 @@ export function EscalationThread({
                     <p>{msg.body}</p>
                   </div>
                   {lastInRun ? (
-                    <p
+                    <time
+                      dateTime={messageTimeIso(msg.created_at)}
+                      title={`${vietnamMessageDateTime(msg.created_at)} (giờ Việt Nam)`}
                       className={`text-[11px] mt-1 tabular-nums ${
                         fromSelf ? "text-slate-400 pr-0.5" : "text-slate-400 pl-0.5"
                       }`}
                     >
-                      {formatClock(msg.created_at)}
-                    </p>
+                      {vietnamMessageClock(msg.created_at, now)}
+                    </time>
                   ) : null}
                 </div>
               </div>

@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.datetime_vn import utc_now_naive
 from app.db.session import Base
 
 
@@ -24,9 +25,9 @@ class ChatEscalation(Base):
     reason: Mapped[str] = mapped_column(String(32))
     patient_note: Mapped[str] = mapped_column(String(200), default="")
     status: Mapped[str] = mapped_column(String(24), default="waiting_doctor", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=utc_now_naive, server_default=func.now(), onupdate=utc_now_naive
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -48,6 +49,6 @@ class ChatEscalationMessage(Base):
     sender: Mapped[str] = mapped_column(String(12))
     body: Mapped[str] = mapped_column(Text, default="")
     kind: Mapped[str] = mapped_column(String(16), default="reply")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, server_default=func.now())
 
     escalation: Mapped[ChatEscalation] = relationship("ChatEscalation", back_populates="messages")

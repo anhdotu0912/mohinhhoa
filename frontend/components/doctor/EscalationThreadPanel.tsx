@@ -1,161 +1,121 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { ApiError, type EscalationOut } from "@/lib/types";
 import { EscalationThread } from "@/components/shared/EscalationThread";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 
-export function EscalationThreadPanel({
-  escalationId,
-  onClose,
-  onResolved,
-}: {
+/** Conversation contents inside the doctor's floating messenger. */
+export function EscalationThreadPanel({ escalationId, expanded, onClose, onBack, onUpdated }: {
   escalationId: string;
+  expanded: boolean;
   onClose: () => void;
-  onResolved?: () => void;
+  onBack: () => void;
+  onUpdated: () => void;
 }) {
   const [thread, setThread] = useState<EscalationOut | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const busyRef = useRef(false);
+  const mountedRef = useRef(false);
+  const versionRef = useRef(0);
+  const nextVersion = useCallback(() => ++versionRef.current, []);
 
   const load = useCallback(async () => {
-    setError(null);
+    if (busyRef.current) return;
+    const version = nextVersion();
     try {
       const data = await api.getDoctorEscalation(escalationId);
+      if (!mountedRef.current || version !== versionRef.current) return;
       setThread(data);
+      setLoadError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không tải được cuộc trao đổi.");
-    } finally {
-      setLoading(false);
+      if (mountedRef.current && version === versionRef.current) {
+        setLoadError(err instanceof ApiError ? err.message : "Không tải được tin mới. Vui lòng thử lại.");
+      }
     }
-  }, [escalationId]);
+  }, [escalationId, nextVersion]);
 
   useEffect(() => {
-    setLoading(true);
+    mountedRef.current = true;
     void load();
-  }, [load]);
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const timer = window.setInterval(refresh, expanded ? 5_000 : 20_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      mountedRef.current = false;
+      nextVersion();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load, expanded, nextVersion]);
 
   const handleSend = async (body: string) => {
+    if (busyRef.current || !thread || thread.status === "resolved") throw new Error("Cuộc trao đổi chưa sẵn sàng.");
+    busyRef.current = true;
+    nextVersion();
     setSending(true);
     setError(null);
     try {
       const next = await api.replyDoctorEscalation(escalationId, body);
+      if (!mountedRef.current) return;
       setThread(next);
+      setLoadError(null);
+      onUpdated();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không gửi được phản hồi.");
+      if (mountedRef.current) setError(err instanceof ApiError ? err.message : "Không gửi được phản hồi. Nội dung vẫn được giữ để thử lại.");
+      throw err;
     } finally {
-      setSending(false);
+      busyRef.current = false;
+      if (mountedRef.current) { setSending(false); void load(); }
     }
   };
 
   const handleResolve = async () => {
+    if (busyRef.current || !thread || thread.status === "resolved") return;
+    busyRef.current = true;
+    nextVersion();
     setResolving(true);
     setError(null);
     try {
       const next = await api.resolveDoctorEscalation(escalationId);
+      if (!mountedRef.current) return;
       setThread(next);
-      onResolved?.();
+      onUpdated();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Không đóng được việc.");
+      if (mountedRef.current) setError(err instanceof ApiError ? err.message : "Không kết thúc được cuộc trao đổi.");
     } finally {
-      setResolving(false);
+      busyRef.current = false;
+      if (mountedRef.current) { setResolving(false); void load(); }
     }
   };
 
-  const avatarSrc = resolveUserAvatar(thread?.patient_avatar);
+  const avatar = resolveUserAvatar(thread?.patient_avatar);
   const name = thread?.patient_name || "Bệnh nhân";
+  const status = !thread ? "Đang tải tin nhắn…" : thread.status === "resolved" ? "Trao đổi đã kết thúc" : thread.status === "waiting_patient" ? "Đã trả lời · chờ bệnh nhân" : "Bệnh nhân đang chờ phản hồi";
 
   return (
-    <div className="fixed inset-0 z-[80] flex justify-end">
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Đóng trao đổi"
-        className="absolute inset-0 bg-slate-950/40 cursor-pointer"
-        onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onClose();
-        }}
-      />
-      <aside className="relative z-10 h-full w-full max-w-lg bg-white border-l border-slate-200 shadow-2xl flex flex-col">
-        <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative w-11 h-11 shrink-0">
-              <div className="w-11 h-11 rounded-full bg-emerald-50 text-[#006857] border border-emerald-200 flex items-center justify-center font-bold text-sm">
-                {userInitials(name)}
-              </div>
-              {avatarSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarSrc}
-                  alt=""
-                  className="absolute inset-0 w-11 h-11 rounded-full object-cover"
-                />
-              ) : null}
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-bold text-base text-slate-900 truncate">{name}</h2>
-              <p className="text-xs text-slate-500 font-medium">
-                {thread?.status === "resolved"
-                  ? "Đã kết thúc"
-                  : thread?.status === "waiting_patient"
-                    ? "Đã trả lời · chờ bệnh nhân"
-                    : "Cần phản hồi"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {thread && thread.status !== "resolved" ? (
-              <button
-                type="button"
-                onClick={() => void handleResolve()}
-                disabled={resolving || sending}
-                title="Đánh dấu đã xử lý xong cuộc trao đổi này"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-emerald-50 hover:border-emerald-300 hover:text-[#006857] transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <span
-                  className={`material-symbols-outlined text-[16px] ${
-                    resolving ? "animate-spin" : ""
-                  }`}
-                >
-                  {resolving ? "progress_activity" : "task_alt"}
-                </span>
-                <span>{resolving ? "Đang đóng..." : "Đã xong"}</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-              title="Đóng"
-              aria-label="Đóng trao đổi"
-            >
-              <span className="material-symbols-outlined text-[22px]">close</span>
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 min-h-0 flex flex-col bg-[#f8fafc]">
-          {loading ? (
-            <p className="text-sm text-slate-500 p-5">Đang tải cuộc trao đổi…</p>
-          ) : thread ? (
-            <EscalationThread
-              thread={thread}
-              viewer="doctor"
-              counterpartName={name}
-              counterpartAvatar={thread.patient_avatar}
-              sending={sending}
-              error={error}
-              onSend={(body) => void handleSend(body)}
-            />
-          ) : (
-            <p className="text-sm text-rose-700 p-5">{error || "Không tìm thấy yêu cầu."}</p>
+    <section aria-label={`Nhắn tin với ${name}`} className="flex h-full min-h-0 flex-col">
+      <header className="flex shrink-0 items-center gap-2 border-b border-teal-100 bg-teal-50/60 px-3 py-3">
+        <button type="button" onClick={onBack} aria-label="Danh sách tin nhắn bệnh nhân" title="Danh sách tin nhắn" className="flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-teal-800 hover:bg-teal-100"><span className="material-symbols-outlined text-xl">arrow_back</span></button>
+        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-teal-200 bg-white text-xs font-bold text-teal-800">
+          {userInitials(name)}
+          {avatar && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           )}
-        </div>
-      </aside>
-    </div>
+        </span>
+        <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold text-slate-900">{name}</h2><p role="status" className="mt-0.5 text-[11px] text-slate-600">{status}</p></div>
+        {thread && thread.status !== "resolved" && <button type="button" onClick={() => void handleResolve()} disabled={resolving || sending} title="Đánh dấu đã xử lý xong" aria-label="Kết thúc cuộc trao đổi" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-teal-700 hover:bg-teal-100 disabled:opacity-50"><span className={`material-symbols-outlined text-xl ${resolving ? "animate-spin" : ""}`}>{resolving ? "progress_activity" : "task_alt"}</span></button>}
+        <button type="button" onClick={onClose} title="Thu gọn chat" aria-label="Thu gọn chat bệnh nhân" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"><span className="material-symbols-outlined text-xl">remove</span></button>
+      </header>
+      {loadError && <div role="alert" className="flex items-center justify-between gap-2 bg-amber-50 px-3 py-2 text-xs text-amber-900"><span>{loadError}</span><button type="button" onClick={() => void load()} className="shrink-0 font-semibold underline">Thử lại</button></div>}
+      {thread ? <EscalationThread compact active={expanded} thread={thread} viewer="doctor" counterpartName={name} counterpartAvatar={thread.patient_avatar} sending={sending} composerDisabled={resolving} error={error} onSend={handleSend} /> : <p className="flex flex-1 items-center justify-center p-4 text-sm text-slate-500">{loadError ? "Chưa tải được cuộc trao đổi." : "Đang tải cuộc trao đổi…"}</p>}
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-# P-014 — VinNutri — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
+#VinNutri — AI Agent Trợ Lý Dinh Dưỡng & Lối Sống Theo Bệnh Lý
 
 Prototype giúp bệnh nhân đái tháo đường Type 2 nhận thực đơn 7 ngày cá nhân hoá, cảnh báo tương tác thuốc–thực phẩm, nhắc tuân thủ (compliance), và dashboard cho bác sĩ/chuyên gia dinh dưỡng duyệt thực đơn.
 
@@ -306,10 +306,9 @@ Rate-limit đăng nhập: sau 5 lần sai / 15 phút → `429 TOO_MANY_ATTEMPTS`
 
 | Thành viên | Vai trò |
 |---|---|
-| Nguyễn Thiên Tài | AI Engineer |
-| Hoàng Văn Quang | Backend Engineer |
-| Đỗ Tú Anh | Frontend Engineer |
-| Thiều Thị Ngọc Ánh | Clinical QA & AI Evaluator |
+| DO TU ANH | AI Engineer |
+| NGUYEN NGOC HUYEN | Frontend Engineer |
+| NGUYEN LINH ANH | Clinical QA & AI Evaluator |
 
 ---
 

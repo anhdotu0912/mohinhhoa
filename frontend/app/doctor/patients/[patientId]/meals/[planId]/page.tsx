@@ -740,30 +740,30 @@ export default function PlanReviewDetailPage() {
     return (
       <div
         key={slot}
-        className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-xs"
+        className="min-w-0 overflow-hidden rounded-xl border border-slate-200/80 bg-white"
       >
-        <div className="flex items-center justify-between gap-sm pb-sm">
-          <div className="flex items-center gap-xs min-w-0">
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b px-3.5 py-2.5 ${slot === "breakfast" ? "border-amber-100 bg-amber-50/70" : slot === "lunch" ? "border-teal-100 bg-teal-50/70" : slot === "dinner" ? "border-sky-100 bg-sky-50/70" : "border-violet-100 bg-violet-50/70"}`}>
+          <div className="flex min-w-0 items-center gap-2">
             <span className={`material-symbols-outlined text-[20px] ${meta.iconClass}`}>
               {meta.icon}
             </span>
-            <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm leading-tight">
+            <h4 className="text-lg font-bold leading-tight text-slate-900">
               {meta.title}
             </h4>
             {slotWarnings.length > 0 && (
-              <span className="text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded shrink-0">
+              <span className="text-sm font-bold text-rose-800 bg-rose-50 border border-rose-200 px-2 py-1 rounded shrink-0">
                 {slotWarnings.length} vi phạm
               </span>
             )}
           </div>
           {canEdit && (
-            <div className="flex items-center gap-xs shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               {isEditing ? (
                 <>
                   <button
                     type="button"
                     onClick={() => openAddDish(slot)}
-                    className="text-xs text-primary font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                    className="text-sm text-primary font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">add</span>
                     Thêm món
@@ -773,7 +773,7 @@ export default function PlanReviewDetailPage() {
                       type="button"
                       onClick={handleCancelEdit}
                       disabled={saving}
-                      className="px-2 py-1 rounded-lg text-[11px] font-semibold border border-outline-variant text-on-surface-variant hover:bg-surface-variant cursor-pointer disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-outline-variant text-on-surface-variant hover:bg-surface-variant cursor-pointer disabled:opacity-50"
                     >
                       Hủy
                     </button>
@@ -782,7 +782,7 @@ export default function PlanReviewDetailPage() {
                     type="button"
                     onClick={finishEditSlot}
                     disabled={saving}
-                    className="px-2 py-1 rounded-lg text-[11px] font-bold border border-emerald-500 bg-emerald-50 text-emerald-800 cursor-pointer disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg text-sm font-bold border border-emerald-500 bg-emerald-50 text-emerald-800 cursor-pointer disabled:opacity-50"
                   >
                     {dirty ? (saving ? "Đang lưu…" : "Lưu") : "Xong"}
                   </button>
@@ -792,7 +792,7 @@ export default function PlanReviewDetailPage() {
                   type="button"
                   onClick={() => startEditSlot(slot)}
                   disabled={saving || (editingSlot !== null && editingSlot !== slot)}
-                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-outline-variant text-on-surface hover:bg-surface-variant cursor-pointer disabled:opacity-50 flex items-center gap-0.5"
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-outline-variant text-on-surface hover:bg-surface-variant cursor-pointer disabled:opacity-50 flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-[14px]">edit</span>
                   Sửa món
@@ -802,7 +802,7 @@ export default function PlanReviewDetailPage() {
           )}
         </div>
 
-        <div className="space-y-sm">
+        <div className="space-y-2.5 px-3.5 py-3">
           <MealMetricRow
             kcal={mealKcal}
             saltG={mealSalt}
@@ -814,7 +814,7 @@ export default function PlanReviewDetailPage() {
           {slotWarnings.length > 0 && (
             <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg space-y-1">
               {slotWarnings.map((w) => (
-                <p key={w} className="text-xs text-rose-900 leading-relaxed">
+                <p key={w} className="text-sm text-rose-900 leading-relaxed">
                   {w}
                 </p>
               ))}
@@ -824,7 +824,7 @@ export default function PlanReviewDetailPage() {
           {slotAdvisory.length > 0 && (
             <div className="p-2.5 bg-surface-container-low border border-outline-variant rounded-lg space-y-1">
               {slotAdvisory.map((w) => (
-                <p key={w} className="text-xs text-on-surface-variant leading-relaxed">
+                <p key={w} className="text-sm text-on-surface-variant leading-relaxed">
                   {w}
                 </p>
               ))}
@@ -845,7 +845,7 @@ export default function PlanReviewDetailPage() {
             </div>
           )}
 
-          <div className="space-y-xs">
+          <div className="space-y-3">
             {items.length === 0 ? (
               <p className="text-xs text-on-surface-variant italic p-xs">Chưa có món ăn</p>
             ) : (
@@ -872,7 +872,7 @@ export default function PlanReviewDetailPage() {
 
   if (loading) {
     return (
-      <main className="p-6 md:p-8 text-sm text-on-surface-variant w-full max-w-[1600px] mx-auto flex-1">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-4 text-sm text-on-surface-variant sm:px-6">
         Đang tải thực đơn…
       </main>
     );
@@ -880,7 +880,7 @@ export default function PlanReviewDetailPage() {
 
   if (loadError || !plan || !patient || !rawPlan) {
     return (
-      <main className="p-6 md:p-8 w-full max-w-[1600px] mx-auto flex-1">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-4 sm:px-6">
         <p className="text-sm text-error mb-md">{loadError || "Không tìm thấy thực đơn."}</p>
         <Link
           href={doctorChartHref(patientId, "meals")}
@@ -903,12 +903,12 @@ export default function PlanReviewDetailPage() {
         </div>
       )}
 
-      <div className="sticky top-[calc(var(--doctor-nav-height,64px)+4.5rem)] z-10 bg-[#F7F8FA]/95 backdrop-blur-md border-b border-outline-variant/60 shadow-xs px-4 sm:px-6 md:px-8 py-3">
-        <div className="max-w-[1600px] w-full mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto w-full max-w-[1240px] px-4 pt-3 sm:px-6">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-100 bg-white px-3.5 py-2.5">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {status === "pending" && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Chờ duyệt
               </span>
             )}
@@ -936,7 +936,7 @@ export default function PlanReviewDetailPage() {
               </span>
             )}
             {plan.createdAt ? (
-              <span className="text-[11px] text-on-surface-variant">
+              <span className="text-xs text-slate-500">
                 Tạo {plan.createdAt}
               </span>
             ) : null}
@@ -984,9 +984,9 @@ export default function PlanReviewDetailPage() {
         </div>
       </div>
 
-      <main className="p-4 sm:p-6 md:p-8 w-full max-w-[1600px] mx-auto space-y-6 pb-12 flex-1">
+      <main className="mx-auto w-full max-w-[1240px] flex-1 space-y-4 px-4 pb-8 pt-3 text-sm sm:px-6">
         {showApplyPrompt && (
-          <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 flex flex-col gap-4 shadow-2xs">
+          <div className="flex flex-col gap-3 rounded-xl border border-teal-200 bg-teal-50/60 p-3.5">
             <div>
               <p className="text-sm font-bold text-on-surface">
                 Áp dụng thực đơn cho bệnh nhân?
@@ -1036,14 +1036,15 @@ export default function PlanReviewDetailPage() {
         )}
 
         {daysList.length > 0 && (
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-3 shadow-2xs overflow-x-auto">
-            <div className="flex items-center gap-2 min-w-max">
-              <span className="text-xs font-bold text-on-surface-variant px-2 flex items-center gap-1.5">
+          <div className="flex flex-col items-center gap-2">
+              <span className="flex w-fit items-center gap-1.5 text-xs font-semibold text-slate-600">
                 <span className="material-symbols-outlined text-[18px] text-primary">
                   calendar_month
                 </span>
-                Chọn ngày xem:
+                Chọn ngày xem
               </span>
+            <div className="w-fit max-w-full overflow-x-auto rounded-xl border border-teal-100 bg-white p-1 custom-scrollbar">
+            <div role="group" aria-label="Ngày trong thực đơn" className="flex w-max items-center gap-1">
               {daysList.map((d) => {
                 const isDayActive = d.dayIndex === activeDayIndex;
                 const kcalLabel =
@@ -1063,27 +1064,21 @@ export default function PlanReviewDetailPage() {
                   <button
                     key={d.dayIndex}
                     type="button"
+                    aria-pressed={isDayActive}
+                    aria-label={`${d.dayName}, ${Math.round(kcalLabel)} kcal${dayWarnCount ? `, ${dayWarnCount} cảnh báo` : ""}`}
                     onClick={() => handleSelectDay(d.dayIndex)}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`flex min-w-[94px] flex-none flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
                       isDayActive
                         ? "bg-primary text-on-primary shadow-2xs font-bold"
-                        : "bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                        : "text-slate-600 hover:bg-teal-50 hover:text-teal-800"
                     }`}
                   >
-                    <span>{d.dayName}</span>
-                    <span className="text-[10px] opacity-80 tabular-nums">({kcalLabel} kcal)</span>
-                    {!!dayWarnCount && (
-                      <span
-                        className={`text-[10px] font-bold ${
-                          isDayActive ? "text-amber-100" : "text-amber-700"
-                        }`}
-                      >
-                        !
-                      </span>
-                    )}
+                    <span>{d.dayName}{!!dayWarnCount ? " !" : ""}</span>
+                    <span className="text-[11px] font-medium opacity-80 tabular-nums">{Math.round(kcalLabel)} kcal</span>
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
         )}
@@ -1105,10 +1100,10 @@ export default function PlanReviewDetailPage() {
           kcalUpper={dayBand.upper}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/40">
-              <h3 className="font-h2 text-h2 font-bold text-on-surface text-base">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+              <h3 className="text-base font-bold text-slate-900">
                 Chi tiết khẩu phần: {currentDayData?.dayName || `Ngày ${activeDayIndex}`}
               </h3>
               <span className="text-xs text-on-surface-variant font-medium">
@@ -1122,13 +1117,13 @@ export default function PlanReviewDetailPage() {
             {renderMealSection("snack", snack)}
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-subtle">
-              <h4 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-3 flex items-center gap-1.5">
+          <aside className="min-w-0 rounded-xl border border-teal-100 bg-white p-3.5" aria-label="Nguồn tham khảo thực đơn">
+            <div>
+              <h4 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-900">
                 <span className="material-symbols-outlined text-primary text-[18px]">
                   menu_book
                 </span>
-                Trích dẫn Y khoa & Guideline
+                Nguồn tham khảo
               </h4>
               {plan.citations.length === 0 ? (
                 <p className="text-xs text-on-surface-variant italic">
@@ -1141,13 +1136,13 @@ export default function PlanReviewDetailPage() {
                       <button
                         type="button"
                         onClick={() => handleOpenCitation(cite)}
-                        className="w-full text-left flex items-start gap-2 bg-surface-container-low/40 p-2.5 rounded-lg border border-outline-variant/40 font-medium hover:border-primary/50 hover:bg-surface-container-low cursor-pointer"
+                        className="flex w-full items-start gap-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-left font-medium hover:border-teal-200 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
                       >
                         <span className="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">
                           menu_book
                         </span>
                         <span className="min-w-0">
-                          <span className="break-words leading-relaxed text-on-surface">
+                          <span className="break-words text-xs leading-relaxed text-slate-700 [overflow-wrap:anywhere]">
                             {cite}
                           </span>
                           <span className="block text-[10px] text-primary font-semibold mt-0.5">
@@ -1160,7 +1155,7 @@ export default function PlanReviewDetailPage() {
                 </ul>
               )}
             </div>
-          </div>
+          </aside>
         </div>
       </main>
 
@@ -1327,14 +1322,14 @@ function DishRow({
   const alts = item.alternatives || [];
   const portion = formatPortionLabel(item.portion);
   return (
-    <div className="p-3 bg-surface-container-low/40 border border-outline-variant/40 rounded-lg text-xs space-y-2">
+    <div className="min-w-0 space-y-2.5 rounded-2xl border border-teal-100 bg-slate-50/60 p-3.5 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="font-bold text-on-surface font-body text-xs leading-snug">
+          <span className="break-words text-[17px] font-semibold leading-relaxed text-slate-900 sm:text-lg">
             {item.name}
           </span>
           {portion ? (
-            <p className="text-[11px] text-on-surface-variant mt-0.5 tabular-nums">
+            <p className="mt-1 text-[15px] leading-relaxed tabular-nums text-slate-700">
               Khẩu phần {portion}
             </p>
           ) : null}
@@ -1362,24 +1357,26 @@ function DishRow({
         })}
         omit={["protein", "fat"]}
         layer="detail"
-        compact
+        className="gap-2 [&>span]:px-2.5 [&>span]:py-1.5 [&>span]:text-sm [&_.material-symbols-outlined]:text-base [&>span>span:last-child]:text-slate-600"
       />
       {alts.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-outline-variant/30">
-          <span className="text-[10px] font-bold text-on-surface-variant">Thay thế:</span>
+        <details className="group pt-1 text-sm">
+          <summary className="w-fit cursor-pointer rounded py-1 text-[15px] font-semibold text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500">Đổi món · {alts.length} lựa chọn</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {alts.map((alt) => (
             <button
               key={alt.foodId || alt.name}
               type="button"
               onClick={() => onSwap(alt)}
               disabled={!canSwap}
-              className="px-2.5 py-0.5 rounded-md border border-outline-variant/60 text-[11px] font-medium text-on-surface hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default cursor-pointer"
+              className="px-3 py-1.5 rounded-md border border-outline-variant/60 text-sm font-medium text-on-surface hover:border-primary hover:text-primary transition-all disabled:opacity-60 disabled:cursor-default cursor-pointer"
               title={`Đổi sang ${alt.name} · ${formatQty(alt.calories)} kcal`}
             >
               {alt.name}
             </button>
           ))}
-        </div>
+          </div>
+        </details>
       )}
     </div>
   );

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.agents.skills.utility_skills import emergency_triage_check
+from app.core.datetime_vn import utc_now_naive
 from app.core.errors import APIError
 from app.models.chat_escalation import ChatEscalation, ChatEscalationMessage
 from app.models.chat_session import ChatMessage, ChatSession
@@ -108,7 +108,7 @@ def _notify_sent(db: Session, patient_id: str, escalation: ChatEscalation) -> No
         type="escalation_sent",
         title="Đã gửi câu hỏi cho bác sĩ",
         body=question or "Câu hỏi của bạn đã được chuyển tới bác sĩ phụ trách.",
-        scheduled_at=datetime.now(),
+        scheduled_at=utc_now_naive(),
         status="sent",
         related_ids={"escalation_id": escalation.id},
         payload={"reason": escalation.reason},
@@ -121,7 +121,7 @@ def _notify_reply(db: Session, patient_id: str, escalation: ChatEscalation, body
         type="escalation_reply",
         title="Bác sĩ đã phản hồi",
         body=_truncate(body, 180) or "Bác sĩ phụ trách đã trả lời câu hỏi của bạn.",
-        scheduled_at=datetime.now(),
+        scheduled_at=utc_now_naive(),
         status="sent",
         related_ids={"escalation_id": escalation.id},
         payload={"reason": escalation.reason},
@@ -178,6 +178,7 @@ def _to_out(
         created_at=row.created_at,
         updated_at=row.updated_at,
         resolved_at=row.resolved_at,
+        last_message_at=max((m.created_at for m in row.messages), default=row.created_at),
     )
 
 
@@ -232,7 +233,7 @@ def create_escalation(db: Session, patient: User, payload: EscalationCreate) -> 
 
     note = (payload.note or "").strip()
     existing = _get_open_for_patient(db, patient.id)
-    now = datetime.now()
+    now = utc_now_naive()
 
     if existing:
         if question and question != existing.question_text:
@@ -353,7 +354,7 @@ def add_patient_message(db: Session, patient: User, escalation_id: str, body: st
         )
     )
     row.status = "waiting_doctor"
-    row.updated_at = datetime.now()
+    row.updated_at = utc_now_naive()
     db.commit()
     row = _reload(db, row.id)
     return _to_out(db, row)
@@ -369,6 +370,12 @@ def list_doctor_escalations(
     elif wanted != "all":
         query = query.filter(ChatEscalation.status == wanted)
     rows = query.order_by(ChatEscalation.updated_at.desc()).all()
+    last_messages = dict(
+        db.query(ChatEscalationMessage.escalation_id, func.max(ChatEscalationMessage.created_at))
+        .filter(ChatEscalationMessage.escalation_id.in_([row.id for row in rows]))
+        .group_by(ChatEscalationMessage.escalation_id)
+        .all()
+    ) if rows else {}
     items: list[EscalationListItem] = []
     for row in rows:
         patient = db.get(User, row.patient_id)
@@ -388,6 +395,7 @@ def list_doctor_escalations(
                 status=row.status,  # type: ignore[arg-type]
                 created_at=row.created_at,
                 updated_at=row.updated_at,
+                last_message_at=last_messages.get(row.id) or row.created_at,
             )
         )
     return items
@@ -413,7 +421,7 @@ def add_doctor_message(db: Session, doctor: User, escalation_id: str, body: str)
         )
     )
     row.status = "waiting_patient"
-    row.updated_at = datetime.now()
+    row.updated_at = utc_now_naive()
     _notify_reply(db, row.patient_id, row, text)
     db.commit()
     row = _reload(db, row.id)
@@ -424,7 +432,7 @@ def resolve_escalation(db: Session, doctor: User, escalation_id: str) -> Escalat
     row = _get_for_doctor(db, escalation_id, doctor.id)
     if row.status != "resolved":
         row.status = "resolved"
-        row.resolved_at = datetime.now()
+        row.resolved_at = utc_now_naive()
         row.updated_at = row.resolved_at
         db.commit()
     return _to_out(db, _reload(db, row.id))

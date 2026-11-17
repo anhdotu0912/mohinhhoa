@@ -938,6 +938,7 @@ HITL một chiều: bệnh nhân **opt-in** (bấm nút) khi câu AI thuộc `re
 ```json
 // Response 200 → list[EscalationListItem] (không kèm messages đầy đủ)
 ```
+`EscalationListItem.last_message_at` (optional ISO-8601) là giờ tin nhắn/ghi chú/context mới nhất được lưu, hoặc `created_at` khi chưa có tin nhắn. Dùng trường này để hiện thời gian và sắp xếp cuộc trao đổi, thay vì `updated_at` có thể thay đổi do thao tác đóng/mở trạng thái. Cả danh sách và chi tiết trả timestamp có múi giờ UTC (`Z` hoặc `+00:00`); timestamp naive trong DB được coi là UTC. Ghi mới dùng UTC, không phụ thuộc múi giờ máy chủ. Dữ liệu cũ không bị tự động cộng/trừ giờ bằng phỏng đoán; `last_message_at` lấy từ bản ghi tin nhắn trong DB.
 
 #### `GET /doctor/escalations/{id}`
 **Role:** `doctor` (chỉ bệnh nhân đã gán).
@@ -978,6 +979,7 @@ HITL một chiều: bệnh nhân **opt-in** (bấm nút) khi câu AI thuộc `re
     { "id": "m_uuid", "sender": "patient", "body": "ghi chú", "created_at": "...", "kind": "note" }
   ],
   "notification_id": "notif_uuid",
+  "last_message_at": "2026-11-17T04:39:29Z",
   "created_at": "...",
   "updated_at": "...",
   "resolved_at": null

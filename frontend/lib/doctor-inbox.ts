@@ -5,6 +5,7 @@ import type {
   MealPlanOutput,
 } from "@/lib/types";
 import { ESCALATION_REASON_LABEL } from "@/lib/escalation";
+import { parseMessageTime } from "@/lib/message-time";
 import {
   doctorChartHref,
   doctorMealPlansHref,
@@ -249,7 +250,7 @@ export function buildInboxJobs(
       href: doctorInboxHref("chat_escalation", { escalation: row.id }),
       cta: "Trả lời",
       urgency: row.status === "waiting_doctor" ? "soon" : "normal",
-      sortAt: row.updated_at || row.created_at || "",
+      sortAt: row.last_message_at || row.updated_at || row.created_at || "",
     });
   }
 
@@ -257,6 +258,6 @@ export function buildInboxJobs(
   return jobs.sort((a, b) => {
     const ur = urgencyRank[a.urgency] - urgencyRank[b.urgency];
     if (ur !== 0) return ur;
-    return (b.sortAt || "").localeCompare(a.sortAt || "");
+    return (parseMessageTime(b.sortAt)?.getTime() ?? 0) - (parseMessageTime(a.sortAt)?.getTime() ?? 0);
   });
 }

@@ -101,25 +101,31 @@ function CompactMetricCell({ metric }: { metric: CompactMetric }) {
       : metric.mode === "ceiling"
         ? `≤ ${formatQty(upper)}${metric.unit === "kcal" ? "" : metric.unit}`
         : `${Math.round(metric.lower)}–${Math.round(upper)}`);
+  const tone = {
+    calories: "border-teal-200 bg-teal-50/70",
+    carb: "border-amber-200 bg-amber-50/70",
+    salt: "border-sky-200 bg-sky-50/70",
+    sugar: "border-violet-200 bg-violet-50/70",
+  }[metric.key];
 
   return (
     <div
-      className={`rounded-lg border px-2.5 py-2 min-w-0 transition-colors ${
+      className={`min-w-0 rounded-xl border px-3 py-3 transition-colors ${
         hardFail
           ? "border-rose-300 bg-rose-50/80 ring-1 ring-rose-300/60 shadow-xs"
-          : "border-outline-variant bg-surface-container-lowest"
+          : tone
       }`}
     >
-      <div className="flex items-baseline justify-between gap-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
         <span
-          className={`text-[10px] font-bold uppercase tracking-wide ${
+          className={`text-xs font-semibold ${
             hardFail ? "text-rose-900" : "text-on-surface-variant"
           }`}
         >
           {metric.label}
         </span>
         <span
-          className={`text-[10px] tabular-nums shrink-0 font-medium ${
+          className={`text-[11px] tabular-nums shrink-0 font-medium ${
             hardFail ? "text-rose-700 font-bold" : "text-on-surface-variant"
           }`}
           title={metric.subText}
@@ -127,23 +133,23 @@ function CompactMetricCell({ metric }: { metric: CompactMetric }) {
           {limitText}
         </span>
       </div>
-      <p className="mt-0.5 flex items-baseline gap-0.5">
+      <p className="mt-2 flex items-baseline gap-1">
         <span
-          className={`text-base font-bold tabular-nums leading-none ${
+          className={`text-[22px] font-bold tabular-nums leading-none ${
             hardFail ? "text-rose-700" : "text-on-surface"
           }`}
         >
           {metric.key === "calories" ? Math.round(metric.value) : formatQty(metric.value)}
         </span>
         <span
-          className={`text-[10px] ${
+          className={`text-xs ${
             hardFail ? "text-rose-600" : "text-on-surface-variant"
           }`}
         >
           {metric.unit}
         </span>
       </p>
-      <div className="mt-1.5">
+      <div className="mt-2.5">
         <ThresholdBar
           value={metric.value}
           lower={metric.lower}
@@ -195,7 +201,7 @@ export function DayNutritionDashboard({
   const metrics: CompactMetric[] = [
     {
       key: "calories",
-      label: "Kcal",
+      label: "Năng lượng",
       unit: "kcal",
       value: calories,
       mode: "band",
@@ -204,7 +210,7 @@ export function DayNutritionDashboard({
     },
     {
       key: "carb",
-      label: "Carb/bữa",
+      label: "Carb/bữa cao nhất",
       unit: "g",
       value: maxMealCarb,
       mode: "ceiling",
@@ -240,11 +246,11 @@ export function DayNutritionDashboard({
 
   return (
     <section
-      className="bg-surface-container-lowest border border-outline-variant rounded-xl p-sm shadow-xs"
+      className="mx-auto w-full max-w-[960px] space-y-2.5"
       aria-label={`Tổng ngày ${dayLabel}`}
     >
-      <h3 className="font-h2 text-h2 text-on-surface font-bold text-sm mb-sm">
-        Tổng ngày — {dayLabel}
+      <h3 className="text-center text-base font-semibold text-slate-800">
+        Dinh dưỡng — {dayLabel}
       </h3>
 
       {dayWarnings.length > 0 && (
@@ -267,7 +273,7 @@ export function DayNutritionDashboard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
         {metrics.map((metric) => (
           <CompactMetricCell key={metric.key} metric={metric} />
         ))}
@@ -305,19 +311,19 @@ export function MealMetricRow({
   ];
 
   return (
-    <div className="grid gap-1 grid-cols-2 sm:grid-cols-4">
+    <div className="flex flex-wrap items-center gap-1.5">
       {cells.map((cell) => (
         <div
           key={cell.label}
-          className={`rounded-md border px-2 py-1.5 min-w-0 ${
+          className={`inline-flex w-fit items-baseline gap-1.5 rounded-md border px-2.5 py-1.5 min-w-0 ${
             cell.warn
               ? "border-rose-200 bg-rose-50"
               : "border-outline-variant/60 bg-surface-container-low/40"
           }`}
         >
-          <p className="text-[10px] font-semibold text-on-surface-variant">{cell.label}</p>
+          <p className="text-sm font-medium text-slate-700">{cell.label}</p>
           <p
-            className={`text-xs font-bold tabular-nums ${
+            className={`text-[15px] font-bold tabular-nums ${
               cell.warn ? "text-rose-900" : "text-on-surface"
             }`}
           >

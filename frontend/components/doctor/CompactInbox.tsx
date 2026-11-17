@@ -9,6 +9,8 @@ import Pagination from "@/components/shared/Pagination";
 import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { INBOX_TYPE_META, type InboxJob } from "@/lib/doctor-inbox";
 import { doctorChartHref, doctorInboxHref, type InboxJobType } from "@/lib/doctor-routes";
+import { messageTimeIso, relativeMessageTime, vietnamMessageDateTime } from "@/lib/message-time";
+import { useCurrentTime } from "@/lib/use-current-time";
 
 const FILTERS: { id: "all" | InboxJobType; label: string }[] = [
   { id: "all", label: "Tất cả công việc" },
@@ -20,20 +22,9 @@ const FILTERS: { id: "all" | InboxJobType; label: string }[] = [
   { id: "patient_claim", label: "Chờ nhận bệnh nhân" },
 ];
 
-function relativeTime(value: string) {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return "Gần đây";
-  const hours = Math.floor((Date.now() - date.getTime()) / 3_600_000);
-  if (hours < 1) return "Vừa xong";
-  if (hours < 24) return `${hours} giờ trước`;
-  if (hours < 48) return "Hôm qua";
-  if (hours < 168) return `${Math.floor(hours / 24)} ngày trước`;
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" });
-}
-
 export function CompactInbox({
   jobs, counts, urgentCount, total, page, pageSize, activeType, urgencyFilter,
-  searchQuery, loading, refreshing, error, claimingId, onSearch, onRefresh, onClaim, onPage,
+  searchQuery, loading, refreshing, error, claimingId, onSearch, onRefresh, onClaim, onPage, onOpenChat,
 }: {
   jobs: InboxJob[];
   counts: Record<"all" | InboxJobType, number>;
@@ -52,8 +43,10 @@ export function CompactInbox({
   onRefresh: () => void;
   onClaim: (job: InboxJob) => void;
   onPage: (page: number) => void;
+  onOpenChat?: (id: string) => void;
 }) {
   const router = useRouter();
+  const now = useCurrentTime();
   const busy = loading || refreshing;
   const summary = [
     { label: "Cần xử lý sớm", value: urgentCount, note: "công việc", icon: Zap, color: "border-rose-200/70 bg-rose-50/50 hover:border-rose-400", iconColor: "bg-rose-100 text-rose-700", valueColor: "text-rose-800", href: urgencyFilter ? doctorInboxHref("all") : doctorInboxHref("all", { urgency: "soon" }), active: urgencyFilter },
@@ -111,7 +104,7 @@ export function CompactInbox({
           <div className="flex min-h-36 flex-col items-center justify-center gap-2 px-5 py-6 text-center"><Inbox size={23} strokeWidth={1.5} className="text-slate-300" /><p className="text-sm font-medium text-slate-600">{searchQuery ? "Không tìm thấy công việc phù hợp" : "Không có công việc trong bộ lọc này"}</p><p className="text-xs text-slate-400">{searchQuery ? "Thử tên, mã bệnh nhân hoặc từ khóa khác." : "Chọn loại công việc khác để xem thêm."}</p>{searchQuery && <button type="button" onClick={() => onSearch("")} className="mt-1 text-xs font-medium text-teal-700">Xóa tìm kiếm</button>}</div>
         ) : (
           <>
-            <div aria-hidden="true" className="hidden grid-cols-[200px_minmax(0,1fr)_80px_160px] gap-4 border-b border-slate-100 bg-slate-50/60 px-4 py-2 text-[12px] font-medium text-slate-500 lg:grid"><span>Bệnh nhân</span><span>Công việc</span><span>Cập nhật</span><span className="text-right">Thao tác</span></div>
+            <div aria-hidden="true" className="hidden grid-cols-[200px_minmax(0,1fr)_120px_160px] gap-4 border-b border-slate-100 bg-slate-50/60 px-4 py-2 text-[12px] font-medium text-slate-500 lg:grid"><span>Bệnh nhân</span><span>Công việc</span><span>Cập nhật</span><span className="text-right">Thao tác</span></div>
             <ul data-inbox-rows className="divide-y divide-slate-100">
               {jobs.map((job) => {
                 const meta = INBOX_TYPE_META[job.type];
@@ -120,12 +113,12 @@ export function CompactInbox({
                 const claimBusy = claimingId === job.id;
                 const href = job.type === "chat_escalation" ? doctorInboxHref(activeType, { urgency: urgencyFilter ? "soon" : undefined, escalation: job.id.replace(/^escalation:/, "") }) : job.href;
                 return (
-                  <li key={job.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-teal-50/30 lg:grid-cols-[200px_minmax(0,1fr)_80px_160px] lg:gap-x-4">
+                  <li key={job.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-teal-50/30 lg:grid-cols-[200px_minmax(0,1fr)_120px_160px] lg:gap-x-4">
                     <div className="order-1 flex min-w-0 items-center gap-2.5">
                       <span translate="no" className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-teal-100 bg-teal-50 text-[11px] font-semibold text-teal-700">{userInitials(job.patientName)}{avatar && <img alt="" src={avatar} className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />}</span>
                       <div className="min-w-0">
                         {isClaim ? <p className="truncate text-[14px] font-semibold text-slate-800">{job.patientName}</p> : <Link href={doctorChartHref(job.patientId)} className="block truncate text-[14px] font-semibold text-slate-800 hover:text-teal-700 hover:underline">{job.patientName}</Link>}
-                        <p className="mt-0.5 truncate text-[11px] text-slate-400">{job.patientAge != null ? `${job.patientAge} tuổi` : ""}{job.patientGender ? ` · ${job.patientGender}` : ""}<span className="hidden xl:inline" title={job.patientId}>{job.patientAge != null || job.patientGender ? " · " : ""}{job.patientId.length > 10 ? `…${job.patientId.slice(-6)}` : job.patientId}</span><span className="lg:hidden"> · {relativeTime(job.sortAt)}</span></p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-400">{job.patientAge != null ? `${job.patientAge} tuổi` : ""}{job.patientGender ? ` · ${job.patientGender}` : ""}<span className="hidden xl:inline" title={job.patientId}>{job.patientAge != null || job.patientGender ? " · " : ""}{job.patientId.length > 10 ? `…${job.patientId.slice(-6)}` : job.patientId}</span><span className="lg:hidden"> · <time dateTime={messageTimeIso(job.sortAt)} title={`${vietnamMessageDateTime(job.sortAt)} (giờ Việt Nam)`}>{relativeMessageTime(job.sortAt, now)}</time></span></p>
                       </div>
                     </div>
                     <div className="order-3 col-span-2 min-w-0 lg:order-2 lg:col-span-1">
@@ -133,13 +126,13 @@ export function CompactInbox({
                       <p className="line-clamp-2 text-[14px] font-medium leading-snug text-slate-700" title={job.title}>{job.title}</p>
                       <p className="mt-0.5 truncate text-[12px] leading-relaxed text-slate-500" title={job.subtitle}>{job.subtitle}</p>
                     </div>
-                    <time dateTime={job.sortAt || undefined} title={job.sortAt ? new Date(job.sortAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : undefined} className="order-3 hidden text-[11px] text-slate-400 lg:block">{relativeTime(job.sortAt)}</time>
+                    <time dateTime={messageTimeIso(job.sortAt)} title={`${vietnamMessageDateTime(job.sortAt)} (giờ Việt Nam)`} className="order-3 hidden text-xs text-slate-600 lg:block">{relativeMessageTime(job.sortAt, now)}<span className="mt-1 block text-[11px] text-slate-500">{vietnamMessageDateTime(job.sortAt, true)}</span></time>
                     <div className="order-2 grid w-[160px] grid-cols-[minmax(0,1fr)_32px] items-center gap-2 lg:order-4">
                       {isClaim ? (
                         <button type="button" onClick={() => onClaim(job)} disabled={Boolean(claimingId)} className="flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#0f766e] px-2 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-50 lg:h-8">{claimBusy ? "Đang nhận…" : job.cta}{claimBusy ? <RefreshCw size={13} className="shrink-0 animate-spin" /> : <ArrowRight size={13} className="shrink-0" />}</button>
                       ) : (
                         <>
-                          <Link href={href} className="flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#0f766e] px-2 text-xs font-medium text-white hover:bg-teal-800 lg:h-8">{job.cta}<ArrowRight size={13} className="shrink-0" /></Link>
+                          <Link href={href} onClick={(event) => { if (job.type === "chat_escalation" && onOpenChat && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onOpenChat(job.id.replace(/^escalation:/, "")); } }} className="flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#0f766e] px-2 text-xs font-medium text-white hover:bg-teal-800 lg:h-8">{job.cta}<ArrowRight size={13} className="shrink-0" /></Link>
                           <Link href={doctorChartHref(job.patientId)} aria-label={`Hồ sơ bệnh nhân ${job.patientName}`} title="Hồ sơ bệnh nhân" className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border border-teal-100 bg-teal-50/60 text-teal-600 hover:border-teal-300 hover:text-teal-800 sm:flex"><ExternalLink size={13} /></Link>
                         </>
                       )}

@@ -1,0 +1,37 @@
+import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { EscalationThread } from "../components/shared/EscalationThread";
+import { buildInboxJobs } from "./doctor-inbox";
+import { messageTimeIso, parseMessageTime, relativeMessageTime, vietnamMessageClock, vietnamMessageDateTime } from "./message-time";
+import type { EscalationListItem, EscalationOut } from "./types";
+
+const now = Date.parse("2026-11-17T08:19:09Z");
+const naive = "2026-11-17T04:39:29.457836";
+assert.equal(messageTimeIso(naive), "2026-11-17T04:39:29.457Z");
+assert.equal(messageTimeIso("2026-11-17T11:39:29.457+07:00"), messageTimeIso(naive));
+assert.equal(vietnamMessageClock(naive, now), "11:39");
+assert.equal(vietnamMessageDateTime(naive), "17/11/2026 · 11:39");
+assert.equal(relativeMessageTime(naive, now), "3 giờ trước");
+assert.equal(relativeMessageTime("2026-11-17T08:14:09Z", now), "5 phút trước");
+assert.equal(relativeMessageTime("2026-11-17T08:18:59Z", now), "Vừa xong");
+assert.equal(relativeMessageTime("2026-11-17T10:00:00Z", now), "Sắp tới");
+assert.equal(relativeMessageTime("not-a-date", now), "Chưa rõ thời gian");
+assert.equal(parseMessageTime(null), null);
+assert.equal(messageTimeIso("03/11/2026"), "2026-11-02T17:00:00.000Z");
+assert.equal(messageTimeIso("2026-11-03"), "2026-11-02T17:00:00.000Z");
+const afterMidnight = Date.parse("2026-11-17T17:02:00Z");
+assert.equal(relativeMessageTime("2026-11-17T16:58:00Z", afterMidnight), "4 phút trước");
+assert.equal(vietnamMessageClock("2026-11-17T16:58:00Z", afterMidnight), "17/11 · 23:58");
+assert.equal(vietnamMessageClock("2026-11-17T17:01:00Z", afterMidnight), "00:01");
+assert.equal(relativeMessageTime("2026-11-16T16:00:00Z", afterMidnight), "2 ngày trước");
+
+const item = (id: string, timestamp: string): EscalationListItem => ({ id, patient_id: "fixture", doctor_id: "fixture-doctor", question_text: "Fixture question", reason: "unknown", status: "waiting_doctor", created_at: "2026-11-16T00:00:00Z", updated_at: "2026-11-17T15:00:00", last_message_at: timestamp });
+const jobs = buildInboxJobs([], [], [], [item("older", "2026-11-17T07:00:00Z"), item("newer", "2026-11-17T08:00:00Z")]);
+assert.equal(jobs[0].id, "escalation:newer");
+assert.equal(jobs[0].sortAt, "2026-11-17T08:00:00Z", "Use authoritative message time instead of legacy local updated_at");
+const thread: EscalationOut = { ...item("thread", naive), answer_text: "", patient_note: "", messages: [{ id: "message", sender: "patient", kind: "reply", body: "Fixture reply", created_at: naive }] };
+const html = renderToStaticMarkup(createElement(EscalationThread, { thread, viewer: "doctor", compact: true, onSend: async () => {} }));
+assert.match(html, /datetime="2026-11-17T04:39:29\.457Z"/i);
+assert.ok(html.includes("17/11/2026 · 11:39 (giờ Việt Nam)"));
+console.log("PASS: UTC/offset/legacy timestamps, minutes and hours, Vietnam midnight, absolute chat times and sorting by actual message time.");

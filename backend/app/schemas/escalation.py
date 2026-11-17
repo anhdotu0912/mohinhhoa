@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
+from app.core.datetime_vn import assume_utc
 from app.schemas.meal_plan import UnmatchedPair
 
 EscalationReason = Literal["missing_citations", "unknown", "refuse", "unmatched_kb"]
@@ -40,6 +41,10 @@ class EscalationMessageOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_serializer("created_at")
+    def _utc_timestamp(self, value: datetime) -> datetime:
+        return assume_utc(value)
+
 
 class EscalationOut(BaseModel):
     id: str
@@ -60,8 +65,13 @@ class EscalationOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
+    last_message_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at", "resolved_at", "last_message_at")
+    def _utc_timestamp(self, value: datetime | None) -> datetime | None:
+        return assume_utc(value) if value is not None else None
 
 
 class EscalationListItem(BaseModel):
@@ -76,5 +86,10 @@ class EscalationListItem(BaseModel):
     status: EscalationStatus
     created_at: datetime
     updated_at: datetime
+    last_message_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at", "last_message_at")
+    def _utc_timestamp(self, value: datetime | None) -> datetime | None:
+        return assume_utc(value) if value is not None else None

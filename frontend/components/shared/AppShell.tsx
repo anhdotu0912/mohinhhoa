@@ -6,6 +6,7 @@ import type { AppRole } from "@/lib/nav-config";
 import { DoctorNavigation } from "@/components/doctor/DoctorNavigation";
 import { MobileMenuContext } from "@/components/shared/MobileMenuContext";
 import { PatientChatShell } from "@/components/patient-chat/PatientChatShell";
+import { DoctorMessengerProvider } from "@/components/doctor/DoctorMessenger";
 
 export { useMobileMenu } from "@/components/shared/MobileMenuContext";
 
@@ -52,12 +53,14 @@ export function AppShell({
   // Doctor pages share horizontal navigation; patient chat keeps its own shell.
   return (
     <MobileMenuContext.Provider value={value}>
-      <div className="min-h-screen bg-[#F7F8FA] font-body text-body text-on-surface [--doctor-nav-height:124px] md:[--doctor-nav-height:88px]">
-        <DoctorNavigation />
-        <div className="flex min-h-[calc(100dvh-var(--doctor-nav-height))] w-full min-w-0 flex-col">
-          <div className="flex-1 w-full flex flex-col min-w-0">{children}</div>
+      <DoctorMessengerProvider>
+        <div className="min-h-screen bg-[#F7F8FA] font-body text-body text-on-surface [--doctor-nav-height:124px] md:[--doctor-nav-height:88px]">
+          <DoctorNavigation />
+          <div className="flex min-h-[calc(100dvh-var(--doctor-nav-height))] w-full min-w-0 flex-col">
+            <div className="flex-1 w-full flex flex-col min-w-0">{children}</div>
+          </div>
         </div>
-      </div>
+      </DoctorMessengerProvider>
     </MobileMenuContext.Provider>
   );
 }

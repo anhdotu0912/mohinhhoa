@@ -781,6 +781,7 @@ export interface EscalationOut {
   created_at: string;
   updated_at: string;
   resolved_at?: string | null;
+  last_message_at?: string | null;
 }
 
 export interface EscalationListItem {
@@ -795,6 +796,7 @@ export interface EscalationListItem {
   status: EscalationStatus;
   created_at: string;
   updated_at: string;
+  last_message_at?: string | null;
 }
 
 export interface EscalationCreatePayload {

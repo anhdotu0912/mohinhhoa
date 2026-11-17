@@ -113,6 +113,15 @@ def test_create_escalation_and_doctor_thread(client):
     )
     assert follow.status_code == 200, follow.text
     assert follow.json()["status"] == "waiting_doctor"
+    doctor_thread = client.get(
+        f"/api/v1/doctor/escalations/{esc_id}", headers=doctor_headers
+    )
+    assert doctor_thread.status_code == 200
+    assert doctor_thread.json()["question_text"] == "Xoài ăn được không?"
+    assert any(
+        m["sender"] == "patient" and m["body"] == "Vậy buổi sáng ăn được không?"
+        for m in doctor_thread.json()["messages"]
+    )
 
     resolved = client.post(
         f"/api/v1/doctor/escalations/{esc_id}/resolve",
@@ -171,6 +180,14 @@ def test_join_open_thread_instead_of_second_job(client):
     assert second.json()["id"] == first.json()["id"]
     kinds = [m["kind"] for m in second.json()["messages"]]
     assert "context" in kinds
+    doctor_headers = _login(client, DOCTOR)
+    received = client.get(
+        f"/api/v1/doctor/escalations/{first.json()['id']}", headers=doctor_headers
+    )
+    assert received.status_code == 200
+    context = next(m for m in received.json()["messages"] if m["kind"] == "context")
+    assert "Còn sầu riêng thì sao?" in context["body"]
+    assert "Tôi không tìm thấy nguồn tham khảo phù hợp" in context["body"]
 
 
 def test_refuse_missing_citations_and_unmatched(client):
@@ -246,3 +263,57 @@ def test_unassigned_patient_cannot_escalate(client):
     )
     assert created.status_code == 400
     assert created.json()["code"] == "NO_ASSIGNED_DOCTOR"
+
+
+def test_escalation_timestamps_use_utc_and_actual_message_time(client, db_session, monkeypatch):
+    from datetime import UTC, datetime, timedelta, timezone
+
+    from app.models.chat_escalation import ChatEscalation
+
+    patient_headers = _login(client, PATIENT)
+    doctor_headers = _login(client, DOCTOR)
+    session_id = _create_session(client, patient_headers)
+    _, ai_id = _seed_turn(client, patient_headers, session_id)
+    clock = [datetime(2026, 11, 17, 8, 0, tzinfo=UTC)]
+
+    class VietnamHostClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is None:
+                return clock[0].astimezone(timezone(timedelta(hours=7))).replace(tzinfo=None)
+            return clock[0].astimezone(tz)
+
+    monkeypatch.setattr("app.core.datetime_vn.datetime", VietnamHostClock)
+    created = client.post("/api/v1/chat/escalations", headers=patient_headers, json={"session_id": session_id, "ai_message_id": ai_id})
+    assert created.status_code == 201, created.text
+    row = created.json()
+    assert datetime.fromisoformat(row["created_at"]) == clock[0]
+    assert row["last_message_at"] == row["created_at"]
+    esc_id = row["id"]
+
+    clock[0] += timedelta(minutes=10)
+    follow = client.post(f"/api/v1/chat/escalations/{esc_id}/messages", headers=patient_headers, json={"body": "Fixture patient follow-up"})
+    assert follow.status_code == 200
+    assert datetime.fromisoformat(follow.json()["updated_at"]) == clock[0]
+    assert datetime.fromisoformat(follow.json()["messages"][-1]["created_at"]) == clock[0]
+
+    clock[0] += timedelta(minutes=5)
+    reply = client.post(f"/api/v1/doctor/escalations/{esc_id}/messages", headers=doctor_headers, json={"body": "Fixture doctor reply"})
+    assert reply.status_code == 200
+    assert datetime.fromisoformat(reply.json()["updated_at"]) == clock[0]
+
+    # Old local updated_at values must not change the displayed message age.
+    legacy = db_session.get(ChatEscalation, esc_id)
+    legacy.updated_at = clock[0].replace(tzinfo=None) + timedelta(hours=7)
+    db_session.commit()
+    listed = client.get("/api/v1/doctor/escalations", headers=doctor_headers)
+    assert listed.status_code == 200
+    listed_row = next(item for item in listed.json() if item["id"] == esc_id)
+    assert datetime.fromisoformat(listed_row["last_message_at"]) == clock[0]
+    detail = client.get(f"/api/v1/doctor/escalations/{esc_id}", headers=doctor_headers)
+    assert datetime.fromisoformat(detail.json()["last_message_at"]) == clock[0]
+
+    clock[0] += timedelta(minutes=5)
+    resolved = client.post(f"/api/v1/doctor/escalations/{esc_id}/resolve", headers=doctor_headers)
+    assert resolved.status_code == 200
+    assert datetime.fromisoformat(resolved.json()["resolved_at"]) == clock[0]

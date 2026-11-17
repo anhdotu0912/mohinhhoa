@@ -10,6 +10,7 @@ import { resolveUserAvatar, userInitials } from "@/lib/avatar";
 import { APP_NAME } from "@/lib/brand";
 import { buildInboxJobs } from "@/lib/doctor-inbox";
 import { NAV_BY_ROLE, resolveActiveNavId } from "@/lib/nav-config";
+import { DOCTOR_MESSAGES_UPDATED } from "./DoctorMessenger";
 
 export function DoctorNavigation() {
   const pathname = usePathname();
@@ -43,15 +44,21 @@ export function DoctorNavigation() {
   useEffect(() => {
     if (!token || role !== "doctor") return;
     let cancelled = false;
-    Promise.all([
-      api.listDoctorPatients(),
-      api.listDoctorMealPlans("pending_review").catch(() => []),
-      api.listClaimQueue().catch(() => []),
-      api.listDoctorEscalations("open").catch(() => []),
-    ]).then(([patients, plans, claims, escalations]) => {
-      if (!cancelled) setInboxCount(buildInboxJobs(patients, plans, claims, escalations).length);
-    }).catch(() => { if (!cancelled) setInboxCount(null); });
-    return () => { cancelled = true; };
+    let version = 0;
+    const refresh = () => {
+      const requestVersion = ++version;
+      void Promise.all([
+        api.listDoctorPatients(),
+        api.listDoctorMealPlans("pending_review").catch(() => []),
+        api.listClaimQueue().catch(() => []),
+        api.listDoctorEscalations("open").catch(() => []),
+      ]).then(([patients, plans, claims, escalations]) => {
+        if (!cancelled && requestVersion === version) setInboxCount(buildInboxJobs(patients, plans, claims, escalations).length);
+      }).catch(() => { if (!cancelled && requestVersion === version) setInboxCount(null); });
+    };
+    refresh();
+    window.addEventListener(DOCTOR_MESSAGES_UPDATED, refresh);
+    return () => { cancelled = true; window.removeEventListener(DOCTOR_MESSAGES_UPDATED, refresh); };
   }, [token, role, pathname]);
 
   useEffect(() => {

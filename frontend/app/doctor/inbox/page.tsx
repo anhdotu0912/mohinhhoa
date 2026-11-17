@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getPageItems } from "@/components/shared/Pagination";
 import { api } from "@/lib/api";
@@ -9,10 +9,10 @@ import {
   buildInboxJobs,
   type InboxJob,
 } from "@/lib/doctor-inbox";
-import { doctorChartHref, doctorInboxHref, type InboxJobType } from "@/lib/doctor-routes";
+import { doctorChartHref, type InboxJobType } from "@/lib/doctor-routes";
 import { ApiError, type MealPlanOutput } from "@/lib/types";
 import { CompactInbox } from "@/components/doctor/CompactInbox";
-import { EscalationThreadPanel } from "@/components/doctor/EscalationThreadPanel";
+import { DOCTOR_MESSAGES_UPDATED, useDoctorMessenger } from "@/components/doctor/DoctorMessenger";
 
 const PAGE_SIZE = 10;
 
@@ -32,6 +32,9 @@ function InboxContent() {
   const searchParams = useSearchParams();
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
+  const { openConversation } = useDoctorMessenger();
+  const loadVersion = useRef(0);
+  const nextLoadVersion = useCallback(() => ++loadVersion.current, []);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,30 +55,37 @@ function InboxContent() {
   }, []);
 
   const load = useCallback(
-    async (isManualRefresh = false) => {
+    async (isManualRefresh = false, background = false) => {
       if (!token || role !== "doctor") return;
-      if (isManualRefresh) setRefreshing(true);
-      else setLoading(true);
+      const version = nextLoadVersion();
+      if (!background) {
+        if (isManualRefresh) setRefreshing(true);
+        else setLoading(true);
+      }
       setError(null);
       try {
         const [patients, plans, claimQueue, escalations] = await Promise.all([
           api.listDoctorPatients(),
           api.listDoctorMealPlans("pending_review").catch(() => [] as MealPlanOutput[]),
           api.listClaimQueue().catch(() => []),
-          api.listDoctorEscalations("open").catch(() => []),
+          api.listDoctorEscalations("open"),
         ]);
+        if (version !== loadVersion.current) return;
         setJobs(buildInboxJobs(patients, plans, claimQueue, escalations));
       } catch (err) {
-        setJobs([]);
+        if (version !== loadVersion.current) return;
+        if (!background) setJobs([]);
         setError(
           err instanceof ApiError ? err.message : "Không tải được hàng việc y khoa."
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (version === loadVersion.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [token, role]
+    [token, role, nextLoadVersion]
   );
 
   const showToast = useCallback((message: string) => {
@@ -116,7 +126,27 @@ function InboxContent() {
       return;
     }
     void load();
-  }, [hydrated, token, role, router, load]);
+    return () => { nextLoadVersion(); };
+  }, [hydrated, token, role, router, load, nextLoadVersion]);
+
+  useEffect(() => {
+    if (openEscalationId) openConversation(openEscalationId);
+  }, [openEscalationId, openConversation]);
+
+  useEffect(() => {
+    if (!hydrated || !token || role !== "doctor") return;
+    const refresh = () => { if (document.visibilityState === "visible") void load(false, true); };
+    const timer = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener(DOCTOR_MESSAGES_UPDATED, refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(DOCTOR_MESSAGES_UPDATED, refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [hydrated, token, role, load]);
 
   // Reset về trang 1 khi đổi bộ lọc hoặc từ khóa tìm kiếm
   useEffect(() => {
@@ -195,17 +225,8 @@ function InboxContent() {
         onRefresh={() => void load(true)}
         onClaim={(job) => void handleClaim(job)}
         onPage={setPage}
+        onOpenChat={openConversation}
       />
-      {openEscalationId ? (
-        <EscalationThreadPanel
-          escalationId={openEscalationId}
-          onClose={() => router.push(doctorInboxHref(activeType, urgencyFilter ? { urgency: "soon" } : undefined))}
-          onResolved={() => {
-            void load(true);
-            router.push(doctorInboxHref(activeType, urgencyFilter ? { urgency: "soon" } : undefined));
-          }}
-        />
-      ) : null}
     </>
   );
 }
